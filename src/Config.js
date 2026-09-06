@@ -80,6 +80,7 @@ export const LogFile = path.join(os.homedir(), ".claudio", "bridge.log");
 export const MaxImageWidth = 480;
 export const ChaptersFile = path.join(os.homedir(), ".claudio", "chapters.json");
 export const CostsFile = path.join(os.homedir(), ".claudio", "costs.json");
+export const InstalledPluginFile = path.join(os.homedir(), ".claudio", "plugin.json");
 export const CommandsCacheFile = path.join(os.homedir(), ".claudio", "commands.json");
 export const MaxBodyBytes = 12 * 1024 * 1024;
 export const KeepSessionsWarm = process.env.CLAUDIO_COLD !== "1";

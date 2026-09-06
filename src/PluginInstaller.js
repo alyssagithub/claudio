@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { GitHubRepo, PluginFileName } from "./Config.js";
+import { GitHubRepo, InstalledPluginFile, PluginFileName } from "./Config.js";
 import { GetPluginsFolder } from "./StudioPaths.js";
 
 let Releases = { At: 0, List: [] };
@@ -80,6 +80,7 @@ export async function InstallVersion(Version) {
 
   fs.mkdirSync(PluginsFolder, { recursive: true });
   WritePlugin(path.join(PluginsFolder, PluginFileName), Buffer.from(await Download.arrayBuffer()));
+  RememberInstalled(String(Release.tag_name).replace(/^v/, ""));
 
   return Release.tag_name;
 }
@@ -87,6 +88,23 @@ export async function InstallVersion(Version) {
 // Studio reads this file at startup, so it must never see half of one. An
 // error page from a CDN is also a valid 200, and rbxm files start with a
 // known magic string, so check it before it lands.
+export function InstalledPluginVersion() {
+  try {
+    return JSON.parse(fs.readFileSync(InstalledPluginFile, "utf8").replace(/^﻿/, "")).version || null;
+  } catch {
+    return null;
+  }
+}
+
+function RememberInstalled(Installed) {
+  try {
+    fs.mkdirSync(path.dirname(InstalledPluginFile), { recursive: true });
+    fs.writeFileSync(InstalledPluginFile, JSON.stringify({ version: Installed }, null, 2));
+  } catch (Error) {
+    console.error("Could not record the installed plugin version: " + Error.message);
+  }
+}
+
 function WritePlugin(Target, Body) {
   if (Body.length < 1024 || !Body.subarray(0, 8).toString("binary").startsWith("<roblox")) {
     throw new Error("That download is not a Roblox model file");
@@ -132,5 +150,6 @@ export async function InstallPlugin(LocalPath) {
   }
 
   WritePlugin(Target, Buffer.from(await AssetResponse.arrayBuffer()));
+  RememberInstalled(String(Release.tag_name).replace(/^v/, ""));
   console.log(`Installed ${PluginFileName} ${Release.tag_name} to ${Target}`);
 }

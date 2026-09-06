@@ -9,7 +9,7 @@ import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
 import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
-import { InstallVersion, IsNewer, ListReleases } from "./PluginInstaller.js";
+import { InstallVersion, InstalledPluginVersion, IsNewer, ListReleases } from "./PluginInstaller.js";
 import { ArmClipboard, DisarmClipboard, ReadClipboardImage, ShowToast, WriteClipboard } from "./Notify.js";
 import { ForgetConversation, GetModels } from "./Models.js";
 
@@ -416,11 +416,15 @@ export function StartServer(Port) {
       if (Request.method === "GET" && Url.pathname === "/versions") {
         const Found = await ListReleases();
         const Newest = Found.filter((Entry) => !Entry.prerelease)[0];
+        const Plugin = Url.searchParams.get("plugin") || InstalledPluginVersion() || Version;
 
         SendJson(Response, 200, {
-          current: Version,
+          current: Plugin,
+          bridge: Version,
+          matched: Plugin === Version,
           latest: Newest ? Newest.version : null,
-          newer: Boolean(Newest && IsNewer(Newest.version, Version)),
+          newer: Boolean(Newest && IsNewer(Newest.version, Plugin)),
+          bridgeNewer: Boolean(Newest && IsNewer(Newest.version, Version)),
           releases: Found,
         });
         return;

@@ -43,6 +43,16 @@ export function LaunchHidden() {
   execFile("wscript.exe", [LauncherPath], { detached: true, stdio: "ignore" }).unref();
 }
 
+async function PortIsBusy(Port) {
+  try {
+    await fetch(`http://127.0.0.1:${Port || DefaultPort}/health`);
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function StopBridge(Port) {
   try {
     await fetch(`http://127.0.0.1:${Port || DefaultPort}/quit`, { method: "POST" });
@@ -59,20 +69,22 @@ export async function RestartBridge(Port) {
     throw new Error("Run `claudio install-startup` first.");
   }
 
-  if (await StopBridge(Port)) {
-    for (let Attempt = 0; Attempt < 20; Attempt += 1) {
-      await new Promise((Resolve) => setTimeout(Resolve, 250));
+  await StopBridge(Port);
 
-      try {
-        await fetch(`http://127.0.0.1:${Port || DefaultPort}/health`);
-      } catch {
-        break;
-      }
+  // Launching while the old one still holds the port just kills the new
+  // process, and the machine quietly carries on with the build being replaced.
+  for (let Attempt = 0; Attempt < 60; Attempt += 1) {
+    if (!(await PortIsBusy(Port))) {
+      LaunchHidden();
+      console.log(`Started the bridge hidden. Log: ${LogFile}`);
+
+      return;
     }
+
+    await new Promise((Resolve) => setTimeout(Resolve, 250));
   }
 
-  LaunchHidden();
-  console.log(`Started the bridge hidden. Log: ${LogFile}`);
+  throw new Error(`The bridge on port ${Port || DefaultPort} would not stop, so a new one was not started. Close it and run \`claudio restart\` again.`);
 }
 
 export function UninstallStartup() {

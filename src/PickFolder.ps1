@@ -1,6 +1,7 @@
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 public static class ClaudioFolderPicker
 {
@@ -48,16 +49,76 @@ public static class ClaudioFolderPicker
         void Compare(IShellItem psi, uint hint, out int order);
     }
 
-    public static string Pick(string title)
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr param);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr window);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindow(IntPtr window, uint command);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr window, StringBuilder text, int count);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr window);
+
+    private delegate bool EnumWindowsProc(IntPtr window, IntPtr param);
+
+    // Studio's main window is the visible, ownerless one on the process, and its
+    // class tells it apart from the splash and the tooltip windows.
+    private static IntPtr FindStudio(uint processId)
     {
+        IntPtr found = IntPtr.Zero;
+
+        EnumWindows(delegate(IntPtr window, IntPtr param)
+        {
+            uint owner;
+
+            GetWindowThreadProcessId(window, out owner);
+
+            if (owner != processId || !IsWindowVisible(window) || GetWindow(window, 4) != IntPtr.Zero)
+            {
+                return true;
+            }
+
+            StringBuilder name = new StringBuilder(256);
+
+            GetClassName(window, name, name.Capacity);
+
+            if (name.ToString().IndexOf("Qt", StringComparison.Ordinal) < 0)
+            {
+                return true;
+            }
+
+            found = window;
+            return false;
+        }, IntPtr.Zero);
+
+        return found;
+    }
+
+    public static string Pick(string title, int processId)
+    {
+        IntPtr owner = processId > 0 ? FindStudio((uint)processId) : IntPtr.Zero;
         IFileDialog dialog = (IFileDialog)(new FileOpenDialog());
+
+        if (owner != IntPtr.Zero)
+        {
+            SetForegroundWindow(owner);
+        }
+
         uint options;
 
         dialog.GetOptions(out options);
         dialog.SetOptions(options | 0x20 | 0x8 | 0x800); // pick folders, file must exist, force filesystem
         dialog.SetTitle(title);
 
-        if (dialog.Show(IntPtr.Zero) != 0)
+        if (dialog.Show(owner) != 0)
         {
             return "";
         }
@@ -72,4 +133,10 @@ public static class ClaudioFolderPicker
 }
 '@
 
-[ClaudioFolderPicker]::Pick("Pick the folder Claude should work in")
+$Studio = Get-Process -Name RobloxStudioBeta, RobloxStudio -ErrorAction SilentlyContinue |
+    Where-Object { $_.MainWindowHandle -ne 0 } |
+    Select-Object -First 1
+
+$Owner = if ($Studio) { $Studio.Id } else { 0 }
+
+[ClaudioFolderPicker]::Pick("Pick the folder Claude should work in", $Owner)

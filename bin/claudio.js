@@ -4,6 +4,7 @@ import { InstallPlugin } from "../src/PluginInstaller.js";
 import { StartServer } from "../src/Server.js";
 import { RunSetup } from "../src/Setup.js";
 import { RunUninstall } from "../src/Uninstall.js";
+import { ReportVersion } from "../src/Version.js";
 import { InstallStartup, RestartBridge, StopBridge, UninstallStartup } from "../src/Startup.js";
 
 const Arguments = process.argv.slice(2);
@@ -32,6 +33,8 @@ if (Command === "setup") {
   } catch (Error) {
     Fail(Error);
   }
+} else if (Command === "version" || Arguments.includes("--version")) {
+  ReportVersion().catch(Fail);
 } else if (Command === "uninstall-startup") {
   UninstallStartup();
 } else if (Command === "restart") {
@@ -41,6 +44,6 @@ if (Command === "setup") {
 } else if (Command === undefined || Command === "start") {
   StartServer(Number(ReadFlag("--port") || process.env.CLAUDIO_PORT || DefaultPort));
 } else {
-  console.error("Usage: claudio setup | claudio uninstall [--mcp] | claudio [start] [--port N] | claudio install [--local path/to/Claudio.rbxm] | claudio install-startup | claudio uninstall-startup | claudio restart | claudio stop");
+  console.error("Usage: claudio setup | claudio uninstall [--mcp] | claudio [start] [--port N] | claudio install [--local path/to/Claudio.rbxm] | claudio install-startup | claudio uninstall-startup | claudio restart | claudio stop | claudio version");
   process.exit(1);
 }

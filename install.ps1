@@ -62,12 +62,38 @@ if (Has "node") {
     }
 }
 
+# A branch archive sits behind a CDN for a few minutes, so someone reinstalling
+# to pick up a fix can quietly get the version they already had. A commit
+# archive is immutable and never cached wrong, so ask GitHub what main points at
+# and install that exact commit.
+$Latest = "main"
+
+try {
+    $Head = Invoke-RestMethod "https://api.github.com/repos/alyssagithub/claudio/commits/main" -Headers @{
+        "User-Agent"    = "claudio-installer"
+        "Cache-Control" = "no-cache"
+    }
+
+    if ($Head.sha) {
+        $Latest = $Head.sha
+    }
+} catch {
+    Write-Host "Couldn't reach GitHub to check the newest version, carrying on with main." -ForegroundColor DarkYellow
+}
+
+$Package = "https://github.com/alyssagithub/claudio/archive/$Latest.tar.gz"
+
 Write-Host "Installing Claudio."
-Native { & npm install -g https://github.com/alyssagithub/claudio/archive/refs/heads/main.tar.gz }
+Native { & npm install -g $Package }
 
 if ($LASTEXITCODE -ne 0) {
-    Fail "npm couldn't install it. Try a new terminal, or do it yourself: npm install -g https://github.com/alyssagithub/claudio/archive/refs/heads/main.tar.gz"
+    Fail "npm couldn't install it. Try a new terminal, or do it yourself: npm install -g $Package"
 }
+
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claudio" | Out-Null
+[ordered]@{ commit = $Latest; at = (Get-Date).ToString("o") } |
+    ConvertTo-Json |
+    Out-File "$env:USERPROFILE\.claudio\installed.json" -Encoding utf8
 
 RefreshPath
 

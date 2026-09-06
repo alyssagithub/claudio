@@ -5,17 +5,27 @@ import { DefaultPort, DesktopConfigPath, PluginFileName } from "./Config.js";
 import { GetPluginsFolder } from "./StudioPaths.js";
 import { StopBridge, UninstallStartup } from "./Startup.js";
 
-function Remove(Target, Label, Removed, Kept) {
+// The bridge's log is opened by the cmd that launched it, not by node, so the
+// handle can outlive the port closing. Keep trying for a few seconds.
+async function Remove(Target, Label, Removed, Kept) {
   if (!fs.existsSync(Target)) {
     Kept.push(`${Label} was not there`);
     return;
   }
 
-  try {
-    fs.rmSync(Target, { recursive: true, force: true });
-    Removed.push(`${Label} (${Target})`);
-  } catch (Error) {
-    Kept.push(`${Label} could not be removed: ${Error.message}`);
+  for (let Attempt = 1; Attempt <= 12; Attempt += 1) {
+    try {
+      fs.rmSync(Target, { recursive: true, force: true });
+      Removed.push(`${Label} (${Target})`);
+      return;
+    } catch (Error) {
+      if (Attempt === 12) {
+        Kept.push(`${Label} could not be removed: ${Error.message}`);
+        return;
+      }
+
+      await new Promise((Resolve) => setTimeout(Resolve, 300));
+    }
   }
 }
 
@@ -63,9 +73,9 @@ export async function RunUninstall(AlsoMcp) {
     Kept.push(`the startup launcher could not be removed: ${Error.message}`);
   }
 
-  Remove(path.join(GetPluginsFolder(), PluginFileName), "the Studio plugin", Removed, Kept);
-  Remove(path.join(os.homedir(), ".claudio"), "Claudio's own folder", Removed, Kept);
-  Remove(`${DesktopConfigPath}.claudio-backup`, "the config backup Claudio made", Removed, Kept);
+  await Remove(path.join(GetPluginsFolder(), PluginFileName), "the Studio plugin", Removed, Kept);
+  await Remove(path.join(os.homedir(), ".claudio"), "Claudio's own folder", Removed, Kept);
+  await Remove(`${DesktopConfigPath}.claudio-backup`, "the config backup Claudio made", Removed, Kept);
 
   if (AlsoMcp) {
     DropMcpServer(Removed, Kept);

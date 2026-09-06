@@ -44,7 +44,7 @@ function OpenLoginWindow() {
   const Command = fs.existsSync(Shim) ? `"${Shim}"` : "claude";
 
   try {
-    exec(`start "Claude Code login" cmd /k ${Command}`);
+    exec(`start "Claude Code login" cmd /k ${Command} auth login`);
     return true;
   } catch {
     return false;

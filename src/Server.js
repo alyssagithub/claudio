@@ -9,6 +9,7 @@ import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
 import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
+import { EnsureToken, TokenMatches } from "./Token.js";
 import { InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
 import { ArmClipboard, DisarmClipboard, ReadClipboardImage, ShowToast, WriteClipboard } from "./Notify.js";
 import { ForgetConversation, GetModels } from "./Models.js";
@@ -233,6 +234,11 @@ export function StartServer(Port) {
 
     if (Request.headers.origin !== undefined) {
       SendJson(Response, 403, { error: "Browser requests are not accepted" });
+      return;
+    }
+
+    if (!TokenMatches(Request.headers["x-claudio-token"])) {
+      SendJson(Response, 401, { error: "This request did not come from the Claudio plugin" });
       return;
     }
 
@@ -522,6 +528,8 @@ export function StartServer(Port) {
 
     throw Error;
   });
+
+  EnsureToken();
 
   Server.listen(Port, "127.0.0.1", () => {
     console.log(`Claudio bridge listening on http://127.0.0.1:${Port}`);

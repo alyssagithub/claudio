@@ -41,9 +41,9 @@ async function EnsureClaude(Manual) {
   const Found = await Run("claude --version");
 
   if (Found.Ok) {
-    console.log(`Claude Code is installed (${Found.Output.split("\n")[0]}).`);
+    console.log(`Found Claude Code ${Found.Output.split("\n")[0].replace(" (Claude Code)", "")}.`);
   } else {
-    console.log("Claude Code is missing, installing it now. This can take a minute.");
+    console.log("No Claude Code, installing it. Takes a minute.");
 
     const Installed = await Run("npm install -g @anthropic-ai/claude-code");
 
@@ -52,13 +52,13 @@ async function EnsureClaude(Manual) {
       return;
     }
 
-    console.log("Installed Claude Code.");
+    console.log("Done.");
   }
 
   const Status = await Run("claude auth status");
 
   if (Status.Ok && /true|logged in/i.test(Status.Output)) {
-    console.log("You are logged in to Claude Code.");
+    console.log("Logged in already.");
     return;
   }
 
@@ -69,7 +69,7 @@ function EnsureRobloxServer(Manual) {
   const Config = ReadConfig();
 
   if (HasRobloxServer(Config)) {
-    console.log("A Roblox MCP server is already configured.");
+    console.log("Roblox MCP server already configured.");
     return;
   }
 
@@ -92,13 +92,12 @@ function EnsureRobloxServer(Manual) {
 export async function RunSetup(LocalPath) {
   const Manual = [];
 
-  console.log("Setting Claudio up.\n");
+  console.log("Setting up.\n");
 
   await EnsureClaude(Manual);
 
   try {
     await InstallPlugin(LocalPath);
-    console.log(`Installed the Claudio plugin into ${GetPluginsFolder()}.`);
   } catch (Error) {
     Manual.push(`Install the plugin yourself: download Claudio.rbxm from the releases page and drop it in ${GetPluginsFolder()}`);
     console.log(`Could not install the plugin automatically: ${Error.message}`);
@@ -109,7 +108,6 @@ export async function RunSetup(LocalPath) {
   if (process.platform === "win32") {
     try {
       InstallStartup();
-      console.log("The bridge is running and will start with Windows from now on. Undo that with `claudio uninstall-startup`.");
     } catch (Error) {
       Manual.push("Start the bridge by running `claudio` and leaving that window open (" + Error.message + ")");
     }
@@ -119,11 +117,11 @@ export async function RunSetup(LocalPath) {
 
   Manual.push("Restart Roblox Studio, then open the Claudio button in the Plugins tab.");
 
-  console.log("\nSetup finished. Steps you need to do yourself:\n");
+  console.log("\nLeft for you:\n");
 
   for (const [Index, Step] of Manual.entries()) {
     console.log(`  ${Index + 1}. ${Step}`);
   }
 
-  console.log("\nThat is everything. The bridge is already running, so Studio is the only thing you need to open from now on.");
+  console.log("\nThe bridge is up. From here Studio is the only thing you need to open.");
 }

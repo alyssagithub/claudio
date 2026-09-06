@@ -43,7 +43,7 @@ async function EnsureClaude(Manual) {
 
   const Status = await Run("claude auth status");
 
-  if (Status.Ok && /true|logged in/i.test(Status.Output)) {
+  if (Status.Ok && !/not logged in|logged out/i.test(Status.Output) && /"?loggedIn"?\s*[:=]\s*true|logged in/i.test(Status.Output)) {
     console.log("Logged in already.");
     return false;
   }

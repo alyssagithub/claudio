@@ -40,7 +40,12 @@ export function LaunchHidden() {
     throw new Error("Run `claudio install-startup` first.");
   }
 
-  execFile("wscript.exe", [LauncherPath], { detached: true, stdio: "ignore" }).unref();
+  const Launched = execFile("wscript.exe", [LauncherPath], { detached: true });
+
+  Launched.on("error", (Error) => {
+    console.error("Could not start the bridge launcher: " + Error.message);
+  });
+  Launched.unref();
 }
 
 async function PortIsBusy(Port) {
@@ -76,9 +81,18 @@ export async function RestartBridge(Port) {
   for (let Attempt = 0; Attempt < 60; Attempt += 1) {
     if (!(await PortIsBusy(Port))) {
       LaunchHidden();
-      console.log(`Started the bridge hidden. Log: ${LogFile}`);
 
-      return;
+      for (let Wait = 0; Wait < 40; Wait += 1) {
+        await new Promise((Resolve) => setTimeout(Resolve, 250));
+
+        if (await PortIsBusy(Port)) {
+          console.log(`Started the bridge hidden. Log: ${LogFile}`);
+
+          return;
+        }
+      }
+
+      throw new Error(`The bridge was launched but never answered on port ${Port || DefaultPort}. Check ${LogFile}.`);
     }
 
     await new Promise((Resolve) => setTimeout(Resolve, 250));

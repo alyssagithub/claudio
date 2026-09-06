@@ -5,6 +5,10 @@ import { GetPluginsFolder } from "./StudioPaths.js";
 
 let Releases = { At: 0, List: [] };
 
+export function LooksLikeVersion(Text) {
+  return typeof Text === "string" && /^v?\d+(\.\d+)*$/.test(Text.trim());
+}
+
 function Compare(Left, Right) {
   const Parts = (Text) => String(Text).replace(/^v/, "").split(".").map((Piece) => Number(Piece) || 0);
   const First = Parts(Left);
@@ -20,7 +24,27 @@ function Compare(Left, Right) {
 }
 
 export function IsNewer(Candidate, Current) {
+  if (!LooksLikeVersion(Candidate) || !LooksLikeVersion(Current)) {
+    return false;
+  }
+
   return Compare(Candidate, Current) > 0;
+}
+
+export function NewestRelease(Releases) {
+  let Best = null;
+
+  for (const Entry of Releases) {
+    if (Entry.prerelease || !LooksLikeVersion(Entry.version)) {
+      continue;
+    }
+
+    if (!Best || IsNewer(Entry.version, Best.version)) {
+      Best = Entry;
+    }
+  }
+
+  return Best;
 }
 
 export async function ListReleases() {
@@ -90,7 +114,9 @@ export async function InstallVersion(Version) {
 // known magic string, so check it before it lands.
 export function InstalledPluginVersion() {
   try {
-    return JSON.parse(fs.readFileSync(InstalledPluginFile, "utf8").replace(/^﻿/, "")).version || null;
+    const Recorded = JSON.parse(fs.readFileSync(InstalledPluginFile, "utf8").replace(/^﻿/, "")).version;
+
+    return LooksLikeVersion(Recorded) ? Recorded.replace(/^v/, "") : null;
   } catch {
     return null;
   }
@@ -110,8 +136,16 @@ function WritePlugin(Target, Body) {
     throw new Error("That download is not a Roblox model file");
   }
 
-  fs.writeFileSync(`${Target}.claudio-writing`, Body);
-  fs.renameSync(`${Target}.claudio-writing`, Target);
+  const Temporary = `${Target}.claudio-writing`;
+
+  try {
+    fs.writeFileSync(Temporary, Body);
+    fs.renameSync(Temporary, Target);
+  } catch (Error) {
+    fs.rmSync(Temporary, { force: true });
+
+    throw Error;
+  }
 }
 
 export async function InstallPlugin(LocalPath) {
@@ -121,8 +155,10 @@ export async function InstallPlugin(LocalPath) {
   fs.mkdirSync(PluginsFolder, { recursive: true });
 
   if (LocalPath) {
-    fs.copyFileSync(LocalPath, Target);
+    WritePlugin(Target, fs.readFileSync(LocalPath));
+    RememberInstalled(null);
     console.log(`Copied ${LocalPath} to ${Target}`);
+
     return;
   }
 

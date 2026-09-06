@@ -33,6 +33,13 @@ export function WriteConfig(Config) {
   const Temporary = `${DesktopConfigPath}.claudio-writing`;
 
   fs.mkdirSync(path.dirname(DesktopConfigPath), { recursive: true });
-  fs.writeFileSync(Temporary, JSON.stringify(Config, null, 2));
-  fs.renameSync(Temporary, DesktopConfigPath);
+
+  try {
+    fs.writeFileSync(Temporary, JSON.stringify(Config, null, 2));
+    fs.renameSync(Temporary, DesktopConfigPath);
+  } catch (Error) {
+    fs.rmSync(Temporary, { force: true });
+
+    throw Error;
+  }
 }

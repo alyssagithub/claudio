@@ -82,6 +82,7 @@ export async function RunUninstall(AlsoMcp) {
   }
 
   await Remove(path.join(GetPluginsFolder(), PluginFileName), "the Studio plugin", Removed, Kept);
+  fs.rmSync(path.join(GetPluginsFolder(), `${PluginFileName}.claudio-writing`), { force: true });
   await Remove(path.join(os.homedir(), ".claudio"), "Claudio's own folder", Removed, Kept);
   if (AlsoMcp) {
     DropMcpServer(Removed, Kept);

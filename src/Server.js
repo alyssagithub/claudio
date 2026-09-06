@@ -9,7 +9,7 @@ import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
 import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
-import { InstallVersion, InstalledPluginVersion, IsNewer, ListReleases } from "./PluginInstaller.js";
+import { InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
 import { ArmClipboard, DisarmClipboard, ReadClipboardImage, ShowToast, WriteClipboard } from "./Notify.js";
 import { ForgetConversation, GetModels } from "./Models.js";
 
@@ -49,17 +49,24 @@ function SendJson(Response, StatusCode, Body) {
 
 function ReadBody(Request) {
   return new Promise((Resolve, Reject) => {
-    let Raw = "";
+    const Chunks = [];
+    let Size = 0;
 
     Request.on("data", (Chunk) => {
-      Raw += Chunk;
+      Size += Chunk.length;
 
-      if (Raw.length > MaxBodyBytes) {
+      if (Size > MaxBodyBytes) {
         Reject(new Error("Body is too large"));
         Request.destroy();
+
+        return;
       }
+
+      Chunks.push(Chunk);
     });
     Request.on("end", () => {
+      const Raw = Buffer.concat(Chunks).toString("utf8");
+
       try {
         Resolve(Raw ? JSON.parse(Raw) : {});
       } catch {
@@ -415,15 +422,17 @@ export function StartServer(Port) {
 
       if (Request.method === "GET" && Url.pathname === "/versions") {
         const Found = await ListReleases();
-        const Newest = Found.filter((Entry) => !Entry.prerelease)[0];
-        const Plugin = Url.searchParams.get("plugin") || InstalledPluginVersion() || Version;
+        const Newest = NewestRelease(Found);
+        const Asked = Url.searchParams.get("plugin");
+        const Plugin = LooksLikeVersion(Asked) ? Asked.replace(/^v/, "") : InstalledPluginVersion();
 
         SendJson(Response, 200, {
           current: Plugin,
           bridge: Version,
-          matched: Plugin === Version,
+          matched: Plugin !== null && Plugin === Version,
+          known: Plugin !== null,
           latest: Newest ? Newest.version : null,
-          newer: Boolean(Newest && IsNewer(Newest.version, Plugin)),
+          newer: Boolean(Newest && Plugin && IsNewer(Newest.version, Plugin)),
           bridgeNewer: Boolean(Newest && IsNewer(Newest.version, Version)),
           releases: Found,
         });

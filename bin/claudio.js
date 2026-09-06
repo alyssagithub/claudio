@@ -29,7 +29,7 @@ if (Command === "setup") {
 } else if (Command === "install") {
   InstallPlugin(ReadFlag("--local")).catch(Fail);
 } else if (Command === "install-startup") {
-  InstallStartup().catch(Fail);
+  InstallStartup(Number(ReadFlag("--port") || process.env.CLAUDIO_PORT || DefaultPort)).catch(Fail);
 } else if (Command === "version" || Arguments.includes("--version")) {
   ReportVersion().catch(Fail);
 } else if (Command === "uninstall-startup") {

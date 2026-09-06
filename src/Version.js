@@ -31,7 +31,7 @@ export async function ReportVersion() {
 
   console.log(`Claudio ${Version}`);
 
-  if (Here) {
+  if (Here && typeof Here.commit === "string") {
     console.log(`Installed ${Here.commit.slice(0, 7)} on ${new Date(Here.at).toLocaleString()}`);
   } else {
     console.log("Installed by hand rather than by the installer, so there is no commit recorded.");

@@ -1,0 +1,21 @@
+{
+  "name": "claudio",
+  "version": "1.0.0",
+  "description": "Local bridge between Roblox Studio and the Claude Code login on this machine",
+  "type": "module",
+  "bin": {
+    "claudio": "bin/claudio.js"
+  },
+  "scripts": {
+    "start": "node bin/claudio.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.259",
+    "jpeg-js": "^0.4.4",
+    "node-notifier": "^10.0.1",
+    "pngjs": "^7.0.0"
+  }
+}

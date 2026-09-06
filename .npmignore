@@ -1,0 +1,6 @@
+node_modules/
+*.log
+*.claudio-backup
+Claudio.rbxm
+install.ps1
+uninstall.ps1

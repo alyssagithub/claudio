@@ -228,6 +228,57 @@ function IsPromptLine(Line) {
 
 const Parsed = new Map();
 
+// Claude Code can be killed mid-write, leaving a line with no newline after
+// it. Appending to that joins two records into one and both readers lose it.
+function EndsCleanly(File) {
+  try {
+    const Size = fs.statSync(File).size;
+
+    if (Size === 0) {
+      return true;
+    }
+
+    const Handle = fs.openSync(File, "r");
+    const Last = global.Buffer.alloc(1);
+
+    fs.readSync(Handle, Last, 0, 1, Size - 1);
+    fs.closeSync(Handle);
+
+    return Last.toString("utf8") === "\n";
+  } catch {
+    return true;
+  }
+}
+
+// A rename is appended, so the newest title lives at the end of a file the
+// head read never reaches. Only title lines matter here.
+function ReadTail(File) {
+  try {
+    const Size = fs.statSync(File).size;
+
+    if (Size <= 256 * 1024) {
+      return [];
+    }
+
+    const Handle = fs.openSync(File, "r");
+    const Length = Math.min(64 * 1024, Size);
+    const Buffer = global.Buffer.alloc(Length);
+
+    fs.readSync(Handle, Buffer, 0, Length, Size - Length);
+    fs.closeSync(Handle);
+
+    return Buffer.toString("utf8").split("\n").map((Line) => {
+      try {
+        return JSON.parse(Line);
+      } catch {
+        return null;
+      }
+    }).filter((Line) => Line && Line.type === "custom-title");
+  } catch {
+    return [];
+  }
+}
+
 function ReadLines(File, MaxBytes) {
   const Key = `${File}:${MaxBytes || 0}`;
   const Stamp = (() => {
@@ -329,7 +380,7 @@ export function ListConversations() {
 
 
       const File = path.join(Folder, Name);
-      const Lines = ReadLines(File, 256 * 1024);
+      const Lines = ReadLines(File).concat(ReadTail(File));
 
       if (!Lines || !Lines.some(IsPromptLine)) {
         continue;
@@ -498,7 +549,7 @@ export function GetConversation(Id) {
       const Text = TextOf(Content);
       const Response = Line.requestId || (Line.message && Line.message.id);
 
-      if (!Priced.has(Response)) {
+      if (Response === undefined || !Priced.has(Response)) {
         Priced.add(Response);
         PendingCost += EstimateCost(Line) || 0;
       }
@@ -601,8 +652,7 @@ export function RenameConversation(Id, Title) {
     return false;
   }
 
-  fs.appendFileSync(File, `${JSON.stringify({ type: "custom-title", customTitle: Title, timestamp: new Date().toISOString() })}
-`);
+  fs.appendFileSync(File, `${EndsCleanly(File) ? "" : "\n"}${JSON.stringify({ type: "custom-title", customTitle: Title, timestamp: new Date().toISOString() })}\n`);
   UpdateDesktopSession(Id, (Session) => {
     Session.title = Title;
     Session.titleSource = "user";

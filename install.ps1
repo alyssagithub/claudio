@@ -18,7 +18,7 @@ function Has($Name) {
 }
 
 function RefreshPath {
-    $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+    $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User") + ";" + $env:Path
 }
 
 # npm and winget write warnings to stderr, which a Stop preference turns into
@@ -55,6 +55,11 @@ if (Has "node") {
 
     Write-Host "No Node.js, installing it. Takes a couple of minutes."
     Native { winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements --silent }
+
+    if ($LASTEXITCODE -ne 0) {
+        Fail "winget could not install Node.js (exit $LASTEXITCODE). That usually needs an elevated terminal, or get it from https://nodejs.org and run this again."
+    }
+
     RefreshPath
 
     if (-not (Has "node")) {
@@ -90,10 +95,12 @@ if ($LASTEXITCODE -ne 0) {
     Fail "npm couldn't install it. Try a new terminal, or do it yourself: npm install -g $Package"
 }
 
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claudio" | Out-Null
-$Record = [ordered]@{ commit = $Latest; at = (Get-Date).ToString("o") } | ConvertTo-Json
+if ($Latest -ne "main") {
+    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claudio" | Out-Null
+    $Record = [ordered]@{ commit = $Latest; at = (Get-Date).ToString("o") } | ConvertTo-Json
 
-[System.IO.File]::WriteAllText("$env:USERPROFILE\.claudio\installed.json", $Record)
+    [System.IO.File]::WriteAllText("$env:USERPROFILE\.claudio\installed.json", $Record)
+}
 
 RefreshPath
 

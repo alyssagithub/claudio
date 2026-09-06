@@ -48,7 +48,7 @@ if ($env:CLAUDIO_SOUND -eq "1") {
     }
 }
 
-$Studio = Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+$Studio = Get-Process -Name RobloxStudioBeta, RobloxStudio -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
 $Foreground = [Claudio.Window]::GetForegroundWindow()
 
 if (-not $Studio) {
@@ -88,7 +88,14 @@ if (-not $IconPath -or -not (Test-Path $IconPath)) {
 
     if (-not (Test-Path $IconPath)) {
         New-Item -ItemType Directory -Force -Path (Split-Path $IconPath) | Out-Null
-        [System.Drawing.Icon]::ExtractAssociatedIcon($Studio.Path).ToBitmap().Save($IconPath, [System.Drawing.Imaging.ImageFormat]::Png)
+
+        # Studio running elevated or as another user makes its path unreadable,
+        # which is no reason to lose the whole notification.
+        try {
+            [System.Drawing.Icon]::ExtractAssociatedIcon($Studio.Path).ToBitmap().Save($IconPath, [System.Drawing.Imaging.ImageFormat]::Png)
+        } catch {
+            $IconPath = $null
+        }
     }
 }
 

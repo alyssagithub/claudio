@@ -6,7 +6,7 @@ import { exec, execFile } from "node:child_process";
 import { LongPollMilliseconds, MaxBodyBytes, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
-import { AbortAllTurns, AnswerPermission, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { InstallVersion, IsNewer, ListReleases } from "./PluginInstaller.js";
@@ -242,7 +242,7 @@ export function StartServer(Port) {
           mcpServers: Object.keys(ReadMcpServers()),
           systemPrompt: SystemPromptFor(Object.keys(ReadMcpServers())),
           limits: GetLimits(),
-          workingDirectory: WorkingDirectory,
+          workingDirectory: LastUsedFolder() || null,
         });
         return;
       }
@@ -286,6 +286,11 @@ export function StartServer(Port) {
 
         if (ConversationId && IsConversationBusy(ConversationId)) {
           SendJson(Response, 409, { error: "That chat is still answering. Stop it first." });
+          return;
+        }
+
+        if (!UsableFolder(Body.workingDirectory) && !ConversationId) {
+          SendJson(Response, 400, { error: "Pick a folder for Claude to work in first. Settings, then Working folder." });
           return;
         }
 

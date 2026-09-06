@@ -4,6 +4,7 @@ import path from "node:path";
 import { DefaultPort, DesktopConfigPath, PluginFileName } from "./Config.js";
 import { GetPluginsFolder } from "./StudioPaths.js";
 import { StopBridge, UninstallStartup } from "./Startup.js";
+import { ReadConfig, RobloxServer, WriteConfig } from "./DesktopConfig.js";
 
 // The bridge's log is opened by the cmd that launched it, not by node, so the
 // handle can outlive the port closing. Keep trying for a few seconds.
@@ -30,22 +31,29 @@ async function Remove(Target, Label, Removed, Kept) {
 }
 
 function DropMcpServer(Removed, Kept) {
-  let Config = null;
+  const Read = ReadConfig();
 
-  try {
-    Config = JSON.parse(fs.readFileSync(DesktopConfigPath, "utf8"));
-  } catch {
+  if (Read.Unreadable || Read.Missing) {
     Kept.push("the Claude desktop config was not readable, so its MCP servers were left alone");
     return;
   }
 
-  if (!Config.mcpServers || !Config.mcpServers["robloxstudio-mcp"]) {
+  const Entry = Read.Config.mcpServers && Read.Config.mcpServers["robloxstudio-mcp"];
+
+  if (!Entry) {
     Kept.push("no robloxstudio-mcp entry to remove");
     return;
   }
 
-  delete Config.mcpServers["robloxstudio-mcp"];
-  fs.writeFileSync(DesktopConfigPath, JSON.stringify(Config, null, 2));
+  // Setup skips writing when an entry is already there, so an entry that does
+  // not match ours is the person's own and is not Claudio's to delete.
+  if (JSON.stringify(Entry) !== JSON.stringify(RobloxServer)) {
+    Kept.push("the robloxstudio-mcp entry, because it is not the one Claudio wrote");
+    return;
+  }
+
+  delete Read.Config.mcpServers["robloxstudio-mcp"];
+  WriteConfig(Read.Config);
   Removed.push("the robloxstudio-mcp entry from the Claude desktop config");
 }
 
@@ -75,11 +83,11 @@ export async function RunUninstall(AlsoMcp) {
 
   await Remove(path.join(GetPluginsFolder(), PluginFileName), "the Studio plugin", Removed, Kept);
   await Remove(path.join(os.homedir(), ".claudio"), "Claudio's own folder", Removed, Kept);
-  await Remove(`${DesktopConfigPath}.claudio-backup`, "the config backup Claudio made", Removed, Kept);
-
   if (AlsoMcp) {
     DropMcpServer(Removed, Kept);
   }
+
+  await Remove(`${DesktopConfigPath}.claudio-backup`, "the config backup Claudio made", Removed, Kept);
 
   console.log("Removed:");
 

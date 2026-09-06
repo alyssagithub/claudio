@@ -24,7 +24,7 @@ function ReadCommandsCache() {
 
 let Commands = ReadCommandsCache();
 let AskedForModels = false;
-const Limits = new Map();
+let Limits = new Map();
 
 export function GetLimits() {
   return [...Limits.values()];
@@ -36,12 +36,12 @@ function Blocks(Message) {
   return Array.isArray(Content) ? Content : [];
 }
 
-function StoreWindow(Kind, Label, Entry) {
+function StoreWindow(Into, Kind, Label, Entry) {
   if (!Entry) {
     return;
   }
 
-  Limits.set(Kind, {
+  Into.set(Kind, {
     kind: Kind,
     label: Label,
     status: "allowed",
@@ -128,15 +128,18 @@ export async function RefreshUsage(Session) {
       return;
     }
 
-    Limits.clear();
-    StoreWindow("five_hour", "5-hour limit", Windows.five_hour);
-    StoreWindow("seven_day", "Weekly - all models", Windows.seven_day);
-    StoreWindow("seven_day_opus", "Weekly - Opus", Windows.seven_day_opus);
-    StoreWindow("seven_day_sonnet", "Weekly - Sonnet", Windows.seven_day_sonnet);
+    const Fresh = new Map();
+
+    StoreWindow(Fresh, "five_hour", "5-hour limit", Windows.five_hour);
+    StoreWindow(Fresh, "seven_day", "Weekly - all models", Windows.seven_day);
+    StoreWindow(Fresh, "seven_day_opus", "Weekly - Opus", Windows.seven_day_opus);
+    StoreWindow(Fresh, "seven_day_sonnet", "Weekly - Sonnet", Windows.seven_day_sonnet);
 
     for (const Scoped of Windows.model_scoped || []) {
-      StoreWindow("model:" + Scoped.display_name, "Weekly - " + Scoped.display_name, Scoped);
+      StoreWindow(Fresh, "model:" + Scoped.display_name, "Weekly - " + Scoped.display_name, Scoped);
     }
+
+    Limits = Fresh;
   } catch (Error) {
     console.error("Could not read usage: " + Error.message);
   }
@@ -423,6 +426,10 @@ function FinishTurn(Turn, Status, Error) {
     Failed: Status === "error",
     Denied: Turn.Activity.some((Name) => Name.startsWith("denied ")),
   });
+  if (Turn.Session && Turn.Session.CurrentTurn === Turn) {
+    Turn.Session.CurrentTurn = null;
+  }
+
   Publish(Turn, { Status, Error: Error || null, CommittedText: Text, PendingText: "" });
   setTimeout(() => Turns.delete(Turn.Id), FinishedTurnLifetimeMilliseconds);
 }
@@ -524,7 +531,7 @@ function CloseIdleSessions() {
 
   const Remaining = [...Sessions.values()].filter((Session) => !Session.CurrentTurn).sort((Left, Right) => Left.LastUsedAt - Right.LastUsedAt);
 
-  for (const Session of Remaining.slice(0, Math.max(0, Sessions.size - MaxWarmSessions))) {
+  for (const Session of Remaining.slice(0, Math.max(0, Remaining.length - MaxWarmSessions))) {
     Session.Close();
   }
 }
@@ -774,6 +781,11 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
       }
 
       Ended = true;
+      Session.Ended = true;
+
+      if (Spare === Session) {
+        Spare = null;
+      }
 
       if (Sessions.get(Session.Key) === Session) {
         Sessions.delete(Session.Key);
@@ -885,7 +897,7 @@ let Spare = null;
 function TakeSpare(Model, Effort) {
   const Ready = Spare;
 
-  if (!Ready || Ready.CurrentTurn || Ready.Model !== Model || (Ready.Effort || null) !== (Effort || null)) {
+  if (!Ready || Ready.Ended || Ready.CurrentTurn || Ready.Model !== Model || (Ready.Effort || null) !== (Effort || null)) {
     return null;
   }
 
@@ -894,6 +906,10 @@ function TakeSpare(Model, Effort) {
 }
 
 let LastFolder = null;
+
+export function LastUsedFolder() {
+  return LastFolder;
+}
 
 // Warming a spare in the wrong folder is worse than not warming one, because
 // a mismatched spare cannot be reused. Wait until a turn tells us the folder.
@@ -909,15 +925,15 @@ function EffortRank(Effort) {
   return EffortOrder.indexOf(Effort || "none");
 }
 
-function UsableFolder(Folder) {
+export function UsableFolder(Folder) {
   if (typeof Folder !== "string" || Folder.trim() === "") {
-    return WorkingDirectory;
+    return null;
   }
 
   try {
-    return fs.statSync(Folder).isDirectory() ? Folder : WorkingDirectory;
+    return fs.statSync(Folder).isDirectory() ? Folder : null;
   } catch {
-    return WorkingDirectory;
+    return null;
   }
 }
 
@@ -955,7 +971,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     GuardTools: GuardTools === true,
     ExtraPrompt: ExtraPrompt !== false,
     FastMode: FastMode === true,
-    WorkingDirectory: (Existing && Existing.workingDirectory) || UsableFolder(Folder),
+    WorkingDirectory: (Existing && UsableFolder(Existing.workingDirectory)) || UsableFolder(Folder),
     SessionId: ConversationId,
     Status: "running",
     CommittedText: "",
@@ -983,7 +999,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
   LastFolder = Turn.WorkingDirectory;
 
   const Warm = ConversationId ? Sessions.get(ConversationId) : TakeSpare(Chosen.model, Chosen.effort);
-  const Reusable = Warm && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory;
+  const Reusable = Warm && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory;
 
   if (Warm && !Reusable) {
     Warm.Close();

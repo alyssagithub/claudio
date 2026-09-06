@@ -5,13 +5,7 @@ import { AllowedTools, DesktopConfigPath } from "./Config.js";
 import { InstallPlugin } from "./PluginInstaller.js";
 import { GetPluginsFolder } from "./StudioPaths.js";
 import { InstallStartup } from "./Startup.js";
-
-const RobloxServer = {
-  command: process.platform === "win32" ? "cmd" : "npx",
-  args: process.platform === "win32"
-    ? ["/c", "npx", "-y", "@chrrxs/robloxstudio-mcp@latest", "--auto-install-plugin"]
-    : ["-y", "@chrrxs/robloxstudio-mcp@latest", "--auto-install-plugin"],
-};
+import { ReadConfig, RobloxServer, WriteConfig } from "./DesktopConfig.js";
 
 function Run(Line) {
   return new Promise((Resolve) => {
@@ -19,14 +13,6 @@ function Run(Line) {
       Resolve({ Ok: !Error, Output: `${Stdout || ""}${Stderr || ""}`.trim() });
     });
   });
-}
-
-function ReadConfig() {
-  try {
-    return JSON.parse(fs.readFileSync(DesktopConfigPath, "utf8"));
-  } catch {
-    return null;
-  }
 }
 
 const Usable = AllowedTools
@@ -48,8 +34,8 @@ async function EnsureClaude(Manual) {
     const Installed = await Run("npm install -g @anthropic-ai/claude-code");
 
     if (!Installed.Ok) {
-      Manual.push("Install Claude Code yourself: npm install -g @anthropic-ai/claude-code");
-      return;
+      Manual.push("Install Claude Code yourself: npm install -g @anthropic-ai/claude-code, then run `claude auth login`.");
+      return false;
     }
 
     console.log("Done.");
@@ -89,26 +75,32 @@ function SignIn() {
 }
 
 function EnsureRobloxServer(Manual) {
-  const Config = ReadConfig();
+  const Read = ReadConfig();
 
-  if (HasRobloxServer(Config)) {
+  if (Read.Unreadable) {
+    console.log(`Left the Claude desktop config alone, it could not be read: ${Read.Unreadable}`);
+    Manual.push(`Add robloxstudio-mcp to ${DesktopConfigPath} yourself. Claudio did not touch it because it could not read it, and overwriting would have lost whatever is in there.`);
+    return;
+  }
+
+  if (HasRobloxServer(Read.Config)) {
     console.log("Roblox MCP server already configured.");
     return;
   }
 
-  const Fresh = Config || {};
+  const Fresh = Read.Config || {};
 
-  if (Config) {
-    fs.copyFileSync(DesktopConfigPath, `${DesktopConfigPath}.claudio-backup`);
-  } else {
+  if (Read.Missing) {
     fs.mkdirSync(path.dirname(DesktopConfigPath), { recursive: true });
+  } else {
+    fs.copyFileSync(DesktopConfigPath, `${DesktopConfigPath}.claudio-backup`);
   }
 
   Fresh.mcpServers = Fresh.mcpServers || {};
   Fresh.mcpServers["robloxstudio-mcp"] = RobloxServer;
-  fs.writeFileSync(DesktopConfigPath, JSON.stringify(Fresh, null, 2));
+  WriteConfig(Fresh);
 
-  console.log(Config ? "Added robloxstudio-mcp to the Claude desktop config (previous file kept as .claudio-backup)." : `Created ${DesktopConfigPath} with robloxstudio-mcp.`);
+  console.log(Read.Missing ? `Created ${DesktopConfigPath} with robloxstudio-mcp.` : "Added robloxstudio-mcp to the Claude desktop config (previous file kept as .claudio-backup).");
   Manual.push("Fully close and reopen Roblox Studio so the Roblox MCP plugin loads, then check it shows Connected.");
 }
 

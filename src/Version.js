@@ -7,7 +7,8 @@ const InstalledFile = path.join(os.homedir(), ".claudio", "installed.json");
 
 function Installed() {
   try {
-    return JSON.parse(fs.readFileSync(InstalledFile, "utf8"));
+    // Windows PowerShell writes utf8 with a BOM, which JSON.parse rejects.
+    return JSON.parse(fs.readFileSync(InstalledFile, "utf8").replace(/^\uFEFF/, ""));
   } catch {
     return null;
   }

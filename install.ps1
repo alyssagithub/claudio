@@ -91,9 +91,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claudio" | Out-Null
-[ordered]@{ commit = $Latest; at = (Get-Date).ToString("o") } |
-    ConvertTo-Json |
-    Out-File "$env:USERPROFILE\.claudio\installed.json" -Encoding utf8
+$Record = [ordered]@{ commit = $Latest; at = (Get-Date).ToString("o") } | ConvertTo-Json
+
+[System.IO.File]::WriteAllText("$env:USERPROFILE\.claudio\installed.json", $Record)
 
 RefreshPath
 

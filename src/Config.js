@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 
-export const Version = "1.0.1";
+export const Version = "1.1.0";
 export const ProtocolVersion = 1;
 export const DefaultPort = 47225;
 export const LongPollMilliseconds = 10000;

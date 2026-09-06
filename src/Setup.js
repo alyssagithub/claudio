@@ -42,12 +42,22 @@ function HasRobloxServer(Config) {
 // window has to own its console outright: exec hands the child this
 // process's pipes, and the prompt then draws on screen while the typing
 // goes into a pipe nobody reads.
+//
+// Windows Terminal first, because clicking on the old console puts it in
+// QuickEdit selection mode, where the title gains a "Select" and every
+// keystroke is swallowed until Escape. Someone signing in clicks the window
+// to focus it, so they meet that straight away and it looks frozen.
 function OpenLoginWindow() {
   const Shim = path.join(process.env.APPDATA || "", "npm", "claude.cmd");
   const Command = fs.existsSync(Shim) ? Shim : "claude";
+  const Terminal = path.join(process.env.LOCALAPPDATA || "", "Microsoft", "WindowsApps", "wt.exe");
+
+  const Opens = fs.existsSync(Terminal)
+    ? [Terminal, ["--title", "Claude Code login", "cmd", "/k", Command, "auth", "login"]]
+    : ["cmd", ["/c", "start", "Claude Code login", "cmd", "/k", Command, "auth", "login"]];
 
   try {
-    const Window = spawn("cmd", ["/c", "start", "Claude Code login", "cmd", "/k", Command, "auth", "login"], {
+    const Window = spawn(Opens[0], Opens[1], {
       detached: true,
       stdio: "ignore",
       windowsHide: false,

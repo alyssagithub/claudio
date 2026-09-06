@@ -4,6 +4,8 @@ import path from "node:path";
 import { DefaultPort, DesktopConfigPath, PluginFileName } from "./Config.js";
 import { GetPluginsFolder } from "./StudioPaths.js";
 import { StopBridge, UninstallStartup } from "./Startup.js";
+import { EnsureToken } from "./Token.js";
+import { ForgetPluginSetting } from "./PluginSettings.js";
 import { ReadConfig, RobloxServer, WriteConfig } from "./DesktopConfig.js";
 
 // The bridge's log is opened by the cmd that launched it, not by node, so the
@@ -47,7 +49,12 @@ function DropMcpServer(Removed, Kept) {
 
   // Setup skips writing when an entry is already there, so an entry that does
   // not match ours is the person's own and is not Claudio's to delete.
-  if (JSON.stringify(Entry) !== JSON.stringify(RobloxServer)) {
+  const Same = Entry.command === RobloxServer.command
+    && Array.isArray(Entry.args)
+    && Entry.args.length === RobloxServer.args.length
+    && Entry.args.every((Argument, At) => Argument === RobloxServer.args[At]);
+
+  if (!Same) {
     Kept.push("the robloxstudio-mcp entry, because it is not the one Claudio wrote");
     return;
   }
@@ -68,12 +75,16 @@ export async function RunUninstall(AlsoMcp) {
       await new Promise((Resolve) => setTimeout(Resolve, 250));
 
       try {
-        await fetch(`http://127.0.0.1:${Port}/health`);
+        await fetch(`http://127.0.0.1:${Port}/health`, {
+          headers: { "X-Claudio-Token": EnsureToken() },
+        });
       } catch {
         break;
       }
     }
   }
+
+  ForgetPluginSetting("BridgeToken");
 
   try {
     UninstallStartup();
@@ -88,7 +99,11 @@ export async function RunUninstall(AlsoMcp) {
     DropMcpServer(Removed, Kept);
   }
 
-  await Remove(`${DesktopConfigPath}.claudio-backup`, "the config backup Claudio made", Removed, Kept);
+  if (AlsoMcp) {
+    await Remove(`${DesktopConfigPath}.claudio-backup`, "the config backup Claudio made", Removed, Kept);
+  } else {
+    Kept.push("the config backup, since the robloxstudio-mcp entry is still there");
+  }
 
   console.log("Removed:");
 

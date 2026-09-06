@@ -40,17 +40,28 @@ export function EnsureToken() {
     Remember(Current);
   }
 
-  WritePluginSetting("BridgeToken", Current);
-
   return Current;
+}
+
+// Studio rewrites its settings from memory when it closes, so the handover is
+// repeated at every bridge start rather than assumed to have stuck.
+export function HandToken() {
+  return WritePluginSetting("BridgeToken", EnsureToken());
 }
 
 export function TokenMatches(Given) {
   const Wanted = EnsureToken();
 
-  if (typeof Given !== "string" || Given.length !== Wanted.length) {
+  if (typeof Given !== "string") {
     return false;
   }
 
-  return crypto.timingSafeEqual(Buffer.from(Given), Buffer.from(Wanted));
+  const Offered = Buffer.from(Given, "utf8");
+  const Expected = Buffer.from(Wanted, "utf8");
+
+  if (Offered.length !== Expected.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(Offered, Expected);
 }

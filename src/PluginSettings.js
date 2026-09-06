@@ -33,7 +33,9 @@ function SettingsFiles() {
 
 function ReadSettings(File) {
   try {
-    return JSON.parse(fs.readFileSync(File, "utf8").replace(/^﻿/, ""));
+    const Parsed = JSON.parse(fs.readFileSync(File, "utf8").replace(/^﻿/, ""));
+
+    return Parsed && typeof Parsed === "object" && !Array.isArray(Parsed) ? Parsed : null;
   } catch {
     return null;
   }
@@ -87,6 +89,24 @@ export function WritePluginSetting(Key, Value) {
   return Written;
 }
 
-export function SettingsFileCount() {
-  return SettingsFiles().length;
+export function ForgetPluginSetting(Key) {
+  for (const File of SettingsFiles()) {
+    const Settings = ReadSettings(File);
+
+    if (!Settings || Settings[SettingPrefix + Key] === undefined) {
+      continue;
+    }
+
+    delete Settings[SettingPrefix + Key];
+
+    const Temporary = `${File}.claudio-writing`;
+
+    try {
+      fs.writeFileSync(Temporary, JSON.stringify(Settings, null, 2));
+      fs.renameSync(Temporary, File);
+    } catch (Error) {
+      fs.rmSync(Temporary, { force: true });
+      console.error(`Could not clear the plugin setting ${Key}: ${Error.message}`);
+    }
+  }
 }

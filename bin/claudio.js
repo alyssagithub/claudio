@@ -17,6 +17,23 @@ function ReadFlag(Name) {
   return Value && Value.startsWith("--") ? null : Value;
 }
 
+function ChosenPort() {
+  const Given = ReadFlag("--port") || process.env.CLAUDIO_PORT;
+
+  if (Given === null || Given === undefined || Given === "") {
+    return DefaultPort;
+  }
+
+  const Number_ = Number(Given);
+
+  if (!Number.isInteger(Number_) || Number_ < 1 || Number_ > 65535) {
+    console.error(`${Given} is not a port number.`);
+    process.exit(1);
+  }
+
+  return Number_;
+}
+
 function Fail(Error) {
   console.error(Error.message);
   process.exit(1);
@@ -29,17 +46,17 @@ if (Command === "setup") {
 } else if (Command === "install") {
   InstallPlugin(ReadFlag("--local")).catch(Fail);
 } else if (Command === "install-startup") {
-  InstallStartup(Number(ReadFlag("--port") || process.env.CLAUDIO_PORT || DefaultPort)).catch(Fail);
+  InstallStartup(ChosenPort()).catch(Fail);
 } else if (Command === "version" || Arguments.includes("--version")) {
   ReportVersion().catch(Fail);
 } else if (Command === "uninstall-startup") {
   UninstallStartup();
 } else if (Command === "restart") {
-  RestartBridge(Number(ReadFlag("--port") || process.env.CLAUDIO_PORT || DefaultPort)).catch(Fail);
+  RestartBridge(ChosenPort()).catch(Fail);
 } else if (Command === "stop") {
-  StopBridge(Number(ReadFlag("--port") || process.env.CLAUDIO_PORT || DefaultPort));
+  StopBridge(ChosenPort());
 } else if (Command === undefined || Command === "start") {
-  StartServer(Number(ReadFlag("--port") || process.env.CLAUDIO_PORT || DefaultPort));
+  StartServer(ChosenPort());
 } else {
   console.error("Usage: claudio setup | claudio uninstall [--mcp] | claudio [start] [--port N] | claudio install [--local path/to/Claudio.rbxm] | claudio install-startup | claudio uninstall-startup | claudio restart | claudio stop | claudio version");
   process.exit(1);

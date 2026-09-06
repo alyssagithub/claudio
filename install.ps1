@@ -95,6 +95,10 @@ if ($LASTEXITCODE -ne 0) {
     Fail "npm couldn't install it. Try a new terminal, or do it yourself: npm install -g $Package"
 }
 
+if ($Latest -eq "main") {
+    Remove-Item -Force -ErrorAction SilentlyContinue "$env:USERPROFILE\.claudio\installed.json"
+}
+
 if ($Latest -ne "main") {
     New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claudio" | Out-Null
     $Record = [ordered]@{ commit = $Latest; at = (Get-Date).ToString("o") } | ConvertTo-Json

@@ -4,6 +4,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { DefaultPort, LogFile } from "./Config.js";
+import { EnsureToken } from "./Token.js";
 
 const LauncherPath = path.join(
   process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"),
@@ -21,7 +22,8 @@ export async function InstallStartup(Port) {
 
   const CliPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "bin", "claudio.js");
 
-  const Command = `cmd /c ""${process.execPath}" "${CliPath}" >> "${LogFile}" 2>&1"`;
+  const Chosen = Port && Port !== DefaultPort ? ` --port ${Number(Port)}` : "";
+  const Command = `cmd /c ""${process.execPath}" "${CliPath}"${Chosen} >> "${LogFile}" 2>&1"`;
 
   fs.mkdirSync(path.dirname(LogFile), { recursive: true });
   fs.writeFileSync(LauncherPath, [
@@ -50,7 +52,9 @@ export function LaunchHidden() {
 
 async function PortIsBusy(Port) {
   try {
-    await fetch(`http://127.0.0.1:${Port || DefaultPort}/health`);
+    await fetch(`http://127.0.0.1:${Port || DefaultPort}/health`, {
+      headers: { "X-Claudio-Token": EnsureToken() },
+    });
 
     return true;
   } catch {
@@ -60,7 +64,16 @@ async function PortIsBusy(Port) {
 
 export async function StopBridge(Port) {
   try {
-    await fetch(`http://127.0.0.1:${Port || DefaultPort}/quit`, { method: "POST" });
+    const Answer = await fetch(`http://127.0.0.1:${Port || DefaultPort}/quit`, {
+      method: "POST",
+      headers: { "X-Claudio-Token": EnsureToken() },
+    });
+
+    if (Answer.status === 401) {
+      console.log("A bridge is running but would not accept the request to quit. Close it yourself and try again.");
+      return false;
+    }
+
     console.log("Asked the running bridge to quit.");
     return true;
   } catch {

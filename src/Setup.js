@@ -37,40 +37,6 @@ function HasRobloxServer(Config) {
   return Object.keys((Config && Config.mcpServers) || {}).some((Name) => Usable.includes(Name));
 }
 
-// A fresh npm install of Claude Code is not on this process's PATH yet, so
-// point the new window at the shim directly when it is there. The login
-// window has to own its console outright: exec hands the child this
-// process's pipes, and the prompt then draws on screen while the typing
-// goes into a pipe nobody reads.
-//
-// Windows Terminal first, because clicking on the old console puts it in
-// QuickEdit selection mode, where the title gains a "Select" and every
-// keystroke is swallowed until Escape. Someone signing in clicks the window
-// to focus it, so they meet that straight away and it looks frozen.
-function OpenLoginWindow() {
-  const Shim = path.join(process.env.APPDATA || "", "npm", "claude.cmd");
-  const Command = fs.existsSync(Shim) ? Shim : "claude";
-  const Terminal = path.join(process.env.LOCALAPPDATA || "", "Microsoft", "WindowsApps", "wt.exe");
-
-  const Opens = fs.existsSync(Terminal)
-    ? [Terminal, ["--title", "Claude Code login", "cmd", "/k", Command, "auth", "login"]]
-    : ["cmd", ["/c", "start", "Claude Code login", "cmd", "/k", Command, "auth", "login"]];
-
-  try {
-    const Window = spawn(Opens[0], Opens[1], {
-      detached: true,
-      stdio: "ignore",
-      windowsHide: false,
-    });
-
-    Window.unref();
-
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function EnsureClaude(Manual) {
   const Found = await Run("claude --version");
 
@@ -93,16 +59,33 @@ async function EnsureClaude(Manual) {
 
   if (Status.Ok && /true|logged in/i.test(Status.Output)) {
     console.log("Logged in already.");
-    return;
+    return false;
   }
 
-  if (process.platform === "win32" && OpenLoginWindow()) {
-    console.log("Opened a window to log in to Claude Code. Sign in there, the rest of this carries on meanwhile.");
-    Manual.push("Finish the Claude Code login in the window that opened. Claudio uses that login, there is no API key to paste.");
-    return;
-  }
+  return true;
+}
 
-  Manual.push("Log in to Claude Code: run `claude` in a terminal, then follow the browser prompt. Claudio uses that login, so there is no API key to paste.");
+// Sign in here rather than in a window of our own. A window we open gets a
+// console we cannot vouch for, and a sign-in prompt that will not take
+// keystrokes is indistinguishable from a hung install; this terminal is one
+// the person is already typing in.
+function SignIn() {
+  return new Promise((Resolve) => {
+    if (!process.stdin.isTTY) {
+      Resolve(false);
+      return;
+    }
+
+    console.log("\nSigning in to Claude Code. A browser opens, and the code comes back here.\n");
+
+    const Login = spawn(process.platform === "win32" ? "claude.cmd" : "claude", ["auth", "login"], {
+      stdio: "inherit",
+      shell: process.platform === "win32",
+    });
+
+    Login.on("error", () => Resolve(false));
+    Login.on("close", (Code) => Resolve(Code === 0));
+  });
 }
 
 function EnsureRobloxServer(Manual) {
@@ -134,7 +117,7 @@ export async function RunSetup(LocalPath) {
 
   console.log("Setting up.\n");
 
-  await EnsureClaude(Manual);
+  const NeedsLogin = await EnsureClaude(Manual);
 
   try {
     await InstallPlugin(LocalPath);
@@ -156,6 +139,10 @@ export async function RunSetup(LocalPath) {
   }
 
   Manual.push("Restart Roblox Studio, then open the Claudio button in the Plugins tab.");
+
+  if (NeedsLogin && !(await SignIn())) {
+    Manual.unshift("Log in to Claude Code: run `claude auth login` and follow the browser prompt. Claudio uses that login, so there is no API key to paste.");
+  }
 
   console.log("\nLeft for you:\n");
 

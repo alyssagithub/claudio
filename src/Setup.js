@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { exec } from "node:child_process";
+import { exec, spawn } from "node:child_process";
 import { AllowedTools, DesktopConfigPath } from "./Config.js";
 import { InstallPlugin } from "./PluginInstaller.js";
 import { GetPluginsFolder } from "./StudioPaths.js";
@@ -38,13 +38,23 @@ function HasRobloxServer(Config) {
 }
 
 // A fresh npm install of Claude Code is not on this process's PATH yet, so
-// point the new window at the shim directly when it is there.
+// point the new window at the shim directly when it is there. The login
+// window has to own its console outright: exec hands the child this
+// process's pipes, and the prompt then draws on screen while the typing
+// goes into a pipe nobody reads.
 function OpenLoginWindow() {
   const Shim = path.join(process.env.APPDATA || "", "npm", "claude.cmd");
-  const Command = fs.existsSync(Shim) ? `"${Shim}"` : "claude";
+  const Command = fs.existsSync(Shim) ? Shim : "claude";
 
   try {
-    exec(`start "Claude Code login" cmd /k ${Command} auth login`);
+    const Window = spawn("cmd", ["/c", "start", "Claude Code login", "cmd", "/k", Command, "auth", "login"], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: false,
+    });
+
+    Window.unref();
+
     return true;
   } catch {
     return false;

@@ -137,7 +137,7 @@ export async function RunSetup(LocalPath) {
 
   if (process.platform === "win32") {
     try {
-      InstallStartup();
+      await InstallStartup();
     } catch (Error) {
       Manual.push("Start the bridge by running `claudio` and leaving that window open (" + Error.message + ")");
     }

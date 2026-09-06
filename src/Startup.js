@@ -14,7 +14,7 @@ function VisualBasicString(Value) {
   return `"${Value.replace(/"/g, '""')}"`;
 }
 
-export function InstallStartup() {
+export async function InstallStartup(Port) {
   if (process.platform !== "win32") {
     throw new Error("Startup install is only written for Windows so far.");
   }
@@ -30,9 +30,9 @@ export function InstallStartup() {
     "",
   ].join("\r\n"));
 
-  LaunchHidden();
   console.log(`Installed ${LauncherPath}`);
-  console.log(`The bridge now starts hidden at logon and is starting now. Log: ${LogFile}`);
+
+  await RestartBridge(Port);
 }
 
 export function LaunchHidden() {

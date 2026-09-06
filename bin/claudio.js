@@ -28,7 +28,7 @@ if (Command === "setup") {
   InstallPlugin(ReadFlag("--local")).catch(Fail);
 } else if (Command === "install-startup") {
   try {
-    InstallStartup();
+    InstallStartup().catch(Fail);
   } catch (Error) {
     Fail(Error);
   }

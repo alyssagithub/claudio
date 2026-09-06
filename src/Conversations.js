@@ -215,6 +215,7 @@ export function StripContext(Text) {
     .replace(/\n*<studio_context>[\s\S]*?<\/studio_context>\n*/g, "")
     .replace(/\n*<studio_place>[\s\S]*?<\/studio_place>\n*/g, "")
     .replace(/\n*<studio_edits>[\s\S]*?<\/studio_edits>\n*/g, "")
+    .replace(/\n+I changed these in Studio myself since my last message:(?:\n- [^\n]*)+\n*/g, "")
     .trim();
 }
 

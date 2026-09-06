@@ -78,7 +78,24 @@ export async function ListReleases() {
   return Releases.List;
 }
 
+// What this downloads becomes the code Studio loads next start, so the version
+// is checked here as well as at the route, and the file has to come from where
+// the release says it should.
+function FromGitHub(Url) {
+  try {
+    const Parsed = new URL(Url);
+
+    return Parsed.protocol === "https:" && /(^|\.)github(usercontent)?\.com$/.test(Parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export async function InstallVersion(Version) {
+  if (!LooksLikeVersion(Version)) {
+    throw new Error("A version looks like 1.0.0");
+  }
+
   const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/releases/tags/v${Version}`, {
     headers: { "User-Agent": "claudio-installer" },
   });
@@ -92,6 +109,10 @@ export async function InstallVersion(Version) {
 
   if (!Asset) {
     throw new Error(`Release ${Release.tag_name} has no ${PluginFileName}`);
+  }
+
+  if (!FromGitHub(Asset.browser_download_url)) {
+    throw new Error("That release points its download somewhere other than GitHub");
   }
 
   const Download = await fetch(Asset.browser_download_url, { headers: { "User-Agent": "claudio-installer" } });
@@ -175,6 +196,10 @@ export async function InstallPlugin(LocalPath) {
 
   if (!Asset) {
     throw new Error(`Release ${Release.tag_name} has no asset named ${PluginFileName}`);
+  }
+
+  if (!FromGitHub(Asset.browser_download_url)) {
+    throw new Error("That release points its download somewhere other than GitHub");
   }
 
   const AssetResponse = await fetch(Asset.browser_download_url, {

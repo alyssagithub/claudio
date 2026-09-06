@@ -35,7 +35,7 @@ function Native([scriptblock]$Command) {
 }
 
 if ($IsMacOS -or $IsLinux) {
-    Fail "This one's Windows only. Elsewhere install Node.js yourself, then: npm install -g github:alyssagithub/claudio && claudio setup"
+    Fail "This one's Windows only. Elsewhere install Node.js yourself, then: npm install -g https://github.com/alyssagithub/claudio/archive/refs/heads/main.tar.gz && claudio setup"
 }
 
 Write-Host ""
@@ -63,10 +63,10 @@ if (Has "node") {
 }
 
 Write-Host "Installing Claudio."
-Native { & npm install -g github:alyssagithub/claudio }
+Native { & npm install -g https://github.com/alyssagithub/claudio/archive/refs/heads/main.tar.gz }
 
 if ($LASTEXITCODE -ne 0) {
-    Fail "npm couldn't install it. Try a new terminal, or do it yourself: npm install -g github:alyssagithub/claudio"
+    Fail "npm couldn't install it. Try a new terminal, or do it yourself: npm install -g https://github.com/alyssagithub/claudio/archive/refs/heads/main.tar.gz"
 }
 
 RefreshPath

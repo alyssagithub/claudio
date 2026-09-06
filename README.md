@@ -21,7 +21,7 @@ npm install -g github:alyssagithub/claudio
 claudio setup
 ```
 
-If you don't have Claude Code yet it'll open a window for you to log in. Then restart Studio and click **Claudio** in the Plugins tab, allowing HTTP requests when it asks.
+If you don't have Claude Code yet it'll open a window for you to log in. Then restart Studio and click **Claudio** in the Plugins tab, allowing HTTP requests when it asks. It'll ask you to pick a folder for Claude to work in before anything else, and you can change that later under settings.
 
 ## Uninstall
 
@@ -67,7 +67,7 @@ Studio only loads plugins when it starts, so setup usually means restarting it t
 
 Opening a very long chat is slow, a few seconds for a transcript in the hundreds of megabytes, because the whole thing gets parsed to rebuild the messages.
 
-Claude Code doesn't store what a turn cost anywhere, so for chats from before you installed this the cost is worked out from the token counts in the transcript. The input and cache read prices I checked against real turns. Output price is a guess. Anything sent after installing records the real number.
+Claude Code doesn't store what a turn cost anywhere, so for chats from before you installed this the cost is worked out from the token counts in the transcript. Prices are checked against real turns but hardcoded, so they'll drift if Anthropic changes them. Anything sent after installing records the real number instead.
 
 The npm name `claudio` belongs to someone else, hence installing from git.
 

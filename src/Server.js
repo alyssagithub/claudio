@@ -1,6 +1,7 @@
 import http from "node:http";
+import fs from "node:fs";
 import { exec } from "node:child_process";
-import { LongPollMilliseconds, MaxBodyBytes, ProtocolVersion, Version } from "./Config.js";
+import { LongPollMilliseconds, MaxBodyBytes, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
 import { AbortAllTurns, AnswerPermission, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
@@ -222,6 +223,7 @@ export function StartServer(Port) {
           mcpServers: Object.keys(ReadMcpServers()),
           systemPrompt: SystemPromptFor(Object.keys(ReadMcpServers())),
           limits: GetLimits(),
+          workingDirectory: WorkingDirectory,
         });
         return;
       }
@@ -284,6 +286,7 @@ export function StartServer(Port) {
           FastMode: Body.fastMode === true,
           Escalate: Body.escalate === true,
           Place: Body.place && typeof Body.place === "object" ? Body.place : null,
+          Folder: typeof Body.workingDirectory === "string" ? Body.workingDirectory : null,
         })));
         return;
       }
@@ -359,6 +362,20 @@ export function StartServer(Port) {
         const Asked = await PollUsage(For);
 
         SendJson(Response, 200, { asked: Asked, limits: GetLimits(), context: GetBreakdown(For) });
+        return;
+      }
+
+      if (Request.method === "GET" && Url.pathname === "/folder") {
+        const Wanted = Url.searchParams.get("path") || "";
+        let Usable = false;
+
+        try {
+          Usable = Wanted !== "" && fs.statSync(Wanted).isDirectory();
+        } catch {
+          Usable = false;
+        }
+
+        SendJson(Response, 200, { usable: Usable });
         return;
       }
 

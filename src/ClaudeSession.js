@@ -893,16 +893,32 @@ function TakeSpare(Model, Effort) {
   return Ready;
 }
 
+let LastFolder = null;
+
+// Warming a spare in the wrong folder is worse than not warming one, because
+// a mismatched spare cannot be reused. Wait until a turn tells us the folder.
 export function KeepSpareWarm() {
-  if (!KeepSessionsWarm || Spare) {
+  if (!KeepSessionsWarm || Spare || !LastFolder) {
     return;
   }
 
-  Spare = OpenSession(null, WorkingDirectory, AutoTiers[0].model, AutoTiers[0].effort, true);
+  Spare = OpenSession(null, LastFolder, AutoTiers[0].model, AutoTiers[0].effort, true);
 }
 
 function EffortRank(Effort) {
   return EffortOrder.indexOf(Effort || "none");
+}
+
+function UsableFolder(Folder) {
+  if (typeof Folder !== "string" || Folder.trim() === "") {
+    return WorkingDirectory;
+  }
+
+  try {
+    return fs.statSync(Folder).isDirectory() ? Folder : WorkingDirectory;
+  } catch {
+    return WorkingDirectory;
+  }
 }
 
 function DescribePlace(Place) {
@@ -917,7 +933,7 @@ function DescribePlace(Place) {
   return `<studio_place>\n${Said}\n</studio_place>`;
 }
 
-export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForTools, GuardTools, Escalate, ExtraPrompt, FastMode, Place }) {
+export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForTools, GuardTools, Escalate, ExtraPrompt, FastMode, Place, Folder }) {
   const Existing = ConversationId ? GetConversation(ConversationId) : null;
   const Auto = !Model || Model === "auto";
 
@@ -939,7 +955,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     GuardTools: GuardTools === true,
     ExtraPrompt: ExtraPrompt !== false,
     FastMode: FastMode === true,
-    WorkingDirectory: (Existing && Existing.workingDirectory) || WorkingDirectory,
+    WorkingDirectory: (Existing && Existing.workingDirectory) || UsableFolder(Folder),
     SessionId: ConversationId,
     Status: "running",
     CommittedText: "",
@@ -964,9 +980,10 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
   };
 
   Turns.set(Turn.Id, Turn);
+  LastFolder = Turn.WorkingDirectory;
 
   const Warm = ConversationId ? Sessions.get(ConversationId) : TakeSpare(Chosen.model, Chosen.effort);
-  const Reusable = Warm && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode;
+  const Reusable = Warm && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory;
 
   if (Warm && !Reusable) {
     Warm.Close();

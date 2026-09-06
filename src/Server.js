@@ -10,9 +10,10 @@ import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, CancelTu
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { HandToken, TokenMatches } from "./Token.js";
-import { InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
+import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
 import { ArmClipboard, DisarmClipboard, ReadClipboardImage, ShowToast, WriteClipboard } from "./Notify.js";
 import { ForgetConversation, GetModels } from "./Models.js";
+import { RestartBridge } from "./Startup.js";
 
 let LastLogin = { CheckedAt: 0, Result: null };
 
@@ -454,7 +455,15 @@ export function StartServer(Port) {
         }
 
         try {
-          SendJson(Response, 200, { installed: await InstallVersion(Body.version) });
+          // The bridge first: if it cannot be installed nothing has changed yet,
+          // whereas a plugin swapped alone leaves the two halves disagreeing.
+          const Commit = await InstallBridge(Body.version);
+          const Installed = await InstallVersion(Body.version);
+
+          SendJson(Response, 200, { installed: Installed, commit: Commit, restarting: true });
+          setTimeout(() => {
+            RestartBridge(Port).catch((Error) => console.error("Could not restart onto the new version: " + Error.message));
+          }, 500);
         } catch (Error) {
           SendJson(Response, 502, { error: Error.message });
         }

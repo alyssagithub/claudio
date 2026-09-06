@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { exec } from "node:child_process";
 import { GitHubRepo, InstalledPluginFile, PluginFileName } from "./Config.js";
 import { GetPluginsFolder } from "./StudioPaths.js";
 
@@ -89,6 +90,47 @@ function FromGitHub(Url) {
   } catch {
     return false;
   }
+}
+
+// The plugin and the bridge are cut from the same commit, so moving to another
+// version has to move both or the halves disagree about what they are talking
+// to. The tag resolves to the commit the release was built from.
+async function CommitFor(Version) {
+  const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/commits/v${Version}`, {
+    headers: { "User-Agent": "claudio-installer" },
+  });
+
+  if (!Response.ok) {
+    throw new Error(`Could not find the commit for v${Version}`);
+  }
+
+  const Found = (await Response.json()).sha;
+
+  if (typeof Found !== "string" || !/^[0-9a-f]{40}$/.test(Found)) {
+    throw new Error(`GitHub gave an unusable commit for v${Version}`);
+  }
+
+  return Found;
+}
+
+export async function InstallBridge(Version) {
+  const Commit = await CommitFor(Version);
+
+  await new Promise((Resolve, Reject) => {
+    exec(`npm install -g https://github.com/${GitHubRepo}/archive/${Commit}.tar.gz`, { timeout: 300000 }, (Error, Stdout, Stderr) => {
+      if (Error) {
+        const Said = `${Stderr || ""}${Stdout || ""}`.trim().split(/\r?\n/).slice(-3).join(" ");
+
+        Reject(new Error(`npm could not install the bridge for v${Version}: ${Said}`));
+
+        return;
+      }
+
+      Resolve();
+    });
+  });
+
+  return Commit;
 }
 
 export async function InstallVersion(Version) {

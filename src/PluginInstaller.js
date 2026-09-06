@@ -79,9 +79,21 @@ export async function InstallVersion(Version) {
   const PluginsFolder = GetPluginsFolder();
 
   fs.mkdirSync(PluginsFolder, { recursive: true });
-  fs.writeFileSync(path.join(PluginsFolder, PluginFileName), Buffer.from(await Download.arrayBuffer()));
+  WritePlugin(path.join(PluginsFolder, PluginFileName), Buffer.from(await Download.arrayBuffer()));
 
   return Release.tag_name;
+}
+
+// Studio reads this file at startup, so it must never see half of one. An
+// error page from a CDN is also a valid 200, and rbxm files start with a
+// known magic string, so check it before it lands.
+function WritePlugin(Target, Body) {
+  if (Body.length < 1024 || !Body.subarray(0, 8).toString("binary").startsWith("<roblox")) {
+    throw new Error("That download is not a Roblox model file");
+  }
+
+  fs.writeFileSync(`${Target}.claudio-writing`, Body);
+  fs.renameSync(`${Target}.claudio-writing`, Target);
 }
 
 export async function InstallPlugin(LocalPath) {
@@ -119,6 +131,6 @@ export async function InstallPlugin(LocalPath) {
     throw new Error(`Download failed (${AssetResponse.status})`);
   }
 
-  fs.writeFileSync(Target, Buffer.from(await AssetResponse.arrayBuffer()));
+  WritePlugin(Target, Buffer.from(await AssetResponse.arrayBuffer()));
   console.log(`Installed ${PluginFileName} ${Release.tag_name} to ${Target}`);
 }

@@ -12,8 +12,9 @@ const Command = Arguments[0];
 
 function ReadFlag(Name) {
   const Index = Arguments.indexOf(Name);
+  const Value = Index === -1 ? null : Arguments[Index + 1];
 
-  return Index === -1 ? null : Arguments[Index + 1];
+  return Value && Value.startsWith("--") ? null : Value;
 }
 
 function Fail(Error) {
@@ -28,11 +29,7 @@ if (Command === "setup") {
 } else if (Command === "install") {
   InstallPlugin(ReadFlag("--local")).catch(Fail);
 } else if (Command === "install-startup") {
-  try {
-    InstallStartup().catch(Fail);
-  } catch (Error) {
-    Fail(Error);
-  }
+  InstallStartup().catch(Fail);
 } else if (Command === "version" || Arguments.includes("--version")) {
   ReportVersion().catch(Fail);
 } else if (Command === "uninstall-startup") {

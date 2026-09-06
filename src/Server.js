@@ -1,6 +1,8 @@
 import http from "node:http";
 import fs from "node:fs";
-import { exec } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { exec, execFile } from "node:child_process";
 import { LongPollMilliseconds, MaxBodyBytes, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
@@ -176,6 +178,23 @@ async function HandleConversations(Request, Response, Segments) {
 
 let Armed = false;
 let Picks = [];
+
+let Picking = { Busy: false, Path: null };
+
+function BrowseForFolder() {
+  if (Picking.Busy || process.platform !== "win32") {
+    return Picking.Busy;
+  }
+
+  const Script = path.join(path.dirname(fileURLToPath(import.meta.url)), "PickFolder.ps1");
+
+  Picking = { Busy: true, Path: null };
+  execFile("powershell.exe", ["-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File", Script], { timeout: 600000 }, (Error, Stdout) => {
+    Picking = { Busy: false, Path: Error ? null : String(Stdout || "").trim() };
+  });
+
+  return true;
+}
 
 function WarmUsage() {
   let Tries = 0;
@@ -362,6 +381,16 @@ export function StartServer(Port) {
         const Asked = await PollUsage(For);
 
         SendJson(Response, 200, { asked: Asked, limits: GetLimits(), context: GetBreakdown(For) });
+        return;
+      }
+
+      if (Request.method === "POST" && Url.pathname === "/folder/browse") {
+        SendJson(Response, 200, { started: BrowseForFolder() });
+        return;
+      }
+
+      if (Request.method === "GET" && Url.pathname === "/folder/browse") {
+        SendJson(Response, 200, { pending: Picking.Busy, path: Picking.Path || "" });
         return;
       }
 

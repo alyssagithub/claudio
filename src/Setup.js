@@ -37,6 +37,20 @@ function HasRobloxServer(Config) {
   return Object.keys((Config && Config.mcpServers) || {}).some((Name) => Usable.includes(Name));
 }
 
+// A fresh npm install of Claude Code is not on this process's PATH yet, so
+// point the new window at the shim directly when it is there.
+function OpenLoginWindow() {
+  const Shim = path.join(process.env.APPDATA || "", "npm", "claude.cmd");
+  const Command = fs.existsSync(Shim) ? `"${Shim}"` : "claude";
+
+  try {
+    exec(`start "Claude Code login" cmd /k ${Command}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function EnsureClaude(Manual) {
   const Found = await Run("claude --version");
 
@@ -59,6 +73,12 @@ async function EnsureClaude(Manual) {
 
   if (Status.Ok && /true|logged in/i.test(Status.Output)) {
     console.log("Logged in already.");
+    return;
+  }
+
+  if (process.platform === "win32" && OpenLoginWindow()) {
+    console.log("Opened a window to log in to Claude Code. Sign in there, the rest of this carries on meanwhile.");
+    Manual.push("Finish the Claude Code login in the window that opened. Claudio uses that login, there is no API key to paste.");
     return;
   }
 

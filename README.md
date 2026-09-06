@@ -21,7 +21,7 @@ npm install -g github:alyssagithub/claudio
 claudio setup
 ```
 
-Then restart Studio and click **Claudio** in the Plugins tab, allowing HTTP requests when it asks.
+If you don't have Claude Code yet it'll open a window for you to log in. Then restart Studio and click **Claudio** in the Plugins tab, allowing HTTP requests when it asks.
 
 ## Uninstall
 

@@ -6,12 +6,19 @@ import { WritePluginSetting } from "./PluginSettings.js";
 
 let Current = null;
 
+// The file mode is a POSIX idea and Windows ignores it; what actually protects
+// this is the profile directory it sits in.
 function Remember(Value) {
   try {
     fs.mkdirSync(path.dirname(TokenFile), { recursive: true });
     fs.writeFileSync(TokenFile, JSON.stringify({ token: Value }, null, 2), { mode: 0o600 });
+
+    return true;
   } catch (Error) {
-    console.error("Could not save the bridge token: " + Error.message);
+    console.error(`Could not save the bridge key to ${TokenFile}: ${Error.message}`);
+    console.error("A new key will be made every time the bridge starts, and Studio will have to be told each time.");
+
+    return false;
   }
 }
 

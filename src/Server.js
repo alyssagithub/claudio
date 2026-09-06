@@ -430,7 +430,7 @@ export function StartServer(Port) {
         const Found = await ListReleases();
         const Newest = NewestRelease(Found);
         const Asked = Url.searchParams.get("plugin");
-        const Plugin = LooksLikeVersion(Asked) ? Asked.replace(/^v/, "") : InstalledPluginVersion();
+        const Plugin = LooksLikeVersion(Asked) ? Asked.trim().replace(/^v/, "") : InstalledPluginVersion();
 
         SendJson(Response, 200, {
           current: Plugin,

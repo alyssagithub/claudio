@@ -10,11 +10,11 @@ export function LooksLikeVersion(Text) {
 }
 
 function Compare(Left, Right) {
-  const Parts = (Text) => String(Text).replace(/^v/, "").split(".").map((Piece) => Number(Piece) || 0);
+  const Parts = (Text) => String(Text).trim().replace(/^v/, "").split(".").map((Piece) => Number(Piece) || 0);
   const First = Parts(Left);
   const Second = Parts(Right);
 
-  for (let At = 0; At < 3; At += 1) {
+  for (let At = 0; At < Math.max(First.length, Second.length); At += 1) {
     if ((First[At] || 0) !== (Second[At] || 0)) {
       return (First[At] || 0) > (Second[At] || 0) ? 1 : -1;
     }

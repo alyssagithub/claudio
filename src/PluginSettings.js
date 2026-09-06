@@ -41,17 +41,6 @@ function ReadSettings(File) {
   }
 }
 
-export function ReadPluginSetting(Key) {
-  for (const File of SettingsFiles()) {
-    const Settings = ReadSettings(File);
-
-    if (Settings && Settings[SettingPrefix + Key] !== undefined) {
-      return Settings[SettingPrefix + Key];
-    }
-  }
-
-  return null;
-}
 
 // Studio rewrites this file from its own memory when it closes, so a value
 // written here can be lost on exit. Writing it again at every bridge start is

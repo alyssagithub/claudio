@@ -35,7 +35,13 @@ function Markdown.Build(Text: string, Size: number?): string
 	const Lines: {string} = {}
 
 	for _, Line in string.split(Safe, "\n") do
-		local Marked = Line:gsub("^(#+)%s+(.*)$", function(Hashes: string, Heading: string): string
+		local Marked = Line:gsub("^#+%s+.*$", function(Whole: string): string
+			const Hashes, Heading = Whole:match("^(#+)%s+(.*)$")
+
+			if not Hashes then
+				return Whole
+			end
+
 			const Raised = if #Hashes == 1 then 4 elseif #Hashes == 2 then 2 else 0
 
 			if Raised == 0 or not Size then

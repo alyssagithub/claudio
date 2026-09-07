@@ -292,23 +292,39 @@ function Lay(Tree) {
 function Parse(Text) {
   const Found = new Map();
 
+  let Open = null;
+
   for (const Line of Text.split(/\r?\n/)) {
     const Match = Line.match(/^(.+?\.luau)(?:\s+\[[^\]]*\])?\((\d+),\d+\):\s*(.+)$/);
 
     if (!Match) {
+      if (Open && Line.trim() !== "") {
+        Open.Parts.push(Line.trim());
+      } else {
+        Open = null;
+      }
+
       continue;
     }
 
     const Where = path.relative(Workspace(), path.resolve(Workspace(), Match[1])).split(path.sep).join("/");
 
     if (!Found.has(Where)) {
-      Found.set(Where, new Set());
+      Found.set(Where, []);
     }
 
-    Found.get(Where).add(`line ${Match[2]}: ${Match[3]}`);
+    Open = { Where, Parts: [`line ${Match[2]}: ${Match[3]}`] };
+
+    Found.get(Where).push(Open);
   }
 
-  return Found;
+  const Joined = new Map();
+
+  for (const [Where, Entries] of Found) {
+    Joined.set(Where, new Set(Entries.map((Entry) => Entry.Parts.join(" "))));
+  }
+
+  return Joined;
 }
 
 export async function Analyze(Entries, Raw, Tree) {

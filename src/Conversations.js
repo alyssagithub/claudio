@@ -210,12 +210,19 @@ function TextOf(Content) {
   return (Content || []).filter((Block) => Block.type === "text").map((Block) => Block.text).join("");
 }
 
+const ContextPattern = /<studio_context>[\s\S]*?<\/studio_context>|<studio_place>[\s\S]*?<\/studio_place>|<studio_edits>[\s\S]*?<\/studio_edits>|<studio_lint>[\s\S]*?<\/studio_lint>|I changed these in Studio myself since my last message:(?:\n- [^\n]*)+/g;
+
+export function ExtractContext(Text) {
+  return (Text.match(ContextPattern) || []).join("\n\n");
+}
+
 export function StripContext(Text) {
   return Text
     .replace(/\n*<studio_context>[\s\S]*?<\/studio_context>\n*/g, "")
     .replace(/\n*<studio_place>[\s\S]*?<\/studio_place>\n*/g, "")
     .replace(/\n*<studio_edits>[\s\S]*?<\/studio_edits>\n*/g, "")
-    .replace(/\n+I changed these in Studio myself since my last message:(?:\n- [^\n]*)+\n*/g, "")
+    .replace(/\n*<studio_lint>[\s\S]*?<\/studio_lint>\n*/g, "")
+    .replace(/\n*I changed these in Studio myself since my last message:(?:\n- [^\n]*)+\n*/g, "")
     .trim();
 }
 
@@ -350,6 +357,35 @@ function TitleOf(Lines, Desktop, IsOwn) {
   return Prompt ? StripContext(TextOf(Prompt.message.content)).replace(/\s+/g, " ").trim().slice(0, 60) : "New chat";
 }
 
+function StampOf(Entry) {
+  return Entry && typeof Entry.timestamp === "string" ? Date.parse(Entry.timestamp) : NaN;
+}
+
+// The first stamped line is when the chat began; a transcript with no stamps
+// falls back to when its file was created.
+function StartedAt(Lines, File) {
+  for (const Entry of Lines) {
+    if (Number.isFinite(StampOf(Entry))) {
+      return StampOf(Entry);
+    }
+  }
+
+  return fs.statSync(File).birthtimeMs;
+}
+
+// The file's own modification time is not the last message: the desktop app
+// rewrites a transcript for reasons that leave no new message behind, so the
+// stamp has to come from the last line that actually carries one.
+function EndedAt(Lines, File) {
+  for (let Index = Lines.length - 1; Index >= 0; Index -= 1) {
+    if (Number.isFinite(StampOf(Lines[Index]))) {
+      return StampOf(Lines[Index]);
+    }
+  }
+
+  return fs.statSync(File).mtimeMs;
+}
+
 function WorkingDirectoryOf(Lines) {
   const Line = Lines.find((Entry) => typeof Entry.cwd === "string" && Entry.cwd !== "");
 
@@ -405,7 +441,8 @@ export function ListConversations() {
         source: Desktop[Id] ? "desktop" : "claudio",
         starred: Boolean(Desktop[Id] && Desktop[Id].starred),
         archived: Boolean(Desktop[Id] && Desktop[Id].archived),
-        updatedAt: fs.statSync(File).mtimeMs,
+        createdAt: StartedAt(Lines, File),
+        updatedAt: EndedAt(Lines, File),
       });
     }
   }

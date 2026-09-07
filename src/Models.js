@@ -1,13 +1,28 @@
 import fs from "node:fs";
 import path from "node:path";
-import { AutoTiers, EffortOrder, ModelsCacheFile, ExtraModels } from "./Config.js";
+import { AutoTiers, EffortOrder, LeanMode, ModelsCacheFile, ExtraModels } from "./Config.js";
 
 const Trouble = new Map();
 const Complaints = /^\s*(no|nope)\b|\b(wrong|incorrect|broken|failing|failed)\b|\bstill (not|no|doesn'?t|does not|broken|failing|wrong|the same)\b|\btry again\b|\b(not|isn'?t) working\b|\b(does|did)n'?t work\b|\bthat'?s not\b|\byou missed\b|\bnothing happened\b|\b(undo|revert) (that|it)\b/i;
 const HardWords = /\b(refactor|debug|investigate|why|architecture|design|redesign|rewrite|optimi[sz]e|profile|race|deadlock|memory leak|migrate|plan|audit|review|trace|reproduce)\b/i;
 const EditWords = /\b(fix|change|add|remove|rename|move|create|make|write|update|implement|convert|replace|delete|build)\b/i;
 
-let Models = ReadModelsCache();
+const Retired = ["auto-lean", "delegation"];
+
+function WithLeanMode(List) {
+  const Kept = List.filter((Model) => Model.value !== LeanMode.value && !Retired.includes(Model.value));
+
+  return [{
+    value: LeanMode.value,
+    displayName: LeanMode.displayName,
+    description: LeanMode.description,
+    supportsEffort: false,
+    supportedEffortLevels: [],
+    contextWindow: 0,
+  }].concat(Kept);
+}
+
+let Models = WithLeanMode(ReadModelsCache());
 
 function ReadModelsCache() {
   try {
@@ -18,7 +33,7 @@ function ReadModelsCache() {
 }
 
 export function GetModels() {
-  return Models;
+  return WithLeanMode(Models);
 }
 
 export function SupportsEffort(Value, Effort) {

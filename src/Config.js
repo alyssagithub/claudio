@@ -22,6 +22,7 @@ export const DesktopConfigPath = (() => {
   return path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
 })();
 export const AllowedTools = [
+  "Agent",
   "mcp__robloxstudio-mcp__*",
   "mcp__Roblox_Studio__*",
   "mcp__roblox-docs__*",
@@ -33,13 +34,22 @@ export const AllowedTools = [
   "WebSearch",
   "WebFetch",
 ];
-export function SystemPromptFor(ServerNames) {
+export const CappedTools = ["Read", "Glob", "Grep"];
+export function SystemPromptFor(ServerNames, Delegating) {
   const Lines = ["You are Claudio, a chat assistant in a plugin widget docked in Roblox Studio."];
 
   if (ServerNames.length === 0) {
     Lines.push("No Roblox tool server is connected, so you cannot read or change the open place. Say that plainly instead of guessing at what the place contains, and tell the user to add one in the Claude desktop app's settings.");
   } else {
     Lines.push(`Read and change the open place with these connected tool servers: ${ServerNames.join(", ")}.`);
+  }
+
+  if (Delegating) {
+    Lines.push(
+      "Reading is delegated here. Count what the question needs before you touch a tool: if it needs more than one script, or the contents of a folder, or a search across the place, your first action is a single Agent call to the reader subagent describing everything you want at once, and it answers with a summary plus the paths and line numbers.",
+      "Never walk through several scripts yourself one call at a time; that is the mistake this mode exists to stop.",
+      "Read directly only when the question is about one named script, or when you are about to change a script and need its exact current text.",
+    );
   }
 
   Lines.push(
@@ -51,6 +61,9 @@ export function SystemPromptFor(ServerNames) {
     "EncodingService: Base64, Blake/MD5/SHA hashes, zstd.",
     "UIShadow: GuiObject shadow instance, has Enabled.",
     "Chrono (parihsz/Chrono on wally) takes over character and NPC replication. chrono.Start() on the server and the client is the whole setup, and each model picks NATIVE, NATIVE_WITH_LOCK or CUSTOM. Roblox sends at 20Hz with an interpolation delay you cannot change; Chrono lets you set and read it, keeps a snapshot history so a rewind lands where the player really was, and uses less bandwidth per entity. Its modules are Entity, Holder, Event, Snapshots, ReplicationRules, Stats, Receiver, ServerClock and EntityGrid. Signatures are at parihsz.github.io/Chrono.",
+  );
+
+  Lines.push(
     "Keep replies short. The widget renders headings, bold, italics, bullet lists, inline code, fenced code blocks, and instance paths as clickable links.",
   );
 
@@ -78,6 +91,67 @@ export const DesktopSessionsRoot = path.join(process.env.APPDATA || path.join(os
 export const OwnSessionsFile = path.join(os.homedir(), ".claudio", "sessions.json");
 export const LogFile = path.join(os.homedir(), ".claudio", "bridge.log");
 export const MaxImageWidth = 480;
+export const ToolsFolder = path.join(os.homedir(), ".claudio", "tools");
+export const AnalyzerVersion = "1.69.0";
+export const DefinitionsUrl = "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau";
+export const LeanMode = {
+  value: "token-saver",
+  displayName: "Token Saver (Experimental)",
+  description: "Auto tiering, delegated bulk reading, and oversized tool results truncated",
+};
+export const Modes = [
+  {
+    value: "auto",
+    label: "Auto",
+    detail: "Claude handles permission decisions",
+  },
+  {
+    value: "default",
+    label: "Manual",
+    detail: "Always ask before making changes",
+  },
+  {
+    value: "acceptEdits",
+    label: "Accept edits",
+    detail: "Automatically accept all place edits",
+  },
+  {
+    value: "plan",
+    label: "Plan",
+    detail: "Create a plan before making changes",
+  },
+];
+export const DefaultMode = "auto";
+export function PermissionModeFor(Mode, Bypass) {
+  if (Bypass === true) {
+    return "bypassPermissions";
+  }
+
+  return Modes.some((Entry) => Entry.value === Mode) ? Mode : DefaultMode;
+}
+export const PlanInstructions = [
+  "You are planning work on an open Roblox Studio place. Nothing you do in this phase may change the place.",
+  "Read the place first with the Roblox tools: search_objects, get_project_structure, grep_scripts and get_script_source are all read-only and safe.",
+  "Then write a numbered plan. Each step names the instance path it touches and what changes there.",
+  "Call out anything irreversible on its own line: destroying instances, rewriting a whole script, publishing, or changing Workspace properties.",
+  "Say plainly which steps you cannot verify without a playtest.",
+  "Keep the plan short enough to read in one go. Do not write the code yet.",
+].join(" ");
+export const Delegates = {
+  reader: {
+    description: "Reads Roblox instances, scripts and logs in bulk and returns a short summary. Use whenever a read would return more than a screen of text.",
+    tools: ["mcp__robloxstudio-mcp__*", "mcp__Roblox_Studio__*", "Read", "Glob", "Grep"],
+    prompt: [
+      "You read Roblox Studio state and report back compactly.",
+      "Answer only what was asked. Quote instance paths and line numbers so the caller can look at the real thing.",
+      "Never change anything. Never guess: if the answer is not in what you read, say so.",
+      "Prefer twenty accurate lines over two hundred vague ones.",
+    ].join(" "),
+    model: "haiku",
+  },
+};
+const ConfiguredResultCap = Number(process.env.CLAUDIO_RESULT_CAP);
+export const ResultCapCharacters = process.env.CLAUDIO_RESULT_CAP && Number.isFinite(ConfiguredResultCap) && ConfiguredResultCap >= 0 ? ConfiguredResultCap : 16000;
 export const ChaptersFile = path.join(os.homedir(), ".claudio", "chapters.json");
 export const CostsFile = path.join(os.homedir(), ".claudio", "costs.json");
 export const InstalledPluginFile = path.join(os.homedir(), ".claudio", "plugin.json");

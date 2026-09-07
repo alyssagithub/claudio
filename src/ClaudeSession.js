@@ -2,9 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
-import { AllowedTools, AutoTiers, CancelGraceMilliseconds, CoalesceMilliseconds, EffortOrder, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, SystemPromptFor, WorkingDirectory } from "./Config.js";
-import { AddDesktopSession, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession } from "./Conversations.js";
+import { AllowedTools, AutoTiers, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, SystemPromptFor, WorkingDirectory } from "./Config.js";
+import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
+import { CapToolOutput } from "./ResultCap.js";
 import { ChooseModel, GetModels, NextEffort, RecordTurnOutcome, RememberModels, SupportsEffort } from "./Models.js";
 
 const Turns = new Map();
@@ -584,6 +585,37 @@ function RouteMessage(Session, Message) {
     RememberServers(Message);
   }
 
+  if (Turn && Message.type === "system" && Message.subtype === "task_started") {
+    Publish(Turn, {
+      Tasks: Turn.Tasks.concat([{
+        Id: Message.task_id,
+        Description: Message.description || "Working",
+        Kind: Message.subagent_type || "task",
+        Status: "running",
+        Background: Message.is_backgrounded === true,
+        Depth: Message.spawn_depth || 1,
+      }]),
+    });
+
+    return;
+  }
+
+  if (Turn && Message.type === "system" && Message.subtype === "task_updated") {
+    Publish(Turn, {
+      Tasks: Turn.Tasks.map((Task) => Task.Id === Message.task_id
+        ? {
+          ...Task,
+          Status: (Message.patch && Message.patch.status) || Task.Status,
+          Description: (Message.patch && Message.patch.description) || Task.Description,
+          Background: Message.patch && Message.patch.is_backgrounded !== undefined ? Message.patch.is_backgrounded : Task.Background,
+          Error: (Message.patch && Message.patch.error) || Task.Error,
+        }
+        : Task),
+    });
+
+    return;
+  }
+
   if (!Turn) {
     return;
   }
@@ -747,7 +779,7 @@ function RouteMessage(Session, Message) {
   CloseIdleSessions();
 }
 
-function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskForTools, ExtraPrompt, FastMode) {
+function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskForTools, ExtraPrompt, FastMode, Planning, Delegating, Mode, Bypass) {
   const Pending = [];
   let Wake = null;
   let Ended = false;
@@ -761,6 +793,9 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
     ExtraPrompt: ExtraPrompt !== false,
     FastMode: FastMode === true,
     WorkingDirectory: TurnWorkingDirectory,
+    Planning: Planning === true,
+    Mode: PermissionModeFor(Mode, Bypass),
+    Delegating: Delegating === true,
     GuardTools: false,
     CurrentTurn: null,
     LastUsedAt: Date.now(),
@@ -831,9 +866,12 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
           effort: Effort || undefined,
           cwd: TurnWorkingDirectory,
           includePartialMessages: true,
-          settings: { fastMode: FastMode === true },
+          settings: { fastMode: FastMode === true, todoFeatureEnabled: true },
           thinking: { type: "adaptive", display: "summarized" },
-          permissionMode: "default",
+          permissionMode: Session.Mode,
+          planModeInstructions: PlanInstructions,
+          agents: Session.Delegating ? Delegates : undefined,
+          skills: Session.Delegating ? [] : undefined,
           hooks: {
             PreToolUse: [{
               hooks: [async (HookInput, ToolUseId, Options) => {
@@ -862,9 +900,39 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
                 };
               }],
             }],
+            UserPromptSubmit: [{
+              hooks: [async () => {
+                const Context = Session.PendingContext;
+
+                Session.PendingContext = "";
+
+                if (!Context) {
+                  return {};
+                }
+
+                Session.Place = Session.PendingPlace || Session.Place;
+
+                return { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: Context } };
+              }],
+            }],
+            PostToolUse: [{
+              hooks: [async (HookInput) => {
+                if (!Session.CapResults) {
+                  return {};
+                }
+
+                const Capped = CapToolOutput(HookInput.tool_name, HookInput.tool_response);
+
+                if (!Capped) {
+                  return {};
+                }
+
+                return { hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: Capped } };
+              }],
+            }],
           },
           mcpServers: ReadMcpServers(),
-          systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers())) },
+          systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.Delegating) },
         },
       });
 
@@ -949,9 +1017,11 @@ function DescribePlace(Place) {
   return `<studio_place>\n${Said}\n</studio_place>`;
 }
 
-export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForTools, GuardTools, Escalate, ExtraPrompt, FastMode, Place, Folder }) {
+export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForTools, GuardTools, Escalate, ExtraPrompt, FastMode, Mode, Place, Folder }) {
   const Existing = ConversationId ? GetConversation(ConversationId) : null;
-  const Auto = !Model || Model === "auto";
+  const Lean = Model === LeanMode.value;
+  const Auto = Lean || !Model || Model === "auto";
+  const Planning = Mode === "plan";
 
   if (Escalate && Auto) {
     RecordTurnOutcome(ConversationId, { Failed: true, Denied: false });
@@ -965,6 +1035,10 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     ConversationId,
     Prompt: Text,
     Auto,
+    CapResults: Lean,
+    Planning,
+    Delegating: Lean,
+    Tasks: [],
     Model: Chosen.model,
     Effort: Chosen.effort,
     AskForTools: AskForTools !== false,
@@ -999,7 +1073,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
   LastFolder = Turn.WorkingDirectory;
 
   const Warm = ConversationId ? Sessions.get(ConversationId) : TakeSpare(Chosen.model, Chosen.effort);
-  const Reusable = Warm && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory;
+  const Reusable = Warm && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory && Warm.Planning === Turn.Planning && Warm.Mode === PermissionModeFor(Turn.Mode, Turn.Bypass) && Warm.Delegating === Turn.Delegating;
 
   if (Warm && !Reusable) {
     Warm.Close();
@@ -1009,7 +1083,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Turn.Effort = Warm.Effort;
   }
 
-  const Session = (Reusable ? Warm : null) || OpenSession(ConversationId, Turn.WorkingDirectory, Chosen.model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode);
+  const Session = (Reusable ? Warm : null) || OpenSession(ConversationId, Turn.WorkingDirectory, Chosen.model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode, Turn.Planning, Turn.Delegating, Turn.Mode, Turn.Bypass);
 
   if (Session.Model !== Chosen.model && Session.Query) {
     Session.Model = Chosen.model;
@@ -1023,19 +1097,30 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
   Turn.Session = Session;
   Session.AskForTools = Turn.AskForTools;
   Session.GuardTools = Turn.GuardTools;
+  Session.CapResults = Turn.CapResults;
+  Session.Planning = Turn.Planning;
+  Session.Mode = PermissionModeFor(Turn.Mode, Turn.Bypass);
+  Session.Delegating = Turn.Delegating;
   Session.CurrentTurn = Turn;
   Session.LastUsedAt = Date.now();
 
   const Described = DescribePlace(Place);
+  const NewPlace = Described && Described !== Session.Place ? Described : "";
+  const VisibleText = StripContext(Text);
+  const CarriedContext = [NewPlace, ExtractContext(Text)].filter(Boolean).join("\n\n");
 
-  if (Described && Described !== Session.Place) {
-    Session.Place = Described;
-    Session.Send(UserMessage(`${Described}\n\n${Text}`, Images));
+  if (VisibleText === "" || CarriedContext === "") {
+    Session.PendingContext = "";
+    Session.PendingPlace = "";
+    Session.Place = NewPlace || Session.Place;
+    Session.Send(UserMessage(NewPlace ? NewPlace + "\n\n" + Text : Text, Images));
 
     return Turn;
   }
 
-  Session.Send(UserMessage(Text, Images));
+  Session.PendingContext = CarriedContext;
+  Session.PendingPlace = NewPlace;
+  Session.Send(UserMessage(VisibleText, Images));
 
   return Turn;
 }
@@ -1147,6 +1232,15 @@ export function DescribeTurn(Turn) {
       steps: Call.Steps || [],
       milliseconds: Call.Milliseconds,
     })),
+    tasks: Turn.Tasks.map((Task) => ({
+      id: Task.Id,
+      description: Task.Description,
+      kind: Task.Kind,
+      status: Task.Status,
+      background: Task.Background,
+      depth: Task.Depth,
+    })),
+    planning: Turn.Planning === true,
     milliseconds: Turn.Milliseconds || (Turn.Status === "running" ? Date.now() - Turn.StartedAt : 0),
     tokens: { input: Turn.Usage.Input, output: Turn.Usage.Output, cached: Turn.Usage.Cached },
     limits: GetLimits(),

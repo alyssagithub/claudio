@@ -2,3 +2,4 @@ node_modules/
 *.log
 *.claudio-backup
 Claudio.rbxm
+place/

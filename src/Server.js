@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { exec, execFile } from "node:child_process";
-import { LongPollMilliseconds, MaxBodyBytes, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
+import { DefaultMode, LongPollMilliseconds, MaxBodyBytes, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
 import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
@@ -13,6 +13,7 @@ import { HandToken, TokenMatches } from "./Token.js";
 import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
 import { ArmClipboard, DisarmClipboard, ReadClipboardImage, ShowToast, WriteClipboard } from "./Notify.js";
 import { ForgetConversation, GetModels } from "./Models.js";
+import { Analyze, Warm } from "./Lint.js";
 import { RestartBridge } from "./Startup.js";
 
 let LastLogin = { CheckedAt: 0, Result: null };
@@ -322,10 +323,22 @@ export function StartServer(Port) {
           GuardTools: Body.guardTools === true,
           ExtraPrompt: Body.extraPrompt !== false,
           FastMode: Body.fastMode === true,
+          Mode: typeof Body.mode === "string" ? Body.mode : DefaultMode,
+          Bypass: Body.bypass === true,
           Escalate: Body.escalate === true,
           Place: Body.place && typeof Body.place === "object" ? Body.place : null,
           Folder: typeof Body.workingDirectory === "string" ? Body.workingDirectory : null,
         })));
+        return;
+      }
+
+      if (Request.method === "POST" && Url.pathname === "/lint") {
+        const Body = await ReadBody(Request);
+        const Usable = (Entry) => Entry && typeof Entry.path === "string" && typeof Entry.source === "string" && Entry.source !== "";
+        const Wanted = (Array.isArray(Body.scripts) ? Body.scripts : []).filter(Usable).slice(0, 20);
+        const Tree = (Array.isArray(Body.tree) ? Body.tree : []).filter(Usable).slice(0, 3000);
+
+        SendJson(Response, 200, { scripts: (await Analyze(Wanted, Body.raw === true, Tree)) || [] });
         return;
       }
 
@@ -542,6 +555,7 @@ export function StartServer(Port) {
     const Reached = HandToken();
 
     console.log(`Claudio bridge listening on http://127.0.0.1:${Port}`);
+    Warm().catch(() => {});
 
     if (Reached === 0) {
       console.error("Could not hand the plugin its key: Studio has no settings file yet. Open Studio once, then restart the bridge.");

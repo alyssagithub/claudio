@@ -3,12 +3,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { exec, execFile } from "node:child_process";
-import { DefaultMode, LongPollMilliseconds, MaxBodyBytes, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
+import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
-import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, AnswerStudio, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
+import { AvatarFor } from "./EasterEgg.js";
 import { HandToken, TokenMatches } from "./Token.js";
 import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
 import { ArmClipboard, DisarmClipboard, ReadClipboardImage, ShowToast, WriteClipboard } from "./Notify.js";
@@ -342,6 +343,16 @@ export function StartServer(Port) {
         return;
       }
 
+      if (Request.method === "GET" && Url.pathname === "/aun") {
+        try {
+          SendJson(Response, 200, await AvatarFor(AunId));
+        } catch (Failure) {
+          SendJson(Response, 502, { error: Failure.message });
+        }
+
+        return;
+      }
+
       if (Request.method === "POST" && Url.pathname === "/decode") {
         const Body = await ReadBody(Request);
         const Decoded = typeof Body.data === "string" ? DecodeImage(Body.mediaType || "image/png", Body.data) : null;
@@ -468,8 +479,6 @@ export function StartServer(Port) {
         }
 
         try {
-          // The bridge first: if it cannot be installed nothing has changed yet,
-          // whereas a plugin swapped alone leaves the two halves disagreeing.
           const Commit = await InstallBridge(Body.version);
           const Installed = await InstallVersion(Body.version);
 
@@ -499,6 +508,13 @@ export function StartServer(Port) {
 
         if (!Turn) {
           SendJson(Response, 404, { error: "No such turn" });
+          return;
+        }
+
+        if (Request.method === "POST" && Segments[2] === "studio") {
+          const Done = await ReadBody(Request);
+
+          SendJson(Response, AnswerStudio(Turn, Done.id, Done.result) ? 200 : 409, DescribeTurn(Turn));
           return;
         }
 

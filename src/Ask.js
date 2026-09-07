@@ -26,8 +26,6 @@ const Description = [
   "An Other choice with a free text box is added to every question automatically, so never write one yourself.",
 ].join(" ");
 
-// The answer text is what the model sees, so it has to carry which question
-// each answer belongs to; the plugin renders from the question itself.
 function Describe(Questions, Answers) {
   const Parts = Questions.map((Entry) => {
     const Given = Answers[Entry.question];
@@ -45,11 +43,56 @@ function Describe(Questions, Answers) {
   ].join(" ");
 }
 
-export function AskServerFor(Pose) {
+const PlaytestDescription = [
+  "Start, stop or inspect a simulation of the open place, so behaviour that only happens at runtime can be checked.",
+  "Always stop what you started: a place left running keeps executing scripts, holds the editor in a running state, and every later edit lands in a data model that is about to be thrown away.",
+  "Check status first rather than assuming, and read the reply, because starting something already running and stopping something already stopped are both mistakes worth knowing about.",
+  "This runs the place without a player character, so server scripts, physics and module behaviour can be exercised but anything reading LocalPlayer or PlayerGui cannot.",
+].join(" ");
+
+const LintDescription = [
+  "Check scripts in the open place for analyzer warnings, including scripts nobody has edited.",
+  "Use it to survey a place you have just been given, before changing anything, so pre-existing problems are reported rather than silently attributed to your own edits.",
+  "Scripts you edit are already checked automatically after the edit, so do not call this straight after editing.",
+  "Pass paths to narrow it to part of the tree, or leave it empty to check everything.",
+].join(" ");
+
+function Report(Found) {
+  if (Found.error) {
+    return Found.error;
+  }
+
+  const Scripts = Found.scripts || [];
+
+  if (Scripts.length === 0) {
+    return `Checked ${Found.checked === 1 ? "1 script" : `${Found.checked || 0} scripts`} and found no warnings.`;
+  }
+
+  const Lines = Scripts.map((Entry) => [Entry.path].concat((Entry.lines || []).map((Warning) => `  ${Warning}`)).join("\n"));
+  const Counted = Found.checked === 1 ? "1 script" : `${Found.checked || 0} scripts`;
+
+  return [
+    `Checked ${Counted}. ${Scripts.length === 1 ? "One carries" : `${Scripts.length} carry`} warnings, none introduced in this session:`,
+    Lines.join("\n"),
+    "Report these to the user rather than fixing them unasked, because they were already there and fixing them is a separate decision.",
+  ].join("\n");
+}
+
+export function AskServerFor(Pose, Reach) {
   return createSdkMcpServer({
     name: AskServerName,
     version: "1.0.0",
     tools: [
+      tool("playtest", PlaytestDescription, { action: z.enum(["start", "stop", "pause", "status"]).describe("What to do. Use status to find out what is happening before changing it.") }, async (Input) => {
+        const Found = await Reach("playtest", { action: Input.action });
+
+        return { content: [{ type: "text", text: Found && Found.error ? Found.error : (Found && Found.text) || "Studio did not say what happened." }] };
+      }),
+      tool("lint", LintDescription, { paths: z.array(z.string()).optional().describe("Instance paths to check, such as ServerScriptService.Main. Omit to check the whole place.") }, async (Input) => {
+        const Found = await Reach("lint", { paths: Input.paths || [] });
+
+        return { content: [{ type: "text", text: Report(Found || {}) }] };
+      }),
       tool("ask", Description, { questions: z.array(Question).min(1).max(4) }, async (Input) => {
         const Answers = await Pose(Input.questions);
 

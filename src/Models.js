@@ -103,22 +103,16 @@ export function ForgetConversation(ConversationId) {
   Trouble.delete(ConversationId);
 }
 
-function BaseTier(Text, HasContext) {
+function Weight(Text, HasContext) {
   const Plain = Text.replace(/<studio_context>[\s\S]*?<\/studio_context>/g, "").trim();
+  const Words = Plain.split(/\s+/).length;
 
-  if (HardWords.test(Plain) || Plain.length > 600) {
-    return 4;
-  }
-
-  if (HasContext || EditWords.test(Plain) || Plain.length > 220) {
-    return 3;
-  }
-
-  if (Plain.length < 90 && Plain.split(/\s+/).length < 16) {
-    return 1;
-  }
-
-  return 2;
+  return Math.min(1, Math.min(0.3, Plain.length / 2000)
+    + Math.min(0.15, Words / 400)
+    + (HardWords.test(Plain) ? 0.32 : 0)
+    + (EditWords.test(Plain) ? 0.16 : 0)
+    + (HasContext ? 0.12 : 0)
+    + (Plain.includes("?") ? 0.05 : 0));
 }
 
 export function ChooseModel(ConversationId, Text, HasContext) {
@@ -130,5 +124,5 @@ export function ChooseModel(ConversationId, Text, HasContext) {
     Trouble.set(ConversationId, Escalation);
   }
 
-  return AutoTiers[Math.min(AutoTiers.length - 1, BaseTier(Text, HasContext) - 1 + Escalation)];
+  return AutoTiers[Math.round(Math.min(1, Weight(Text, HasContext) + Escalation * 0.17) * (AutoTiers.length - 1))];
 }

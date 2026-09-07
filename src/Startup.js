@@ -89,8 +89,6 @@ export async function RestartBridge(Port) {
 
   await StopBridge(Port);
 
-  // Launching while the old one still holds the port just kills the new
-  // process, and the machine quietly carries on with the build being replaced.
   for (let Attempt = 0; Attempt < 60; Attempt += 1) {
     if (!(await PortIsBusy(Port))) {
       LaunchHidden();

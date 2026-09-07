@@ -925,6 +925,30 @@ function Chat.Send(Text: string, Quiet: string?)
 		return
 	end
 
+	if Text:lower():match("^%s*aun%s*$") then
+		Append({Role = "user", Text = Text})
+
+		task.spawn(function()
+			const Ok, Found = Client.Aun()
+
+			if not Ok then
+				Append({Role = "assistant", Text = "aun is not answering right now."})
+
+				return
+			end
+
+			const Built, Picture = pcall(Pictures.Build, Found.width, Found.height, Found.pixels)
+
+			Append({
+				Role = "assistant",
+				Text = Found.name,
+				Images = if Built then {Picture} else nil,
+			})
+		end)
+
+		return
+	end
+
 	local Full = Text
 
 	if Settings.Get("AttachSelection")() then

@@ -6,8 +6,6 @@ import { WritePluginSetting } from "./PluginSettings.js";
 
 let Current = null;
 
-// The file mode is a POSIX idea and Windows ignores it; what actually protects
-// this is the profile directory it sits in.
 function Remember(Value) {
   try {
     fs.mkdirSync(path.dirname(TokenFile), { recursive: true });
@@ -32,9 +30,6 @@ function Stored() {
   }
 }
 
-// The same secret every run, so a bridge restart does not lock out a Studio
-// that is already open. It is handed to the plugin through Studio's plugin
-// settings, which a playtested place cannot read.
 export function EnsureToken() {
   if (Current) {
     return Current;
@@ -50,8 +45,6 @@ export function EnsureToken() {
   return Current;
 }
 
-// Studio rewrites its settings from memory when it closes, so the handover is
-// repeated at every bridge start rather than assumed to have stuck.
 export function HandToken() {
   return WritePluginSetting("BridgeToken", EnsureToken());
 }

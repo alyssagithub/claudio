@@ -7,7 +7,9 @@ const Create = Vide.create
 return function(Image: () -> EditableImage, LayoutOrder: number)
 	return Create "ImageLabel" {
 		Name = "Picture",
-		Size = UDim2.fromScale(1, 0),
+		Size = function()
+			return UDim2.new(1, 0, 0, Image().Size.Y)
+		end,
 		BackgroundColor3 = Theme.Colors.Code,
 		ScaleType = Enum.ScaleType.Fit,
 		LayoutOrder = LayoutOrder,

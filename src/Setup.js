@@ -51,10 +51,6 @@ async function EnsureClaude(Manual) {
   return true;
 }
 
-// Sign in here rather than in a window of our own. A window we open gets a
-// console we cannot vouch for, and a sign-in prompt that will not take
-// keystrokes is indistinguishable from a hung install; this terminal is one
-// the person is already typing in.
 function SignIn() {
   return new Promise((Resolve) => {
     if (!process.stdin.isTTY) {

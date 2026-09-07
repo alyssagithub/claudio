@@ -4,6 +4,7 @@ import path from "node:path";
 export const Version = "1.2.0";
 export const ProtocolVersion = 1;
 export const DefaultPort = 47225;
+export const AunId = "264787011452403712";
 export const LongPollMilliseconds = 10000;
 export const CoalesceMilliseconds = 120;
 export const FinishedTurnLifetimeMilliseconds = 10 * 60 * 1000;
@@ -138,6 +139,7 @@ export const PlanInstructions = [
   "Say plainly which steps you cannot verify without a playtest.",
   "Keep the plan short enough to read in one go. Do not write the code yet.",
 ].join(" ");
+export const DelegateModels = ["haiku", "sonnet"];
 export const Delegates = {
   reader: {
     description: "Reads Roblox instances, scripts and logs in bulk and returns a short summary. Use whenever a read would return more than a screen of text.",
@@ -148,7 +150,6 @@ export const Delegates = {
       "Never change anything. Never guess: if the answer is not in what you read, say so.",
       "Prefer twenty accurate lines over two hundred vague ones.",
     ].join(" "),
-    model: "haiku",
   },
 };
 const ConfiguredResultCap = Number(process.env.CLAUDIO_RESULT_CAP);
@@ -164,11 +165,19 @@ export const IdleSessionMilliseconds = 4 * 60 * 1000;
 export const MaxWarmSessions = 2;
 export const ModelsCacheFile = path.join(os.homedir(), ".claudio", "models.json");
 export const AutoTiers = [
-  { model: "haiku", effort: null },
-  { model: "sonnet", effort: "medium" },
-  { model: "default", effort: "medium" },
-  { model: "default", effort: "high" },
-  { model: "default", effort: "max" },
+  { model: "haiku", effort: null, delegate: "haiku" },
+  { model: "sonnet", effort: "none", delegate: "haiku" },
+  { model: "sonnet", effort: "low", delegate: "haiku" },
+  { model: "sonnet", effort: "medium", delegate: "haiku" },
+  { model: "sonnet", effort: "high", delegate: "haiku" },
+  { model: "sonnet", effort: "xhigh", delegate: "haiku" },
+  { model: "sonnet", effort: "max", delegate: "haiku" },
+  { model: "default", effort: "none", delegate: "haiku" },
+  { model: "default", effort: "low", delegate: "haiku" },
+  { model: "default", effort: "medium", delegate: "haiku" },
+  { model: "default", effort: "high", delegate: "haiku" },
+  { model: "default", effort: "xhigh", delegate: "sonnet" },
+  { model: "default", effort: "max", delegate: "sonnet" },
 ];
 export const CancelGraceMilliseconds = 5000;
 export const EffortOrder = ["none", "low", "medium", "high", "xhigh", "max"];

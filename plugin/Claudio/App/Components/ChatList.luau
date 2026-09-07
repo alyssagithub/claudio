@@ -21,8 +21,6 @@ const function When(Stamp: number): string
 	return if Ok then Text else "unknown"
 end
 
--- Counting whole calendar days rather than elapsed seconds, so a clock that
--- crosses a daylight saving change does not shift what counts as yesterday.
 const function DayNumber(Stamp: number): number
 	const Ok, Text = pcall(function()
 		return os.date("%Y-%m-%d", Stamp // 1000)

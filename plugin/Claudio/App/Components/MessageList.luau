@@ -33,7 +33,7 @@ const function Describe(Model: string?, Effort: string?, Auto: boolean?): string
 
 	const Named = Format.Model(Model)
 
-	return if Effort then `Auto mode picked {Named} at {Effort} effort for this message` else `Auto mode picked {Named} for this message`
+	return if Effort and Effort ~= "none" then `Auto mode picked {Named} at {Effort} effort for this message` else `Auto mode picked {Named} for this message`
 end
 
 const function Queued(Entry: () -> Types.QueuedMessage, Index: number)

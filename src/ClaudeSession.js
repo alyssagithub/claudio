@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
-import { AllowedTools, AutoTiers, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, SystemPromptFor, WorkingDirectory } from "./Config.js";
+import { AllowedTools, AutoTiers, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DelegateModels, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, SystemPromptFor, WorkingDirectory } from "./Config.js";
 import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
@@ -370,6 +370,28 @@ function Describe(Value) {
   }
 }
 
+function AgentsOn(Model) {
+  const Named = {};
+
+  for (const [Name, Agent] of Object.entries(Delegates)) {
+    Named[Name] = { ...Agent, model: Model };
+  }
+
+  return Named;
+}
+
+function DelegateFor(Block, Model) {
+  if (Block.name !== "Agent" && Block.name !== "Task") {
+    return null;
+  }
+
+  if (!Block.input || !Delegates[Block.input.subagent_type]) {
+    return null;
+  }
+
+  return { name: Block.input.subagent_type, model: Model };
+}
+
 function DescribeInput(Input) {
   if (!Input || typeof Input !== "object" || Array.isArray(Input)) {
     return Describe(Input);
@@ -502,6 +524,40 @@ function AskQuestion(Session, Questions) {
   });
 }
 
+function AskStudio(Session, Kind, Input) {
+  return new Promise((Resolve) => {
+    const Turn = Session.CurrentTurn;
+
+    if (!Turn) {
+      Resolve({ error: "No turn is running, so Studio cannot be reached." });
+      return;
+    }
+
+    Turn.Studio = {
+      Id: `${Turn.Id}-studio-${Turn.PermissionCount += 1}`,
+      Kind,
+      Input,
+      Resolve,
+    };
+
+    Publish(Turn, {});
+  });
+}
+
+export function AnswerStudio(Turn, JobId, Result) {
+  const Waiting = Turn.Studio;
+
+  if (!Waiting || Waiting.Id !== JobId) {
+    return false;
+  }
+
+  Turn.Studio = null;
+  Publish(Turn, {});
+  Waiting.Resolve(Result);
+
+  return true;
+}
+
 export function AnswerQuestion(Turn, QuestionId, Answers) {
   const Asked = Turn.Question;
 
@@ -613,7 +669,6 @@ function RecordStep(Turn, Message) {
 function RouteMessage(Session, Message) {
   const Turn = Session.CurrentTurn;
 
-
   if (Message.type === "system" && Message.subtype === "init") {
     RememberCommands(Message);
     RememberServers(Message);
@@ -712,6 +767,7 @@ function RouteMessage(Session, Message) {
       Status: "running",
       StartedAt: Date.now(),
       Milliseconds: 0,
+      Delegate: DelegateFor(Block, Turn.Delegate),
     }));
 
     Publish(Turn, {
@@ -813,7 +869,7 @@ function RouteMessage(Session, Message) {
   CloseIdleSessions();
 }
 
-function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskForTools, ExtraPrompt, FastMode, Planning, Delegating, Mode, Bypass) {
+function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskForTools, ExtraPrompt, FastMode, Planning, Delegating, Mode, Bypass, Delegate) {
   const Pending = [];
   let Wake = null;
   let Ended = false;
@@ -823,6 +879,7 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
     ConversationId,
     Model,
     Effort,
+    Delegate,
     AskForTools,
     ExtraPrompt: ExtraPrompt !== false,
     FastMode: FastMode === true,
@@ -904,7 +961,7 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
           thinking: { type: "adaptive", display: "summarized" },
           permissionMode: Session.Mode,
           planModeInstructions: PlanInstructions,
-          agents: Session.Delegating ? Delegates : undefined,
+          agents: Session.Delegating ? AgentsOn(Session.Delegate) : undefined,
           skills: Session.Delegating ? [] : undefined,
           hooks: {
             PreToolUse: [{
@@ -969,7 +1026,7 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
               }],
             }],
           },
-          mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions)) },
+          mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions), (Kind, Input) => AskStudio(Session, Kind, Input)) },
           systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.Delegating) },
         },
       });
@@ -1017,8 +1074,6 @@ export function LastUsedFolder() {
   return LastFolder;
 }
 
-// Warming a spare in the wrong folder is worse than not warming one, because
-// a mismatched spare cannot be reused. Wait until a turn tells us the folder.
 export function KeepSpareWarm() {
   if (!KeepSessionsWarm || Spare || !LastFolder) {
     return;
@@ -1079,6 +1134,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Tasks: [],
     Model: Chosen.model,
     Effort: Chosen.effort,
+    Delegate: Chosen.delegate || DelegateModels[0],
     AskForTools: AskForTools !== false,
     GuardTools: GuardTools === true,
     ExtraPrompt: ExtraPrompt !== false,
@@ -1103,6 +1159,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Permissions: [],
     PermissionCount: 0,
     Question: null,
+    Studio: null,
     Error: null,
     Version: 0,
     Waiters: [],
@@ -1112,7 +1169,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
   LastFolder = Turn.WorkingDirectory;
 
   const Warm = ConversationId ? Sessions.get(ConversationId) : TakeSpare(Chosen.model, Chosen.effort);
-  const Reusable = Warm && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory && Warm.Planning === Turn.Planning && Warm.Mode === PermissionModeFor(Turn.Mode, Turn.Bypass) && Warm.Delegating === Turn.Delegating;
+  const Reusable = Warm && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory && Warm.Planning === Turn.Planning && Warm.Mode === PermissionModeFor(Turn.Mode, Turn.Bypass) && Warm.Delegating === Turn.Delegating && Warm.Delegate === Turn.Delegate;
 
   if (Warm && !Reusable) {
     Warm.Close();
@@ -1122,7 +1179,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Turn.Effort = Warm.Effort;
   }
 
-  const Session = (Reusable ? Warm : null) || OpenSession(ConversationId, Turn.WorkingDirectory, Chosen.model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode, Turn.Planning, Turn.Delegating, Turn.Mode, Turn.Bypass);
+  const Session = (Reusable ? Warm : null) || OpenSession(ConversationId, Turn.WorkingDirectory, Chosen.model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode, Turn.Planning, Turn.Delegating, Turn.Mode, Turn.Bypass, Turn.Delegate);
 
   if (Session.Model !== Chosen.model && Session.Query) {
     Session.Model = Chosen.model;
@@ -1260,6 +1317,7 @@ export function DescribeTurn(Turn) {
     auto: Turn.Auto,
     imageCount: Turn.Images.length,
     question: Turn.Question ? { id: Turn.Question.Id, questions: Turn.Question.Questions } : null,
+    studio: Turn.Studio ? { id: Turn.Studio.Id, kind: Turn.Studio.Kind, input: Turn.Studio.Input } : null,
     permission: Turn.Permissions.length > 0
       ? { id: Turn.Permissions[0].Id, tool: Turn.Permissions[0].ToolName, input: JSON.stringify(Turn.Permissions[0].Input).slice(0, 600) }
       : null,
@@ -1271,6 +1329,7 @@ export function DescribeTurn(Turn) {
       status: Call.Status,
       steps: Call.Steps || [],
       milliseconds: Call.Milliseconds,
+      delegate: Call.Delegate || null,
     })),
     tasks: Turn.Tasks.map((Task) => ({
       id: Task.Id,

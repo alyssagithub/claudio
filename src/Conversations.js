@@ -237,8 +237,6 @@ function IsPromptLine(Line) {
 
 const Parsed = new Map();
 
-// Claude Code can be killed mid-write, leaving a line with no newline after
-// it. Appending to that joins two records into one and both readers lose it.
 function EndsCleanly(File) {
   try {
     const Size = fs.statSync(File).size;
@@ -259,8 +257,6 @@ function EndsCleanly(File) {
   }
 }
 
-// A rename is appended, so the newest title lives at the end of a file the
-// head read never reaches. Only title lines matter here.
 function ReadTail(File) {
   try {
     const Size = fs.statSync(File).size;
@@ -361,8 +357,6 @@ function StampOf(Entry) {
   return Entry && typeof Entry.timestamp === "string" ? Date.parse(Entry.timestamp) : NaN;
 }
 
-// The first stamped line is when the chat began; a transcript with no stamps
-// falls back to when its file was created.
 function StartedAt(Lines, File) {
   for (const Entry of Lines) {
     if (Number.isFinite(StampOf(Entry))) {
@@ -373,9 +367,6 @@ function StartedAt(Lines, File) {
   return fs.statSync(File).birthtimeMs;
 }
 
-// The file's own modification time is not the last message: the desktop app
-// rewrites a transcript for reasons that leave no new message behind, so the
-// stamp has to come from the last line that actually carries one.
 function EndedAt(Lines, File) {
   for (let Index = Lines.length - 1; Index >= 0; Index -= 1) {
     if (Number.isFinite(StampOf(Lines[Index]))) {
@@ -415,7 +406,6 @@ export function ListConversations() {
       if (!Name.endsWith(".jsonl") || (!Desktop[Id] && !Own.has(Id))) {
         continue;
       }
-
 
       const File = path.join(Folder, Name);
       const Lines = ReadLines(File).concat(ReadTail(File));

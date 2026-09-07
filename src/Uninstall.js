@@ -8,8 +8,6 @@ import { EnsureToken } from "./Token.js";
 import { ForgetPluginSetting } from "./PluginSettings.js";
 import { ReadConfig, RobloxServer, WriteConfig } from "./DesktopConfig.js";
 
-// The bridge's log is opened by the cmd that launched it, not by node, so the
-// handle can outlive the port closing. Keep trying for a few seconds.
 async function Remove(Target, Label, Removed, Kept) {
   if (!fs.existsSync(Target)) {
     Kept.push(`${Label} was not there`);
@@ -47,8 +45,6 @@ function DropMcpServer(Removed, Kept) {
     return;
   }
 
-  // Setup skips writing when an entry is already there, so an entry that does
-  // not match ours is the person's own and is not Claudio's to delete.
   const Same = Entry.command === RobloxServer.command
     && Array.isArray(Entry.args)
     && Entry.args.length === RobloxServer.args.length

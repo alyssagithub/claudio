@@ -4,10 +4,6 @@ import path from "node:path";
 
 const SettingPrefix = "Claudio_";
 
-// Studio keeps the settings for locally installed plugins in one flat JSON
-// file per Roblox account, and reads it back live rather than only at startup.
-// Game scripts cannot reach plugin settings, which is what makes this a usable
-// channel for a secret the plugin needs and a playtested place must not have.
 function SettingsFiles() {
   const Root = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "Roblox");
   const Found = [];
@@ -41,10 +37,6 @@ function ReadSettings(File) {
   }
 }
 
-
-// Studio rewrites this file from its own memory when it closes, so a value
-// written here can be lost on exit. Writing it again at every bridge start is
-// what keeps it true, rather than assuming one write lasts.
 export function WritePluginSetting(Key, Value) {
   const Files = SettingsFiles();
   let Written = 0;

@@ -17,7 +17,6 @@ return function()
 	const Picked = Vide.source({} :: {[string]: {[string]: boolean}})
 	const Written = Vide.source({} :: {[string]: string})
 	const Shut = Vide.source(false)
-	const Settled = Vide.source({} :: {{Question: string, Given: string}})
 
 	const function Asked(): {Types.Question}
 		const Held = Chat.Question()
@@ -99,17 +98,10 @@ return function()
 			end
 		end
 
-		const Record = {}
-
-		for _, Question in Asked() do
-			table.insert(Record, {Question = Question.question, Given = Answer(Question)})
-		end
-
 		Step(1)
 		Picked({})
 		Written({})
 		Shut(false)
-		Settled(Record)
 		Chat.Reply(Answers)
 	end
 
@@ -118,7 +110,6 @@ return function()
 		Picked({})
 		Written({})
 		Shut(false)
-		Settled({})
 		Chat.Reply(nil)
 	end
 
@@ -276,75 +267,6 @@ return function()
 		}
 	end
 
-	const function Summary()
-		return Create "Frame" {
-			Name = "Answered",
-			Size = UDim2.fromScale(1, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundColor3 = Theme.Colors.Panel,
-			LayoutOrder = 1500001,
-			Visible = function()
-				return Current() == nil and #Settled() > 0
-			end,
-
-			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-			Create "UIPadding" {
-				PaddingLeft = UDim.new(0, 10),
-				PaddingRight = UDim.new(0, 10),
-				PaddingTop = UDim.new(0, 8),
-				PaddingBottom = UDim.new(0, 8),
-			},
-			Create "UIListLayout" {
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				HorizontalFlex = Enum.UIFlexAlignment.Fill,
-				Padding = UDim.new(0, 4),
-			},
-			Vide.indexes(Settled, function(Entry: () -> {Question: string, Given: string}, Index: number)
-				return Create "Frame" {
-					Name = "Line",
-					Size = UDim2.fromScale(1, 0),
-					AutomaticSize = Enum.AutomaticSize.Y,
-					BackgroundTransparency = 1,
-					LayoutOrder = Index,
-
-					Create "UIListLayout" {SortOrder = Enum.SortOrder.LayoutOrder},
-					Create "TextLabel" {
-						Name = "Question",
-						Size = UDim2.fromScale(1, 0),
-						AutomaticSize = Enum.AutomaticSize.Y,
-						BackgroundTransparency = 1,
-						TextColor3 = Theme.Colors.DimText,
-						TextSize = Settings.SmallText,
-						FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-						TextXAlignment = Enum.TextXAlignment.Left,
-						TextWrapped = true,
-						LayoutOrder = 1,
-						Text = function()
-							return Entry().Question
-						end,
-					},
-					Create "TextLabel" {
-						Name = "Given",
-						Size = UDim2.fromScale(1, 0),
-						AutomaticSize = Enum.AutomaticSize.Y,
-						BackgroundTransparency = 1,
-						TextColor3 = Theme.Colors.Text,
-						TextSize = Settings.TextSize,
-						FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
-						TextXAlignment = Enum.TextXAlignment.Left,
-						TextWrapped = true,
-						LayoutOrder = 2,
-						Text = function()
-							const Given = Entry().Given
-
-							return if Given == "" then "Skipped" else Given
-						end,
-					},
-				}
-			end),
-		}
-	end
-
 	return Create "Frame" {
 		Name = "Asking",
 		Size = UDim2.new(1, -16, 0, 0),
@@ -361,7 +283,6 @@ return function()
 			HorizontalFlex = Enum.UIFlexAlignment.Fill,
 			Padding = UDim.new(0, 6),
 		},
-		Summary(),
 		Create "Frame" {
 			Name = "QuestionCard",
 		Size = UDim2.fromScale(1, 0),

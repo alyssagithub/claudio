@@ -14,6 +14,8 @@ const Icon = require(script.Parent.Icon)
 const IconButton = require(script.Parent.IconButton)
 const Button = require(script.Parent.Button)
 
+const TextService = game:GetService("TextService")
+
 const Create = Vide.create
 
 type Props = {
@@ -42,7 +44,15 @@ const function IsCommand(Name: string): boolean
 	return Name == "Bash" or Name == "PowerShell"
 end
 
-const function Describe(Name: string, Running: boolean): string
+const function Describe(Entry: Types.ToolCall, Running: boolean): string
+	if Entry.delegate then
+		const Sent = Entry.delegate :: {name: string, model: string}
+
+		return `{if Running then "Delegating" else "Delegated"} to the {Sent.name} on {Format.Model(Sent.model)}`
+	end
+
+	const Name = Entry.name
+
 	if IsCommand(Name) then
 		return if Running then "Running a command" else "Ran a command"
 	end
@@ -109,6 +119,14 @@ return function(Props: Props)
 
 	const function IsUser(): boolean
 		return Props.Role() == "user"
+	end
+
+	const function Hug(): number
+		if not IsUser() or (Props.Images ~= nil and #Props.Images() > 0) then
+			return math.huge
+		end
+
+		return TextService:GetTextSize(Props.Text(), Settings.TextSize(), Enum.Font.BuilderSans, Vector2.new(9999, 9999)).X + 21
 	end
 
 	const function Segment(Value: () -> Markdown.Segment)
@@ -211,6 +229,20 @@ return function(Props: Props)
 
 	const Listed = Vide.source(false)
 
+	const function Asked(Entry: Types.ToolCall): {{Question: string, Given: string}}
+		const Pairs = {}
+
+		if Entry.name ~= Config.AskTool then
+			return Pairs
+		end
+
+		for Question, Given in Entry.output:gmatch('"([^"]+)"="([^"]*)"') do
+			table.insert(Pairs, {Question = Question, Given = Given})
+		end
+
+		return Pairs
+	end
+
 	const function Call(Value: () -> Types.ToolCall, Index: number)
 		const Open = Vide.source(false)
 
@@ -221,7 +253,7 @@ return function(Props: Props)
 			BackgroundTransparency = 1,
 			LayoutOrder = Index,
 			Visible = function()
-				return Listed() or Chat.Thinking()
+				return #Asked(Value()) > 0 or Listed() or Chat.Thinking()
 			end,
 
 			Create "UIListLayout" {
@@ -229,11 +261,80 @@ return function(Props: Props)
 				HorizontalFlex = Enum.UIFlexAlignment.Fill,
 				Padding = UDim.new(0, 4),
 			},
+			Create "Frame" {
+				Name = "Answered",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundColor3 = Theme.Colors.Panel,
+				LayoutOrder = 0,
+				Visible = function()
+					return #Asked(Value()) > 0
+				end,
+
+				Create "UICorner" {CornerRadius = UDim.new(0, 6)},
+				Create "UIPadding" {
+					PaddingLeft = UDim.new(0, 10),
+					PaddingRight = UDim.new(0, 10),
+					PaddingTop = UDim.new(0, 8),
+					PaddingBottom = UDim.new(0, 8),
+				},
+				Create "UIListLayout" {
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					HorizontalFlex = Enum.UIFlexAlignment.Fill,
+					Padding = UDim.new(0, 8),
+				},
+				Vide.indexes(function()
+					return Asked(Value())
+				end, function(Pair: () -> {Question: string, Given: string}, Order: number)
+					return Create "Frame" {
+						Name = "Line",
+						Size = UDim2.fromScale(1, 0),
+						AutomaticSize = Enum.AutomaticSize.Y,
+						BackgroundTransparency = 1,
+						LayoutOrder = Order,
+
+						Create "UIListLayout" {SortOrder = Enum.SortOrder.LayoutOrder},
+						Create "TextLabel" {
+							Name = "Question",
+							Size = UDim2.fromScale(1, 0),
+							AutomaticSize = Enum.AutomaticSize.Y,
+							BackgroundTransparency = 1,
+							TextColor3 = Theme.Colors.DimText,
+							TextSize = Settings.SmallText,
+							FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+							TextXAlignment = Enum.TextXAlignment.Left,
+							TextWrapped = true,
+							LayoutOrder = 1,
+							Text = function()
+								return Pair().Question
+							end,
+						},
+						Create "TextLabel" {
+							Name = "Given",
+							Size = UDim2.fromScale(1, 0),
+							AutomaticSize = Enum.AutomaticSize.Y,
+							BackgroundTransparency = 1,
+							TextColor3 = Theme.Colors.Text,
+							TextSize = Settings.TextSize,
+							FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+							TextXAlignment = Enum.TextXAlignment.Left,
+							TextWrapped = true,
+							LayoutOrder = 2,
+							Text = function()
+								return (Pair().Given:gsub(",", ", "))
+							end,
+						},
+					}
+				end),
+			},
 			Create "TextButton" {
 				Name = "Header",
 				Size = UDim2.fromScale(1, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
+				Visible = function()
+					return #Asked(Value()) == 0
+				end,
 				Text = "",
 				AutoButtonColor = false,
 				LayoutOrder = 1,
@@ -273,10 +374,10 @@ return function(Props: Props)
 						const Entry = Value()
 
 						if Entry.status == "running" then
-							return Describe(Entry.name, true)
+							return Describe(Entry, true)
 						end
 
-						return `{Describe(Entry.name, false)}{if Entry.status == "error" then " · failed" else ""}`
+						return `{Describe(Entry, false)}{if Entry.status == "error" then " · failed" else ""}`
 					end,
 				},
 			},
@@ -346,7 +447,12 @@ return function(Props: Props)
 
 		Create "UIListLayout" {
 			SortOrder = Enum.SortOrder.LayoutOrder,
-			HorizontalFlex = Enum.UIFlexAlignment.Fill,
+			HorizontalFlex = function()
+				return if IsUser() then Enum.UIFlexAlignment.None else Enum.UIFlexAlignment.Fill
+			end,
+			HorizontalAlignment = function()
+				return if IsUser() then Enum.HorizontalAlignment.Right else Enum.HorizontalAlignment.Left
+			end,
 			Padding = UDim.new(0, 2),
 		},
 		Create "Frame" {
@@ -360,6 +466,11 @@ return function(Props: Props)
 			LayoutOrder = 1,
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 8)},
+			Create "UISizeConstraint" {
+				MaxSize = function()
+					return Vector2.new(Hug(), math.huge)
+				end,
+			},
 			Create "UIPadding" {
 				PaddingLeft = UDim.new(0, 10),
 				PaddingRight = UDim.new(0, 10),
@@ -425,7 +536,17 @@ return function(Props: Props)
 				AutoButtonColor = false,
 				LayoutOrder = 0,
 				Visible = function()
-					return not Listed() and not Chat.Thinking() and Props.Calls ~= nil and #Props.Calls() > 0
+					if Listed() or Chat.Thinking() or not Props.Calls then
+						return false
+					end
+
+					for _, Entry in Props.Calls() do
+						if Entry.name ~= Config.AskTool then
+							return true
+						end
+					end
+
+					return false
 				end,
 				Activated = function()
 					Listed(not Listed())
@@ -449,10 +570,24 @@ return function(Props: Props)
 					Text = function()
 						const Calls: {Types.ToolCall} = if Props.Calls then Props.Calls() else {}
 						local Commands = 0
+						local Questions = 0
+						local Sent = 0
 
 						for _, Entry in Calls do
+							if Entry.name == Config.AskTool then
+								Questions += 1
+
+								continue
+							end
+
 							if Entry.status == "running" then
-								return Describe(Entry.name, true)
+								return Describe(Entry, true)
+							end
+
+							if Entry.delegate then
+								Sent += 1
+
+								continue
 							end
 
 							if IsCommand(Entry.name) then
@@ -460,15 +595,24 @@ return function(Props: Props)
 							end
 						end
 
-						const Tools = #Calls - Commands
+						const Tools = #Calls - Commands - Questions - Sent
+						const Parts = {}
 
-						if Commands == 0 then
-							return `Used {Tools} tool{if Tools == 1 then "" else "s"}`
+						if Sent > 0 then
+							table.insert(Parts, if Sent == 1 then "Delegated a read" else `Delegated {Sent} reads`)
 						end
 
-						const Ran = if Commands == 1 then "Ran a command" else `Ran {Commands} commands`
+						if Commands > 0 then
+							table.insert(Parts, if Commands == 1 then "ran a command" else `ran {Commands} commands`)
+						end
 
-						return if Tools == 0 then Ran else `{Ran}, used {Tools} tool{if Tools == 1 then "" else "s"}`
+						if Tools > 0 or #Parts == 0 then
+							table.insert(Parts, `used {Tools} tool{if Tools == 1 then "" else "s"}`)
+						end
+
+						const Line = table.concat(Parts, ", ")
+
+						return `{Line:sub(1, 1):upper()}{Line:sub(2)}`
 					end,
 				},
 				Icon {

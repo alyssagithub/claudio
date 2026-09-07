@@ -14,6 +14,10 @@ const Call = Typed.table({
 	status = Typed.string(),
 	milliseconds = Typed.number(),
 	steps = Typed.optional(Typed.array(Typed.string())),
+	delegate = Typed.optional(Typed.table({
+		name = Typed.string(),
+		model = Typed.string(),
+	})),
 })
 
 const Asked = Typed.table({

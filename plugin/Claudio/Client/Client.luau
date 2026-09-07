@@ -124,6 +124,10 @@ function Client.AnswerQuestion(RequestId: string, QuestionId: string, Answers: {
 	})
 end
 
+function Client.Aun(): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/aun`)
+end
+
 function Client.GetImage(RequestId: string, Index: number): (boolean, any)
 	return Http.Request("GET", `{BaseUrl()}/turn/{RequestId}/image/{Index}`)
 end

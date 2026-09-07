@@ -79,9 +79,6 @@ export async function ListReleases() {
   return Releases.List;
 }
 
-// What this downloads becomes the code Studio loads next start, so the version
-// is checked here as well as at the route, and the file has to come from where
-// the release says it should.
 function FromGitHub(Url) {
   try {
     const Parsed = new URL(Url);
@@ -92,9 +89,6 @@ function FromGitHub(Url) {
   }
 }
 
-// The plugin and the bridge are cut from the same commit, so moving to another
-// version has to move both or the halves disagree about what they are talking
-// to. The tag resolves to the commit the release was built from.
 async function CommitFor(Version) {
   const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/commits/v${Version}`, {
     headers: { "User-Agent": "claudio-installer" },
@@ -172,9 +166,6 @@ export async function InstallVersion(Version) {
   return Release.tag_name;
 }
 
-// Studio reads this file at startup, so it must never see half of one. An
-// error page from a CDN is also a valid 200, and rbxm files start with a
-// known magic string, so check it before it lands.
 export function InstalledPluginVersion() {
   try {
     const Recorded = JSON.parse(fs.readFileSync(InstalledPluginFile, "utf8").replace(/^﻿/, "")).version;

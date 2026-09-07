@@ -114,6 +114,7 @@ export type ToolCall = {
 	status: "running" | "done" | "error",
 	milliseconds: number,
 	steps: {string}?,
+	delegate: {name: string, model: string}?,
 }
 
 export type Release = {

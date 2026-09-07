@@ -9,8 +9,6 @@ export const RobloxServer = {
     : ["-y", "@chrrxs/robloxstudio-mcp@latest", "--auto-install-plugin"],
 };
 
-// Three outcomes, not two. Treating an unreadable config as a missing one
-// overwrites whatever the person already had in it.
 export function ReadConfig() {
   let Text;
 
@@ -27,8 +25,6 @@ export function ReadConfig() {
   }
 }
 
-// Claude Desktop reads this file while we write it, so land it in one rename
-// rather than leaving a window where it is half a document.
 export function WriteConfig(Config) {
   const Temporary = `${DesktopConfigPath}.claudio-writing`;
 

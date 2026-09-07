@@ -1,7 +1,7 @@
 --!strict
 return {
 	Name = "Claudio",
-	Version = "1.1.0",
+	Version = "1.2.0",
 	ProtocolVersion = 1,
 	DefaultPort = 47225,
 	WidgetId = "ClaudioChat",

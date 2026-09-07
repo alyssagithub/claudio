@@ -105,6 +105,11 @@ return {
 		model = Typed.optional(Typed.string()),
 		effort = Typed.optional(Typed.string()),
 		auto = Typed.optional(Typed.boolean()),
+		studio = Typed.optional(Typed.table({
+			id = Typed.string(),
+			kind = Typed.string(),
+			input = Typed.optional(Typed.any()),
+		})),
 		calls = Typed.array(Call),
 		tasks = Typed.optional(Typed.array(Typed.table({
 			id = Typed.string(),

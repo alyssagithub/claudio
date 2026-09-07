@@ -370,7 +370,7 @@ function Testing.Hide(): string
 	return "Cleared the stage and put the camera back"
 end
 
-function Testing.Show(Name: string?): string
+function Testing.Show(Name: string?, Narrowed: number?): string
 	Testing.Hide()
 
 	const Widget = PluginGuiService:FindFirstChild("ClaudioTestWidget")
@@ -447,7 +447,7 @@ function Testing.Show(Name: string?): string
 	Lighting.GlobalShadows = false
 
 	const Pixels = 100
-	const Width = Shown.AbsoluteSize.X
+	const Width = Narrowed or Shown.AbsoluteSize.X
 	const Height = Shown.AbsoluteSize.Y
 
 	const Screen = Instance.new("Part")
@@ -525,6 +525,36 @@ function Testing.Show(Name: string?): string
 	end
 
 	return `Showing {Shown.Name} at {math.floor(Width)}x{math.floor(Height)}, drawn at {string.format("%.3f", Camera.ViewportSize.Y / (2 * Distance * Reach) / Pixels)} screen pixels per interface pixel, call Testing.Hide() when the screenshot is taken`
+end
+
+function Testing.Paint(Name: string?): string
+	const Folder = Beside()
+
+	if not Folder then
+		return "Nothing is mounted"
+	end
+
+	const Theme = Import((Folder :: any).App.Theme)
+
+	if not Name then
+		Theme.Paint(nil)
+
+		return `Painting with Studio's own theme again, which is {settings().Studio.Theme.Name}`
+	end
+
+	const Offered = {}
+
+	for _, Choice in settings().Studio:GetAvailableThemes() do
+		if Choice.Name == Name then
+			Theme.Paint(Choice)
+
+			return `Painting the mount as {Choice.Name} while Studio stays on {settings().Studio.Theme.Name}`
+		end
+
+		table.insert(Offered, Choice.Name)
+	end
+
+	return `No theme called "{Name}", try one of {table.concat(Offered, ", ")}`
 end
 
 function Testing.Colours(Name: string?): {string}

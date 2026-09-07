@@ -107,6 +107,11 @@ export type ModelInfo = {
 	extra: boolean?,
 }
 
+export type Change = {
+	Kind: "added" | "removed" | "changed",
+	Text: string,
+}
+
 export type ToolCall = {
 	name: string,
 	input: string,

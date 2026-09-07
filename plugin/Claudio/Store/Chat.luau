@@ -207,6 +207,124 @@ const function ScriptTree(): {any}
 	return Found
 end
 
+const Running: {[string]: boolean} = {}
+
+const function LintPlace(Paths: {string}?): any
+	const Tree = ScriptTree()
+
+	if #Tree == 0 then
+		return {checked = 0, scripts = {}}
+	end
+
+	local Wanted = Tree
+
+	if Paths and #Paths > 0 then
+		Wanted = {}
+
+		for _, Entry in Tree do
+			for _, Path in Paths do
+				if Entry.path == Path or Entry.path:sub(1, #Path + 1) == `{Path}.` then
+					table.insert(Wanted, Entry)
+
+					break
+				end
+			end
+		end
+	end
+
+	if #Wanted == 0 then
+		return {error = "Nothing in the place matched those paths, so there was nothing to check."}
+	end
+
+	const Ok, Result = Client.Lint(Wanted, Tree)
+
+	if not Ok then
+		return {error = `The analyzer could not run: {tostring(Result)}`}
+	end
+
+	return {checked = #Wanted, scripts = Result.scripts}
+end
+
+const function Playtest(Action: string): any
+	const RunService = game:GetService("RunService")
+
+	const function State(): string
+		if RunService:IsRunning() then
+			return if RunService:IsPaused() then "paused" else "running"
+		end
+
+		return "stopped"
+	end
+
+	if Action == "status" then
+		return {text = `The place is {State()}.`}
+	end
+
+	const Before = State()
+
+	if Action == "start" then
+		if Before ~= "stopped" then
+			return {error = `The place is already {Before}, so it was left alone. Stop it first if you want a fresh run.`}
+		end
+
+		RunService:Run()
+	elseif Action == "stop" then
+		if Before == "stopped" then
+			return {error = "The place was already stopped, so nothing changed."}
+		end
+
+		RunService:Stop()
+	elseif Action == "pause" then
+		if Before ~= "running" then
+			return {error = `The place is {Before}, so there was nothing to pause.`}
+		end
+
+		RunService:Pause()
+	else
+		return {error = `Claudio does not know the playtest action "{Action}".`}
+	end
+
+	const Deadline = os.clock() + 5
+
+	while State() == Before and os.clock() < Deadline do
+		task.wait(0.1)
+	end
+
+	const After = State()
+
+	if After == Before then
+		return {error = `Studio accepted {Action} but the place is still {After}, so it did not take.`}
+	end
+
+	return {text = `The place went from {Before} to {After}.`}
+end
+
+const function RunStudioJob(RequestId: string, Job: any)
+	if Running[Job.id] then
+		return
+	end
+
+	Running[Job.id] = true
+
+	task.spawn(function()
+		const Ok, Outcome = pcall(function()
+			if Job.kind == "lint" then
+				return LintPlace(if Job.input then Job.input.paths else nil)
+			end
+
+			if Job.kind == "playtest" then
+				return Playtest(Job.input.action)
+			end
+
+			return {error = `Claudio does not know how to do "{Job.kind}" in Studio.`}
+		end)
+
+		Client.AnswerStudio(RequestId, Job.id, if Ok then Outcome else {error = tostring(Outcome)})
+
+		Running[Job.id] = nil
+	end)
+end
+
 const function CheckEdited(Wanted: {any})
 	if #Wanted == 0 or LintPasses >= 1 then
 		return
@@ -304,6 +422,10 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		Chat.Elapsed(State.milliseconds or 0)
 		Chat.Permission(State.permission)
 		Chat.Question(State.question)
+
+		if State.studio then
+			RunStudioJob(State.requestId, State.studio)
+		end
 
 		if State.conversationId then
 			Chat.ConversationId(State.conversationId)

@@ -124,6 +124,13 @@ function Client.AnswerQuestion(RequestId: string, QuestionId: string, Answers: {
 	})
 end
 
+function Client.AnswerStudio(RequestId: string, JobId: string, Result: any): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/turn/{RequestId}/studio`, {
+		id = JobId,
+		result = Result,
+	})
+end
+
 function Client.Aun(): (boolean, any)
 	return Http.Request("GET", `{BaseUrl()}/aun`)
 end

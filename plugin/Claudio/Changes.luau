@@ -16,61 +16,59 @@ const function Field(Input: string, Name: string): string?
 	return nil
 end
 
-const function Line(Call: Types.ToolCall): string?
+const function Line(Call: Types.ToolCall): Types.Change?
 	const Name = (Call.name:gsub("^mcp__.-__", ""))
 	const Input = Call.input
 
 	if Name == "set_script_source" then
-		return `Rewrote {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`
+		return {Kind = "changed", Text = `Rewrote {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`}
 	end
 
 	if Name == "edit_script_lines" or Name == "insert_script_lines" or Name == "delete_script_lines" then
-		return `Edited {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`
+		return {Kind = "changed", Text = `Edited {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`}
 	end
 
 	if Name == "set_properties" then
-		return `Changed properties on {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`
+		return {Kind = "changed", Text = `Changed properties on {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`}
 	end
 
 	if Name == "manage_instance" then
 		const Action = Field(Input, "action") or "changed"
 		const Past = {
-			create = "Created",
-			delete = "Deleted",
-			destroy = "Deleted",
-			remove = "Deleted",
-			rename = "Renamed",
-			clone = "Cloned",
-			reparent = "Moved",
-			move = "Moved",
+			create = {Kind = "added", Word = "Created"},
+			delete = {Kind = "removed", Word = "Deleted"},
+			destroy = {Kind = "removed", Word = "Deleted"},
+			remove = {Kind = "removed", Word = "Deleted"},
+			rename = {Kind = "changed", Word = "Renamed"},
+			clone = {Kind = "added", Word = "Cloned"},
+			reparent = {Kind = "changed", Word = "Moved"},
+			move = {Kind = "changed", Word = "Moved"},
 		}
 
-		return `{Past[Action] or "Changed"} {Format.Path(Field(Input, "instancePath") or Field(Input, "parentPath") or Field(Input, "className"))}`
+		const Done = Past[Action] or {Kind = "changed", Word = "Changed"}
+
+		return {Kind = Done.Kind, Text = `{Done.Word} {Format.Path(Field(Input, "instancePath") or Field(Input, "parentPath") or Field(Input, "className"))}`}
 	end
 
 	if Name == "import_rbxm" or Name == "insert_asset" then
-		return `Inserted into {Format.Path(Field(Input, "parent_path") or Field(Input, "parentPath"))}`
-	end
-
-	if Name == "execute_luau" or Name == "run_as_job" then
-		return "Ran a Luau script in Studio"
+		return {Kind = "added", Text = `Inserted into {Format.Path(Field(Input, "parent_path") or Field(Input, "parentPath"))}`}
 	end
 
 	if Name == "Write" or Name == "Edit" then
-		return `Wrote {Format.Path(Field(Input, "file_path"))}`
+		return {Kind = "changed", Text = `Wrote {Format.Path(Field(Input, "file_path"))}`}
 	end
 
 	return nil
 end
 
-const function Push(Found: {string}, Seen: {[string]: boolean}, Text: string)
-	if not Seen[Text] then
-		Seen[Text] = true
-		table.insert(Found, Text)
+const function Push(Found: {Types.Change}, Seen: {[string]: boolean}, Entry: Types.Change)
+	if not Seen[Entry.Text] then
+		Seen[Entry.Text] = true
+		table.insert(Found, Entry)
 	end
 end
 
-function Changes.For(Message: Types.Message): {string}
+function Changes.For(Message: Types.Message): {Types.Change}
 	const Edits = Message.Edits
 
 	if not Edits then
@@ -80,8 +78,8 @@ function Changes.For(Message: Types.Message): {string}
 	const Found = {}
 	const Seen = {}
 
-	for _, Text in Edits do
-		Push(Found, Seen, Text)
+	for _, Written in Edits do
+		Push(Found, Seen, {Kind = "changed", Text = Written})
 	end
 
 	const Made: {Types.ToolCall} = Message.Calls or {}
@@ -91,7 +89,7 @@ function Changes.For(Message: Types.Message): {string}
 			const Name = (Call.name:gsub("^mcp__.-__", ""))
 
 			if Name == "Write" or Name == "Edit" then
-				Push(Found, Seen, `Wrote {Format.Path(Field(Call.input, "file_path"))}`)
+				Push(Found, Seen, {Kind = "changed", Text = `Wrote {Format.Path(Field(Call.input, "file_path"))}`})
 			end
 		end
 	end
@@ -99,18 +97,17 @@ function Changes.For(Message: Types.Message): {string}
 	return Found
 end
 
-function Changes.Describe(Calls: {Types.ToolCall}?): {string}
+function Changes.Describe(Calls: {Types.ToolCall}?): {Types.Change}
 	const Found = {}
 	const Seen = {}
 	const Made: {Types.ToolCall} = Calls or {}
 
 	for _, Call in Made do
 		if Call.status ~= "error" then
-			const Text = Line(Call)
+			const Entry = Line(Call)
 
-			if Text and not Seen[Text] then
-				Seen[Text] = true
-				table.insert(Found, Text)
+			if Entry then
+				Push(Found, Seen, Entry)
 			end
 		end
 	end

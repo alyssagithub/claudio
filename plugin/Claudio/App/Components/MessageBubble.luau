@@ -168,7 +168,7 @@ return function(Props: Props)
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Top,
 			Text = function()
-				return if IsCode() then Value().Text else Markdown.Rich(Value().Text)
+				return if IsCode() then Value().Text else Markdown.Rich(Value().Text, Settings.TextSize())
 			end,
 			LayoutOrder = 1000 + Value().Order,
 
@@ -211,7 +211,7 @@ return function(Props: Props)
 		return table.concat(Parts, " · ")
 	end
 
-	const function Written(): {string}
+	const function Written(): {Types.Change}
 		return Changes.For({
 			Edits = if Props.Edits then Props.Edits() else nil,
 			Calls = if Props.Calls then Props.Calls() else nil,
@@ -228,6 +228,23 @@ return function(Props: Props)
 	end
 
 	const Listed = Vide.source(false)
+	const Expanded = Vide.source(false)
+
+	const function Trimmed(): {Types.Change}
+		const All = Written()
+
+		if Expanded() or #All <= 8 then
+			return All
+		end
+
+		const Some = {}
+
+		for Index = 1, 8 do
+			table.insert(Some, All[Index])
+		end
+
+		return Some
+	end
 
 	const function Asked(Entry: Types.ToolCall): {{Question: string, Given: string}}
 		const Pairs = {}
@@ -689,28 +706,100 @@ return function(Props: Props)
 					LayoutOrder = 1,
 					Text = function()
 						const Lines = Written()
-						const Count = `{#Lines} thing{if #Lines == 1 then "" else "s"} in Studio`
+						const Count = `{#Lines} change{if #Lines == 1 then "" else "s"} in Studio`
 
-						return if IsUser() then `You changed {Count}` else `Changed {Count}`
+						return if IsUser() then `You made {Count}` else `Made {Count}`
 					end,
 				},
-				Vide.indexes(Written, function(Text: () -> string, Index: number)
-					return Create "TextLabel" {
+				Vide.indexes(Trimmed, function(Entry: () -> Types.Change, Index: number)
+					const function Tint(): Color3
+						const Kind = Entry().Kind
+
+						if Kind == "added" then
+							return Theme.Colors.Added()
+						end
+
+						return if Kind == "removed" then Theme.Colors.Removed() else Theme.Colors.Altered()
+					end
+
+					return Create "Frame" {
 						Name = "Change",
 						Size = UDim2.fromScale(1, 0),
 						AutomaticSize = Enum.AutomaticSize.Y,
-						BackgroundTransparency = 1,
-						TextColor3 = Theme.Colors.DimText,
-						TextSize = Settings.SmallText,
-						FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-						TextWrapped = true,
-						TextXAlignment = Enum.TextXAlignment.Left,
+						BackgroundColor3 = Tint,
+						BorderSizePixel = 0,
 						LayoutOrder = Index + 1,
-						Text = function()
-							return `• {Text()}`
-						end,
+
+						Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+						Create "UIPadding" {
+							PaddingLeft = UDim.new(0, 4),
+							PaddingRight = UDim.new(0, 4),
+							PaddingTop = UDim.new(0, 2),
+							PaddingBottom = UDim.new(0, 2),
+						},
+						Create "TextLabel" {
+							Name = "Sign",
+							Size = UDim2.fromOffset(12, 14),
+							Position = UDim2.fromOffset(0, 0),
+							BackgroundTransparency = 1,
+							TextColor3 = Theme.Colors.DiffText,
+							TextSize = Settings.SmallText,
+							FontFace = Font.fromEnum(Enum.Font.Code),
+							TextXAlignment = Enum.TextXAlignment.Left,
+							TextYAlignment = Enum.TextYAlignment.Top,
+							ZIndex = 2,
+							Text = function()
+								const Kind = Entry().Kind
+
+								if Kind == "added" then
+									return "+"
+								end
+
+								return if Kind == "removed" then "-" else "~"
+							end,
+						},
+						Create "TextLabel" {
+							Name = "Body",
+							Size = UDim2.fromScale(1, 0),
+							AutomaticSize = Enum.AutomaticSize.Y,
+							BackgroundTransparency = 1,
+							TextColor3 = Theme.Colors.DiffText,
+							TextSize = Settings.SmallText,
+							FontFace = Font.fromEnum(Enum.Font.Code),
+							TextWrapped = true,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							TextYAlignment = Enum.TextYAlignment.Top,
+							Text = function()
+								return Entry().Text
+							end,
+
+							Create "UIPadding" {PaddingLeft = UDim.new(0, 12)},
+						},
 					}
 				end),
+				Create "TextButton" {
+					Name = "More",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					TextColor3 = Theme.Colors.DimText,
+					TextSize = Settings.SmallText,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+					TextXAlignment = Enum.TextXAlignment.Left,
+					AutoButtonColor = false,
+					LayoutOrder = 1000000,
+					Visible = function()
+						return #Written() > 8
+					end,
+					Text = function()
+						return if Expanded() then "Show fewer" else `Show all {#Written()}`
+					end,
+					Activated = function()
+						Expanded(not Expanded())
+					end,
+
+					Create "UIPadding" {PaddingTop = UDim.new(0, 4)},
+				},
 			},
 			Note("Model", 1000002, function()
 				return if Props.Model then Props.Model() or "" else ""

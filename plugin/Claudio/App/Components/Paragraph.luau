@@ -193,7 +193,7 @@ const function Plain(Line: string, LayoutOrder: number)
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		LayoutOrder = LayoutOrder,
-		Text = Markdown.Rich(Line),
+		Text = Markdown.Rich(Line, Settings.TextSize()),
 	}
 end
 
@@ -214,7 +214,7 @@ const function Row(Line: string, LayoutOrder: number, Links: {[string]: string})
 
 	const Words: {Instance} = {}
 
-	for Index, Token in Split(Markdown.Rich(Line)) do
+	for Index, Token in Split(Markdown.Rich(Line, Settings.TextSize())) do
 		const Body, Tail = Token:match("^`(.-)`(.*)$")
 
 		if Body then

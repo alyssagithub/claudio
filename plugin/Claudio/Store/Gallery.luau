@@ -107,7 +107,7 @@ function Gallery.Live(): {[string]: any}
 						{label = "Four (Recommended)", description = "Matches the inline chrome already used everywhere else.", preview = "UICorner { CornerRadius = UDim.new(0, 4) }"},
 						{label = "Six", description = "Softer, and what the menus already use."},
 						{label = "Eight", description = "Softer still, currently only used by message bubbles."},
-					},
+					} :: {Types.Choice},
 				},
 				{
 					question = "Which of these should the pass also cover?",
@@ -119,8 +119,8 @@ function Gallery.Live(): {[string]: any}
 						{label = "Icons", description = "Two icon vocabularies in one interface."},
 					},
 				},
-			},
-		},
+			} :: {Types.Question},
+		} :: Types.Asked,
 	}
 end
 

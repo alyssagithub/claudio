@@ -79,8 +79,7 @@ const Chat = {
 }
 
 const function Append(Message: Types.Message)
-	Message.At = os.time()
-	Chat.Messages(Sift.Array.push(Chat.Messages(), Message))
+	Chat.Messages(Sift.Array.push(Chat.Messages(), Sift.Dictionary.merge(Message, {At = os.time()})))
 end
 
 const function DestroyImages(Images: {EditableImage}?)

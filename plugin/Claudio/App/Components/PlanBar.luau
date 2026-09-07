@@ -4,6 +4,7 @@ const Settings = require(script.Parent.Parent.Parent.Settings)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Changes = require(script.Parent.Parent.Parent.Changes)
 const Theme = require(script.Parent.Parent.Theme)
+const Button = require(script.Parent.Button)
 
 const Create = Vide.create
 
@@ -71,28 +72,14 @@ return function()
 
 			Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
 		},
-		Create "TextButton" {
-			Name = "Approve",
-			AutomaticSize = Enum.AutomaticSize.XY,
-			BackgroundColor3 = Theme.Colors.Accent,
-			TextColor3 = Theme.Colors.AccentText,
-			TextSize = Settings.SmallText,
-			FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
-			AutoButtonColor = false,
-			LayoutOrder = 2,
+		Button {
 			Text = "Run this plan",
-			Activated = function()
+			Primary = true,
+			LayoutOrder = 2,
+			OnClick = function()
 				Settings.Set("Mode", "auto")
 				Chat.Send("Carry out that plan now.")
 			end,
-
-			Create "UICorner" {CornerRadius = UDim.new(0, 5)},
-			Create "UIPadding" {
-				PaddingLeft = UDim.new(0, 10),
-				PaddingRight = UDim.new(0, 10),
-				PaddingTop = UDim.new(0, 4),
-				PaddingBottom = UDim.new(0, 4),
-			},
 		},
 	}
 end

@@ -347,11 +347,15 @@ return function()
 
 	return Create "Frame" {
 		Name = "Asking",
-		Size = UDim2.fromScale(1, 0),
+		Size = UDim2.new(1, -16, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		LayoutOrder = 3,
 
+		Create "UIPadding" {
+			PaddingTop = UDim.new(0, 2),
+			PaddingBottom = UDim.new(0, 2),
+		},
 		Create "UIListLayout" {
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			HorizontalFlex = Enum.UIFlexAlignment.Fill,
@@ -435,7 +439,6 @@ return function()
 				Icon = Config.Icons.Down,
 				LayoutOrder = 4,
 				Size = Settings.SmallText,
-				Tooltip = "Collapse",
 				OnClick = function()
 					Shut(not Shut())
 				end,
@@ -444,7 +447,6 @@ return function()
 				Icon = Config.Icons.Close,
 				LayoutOrder = 5,
 				Size = Settings.SmallText,
-				Tooltip = "Dismiss without answering",
 				OnClick = Dismiss,
 			},
 			Create "Frame" {

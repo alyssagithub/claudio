@@ -32,7 +32,7 @@ end
 return function()
 	return Create "Frame" {
 		Name = "PlanBar",
-		Size = UDim2.fromScale(1, 0),
+		Size = UDim2.new(1, -16, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundColor3 = Theme.Colors.Panel,
 		LayoutOrder = 3,

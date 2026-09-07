@@ -32,7 +32,7 @@ const function Card(Chip: () -> Types.Chip, Index: number, Remove: (string) -> (
 			Name = "Preview",
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
-			ScaleType = Enum.ScaleType.Fit,
+			ScaleType = Enum.ScaleType.Crop,
 			Visible = function()
 				return Chip().Preview ~= nil
 			end,
@@ -42,7 +42,7 @@ const function Card(Chip: () -> Types.Chip, Index: number, Remove: (string) -> (
 				return if Preview then Content.fromObject(Preview) else Content.none
 			end,
 
-			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
+			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
 		},
 		Create "TextLabel" {
 			Name = "Loading",

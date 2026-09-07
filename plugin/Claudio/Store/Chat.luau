@@ -771,18 +771,6 @@ function Chat.Open(Id: string)
 		Chat.Messages(Gallery.Messages())
 		Chat.ListOpen(false)
 
-		const Live = Gallery.Live()
-
-		Chat.Activity(Live.Activity)
-		Chat.StreamingThinking(Live.StreamingThinking)
-		Chat.StreamingText(Live.StreamingText)
-		Chat.Tasks(Live.Tasks)
-		Chat.Queue(Live.Queue)
-		Chat.Permission(Live.Permission)
-		Chat.Question(Live.Question)
-		Chat.Began(os.clock() - 24)
-		Chat.Sending(true)
-
 		return
 	end
 

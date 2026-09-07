@@ -13,6 +13,7 @@ const ChatList = require(script.Parent.Parent.Components.ChatList)
 const TaskList = require(script.Parent.Parent.Components.TaskList)
 const PlanBar = require(script.Parent.Parent.Components.PlanBar)
 const QuestionCard = require(script.Parent.Parent.Components.QuestionCard)
+const GalleryBar = require(script.Parent.Parent.Components.GalleryBar)
 const SettingsPage = require(script.Parent.Parent.Components.SettingsPage)
 const ContextMenu = require(script.Parent.Parent.Components.ContextMenu)
 const ModelPicker = require(script.Parent.Parent.Components.ModelPicker)
@@ -76,7 +77,10 @@ return function()
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
 
-			Create "UIListLayout" {SortOrder = Enum.SortOrder.LayoutOrder},
+			Create "UIListLayout" {
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			},
 			StatusBar(),
 			UpdateBanner(),
 			Vide.switch(function()
@@ -91,6 +95,7 @@ return function()
 				Messages = function()
 					return {
 						MessageList(),
+						GalleryBar(),
 						QuestionCard(),
 						TaskList(),
 						PlanBar(),

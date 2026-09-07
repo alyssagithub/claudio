@@ -43,6 +43,13 @@ function Describe(Questions, Answers) {
   ].join(" ");
 }
 
+const PressDescription = [
+  "Press a button in the running experience by naming it, rather than by guessing screen coordinates.",
+  "Give the full instance path, such as Players.Someone.PlayerGui.Menu.Play, and it works out where that lands on screen itself.",
+  "This needs a play session with a character, so it cannot reach a plugin window or anything in edit mode, and the engine refuses presses that land on Roblox's own interface.",
+  "A press that reaches nothing still reports as sent, so check the place afterwards rather than trusting the reply.",
+].join(" ");
+
 const PlaytestDescription = [
   "Start, stop or inspect a simulation of the open place, so behaviour that only happens at runtime can be checked.",
   "Always stop what you started: a place left running keeps executing scripts, holds the editor in a running state, and every later edit lands in a data model that is about to be thrown away.",
@@ -83,6 +90,11 @@ export function AskServerFor(Pose, Reach) {
     name: AskServerName,
     version: "1.0.0",
     tools: [
+      tool("press", PressDescription, { path: z.string().describe("Full instance path of the GuiObject to press.") }, async (Input) => {
+        const Found = await Reach("press", { path: Input.path });
+
+        return { content: [{ type: "text", text: Found && Found.error ? Found.error : (Found && Found.text) || "Studio did not say what happened." }] };
+      }),
       tool("playtest", PlaytestDescription, { action: z.enum(["start", "stop", "pause", "status"]).describe("What to do. Use status to find out what is happening before changing it.") }, async (Input) => {
         const Found = await Reach("playtest", { action: Input.action });
 

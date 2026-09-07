@@ -6,7 +6,8 @@ import { exec, execFile } from "node:child_process";
 import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
-import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, AnswerStudio, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio } from "./Studio.js";
+import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
@@ -333,6 +334,27 @@ export function StartServer(Port) {
         return;
       }
 
+      if (Request.method === "POST" && Url.pathname === "/studio/enqueue") {
+        const Wanted = await ReadBody(Request);
+
+        SendJson(Response, 200, await RequestStudio(Wanted.kind, Wanted.input || {}));
+        return;
+      }
+
+      if (Url.pathname === "/studio/job") {
+        if (Request.method === "GET") {
+          SendJson(Response, 200, { job: TakeStudioJob() });
+          return;
+        }
+
+        if (Request.method === "POST") {
+          const Done = await ReadBody(Request);
+
+          SendJson(Response, DeliverStudio(Done.id, Done.result) ? 200 : 409, { ok: true });
+          return;
+        }
+      }
+
       if (Request.method === "POST" && Url.pathname === "/lint") {
         const Body = await ReadBody(Request);
         const Usable = (Entry) => Entry && typeof Entry.path === "string" && typeof Entry.source === "string" && Entry.source !== "";
@@ -508,13 +530,6 @@ export function StartServer(Port) {
 
         if (!Turn) {
           SendJson(Response, 404, { error: "No such turn" });
-          return;
-        }
-
-        if (Request.method === "POST" && Segments[2] === "studio") {
-          const Done = await ReadBody(Request);
-
-          SendJson(Response, AnswerStudio(Turn, Done.id, Done.result) ? 200 : 409, DescribeTurn(Turn));
           return;
         }
 

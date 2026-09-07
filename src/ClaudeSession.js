@@ -7,6 +7,7 @@ import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, Remembe
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
+import { Request as RequestStudio } from "./Studio.js";
 import { ChooseModel, GetModels, NextEffort, RecordTurnOutcome, RememberModels, SupportsEffort } from "./Models.js";
 
 const Turns = new Map();
@@ -524,40 +525,6 @@ function AskQuestion(Session, Questions) {
   });
 }
 
-function AskStudio(Session, Kind, Input) {
-  return new Promise((Resolve) => {
-    const Turn = Session.CurrentTurn;
-
-    if (!Turn) {
-      Resolve({ error: "No turn is running, so Studio cannot be reached." });
-      return;
-    }
-
-    Turn.Studio = {
-      Id: `${Turn.Id}-studio-${Turn.PermissionCount += 1}`,
-      Kind,
-      Input,
-      Resolve,
-    };
-
-    Publish(Turn, {});
-  });
-}
-
-export function AnswerStudio(Turn, JobId, Result) {
-  const Waiting = Turn.Studio;
-
-  if (!Waiting || Waiting.Id !== JobId) {
-    return false;
-  }
-
-  Turn.Studio = null;
-  Publish(Turn, {});
-  Waiting.Resolve(Result);
-
-  return true;
-}
-
 export function AnswerQuestion(Turn, QuestionId, Answers) {
   const Asked = Turn.Question;
 
@@ -1026,7 +993,7 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
               }],
             }],
           },
-          mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions), (Kind, Input) => AskStudio(Session, Kind, Input)) },
+          mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions), RequestStudio) },
           systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.Delegating) },
         },
       });
@@ -1159,7 +1126,6 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Permissions: [],
     PermissionCount: 0,
     Question: null,
-    Studio: null,
     Error: null,
     Version: 0,
     Waiters: [],
@@ -1317,7 +1283,6 @@ export function DescribeTurn(Turn) {
     auto: Turn.Auto,
     imageCount: Turn.Images.length,
     question: Turn.Question ? { id: Turn.Question.Id, questions: Turn.Question.Questions } : null,
-    studio: Turn.Studio ? { id: Turn.Studio.Id, kind: Turn.Studio.Kind, input: Turn.Studio.Input } : null,
     permission: Turn.Permissions.length > 0
       ? { id: Turn.Permissions[0].Id, tool: Turn.Permissions[0].ToolName, input: JSON.stringify(Turn.Permissions[0].Input).slice(0, 600) }
       : null,

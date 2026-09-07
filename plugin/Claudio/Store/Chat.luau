@@ -208,6 +208,8 @@ const function ScriptTree(): {any}
 end
 
 const Running: {[string]: boolean} = {}
+local Watching = false
+local Paused = false
 
 const function LintPlace(Paths: {string}?): any
 	const Tree = ScriptTree()
@@ -249,11 +251,11 @@ const function Playtest(Action: string): any
 	const RunService = game:GetService("RunService")
 
 	const function State(): string
-		if RunService:IsRunning() then
-			return if RunService:IsPaused() then "paused" else "running"
+		if not RunService:IsRunning() then
+			return "stopped"
 		end
 
-		return "stopped"
+		return if Paused then "paused" else "running"
 	end
 
 	if Action == "status" then
@@ -267,17 +269,23 @@ const function Playtest(Action: string): any
 			return {error = `The place is already {Before}, so it was left alone. Stop it first if you want a fresh run.`}
 		end
 
+		Paused = false
+
 		RunService:Run()
 	elseif Action == "stop" then
 		if Before == "stopped" then
 			return {error = "The place was already stopped, so nothing changed."}
 		end
 
+		Paused = false
+
 		RunService:Stop()
 	elseif Action == "pause" then
 		if Before ~= "running" then
 			return {error = `The place is {Before}, so there was nothing to pause.`}
 		end
+
+		Paused = true
 
 		RunService:Pause()
 	else
@@ -299,7 +307,63 @@ const function Playtest(Action: string): any
 	return {text = `The place went from {Before} to {After}.`}
 end
 
-const function RunStudioJob(RequestId: string, Job: any)
+const function Press(Path: string): any
+	const UserInputService = game:GetService("UserInputService")
+	const Players = game:GetService("Players")
+	const Player = Players.LocalPlayer
+
+	if not Player then
+		return {error = "Nothing is being played, so there is no interface to press. Start a playtest first."}
+	end
+
+	local Object: Instance? = game
+
+	for _, Step in string.split(Path, ".") do
+		if Object then
+			Object = (Object :: Instance):FindFirstChild(Step)
+		end
+	end
+
+	if not Object or not Object:IsA("GuiObject") then
+		return {error = `Nothing usable at "{Path}". Give the full path to a GuiObject, such as Players.Someone.PlayerGui.Menu.Play.`}
+	end
+
+	const Target = Object :: GuiObject
+
+	if Target.AbsoluteSize.X < 1 or Target.AbsoluteSize.Y < 1 then
+		return {error = `{Target.Name} has no size on screen, so a press would land on whatever is behind it.`}
+	end
+
+	local Ancestor: Instance? = Target
+
+	while Ancestor and Ancestor ~= game do
+		if Ancestor:IsA("GuiObject") and not (Ancestor :: GuiObject).Visible then
+			return {error = `{Target.Name} is not being drawn because {Ancestor.Name} is hidden, so a press would do nothing.`}
+		end
+
+		Ancestor = Ancestor.Parent
+	end
+
+	const Centre = Target.AbsolutePosition + Target.AbsoluteSize / 2 + game:GetService("GuiService"):GetGuiInset()
+	const Virtual = (UserInputService :: any):CreateVirtualInput()
+	const Sent, Trouble = pcall(function()
+		Virtual:SendMouseButton(Centre, Enum.UserInputType.MouseButton1, true)
+		task.wait(0.05)
+		Virtual:SendMouseButton(Centre, Enum.UserInputType.MouseButton1, false)
+	end)
+
+	if not Sent then
+		return {error = `The press was refused at {Centre}: {tostring(Trouble)}`}
+	end
+
+	return {text = `Pressed {Target.Name} at {math.floor(Centre.X)}, {math.floor(Centre.Y)}. Read the place to confirm what it did, because a press that lands on nothing still reports as sent.`}
+end
+
+const function RunStudioJob(Job: any)
+	if typeof(Job) ~= "table" or typeof(Job.id) ~= "string" then
+		return
+	end
+
 	if Running[Job.id] then
 		return
 	end
@@ -316,12 +380,46 @@ const function RunStudioJob(RequestId: string, Job: any)
 				return Playtest(Job.input.action)
 			end
 
+			if Job.kind == "press" then
+				return Press(Job.input.path)
+			end
+
 			return {error = `Claudio does not know how to do "{Job.kind}" in Studio.`}
 		end)
 
-		Client.AnswerStudio(RequestId, Job.id, if Ok then Outcome else {error = tostring(Outcome)})
+		Client.AnswerStudio(Job.id, if Ok then Outcome else {error = tostring(Outcome)})
 
 		Running[Job.id] = nil
+	end)
+end
+
+function Chat.WatchStudioJobs()
+	if Watching then
+		return
+	end
+
+	Watching = true
+
+	task.spawn(function()
+		while Watching and task.wait(1) do
+			if not script:IsDescendantOf(game) then
+				Watching = false
+
+				break
+			end
+
+			const Polled, Trouble = pcall(function()
+				const Ok, Result = Client.TakeStudioJob()
+
+				if Ok and Result and Result.job then
+					RunStudioJob(Result.job)
+				end
+			end)
+
+			if not Polled then
+				warn(`Claudio could not take a Studio job: {tostring(Trouble)}`)
+			end
+		end
 	end)
 end
 
@@ -422,10 +520,6 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		Chat.Elapsed(State.milliseconds or 0)
 		Chat.Permission(State.permission)
 		Chat.Question(State.question)
-
-		if State.studio then
-			RunStudioJob(State.requestId, State.studio)
-		end
 
 		if State.conversationId then
 			Chat.ConversationId(State.conversationId)
@@ -818,6 +912,8 @@ function Chat.Refresh()
 	if #Chat.Models() == 0 then
 		Chat.LoadModels()
 	end
+
+	Chat.WatchStudioJobs()
 end
 
 const Requested: {[number]: boolean} = {}
@@ -1431,6 +1527,8 @@ function Chat.Stop()
 end
 
 function Chat.Unload()
+	Watching = false
+
 	Chat.Stop()
 	Watcher.Stop()
 	Reset()

@@ -46,6 +46,11 @@ export function SystemPromptFor(ServerNames, Delegating) {
     Lines.push(`Read and change the open place with these connected tool servers: ${ServerNames.join(", ")}.`);
   }
 
+  Lines.push(
+    "Claudio ships its own tools, named mcp__claudio__*, and they are the ones to reach for first. Prefer them over any other server that appears to do the same job, because they are built against this plugin, they say what actually happened rather than reporting success for work that silently did nothing, and they are the ones maintained here.",
+    "Use another server only when Claudio has no tool for the job, or when the user, a rule, or a project instruction tells you to.",
+  );
+
   if (Delegating) {
     Lines.push(
       "Reading is delegated here. Count what the question needs before you touch a tool: if it needs more than one script, or the contents of a folder, or a search across the place, your first action is a single Agent call to the reader subagent describing everything you want at once, and it answers with a summary plus the paths and line numbers.",

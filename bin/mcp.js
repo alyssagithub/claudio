@@ -64,13 +64,15 @@ Server.tool(
 
     const Scripts = Found.scripts || [];
 
+    const Counted = Found.checked === 1 ? "1 script" : `${Found.checked || 0} scripts`;
+
     if (Scripts.length === 0) {
-      return { content: [{ type: "text", text: `Checked ${Found.checked || 0} and found no warnings.` }] };
+      return { content: [{ type: "text", text: `Checked ${Counted} and found no warnings.` }] };
     }
 
     const Lines = Scripts.map((Entry) => [Entry.path].concat((Entry.lines || []).map((Warning) => `  ${Warning}`)).join("\n"));
 
-    return { content: [{ type: "text", text: `Checked ${Found.checked}. Warnings:\n${Lines.join("\n")}` }] };
+    return { content: [{ type: "text", text: `Checked ${Counted}. Warnings:\n${Lines.join("\n")}` }] };
   },
 );
 

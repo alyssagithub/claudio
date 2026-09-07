@@ -95,7 +95,7 @@ export function AskServerFor(Pose, Reach) {
 
         return { content: [{ type: "text", text: Found && Found.error ? Found.error : (Found && Found.text) || "Studio did not say what happened." }] };
       }),
-      tool("playtest", PlaytestDescription, { action: z.enum(["start", "stop", "pause", "status"]).describe("What to do. Use status to find out what is happening before changing it.") }, async (Input) => {
+      tool("playtest", PlaytestDescription, { action: z.enum(["start", "stop", "status"]).describe("What to do. Use status to find out what is happening before changing it.") }, async (Input) => {
         const Found = await Reach("playtest", { action: Input.action });
 
         return { content: [{ type: "text", text: Found && Found.error ? Found.error : (Found && Found.text) || "Studio did not say what happened." }] };

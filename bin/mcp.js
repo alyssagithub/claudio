@@ -77,7 +77,7 @@ Server.tool(
 Server.tool(
   "playtest",
   "Start, stop, pause or inspect a simulation of the open place. Always stop what you started. Check status first rather than assuming. This runs without a player character, so LocalPlayer and PlayerGui are not available.",
-  { action: z.enum(["start", "stop", "pause", "status"]) },
+  { action: z.enum(["start", "stop", "status"]) },
   async (Input) => ({ content: [{ type: "text", text: Say(await Ask("playtest", { action: Input.action })) }] }),
 );
 

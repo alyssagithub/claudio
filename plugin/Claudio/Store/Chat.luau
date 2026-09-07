@@ -209,7 +209,6 @@ end
 
 const Running: {[string]: boolean} = {}
 local Watching = false
-local Paused = false
 
 const function LintPlace(Paths: {string}?): any
 	const Tree = ScriptTree()
@@ -251,15 +250,15 @@ const function Playtest(Action: string): any
 	const RunService = game:GetService("RunService")
 
 	const function State(): string
-		if not RunService:IsRunning() then
-			return "stopped"
-		end
-
-		return if Paused then "paused" else "running"
+		return if RunService:IsRunning() then "running" else "stopped"
 	end
 
 	if Action == "status" then
 		return {text = `The place is {State()}.`}
+	end
+
+	if Action == "pause" then
+		return {error = "Pausing is not offered, because Studio reports a paused place as stopped and Claudio will not report a state it cannot check. Stop it instead."}
 	end
 
 	const Before = State()
@@ -269,25 +268,13 @@ const function Playtest(Action: string): any
 			return {error = `The place is already {Before}, so it was left alone. Stop it first if you want a fresh run.`}
 		end
 
-		Paused = false
-
 		RunService:Run()
 	elseif Action == "stop" then
 		if Before == "stopped" then
 			return {error = "The place was already stopped, so nothing changed."}
 		end
 
-		Paused = false
-
 		RunService:Stop()
-	elseif Action == "pause" then
-		if Before ~= "running" then
-			return {error = `The place is {Before}, so there was nothing to pause.`}
-		end
-
-		Paused = true
-
-		RunService:Pause()
 	else
 		return {error = `Claudio does not know the playtest action "{Action}".`}
 	end

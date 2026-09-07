@@ -26,6 +26,7 @@ const Chat = {
 	StreamingImages = Vide.source({} :: {EditableImage}),
 	Activity = Vide.source({} :: {string}),
 	Permission = Vide.source(nil :: Types.Permission?),
+	Question = Vide.source(nil :: Types.Asked?),
 	Sending = Vide.source(false),
 	Queue = Vide.source({} :: {Types.QueuedMessage}),
 	Commands = Vide.source({} :: {Types.Command}),
@@ -113,6 +114,7 @@ const function Reset()
 	Chat.Tokens(nil)
 	Chat.Elapsed(0)
 	Chat.Permission(nil)
+	Chat.Question(nil)
 	Chat.Sending(false)
 	Chat.Began(0)
 	Chat.RequestId = nil
@@ -302,6 +304,7 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		Chat.Tokens(State.tokens)
 		Chat.Elapsed(State.milliseconds or 0)
 		Chat.Permission(State.permission)
+		Chat.Question(State.question)
 
 		if State.conversationId then
 			Chat.ConversationId(State.conversationId)
@@ -375,6 +378,7 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 	Chat.StreamingImages({})
 	Chat.Activity({})
 	Chat.Permission(nil)
+	Chat.Question(nil)
 	Chat.Sending(false)
 	Chat.Began(0)
 	Chat.RequestId = nil
@@ -775,6 +779,7 @@ function Chat.Open(Id: string)
 		Chat.Tasks(Live.Tasks)
 		Chat.Queue(Live.Queue)
 		Chat.Permission(Live.Permission)
+		Chat.Question(Live.Question)
 		Chat.Began(os.clock() - 24)
 		Chat.Sending(true)
 
@@ -1234,6 +1239,30 @@ function Chat.RemoveQueued(Index: number)
 
 	table.remove(Queue, Index)
 	Chat.Queue(Queue)
+end
+
+function Chat.Reply(Answers: {[string]: string}?)
+	const Asked = Chat.Question()
+
+	if not Asked then
+		return
+	end
+
+	if not Chat.RequestId then
+		Chat.Question(nil)
+
+		return
+	end
+
+	const Answering = Chat.RequestId :: string
+
+	task.spawn(function()
+		const Ok = Client.AnswerQuestion(Answering, Asked.id, Answers)
+
+		if Ok and Chat.Question() == Asked then
+			Chat.Question(nil)
+		end
+	end)
 end
 
 function Chat.Answer(Allow: boolean, Always: boolean)

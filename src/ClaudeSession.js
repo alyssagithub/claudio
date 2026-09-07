@@ -6,6 +6,7 @@ import { AllowedTools, AutoTiers, PermissionModeFor, CancelGraceMilliseconds, Co
 import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
+import { AskServerFor, AskServerName } from "./Ask.js";
 import { ChooseModel, GetModels, NextEffort, RecordTurnOutcome, RememberModels, SupportsEffort } from "./Models.js";
 
 const Turns = new Map();
@@ -482,6 +483,39 @@ function AskPermission(Turn, ToolName, Input, Options) {
   });
 }
 
+function AskQuestion(Session, Questions) {
+  return new Promise((Resolve) => {
+    const Turn = Session.CurrentTurn;
+
+    if (!Turn) {
+      Resolve(null);
+      return;
+    }
+
+    Turn.Question = {
+      Id: `${Turn.Id}-ask-${Turn.PermissionCount += 1}`,
+      Questions,
+      Resolve,
+    };
+
+    Publish(Turn, {});
+  });
+}
+
+export function AnswerQuestion(Turn, QuestionId, Answers) {
+  const Asked = Turn.Question;
+
+  if (!Asked || Asked.Id !== QuestionId) {
+    return false;
+  }
+
+  Turn.Question = null;
+  Publish(Turn, {});
+  Asked.Resolve(Answers);
+
+  return true;
+}
+
 export function AnswerPermission(Turn, PermissionId, Allow, Always) {
   const Index = Turn.Permissions.findIndex((Entry) => Entry.Id === PermissionId);
 
@@ -935,7 +969,7 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
               }],
             }],
           },
-          mcpServers: ReadMcpServers(),
+          mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions)) },
           systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.Delegating) },
         },
       });
@@ -1068,6 +1102,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Delivered: {},
     Permissions: [],
     PermissionCount: 0,
+    Question: null,
     Error: null,
     Version: 0,
     Waiters: [],
@@ -1224,6 +1259,7 @@ export function DescribeTurn(Turn) {
     effort: Turn.Effort,
     auto: Turn.Auto,
     imageCount: Turn.Images.length,
+    question: Turn.Question ? { id: Turn.Question.Id, questions: Turn.Question.Questions } : null,
     permission: Turn.Permissions.length > 0
       ? { id: Turn.Permissions[0].Id, tool: Turn.Permissions[0].ToolName, input: JSON.stringify(Turn.Permissions[0].Input).slice(0, 600) }
       : null,

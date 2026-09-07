@@ -16,6 +16,20 @@ const Call = Typed.table({
 	steps = Typed.optional(Typed.array(Typed.string())),
 })
 
+const Asked = Typed.table({
+	id = Typed.string(),
+	questions = Typed.array(Typed.table({
+		question = Typed.string(),
+		header = Typed.string(),
+		multiSelect = Typed.boolean(),
+		options = Typed.array(Typed.table({
+			label = Typed.string(),
+			description = Typed.string(),
+			preview = Typed.optional(Typed.string()),
+		})),
+	})),
+})
+
 const Permission = Typed.table({
 	id = Typed.string(),
 	tool = Typed.string(),
@@ -106,6 +120,7 @@ return {
 		context = Typed.optional(Breakdown),
 		imageCount = Typed.number(),
 		permission = Typed.optional(Permission),
+		question = Typed.optional(Asked),
 		error = Typed.optional(Typed.string()),
 		version = Typed.number(),
 	}),

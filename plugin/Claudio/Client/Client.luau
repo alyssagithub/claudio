@@ -117,6 +117,13 @@ function Client.AnswerPermission(RequestId: string, PermissionId: string, Allow:
 	})
 end
 
+function Client.AnswerQuestion(RequestId: string, QuestionId: string, Answers: {[string]: string}?): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/turn/{RequestId}/answer`, {
+		id = QuestionId,
+		answers = Answers,
+	})
+end
+
 function Client.GetImage(RequestId: string, Index: number): (boolean, any)
 	return Http.Request("GET", `{BaseUrl()}/turn/{RequestId}/image/{Index}`)
 end

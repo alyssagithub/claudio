@@ -6,7 +6,7 @@ import { exec, execFile } from "node:child_process";
 import { DefaultMode, LongPollMilliseconds, MaxBodyBytes, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
-import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { HandToken, TokenMatches } from "./Token.js";
@@ -499,6 +499,14 @@ export function StartServer(Port) {
 
         if (!Turn) {
           SendJson(Response, 404, { error: "No such turn" });
+          return;
+        }
+
+        if (Request.method === "POST" && Segments[2] === "answer") {
+          const Given = await ReadBody(Request);
+          const Answers = Given.answers && typeof Given.answers === "object" ? Given.answers : null;
+
+          SendJson(Response, AnswerQuestion(Turn, Given.id, Answers) ? 200 : 409, DescribeTurn(Turn));
           return;
         }
 

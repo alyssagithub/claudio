@@ -29,6 +29,7 @@ end
 return function(Props: Props)
 	const Hovered = Vide.source(false)
 	const Below = Vide.source(true)
+	const Side = Vide.source(0.5)
 	local Anchor: TextButton
 
 	const function Room(): number
@@ -74,8 +75,19 @@ return function(Props: Props)
 			if Anchor then
 				const Screen = Anchor:FindFirstAncestorWhichIsA("LayerCollector")
 				const Bottom = if Screen then Screen.AbsolutePosition.Y + Screen.AbsoluteSize.Y else math.huge
+				const Right = if Screen then Screen.AbsolutePosition.X + Screen.AbsoluteSize.X else math.huge
+				const Left = if Screen then Screen.AbsolutePosition.X else -math.huge
+				const Middle = Anchor.AbsolutePosition.X + Anchor.AbsoluteSize.X / 2
 
 				Below(Bottom - (Anchor.AbsolutePosition.Y + Anchor.AbsoluteSize.Y) > 30)
+
+				if Right - Middle < 90 then
+					Side(1)
+				elseif Middle - Left < 90 then
+					Side(0)
+				else
+					Side(0.5)
+				end
 			end
 		end,
 		MouseLeave = function()
@@ -89,10 +101,10 @@ return function(Props: Props)
 		Create "TextLabel" {
 			Name = "Tooltip",
 			AnchorPoint = function()
-				return if Below() then Vector2.new(0.5, 0) else Vector2.new(0.5, 1)
+				return Vector2.new(Side(), if Below() then 0 else 1)
 			end,
 			Position = function()
-				return if Below() then UDim2.new(0.5, 0, 1, 4) else UDim2.new(0.5, 0, 0, -4)
+				return UDim2.new(Side(), 0, if Below() then 1 else 0, if Below() then 4 else -4)
 			end,
 			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundColor3 = Theme.Colors.Background,

@@ -73,6 +73,24 @@ export type QueuedMessage = {
 	Edits: {string}?,
 }
 
+export type Choice = {
+	label: string,
+	description: string,
+	preview: string?,
+}
+
+export type Question = {
+	question: string,
+	header: string,
+	multiSelect: boolean,
+	options: {Choice},
+}
+
+export type Asked = {
+	id: string,
+	questions: {Question},
+}
+
 export type Permission = {
 	id: string,
 	tool: string,
@@ -157,6 +175,7 @@ export type Turn = {
 	auto: boolean?,
 	imageCount: number,
 	permission: Permission?,
+	question: Asked?,
 	error: string?,
 	calls: {ToolCall},
 	milliseconds: number,

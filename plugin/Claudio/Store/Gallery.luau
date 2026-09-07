@@ -96,6 +96,31 @@ function Gallery.Live(): {[string]: any}
 			{Display = "A second queued message, so the reorder arrows appear.", Full = "A second queued message.", Attachments = {}, Images = {}, Previews = {}},
 		},
 		Permission = {id = "gallery", tool = "set_properties", input = "{\"path\":\"Workspace.Baseplate\",\"Anchored\":false}"},
+		Question = {
+			id = "gallery-ask",
+			questions = {
+				{
+					question = "Which corner radius should the panels use?",
+					header = "Radius",
+					multiSelect = false,
+					options = {
+						{label = "Four (Recommended)", description = "Matches the inline chrome already used everywhere else.", preview = "UICorner { CornerRadius = UDim.new(0, 4) }"},
+						{label = "Six", description = "Softer, and what the menus already use."},
+						{label = "Eight", description = "Softer still, currently only used by message bubbles."},
+					},
+				},
+				{
+					question = "Which of these should the pass also cover?",
+					header = "Extras",
+					multiSelect = true,
+					options = {
+						{label = "Tooltips", description = "Five implementations with five anchoring rules."},
+						{label = "Spacing", description = "Thirteen padding values with a long tail of one offs."},
+						{label = "Icons", description = "Two icon vocabularies in one interface."},
+					},
+				},
+			},
+		},
 	}
 end
 

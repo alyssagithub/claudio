@@ -23,6 +23,7 @@ export const DesktopConfigPath = (() => {
 })();
 export const AllowedTools = [
   "Agent",
+  "mcp__claudio__*",
   "mcp__robloxstudio-mcp__*",
   "mcp__Roblox_Studio__*",
   "mcp__roblox-docs__*",

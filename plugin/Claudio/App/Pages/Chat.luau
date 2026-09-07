@@ -12,6 +12,7 @@ const InputBar = require(script.Parent.Parent.Components.InputBar)
 const ChatList = require(script.Parent.Parent.Components.ChatList)
 const TaskList = require(script.Parent.Parent.Components.TaskList)
 const PlanBar = require(script.Parent.Parent.Components.PlanBar)
+const QuestionCard = require(script.Parent.Parent.Components.QuestionCard)
 const SettingsPage = require(script.Parent.Parent.Components.SettingsPage)
 const ContextMenu = require(script.Parent.Parent.Components.ContextMenu)
 const ModelPicker = require(script.Parent.Parent.Components.ModelPicker)
@@ -90,6 +91,7 @@ return function()
 				Messages = function()
 					return {
 						MessageList(),
+						QuestionCard(),
 						TaskList(),
 						PlanBar(),
 						InputBar(),

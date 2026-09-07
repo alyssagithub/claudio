@@ -29,7 +29,13 @@ function Overrides() {
 function Run(Command, Args, Options) {
   return new Promise((Resolve) => {
     execFile(Command, Args, { timeout: 30000, maxBuffer: 8 * 1024 * 1024, ...Options }, (Error, Output, Errors) => {
-      Resolve({ Failed: Boolean(Error && Error.code === "ENOENT"), Text: `${Output || ""}${Errors || ""}` });
+      const Stopped = Error && (Error.killed || Error.signal || Error.code === "ENOBUFS");
+
+      Resolve({
+        Failed: Boolean(Error && Error.code === "ENOENT"),
+        Stopped: Boolean(Stopped),
+        Text: Stopped ? `${Command} did not finish: ${Error.message}` : `${Output || ""}${Errors || ""}`,
+      });
     });
   });
 }
@@ -358,6 +364,12 @@ export async function Analyze(Entries, Raw, Tree) {
   }
 
   const Outcome = await Run(Analyzer, Arguments, { cwd: Workspace() });
+
+  if (Outcome.Stopped) {
+    console.error(Outcome.Text);
+    return null;
+  }
+
   const Found = Parse(Outcome.Text);
 
   if (!Found.has(`${Canary}.luau`)) {

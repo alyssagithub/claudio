@@ -35,6 +35,7 @@ const Chat = {
 	Title = Vide.source("New chat"),
 	Conversations = Vide.source({} :: {Types.ConversationSummary}),
 	ListOpen = Vide.source(false),
+	Listed = Vide.source(false),
 	PickerOpen = Vide.source(false),
 	EffortOpen = Vide.source(false),
 	ModeOpen = Vide.source(false),
@@ -651,6 +652,8 @@ end
 
 function Chat.Refresh()
 	const Ok, Result = Client.ListConversations()
+
+	Chat.Listed(true)
 
 	if not Ok then
 		Chat.Say(`Could not list chats: {Result}`)

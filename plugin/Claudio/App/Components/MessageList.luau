@@ -45,6 +45,12 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		LayoutOrder = 900000 + Index,
+		MouseEnter = function()
+			Hovered(true)
+		end,
+		MouseLeave = function()
+			Hovered(false)
+		end,
 
 		Create "UIListLayout" {
 			SortOrder = Enum.SortOrder.LayoutOrder,
@@ -60,12 +66,6 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 			AutoButtonColor = false,
 			Text = "",
 			LayoutOrder = 1,
-			MouseEnter = function()
-				Hovered(true)
-			end,
-			MouseLeave = function()
-				Hovered(false)
-			end,
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 8)},
 			Create "UIPadding" {

@@ -1,5 +1,6 @@
 --!strict
 const Vide = require(script.Parent.Parent.Parent.Packages.vide)
+const Config = require(script.Parent.Parent.Parent.Config)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
@@ -8,12 +9,12 @@ const Theme = require(script.Parent.Parent.Theme)
 const Create = Vide.create
 
 const Marks = {
-	running = "●",
-	pending = "○",
-	completed = "✓",
-	failed = "✕",
-	killed = "✕",
-	paused = "❚",
+	running = "spinner",
+	pending = "circle-dashed",
+	completed = "check",
+	failed = "x",
+	killed = "x",
+	paused = "minus",
 }
 
 const function Running(): {Types.Task}
@@ -54,10 +55,10 @@ const function Row(Task: () -> Types.Task)
 				return if Task().status == "failed" or Task().status == "killed" then Theme.Colors.Error() else Theme.Colors.DimText()
 			end,
 			TextSize = Settings.SmallText,
-			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+			FontFace = Config.IconFont,
 			LayoutOrder = 1,
 			Text = function()
-				return Marks[Task().status] or "●"
+				return Marks[Task().status] or Marks.running
 			end,
 		},
 		Create "TextLabel" {
@@ -115,9 +116,20 @@ return function()
 			TextXAlignment = Enum.TextXAlignment.Left,
 			LayoutOrder = 1,
 			Text = function()
-				const Count = #Running()
+				const Held = Running()
+				local Busy = 0
 
-				return if Count == 1 then "1 task running" else `{Count} tasks running`
+				for _, Task in Held do
+					if Task.status == "running" then
+						Busy += 1
+					end
+				end
+
+				if Busy == #Held then
+					return if Busy == 1 then "1 task running" else `{Busy} tasks running`
+				end
+
+				return if #Held == 1 then "1 task" else `{#Held} tasks, {Busy} running`
 			end,
 		},
 		Vide.indexes(function()

@@ -395,7 +395,11 @@ return function()
 			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 			TextWrapped = true,
 			Text = function()
-				return Chat.Notice() or "No chats yet. Press New to start one, or open one in the Claude desktop app."
+				if Chat.Notice() then
+					return Chat.Notice() :: string
+				end
+
+				return if Chat.Listed() then "No chats yet. Press New to start one, or open one in the Claude desktop app." else "Loading your chats"
 			end,
 			Visible = function()
 				return #Chat.Conversations() == 0

@@ -127,19 +127,5 @@ return function()
 				return table.concat(Parts, " · ")
 			end,
 		},
-		Create "TextButton" {
-			Name = "Interrupt",
-			AutomaticSize = Enum.AutomaticSize.XY,
-			BackgroundTransparency = 1,
-			TextColor3 = Theme.Colors.DimText,
-			TextSize = Settings.SmallText,
-			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-			AutoButtonColor = false,
-			LayoutOrder = 3,
-			Text = "Interrupt",
-			Activated = function()
-				Chat.Stop()
-			end,
-		},
 	}
 end

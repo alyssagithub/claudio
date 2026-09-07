@@ -901,7 +901,11 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
               }],
             }],
             UserPromptSubmit: [{
-              hooks: [async () => {
+              hooks: [async (HookInput) => {
+                if (HookInput && HookInput.source && HookInput.source !== "user") {
+                  return {};
+                }
+
                 const Context = Session.PendingContext;
 
                 Session.PendingContext = "";

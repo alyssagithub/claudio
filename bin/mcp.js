@@ -127,8 +127,8 @@ Server.tool(
 
 Server.tool(
   "capture",
-  "Take a picture of Studio. Point it at an instance to frame that instance first, or give a region so only the pixels you need come back, since a full window costs far more to look at than a crop. The camera is always put back where it was.",
-  { path: z.string().optional(), x: z.number().optional(), y: z.number().optional(), width: z.number().optional(), height: z.number().optional() },
+  "Take a picture of the Studio viewport. Give around with an instance path to crop tightly to that thing, which works for a part, a model or any on screen GuiObject, and costs a fraction of a whole viewport to look at. Give path to point the camera at something first, or x, y, width and height to crop by hand. The camera is always put back where it was. Plugin windows are not in the viewport, so they cannot be captured this way.",
+  { around: z.string().optional(), padding: z.number().optional(), path: z.string().optional(), x: z.number().optional(), y: z.number().optional(), width: z.number().optional(), height: z.number().optional() },
   async (Input) => {
     const { EncodePixels } = await import("../src/Capture.js");
 
@@ -142,7 +142,7 @@ Server.tool(
       }
     }
 
-    const Shot = await Ask("shoot", { x: Input.x, y: Input.y, width: Input.width, height: Input.height });
+    const Shot = await Ask("shoot", { x: Input.x, y: Input.y, width: Input.width, height: Input.height, around: Input.around, padding: Input.padding });
 
     if (Framed && Framed.restore) {
       await Ask("frame", { restore: true });
@@ -161,7 +161,7 @@ Server.tool(
     return {
       content: [
         { type: "image", data: Made.data, mimeType: "image/png" },
-        { type: "text", text: `${Shot.width}x${Shot.height} of the ${Shot.viewport} viewport${Framed && Framed.framed ? `, framed on ${Framed.framed}` : ""}` },
+        { type: "text", text: `${Shot.width}x${Shot.height} of the ${Shot.viewport} viewport${Shot.around ? `, cropped to ${Shot.around}` : ""}${Framed && Framed.framed ? `, framed on ${Framed.framed}` : ""}` },
       ],
     };
   },

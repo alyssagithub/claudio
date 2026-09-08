@@ -319,7 +319,255 @@ const function Resolve(Path: string): Instance?
 	return Object
 end
 
+const function Rendered(Object: Instance): boolean
+	local Current: Instance? = Object
+
+	while Current do
+		if Current:IsA("PluginGui") or Current == game:GetService("CoreGui") or Current == game:GetService("StarterGui") then
+			return false
+		end
+
+		if Current:IsA("PlayerGui") or Current:IsA("SurfaceGui") or Current:IsA("BillboardGui") then
+			return true
+		end
+
+		Current = Current.Parent
+	end
+
+	return false
+end
+
+const function Unstage()
+	const Held = _G.ClaudioStage :: any
+
+	if not Held then
+		return
+	end
+
+	if Held.Part then
+		Held.Part:Destroy()
+	end
+
+	const Camera = workspace.CurrentCamera
+
+	Camera.CFrame = Held.CFrame
+	Camera.FieldOfView = Held.FieldOfView
+
+	const Lighting = game:GetService("Lighting")
+
+	for Name, Value in Held.Lighting do
+		(Lighting :: any)[Name] = Value
+	end
+
+	for _, Effect in Held.Effects do
+		if Effect.Parent then
+			Effect.Object.Parent = Effect.Parent
+		else
+			Effect.Object.Enabled = Effect.Enabled
+		end
+	end
+
+	_G.ClaudioStage = nil
+end
+
+const function Stage(Shown: GuiObject): any
+	Unstage()
+
+	const Width = Shown.AbsoluteSize.X
+	const Height = Shown.AbsoluteSize.Y
+
+	if Width < 1 or Height < 1 then
+		return {error = `{Shown.Name} is not being drawn, so there is nothing to capture.`}
+	end
+
+	const Camera = workspace.CurrentCamera
+	const Lighting = game:GetService("Lighting")
+	const Effects = {}
+
+	for _, Object in Lighting:GetDescendants() do
+		if Object:IsA("Atmosphere") then
+			table.insert(Effects, {Object = Object, Parent = Object.Parent})
+		elseif Object:IsA("PostEffect") then
+			table.insert(Effects, {Object = Object, Enabled = Object.Enabled})
+		end
+	end
+
+	_G.ClaudioStage = {
+		CFrame = Camera.CFrame,
+		FieldOfView = Camera.FieldOfView,
+		Lighting = {
+			Ambient = Lighting.Ambient,
+			OutdoorAmbient = Lighting.OutdoorAmbient,
+			Brightness = Lighting.Brightness,
+			FogEnd = Lighting.FogEnd,
+			ExposureCompensation = Lighting.ExposureCompensation,
+			GlobalShadows = Lighting.GlobalShadows,
+		},
+		Effects = Effects,
+	}
+
+	for _, Effect in Effects do
+		if Effect.Parent then
+			Effect.Object.Parent = nil
+		else
+			Effect.Object.Enabled = false
+		end
+	end
+
+	Lighting.Ambient = Color3.new()
+	Lighting.OutdoorAmbient = Color3.new()
+	Lighting.Brightness = 0
+	Lighting.FogEnd = 1e6
+	Lighting.ExposureCompensation = 0
+	Lighting.GlobalShadows = false
+
+	const Pixels = 100
+	const Screen = Instance.new("Part")
+
+	Screen.Name = "ClaudioStage"
+	Screen.Anchored = true
+	Screen.CanCollide = false
+	Screen.CanQuery = false
+	Screen.CanTouch = false
+	Screen.CastShadow = false
+	Screen.Size = Vector3.new(Width / Pixels, Height / Pixels, 0.05)
+	Screen.CFrame = CFrame.new(0, 10000, 0)
+	Screen.Color = Color3.new()
+	Screen.Parent = workspace
+
+	;(_G.ClaudioStage :: any).Part = Screen
+
+	const Surface = Instance.new("SurfaceGui")
+
+	Surface.Face = Enum.NormalId.Back
+	Surface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	Surface.PixelsPerStud = Pixels
+	Surface.LightInfluence = 0
+	Surface.Parent = Screen
+
+	const Copy = Shown:Clone()
+
+	Copy.Position = UDim2.fromOffset(0, 0)
+	Copy.Size = UDim2.fromOffset(Width, Height)
+	Copy.AnchorPoint = Vector2.zero
+	Copy.Visible = true
+	Copy.Parent = Surface
+
+	const Original = Shown:GetDescendants()
+
+	for Index, Object in Copy:GetDescendants() do
+		if Object:IsA("ScrollingFrame") and Original[Index] and Original[Index]:IsA("ScrollingFrame") then
+			Object.CanvasPosition = (Original[Index] :: ScrollingFrame).CanvasPosition
+		end
+	end
+
+	const Reach = math.tan(math.rad(Camera.FieldOfView / 2))
+	const Across = Camera.ViewportSize.X / Camera.ViewportSize.Y
+	const Fit = math.max(Screen.Size.Y / 2 / Reach, Screen.Size.X / 2 / (Reach * Across))
+	const Away = math.max(Camera.ViewportSize.Y / (2 * Pixels * Reach), Fit)
+
+	Camera.CFrame = CFrame.lookAt(Screen.Position + Vector3.new(0, 0, Away), Screen.Position)
+
+	for _ = 1, 5 do
+		game:GetService("RunService").Heartbeat:Wait()
+	end
+
+	for Index, Object in Copy:GetDescendants() do
+		if Object:IsA("ScrollingFrame") and Original[Index] and Original[Index]:IsA("ScrollingFrame") then
+			Object.CanvasPosition = (Original[Index] :: ScrollingFrame).CanvasPosition
+		end
+	end
+
+	return {staged = true, width = Width, height = Height}
+end
+
+const function ScreenBounds(Object: Instance, Viewport: Vector2): any
+	if Object:IsA("GuiObject") then
+		const Shown = Object :: GuiObject
+
+		if Shown.AbsoluteSize.X < 1 or Shown.AbsoluteSize.Y < 1 then
+			return {error = `{Shown.Name} has no size on screen.`}
+		end
+
+		const Inset = game:GetService("GuiService"):GetGuiInset()
+
+		return {
+			Left = Shown.AbsolutePosition.X + Inset.X,
+			Top = Shown.AbsolutePosition.Y + Inset.Y,
+			Right = Shown.AbsolutePosition.X + Inset.X + Shown.AbsoluteSize.X,
+			Bottom = Shown.AbsolutePosition.Y + Inset.Y + Shown.AbsoluteSize.Y,
+		}
+	end
+
+	local Middle: Vector3
+	local Half: Vector3
+	local Frame: CFrame
+
+	if Object:IsA("Model") then
+		const Box, Size = (Object :: Model):GetBoundingBox()
+
+		Frame = Box
+		Middle = Box.Position
+		Half = Size / 2
+	elseif Object:IsA("BasePart") then
+		const Part = Object :: BasePart
+
+		Frame = Part.CFrame
+		Middle = Part.Position
+		Half = Part.Size / 2
+	else
+		return {error = `{Object.Name} is neither a GuiObject nor something with a position, so there is nothing to crop to.`}
+	end
+
+	const Camera = workspace.CurrentCamera
+	local Left, Top = math.huge, math.huge
+	local Right, Bottom = -math.huge, -math.huge
+	local Seen = false
+
+	for _, Corner in {
+		Vector3.new(-1, -1, -1), Vector3.new(-1, -1, 1), Vector3.new(-1, 1, -1), Vector3.new(-1, 1, 1),
+		Vector3.new(1, -1, -1), Vector3.new(1, -1, 1), Vector3.new(1, 1, -1), Vector3.new(1, 1, 1),
+	} do
+		const World = Frame:PointToWorldSpace(Corner * Half)
+		const Point, OnScreen = Camera:WorldToViewportPoint(World)
+
+		if Point.Z > 0 then
+			Seen = Seen or OnScreen
+			Left = math.min(Left, Point.X)
+			Top = math.min(Top, Point.Y)
+			Right = math.max(Right, Point.X)
+			Bottom = math.max(Bottom, Point.Y)
+		end
+	end
+
+	if Left == math.huge then
+		return {error = `{Object.Name} is behind the camera, so it cannot be cropped to. Frame it first.`}
+	end
+
+	if not Seen and (Right < 0 or Bottom < 0 or Left > Viewport.X or Top > Viewport.Y) then
+		return {error = `{Object.Name} is off screen, so it cannot be cropped to. Frame it first.`}
+	end
+
+	return {Left = Left, Top = Top, Right = Right, Bottom = Bottom}
+end
+
 const function Shoot(Input: any): any
+	local Staged = nil
+
+	if Input.around then
+		const Target = Resolve(Input.around)
+
+		if Target and Target:IsA("GuiObject") and not Rendered(Target) then
+			const Put = Stage(Target :: GuiObject)
+
+			if Put.error then
+				return {error = Put.error}
+			end
+
+			Staged = Put
+		end
+	end
+
 	const CaptureService = game:GetService("CaptureService")
 	const AssetService = game:GetService("AssetService")
 	const Base64 = require(script.Parent.Parent.Base64)
@@ -339,6 +587,10 @@ const function Shoot(Input: any): any
 	end
 
 	if not Captured then
+		if Staged then
+			Unstage()
+		end
+
 		return {error = "Studio did not return a screenshot."}
 	end
 
@@ -353,6 +605,7 @@ const function Shoot(Input: any): any
 	const Whole = (Image :: any).Size
 	local Corner = Vector2.zero
 	local Span = Whole
+	local Around = nil
 
 	if Input.width and Input.height then
 		const Left = math.clamp(tonumber(Input.x) or 0, 0, Whole.X - 1)
@@ -360,6 +613,36 @@ const function Shoot(Input: any): any
 
 		Corner = Vector2.new(Left, Top)
 		Span = Vector2.new(math.clamp(tonumber(Input.width), 1, Whole.X - Left), math.clamp(tonumber(Input.height), 1, Whole.Y - Top))
+	elseif Staged then
+		const Wide = math.min((Staged :: any).width, Whole.X)
+		const Tall = math.min((Staged :: any).height, Whole.Y)
+
+		Corner = Vector2.new(math.floor((Whole.X - Wide) / 2), math.floor((Whole.Y - Tall) / 2))
+		Span = Vector2.new(Wide, Tall)
+		Around = Input.around
+	elseif Input.around then
+		const Object = Resolve(Input.around)
+
+		if not Object then
+			return {error = `Nothing at "{tostring(Input.around)}" to crop to.`}
+		end
+
+		const Edges = ScreenBounds(Object, Whole)
+
+		if Edges.error then
+			return {error = Edges.error}
+		end
+
+		const Pad = tonumber(Input.padding) or 8
+		const Left = math.clamp(math.floor(Edges.Left - Pad), 0, Whole.X - 1)
+		const Top = math.clamp(math.floor(Edges.Top - Pad), 0, Whole.Y - 1)
+
+		Corner = Vector2.new(Left, Top)
+		Span = Vector2.new(
+			math.clamp(math.ceil(Edges.Right + Pad) - Left, 1, Whole.X - Left),
+			math.clamp(math.ceil(Edges.Bottom + Pad) - Top, 1, Whole.Y - Top)
+		)
+		Around = Object:GetFullName()
 	end
 
 	const Read, Pixels = pcall(function(): any
@@ -370,12 +653,20 @@ const function Shoot(Input: any): any
 		return {error = `Could not read those pixels: {tostring(Pixels)}`}
 	end
 
-	return {
+	const Answer = {
 		width = math.floor(Span.X),
 		height = math.floor(Span.Y),
 		viewport = `{math.floor(Whole.X)}x{math.floor(Whole.Y)}`,
+		around = Around,
+		staged = Staged ~= nil,
 		pixels = Base64.Encode(buffer.tostring(Pixels)),
 	}
+
+	if Staged then
+		Unstage()
+	end
+
+	return Answer
 end
 
 const function Frame(Input: any): any

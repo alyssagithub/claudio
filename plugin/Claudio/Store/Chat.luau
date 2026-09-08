@@ -298,6 +298,10 @@ const function Playtest(Action: string): any
 		end
 
 		RunService:Stop()
+
+		pcall(function()
+			require(script.Parent.Parent.Runtime).Remove()
+		end)
 	else
 		return {error = `Claudio does not know the playtest action "{Action}".`}
 	end

@@ -174,6 +174,53 @@ task.spawn(function()
 					return {error = `The runtime agent does not know the playtest action "{tostring(Job.input.action)}".`}
 				end
 
+				if Job.kind == "logs" then
+					const Named = {
+						[Enum.MessageType.MessageOutput] = "print",
+						[Enum.MessageType.MessageInfo] = "info",
+						[Enum.MessageType.MessageWarning] = "warn",
+						[Enum.MessageType.MessageError] = "error",
+					}
+					const History = LogService:GetLogHistory()
+					const Limit = math.clamp(tonumber(Job.input.limit) or 40, 1, 200)
+					const Wanted = if typeof(Job.input.level) == "string" then Job.input.level:lower() else "all"
+					const Needle = if typeof(Job.input.contains) == "string" and Job.input.contains ~= "" then Job.input.contains:lower() else nil
+					const Kept = {}
+
+					for Index = #History, 1, -1 do
+						const Entry = History[Index]
+						const Kind = Named[Entry.messageType] or "print"
+
+						if Wanted == "problems" then
+							if Kind ~= "warn" and Kind ~= "error" then
+								continue
+							end
+						elseif Wanted ~= "all" and Kind ~= Wanted then
+							continue
+						end
+
+						const Message = tostring(Entry.message)
+
+						if Needle and not Message:lower():find(Needle, 1, true) then
+							continue
+						end
+
+						if #Kept >= Limit then
+							break
+						end
+
+						table.insert(Kept, `{Kind}: {if #Message > 400 then `{Message:sub(1, 400)} [cut]` else Message}`)
+					end
+
+					const Lines = {}
+
+					for Index = #Kept, 1, -1 do
+						table.insert(Lines, Kept[Index])
+					end
+
+					return {lines = Lines, scanned = #History, skipped = 0}
+				end
+
 				if Job.kind ~= "execute" and Job.kind ~= "press" then
 					return {error = `The runtime agent does not handle "{tostring(Job.kind)}".`}
 				end

@@ -210,6 +210,75 @@ end
 const Running: {[string]: boolean} = {}
 local Watching = false
 
+const function Logs(Input: any): any
+	const LogService = game:GetService("LogService")
+	const Ok, History = pcall(function(): any
+		return LogService:GetLogHistory()
+	end)
+
+	if not Ok then
+		return {error = `Could not read the log: {tostring(History)}`}
+	end
+
+	const Wanted = if typeof(Input.level) == "string" then Input.level:lower() else "all"
+	const Needle = if typeof(Input.contains) == "string" and Input.contains ~= "" then Input.contains:lower() else nil
+	const Limit = math.clamp(tonumber(Input.limit) or 40, 1, 200)
+	const Since = tonumber(Input.since)
+	const Oldest = if Since then os.time() - Since else nil
+
+	const Named = {
+		[Enum.MessageType.MessageOutput] = "print",
+		[Enum.MessageType.MessageInfo] = "info",
+		[Enum.MessageType.MessageWarning] = "warn",
+		[Enum.MessageType.MessageError] = "error",
+	}
+
+	const Kept = {}
+	local Seen = 0
+	local Skipped = 0
+
+	for Index = #History, 1, -1 do
+		const Entry = History[Index]
+		const Kind = Named[Entry.messageType] or "print"
+
+		Seen += 1
+
+		if Wanted == "problems" then
+			if Kind ~= "warn" and Kind ~= "error" then
+				continue
+			end
+		elseif Wanted ~= "all" and Kind ~= Wanted then
+			continue
+		end
+
+		if Oldest and Entry.timestamp < Oldest then
+			continue
+		end
+
+		const Message = tostring(Entry.message)
+
+		if Needle and not Message:lower():find(Needle, 1, true) then
+			continue
+		end
+
+		if #Kept >= Limit then
+			Skipped += 1
+
+			continue
+		end
+
+		table.insert(Kept, `{Kind}: {if #Message > 400 then `{Message:sub(1, 400)} [cut]` else Message}`)
+	end
+
+	const Lines = {}
+
+	for Index = #Kept, 1, -1 do
+		table.insert(Lines, Kept[Index])
+	end
+
+	return {lines = Lines, scanned = Seen, skipped = Skipped}
+end
+
 const function LintPlace(Paths: {string}?): any
 	const Tree = ScriptTree()
 
@@ -803,7 +872,7 @@ const function Signature(Entry: any, Kind: string): string
 	return if Returns == "Void" or Returns == "any" then Call else `{Call} -> {Returns}`
 end
 
-const function Marks(Entry: any, Owner: string?): string
+const function Marks(Entry: any, Owner: string?, Kind: string?): string
 	const Notes = {}
 	const Display = Entry.Display or {}
 
@@ -813,10 +882,18 @@ const function Marks(Entry: any, Owner: string?): string
 
 	const Permits = Entry.Permits or {}
 
-	if Permits.Read == nil then
-		table.insert(Notes, "cannot be read from here")
-	elseif Permits.Write == nil then
-		table.insert(Notes, "read only")
+	if Kind == "property" then
+		if Permits.Read == nil then
+			table.insert(Notes, "cannot be read from here")
+		elseif Permits.Write == nil then
+			table.insert(Notes, "read only")
+		end
+	elseif Kind == "event" then
+		if Permits.Listen == nil then
+			table.insert(Notes, "cannot be listened to from here")
+		end
+	elseif Permits.Call == nil then
+		table.insert(Notes, "cannot be called from here")
 	end
 
 	for _, Name in {"Read", "Write", "Call", "Listen", "New"} do
@@ -918,6 +995,8 @@ const function Api(Input: any): any
 		return {error = `The engine does not know a class called "{Class}".`}
 	end
 
+	local Shared = 0
+
 	const function Gather(Method: string, Kind: string): {string}
 		const Ok, Listed = pcall(function(): any
 			return (Reflection :: any)[Method](Reflection, Class, {})
@@ -936,10 +1015,18 @@ const function Api(Input: any): any
 				continue
 			end
 
+			const From = tostring(Entry.Owner)
+
+			if not Input.member and Input.inherited ~= true and (From == "Instance" or From == "Object") then
+				Shared += 1
+
+				continue
+			end
+
 			if Kind == "property" then
-				table.insert(Lines, `{Name}: {TypeName(Entry.Type)}{Marks(Entry, Class)}`)
+				table.insert(Lines, `{Name}: {TypeName(Entry.Type)}{Marks(Entry, Class, Kind)}`)
 			else
-				table.insert(Lines, `{Signature(Entry, Kind)}{Marks(Entry, Class)}`)
+				table.insert(Lines, `{Signature(Entry, Kind)}{Marks(Entry, Class, Kind)}`)
 			end
 		end
 
@@ -979,6 +1066,7 @@ const function Api(Input: any): any
 		methods = Gather("GetMethodsOfClass", "method"),
 		events = Gather("GetEventsOfClass", "event"),
 		member = Input.member,
+		shared = Shared,
 	}
 end
 
@@ -1425,6 +1513,10 @@ const function RunStudioJob(Job: any)
 
 	task.spawn(function()
 		const Ok, Outcome = pcall(function()
+			if Job.kind == "logs" then
+				return Logs(Job.input)
+			end
+
 			if Job.kind == "lint" then
 				return LintPlace(if Job.input then Job.input.paths else nil)
 			end

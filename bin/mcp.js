@@ -4,7 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import fs from "node:fs";
 import { DefaultPort, TokenFile } from "../src/Config.js";
-import { ExecuteReport, LintReport, ReadReport, PropertyReport, ApiReport } from "../src/Ask.js";
+import { ExecuteReport, LintReport, ReadReport, PropertyReport, ApiReport, LogReport } from "../src/Ask.js";
 import { Describe as DescribePresence } from "../src/StudioPresence.js";
 
 const Port = Number(process.env.CLAUDIO_PORT) || DefaultPort;
@@ -78,6 +78,18 @@ function Say(Found) {
 const Server = new McpServer({ name: "claudio", version: "1.0.0" });
 
 Server.tool(
+  "logs",
+  "Read the output log of the open place, filtered in Studio so only what you ask for crosses the wire. Use level problems for just warnings and errors, contains to search, and limit to cap how much comes back, which defaults to forty of the most recent. Point it at the session with target when a playtest is running, because the editor and the session keep separate logs.",
+  { level: z.enum(["all", "print", "warn", "error", "info", "problems"]).optional(), contains: z.string().optional(), limit: z.number().optional(), since: z.number().optional(), target: z.enum(["edit", "server"]).optional() },
+  async (Input) => {
+    const Sent = { level: Input.level, contains: Input.contains, limit: Input.limit, since: Input.since };
+    const Found = (Input.target || "edit") === "edit" ? await Ask("logs", Sent) : await AskAs("server", "logs", Sent);
+
+    return { content: [{ type: "text", text: LogReport(Found) }] };
+  },
+);
+
+Server.tool(
   "lint",
   "Check scripts in the open place for analyzer warnings, including scripts nobody has edited. Pass paths to narrow it, or leave it empty to check everything. Report what it finds rather than fixing unasked, because pre-existing warnings were already there.",
   { paths: z.array(z.string()).optional() },
@@ -112,8 +124,8 @@ Server.tool(
 Server.tool(
   "api",
   "Ask the running engine about the Roblox API: a class's properties, methods and events with full signatures, parameter names, return types, what it inherits and what inherits from it, which members are deprecated or read only, and what security each needs. This is the version of Roblox actually installed, so prefer it over remembering an API or reading documentation that may describe a different version. Narrow with member for one member, search to find a class, enum or member by name, or enumName for an enum's items.",
-  { className: z.string().optional(), member: z.string().optional(), search: z.string().optional(), enumName: z.string().optional() },
-  async (Input) => ({ content: [{ type: "text", text: ApiReport(await Ask("api", { className: Input.className, member: Input.member, search: Input.search, enumName: Input.enumName })) }] }),
+  { className: z.string().optional(), member: z.string().optional(), search: z.string().optional(), enumName: z.string().optional(), inherited: z.boolean().optional() },
+  async (Input) => ({ content: [{ type: "text", text: ApiReport(await Ask("api", { className: Input.className, member: Input.member, search: Input.search, enumName: Input.enumName, inherited: Input.inherited === true })) }] }),
 );
 
 Server.tool(

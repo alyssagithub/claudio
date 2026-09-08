@@ -83,6 +83,26 @@ export function PropertyReport(Found) {
   return Parts.join("\n");
 }
 
+export function LogReport(Found) {
+  if (!Found) {
+    return "Studio did not answer.";
+  }
+
+  if (Found.error) {
+    return Found.error;
+  }
+
+  const Lines = Found.lines || [];
+
+  if (Lines.length === 0) {
+    return `Nothing in the log matched, out of ${Found.scanned} entries.`;
+  }
+
+  const Tail = Found.skipped > 0 ? `\n${Found.skipped} older matches not shown; raise limit to see them.` : "";
+
+  return `${Lines.join("\n")}${Tail}`;
+}
+
 export function ApiReport(Found) {
   if (!Found) {
     return "Studio did not answer.";
@@ -130,6 +150,10 @@ export function ApiReport(Found) {
 
   if (Found.subclasses && Found.subclasses.length > 0 && !Found.member) {
     Parts.push(`subclasses: ${Found.subclasses.join(" ")}`);
+  }
+
+  if (Found.shared > 0) {
+    Parts.push(`${Found.shared} members every instance has are not listed; pass inherited to see them.`);
   }
 
   return Parts.join("\n");
@@ -249,8 +273,9 @@ export function AskServerFor(Pose, Reach, ReachIn) {
         member: z.string().optional().describe("Only this member of the class."),
         search: z.string().optional().describe("Find a class or enum whose name contains this. Pass className too to search that class's members."),
         enumName: z.string().optional().describe("An enum to list the items of, such as Material."),
+        inherited: z.boolean().optional().describe("Include the members every instance has, such as Name and Destroy, which are left out by default."),
       }, async (Input) => {
-        const Found = await Reach("api", { className: Input.className, member: Input.member, search: Input.search, enumName: Input.enumName });
+        const Found = await Reach("api", { className: Input.className, member: Input.member, search: Input.search, enumName: Input.enumName, inherited: Input.inherited === true });
 
         return { content: [{ type: "text", text: ApiReport(Found) }] };
       }),
@@ -362,6 +387,19 @@ export function AskServerFor(Pose, Reach, ReachIn) {
         }
 
         return { content: [{ type: "text", text: Found && Found.error ? Found.error : (Found && Found.text) || "Studio did not say what happened." }] };
+      }),
+      tool("logs", "Read the output log of the open place, filtered in Studio so only what you ask for crosses the wire. Use level problems for just warnings and errors, contains to search, and limit to cap how much comes back, which defaults to forty of the most recent. Point it at the session with target when a playtest is running, because the editor and the session keep separate logs.", {
+        level: z.enum(["all", "print", "warn", "error", "info", "problems"]).optional().describe("Which kinds to return. problems means warnings and errors."),
+        contains: z.string().optional().describe("Only lines containing this text."),
+        limit: z.number().optional().describe("How many to return, newest last. Forty by default, two hundred at most."),
+        since: z.number().optional().describe("Only entries from the last this many seconds."),
+        target: z.enum(["edit", "server"]).optional().describe("Whose log to read. edit is the editor and the default; server is the running play session."),
+      }, async (Input) => {
+        const Where = Input.target || "edit";
+        const Sent = { level: Input.level, contains: Input.contains, limit: Input.limit, since: Input.since };
+        const Found = Where === "edit" ? await Reach("logs", Sent) : await ReachIn("server", "logs", Sent);
+
+        return { content: [{ type: "text", text: LogReport(Found) }] };
       }),
       tool("lint", LintDescription, { paths: z.array(z.string()).optional().describe("Instance paths to check, such as ServerScriptService.Main. Omit to check the whole place.") }, async (Input) => {
         const Found = await Reach("lint", { paths: Input.paths || [] });

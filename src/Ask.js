@@ -332,7 +332,13 @@ export function AskServerFor(Pose, Reach, ReachIn) {
         return { content: [{ type: "text", text: ExecuteReport(Found) }] };
       }),
       tool("press", PressDescription, { path: z.string().describe("Full instance path of the GuiObject to press.") }, async (Input) => {
-        const Found = await Reach("press", { path: Input.path });
+        const { RuntimeLive } = await import("./Studio.js");
+
+        if (!RuntimeLive()) {
+          return { content: [{ type: "text", text: "No play session is reachable, and a press has to happen on the client where the interface lives. Start one with the playtest tool and give it a moment to connect." }] };
+        }
+
+        const Found = await ReachIn("server", "press", { path: Input.path });
 
         return { content: [{ type: "text", text: Found && Found.error ? Found.error : (Found && Found.text) || "Studio did not say what happened." }] };
       }),

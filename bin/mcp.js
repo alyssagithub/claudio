@@ -207,7 +207,7 @@ Server.tool(
   "press",
   "Press a button in the running experience by naming its instance path, rather than by guessing screen coordinates. Needs a play session with a character. A press that reaches nothing still reports as sent, so check the place afterwards.",
   { path: z.string() },
-  async (Input) => ({ content: [{ type: "text", text: Say(await Ask("press", { path: Input.path })) }] }),
+  async (Input) => ({ content: [{ type: "text", text: Say(await AskAs("server", "press", { path: Input.path })) }] }),
 );
 
 await Server.connect(new StdioServerTransport());

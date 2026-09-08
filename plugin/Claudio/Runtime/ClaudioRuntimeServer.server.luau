@@ -12,10 +12,40 @@ const Port = script:GetAttribute("Port") or 47225
 const Token = script:GetAttribute("Token") or ""
 const Base = `http://127.0.0.1:{Port}`
 
-const Remote = Instance.new("RemoteFunction")
+const Remote = Instance.new("RemoteEvent")
 
 Remote.Name = "ClaudioRuntime"
 Remote.Parent = ReplicatedStorage
+
+const Replies = {}
+
+Remote.OnServerEvent:Connect(function(_, Id: any, Result: any)
+	if typeof(Id) == "string" then
+		Replies[Id] = if Result == nil then {error = "The client sent nothing back."} else Result
+	end
+end)
+
+const function AskClient(Player: Player, Kind: string, Body: string): any
+	const Id = `{os.clock()}-{math.random(1, 1000000)}`
+
+	Remote:FireClient(Player, Id, Kind, Body)
+
+	const Deadline = os.clock() + 20
+
+	while Replies[Id] == nil and os.clock() < Deadline do
+		task.wait(0.1)
+	end
+
+	const Answer = Replies[Id]
+
+	Replies[Id] = nil
+
+	if Answer == nil then
+		return {error = "The client did not answer within twenty seconds. Its agent may not have loaded."}
+	end
+
+	return Answer
+end
 
 const function Call(Method: string, Where: string, Body: any): (boolean, any)
 	const Ok, Result = pcall(function()
@@ -132,40 +162,18 @@ task.spawn(function()
 					return {error = `The runtime agent does not know the playtest action "{tostring(Job.input.action)}".`}
 				end
 
-				if Job.kind ~= "execute" then
-					return {error = `The runtime agent only runs execute, not "{tostring(Job.kind)}".`}
+				if Job.kind ~= "execute" and Job.kind ~= "press" then
+					return {error = `The runtime agent does not handle "{tostring(Job.kind)}".`}
 				end
 
-				if Job.input.target == "client" then
+				if Job.kind == "press" or Job.input.target == "client" then
 					const Player = game:GetService("Players"):GetPlayers()[1]
 
 					if not Player then
 						return {error = "Nobody is in the session, so there is no client to run on."}
 					end
 
-					local Answer = nil
-						local Finished = false
-
-						task.spawn(function()
-							const Got, Result = pcall(function()
-								return Remote:InvokeClient(Player, Job.input.code)
-							end)
-
-							Answer = if Got then Result else {error = tostring(Result)}
-							Finished = true
-						end)
-
-						const Deadline = os.clock() + 20
-
-						while not Finished and os.clock() < Deadline do
-							task.wait(0.1)
-						end
-
-						if not Finished then
-							return {error = "The client did not answer within twenty seconds. Its agent may not have loaded."}
-						end
-
-						return Answer
+					return AskClient(Player, if Job.kind == "press" then "press" else "execute", if Job.kind == "press" then Job.input.path else Job.input.code)
 				end
 
 				return Run(Job.input.code)

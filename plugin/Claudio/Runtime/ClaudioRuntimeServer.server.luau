@@ -1,6 +1,7 @@
 --!strict
 const HttpService = game:GetService("HttpService")
 const ReplicatedStorage = game:GetService("ReplicatedStorage")
+const LogService = game:GetService("LogService")
 const RunService = game:GetService("RunService")
 
 if not RunService:IsRunning() then
@@ -36,42 +37,49 @@ const function Call(Method: string, Where: string, Body: any): (boolean, any)
 end
 
 const function Run(Code: string): any
-	const Holder = Instance.new("ModuleScript")
-
-	Holder.Name = "ClaudioRuntimeChunk"
-	Holder.Source = `return function()\n{Code}\nend`
-	Holder.Parent = ReplicatedStorage
-
 	const Said = {}
-	const Listening = game:GetService("LogService").MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
+	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
 		if #Said < 200 and Kind ~= Enum.MessageType.MessageInfo then
 			table.insert(Said, Message)
 		end
 	end)
 
-	const Built, Made = pcall(require, Holder)
-
-	if not Built then
+	const function Finish(Answer: {[string]: any}): any
 		task.wait(0.1)
 		Listening:Disconnect()
-		Holder:Destroy()
 
-		return {error = "That did not compile.", output = Said}
+		if #Said > 0 then
+			Answer.output = Said
+		end
+
+		return Answer
 	end
 
-	const Ok, Result = pcall(Made)
+	if typeof(loadstring) ~= "function" then
+		return Finish({error = "Running code here needs loadstring, which this session does not have."})
+	end
 
-	task.wait(0.1)
-	Listening:Disconnect()
-	Holder:Destroy()
+	const Made, Trouble = loadstring(`return function()\n{Code}\nend`)
+
+	if not Made then
+		return Finish({error = `That did not compile: {tostring(Trouble)}`})
+	end
+
+	const Built, Body = pcall(Made)
+
+	if not Built then
+		return Finish({error = tostring(Body)})
+	end
+
+	const Ok, Result = pcall(Body)
+
+	if not Ok then
+		return Finish({error = tostring(Result)})
+	end
 
 	const Answer: {[string]: any} = {}
 
-	if not Ok then
-		Answer.error = tostring(Result):gsub("[%w_%.]*ClaudioRuntimeChunk:(%d+):?%s*", function(Digits: string): string
-			return `line {tonumber(Digits) - 1}: `
-		end)
-	elseif Result ~= nil then
+	if Result ~= nil then
 		if typeof(Result) == "table" then
 			const Encoded, Text = pcall(HttpService.JSONEncode, HttpService, Result)
 
@@ -81,11 +89,7 @@ const function Run(Code: string): any
 		end
 	end
 
-	if #Said > 0 then
-		Answer.output = Said
-	end
-
-	return Answer
+	return Finish(Answer)
 end
 
 task.spawn(function()
@@ -99,9 +103,13 @@ task.spawn(function()
 					const StudioTestService = game:GetService("StudioTestService")
 
 					if Job.input.action == "stop" then
+						Call("POST", "/studio/job", {id = Job.id, result = {text = "Playtest stopped."}})
+
+						task.wait(0.2)
+
 						StudioTestService:EndTest("stopped by Claudio")
 
-						return {text = "Playtest stopped."}
+						return nil
 					end
 
 					if Job.input.action == "players" then
@@ -140,7 +148,9 @@ task.spawn(function()
 				return Run(Job.input.code)
 			end)
 
-			Call("POST", "/studio/job", {id = Job.id, result = if Done then Outcome else {error = tostring(Outcome)}})
+			if not (Done and Outcome == nil) then
+				Call("POST", "/studio/job", {id = Job.id, result = if Done then Outcome else {error = tostring(Outcome)}})
+			end
 		end
 	end
 end)

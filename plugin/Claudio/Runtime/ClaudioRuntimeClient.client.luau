@@ -9,13 +9,7 @@ if not Remote or not Remote:IsA("RemoteFunction") then
 	return
 end
 
-Remote.OnClientInvoke = function(Code: string): any
-	const Holder = Instance.new("ModuleScript")
-
-	Holder.Name = "ClaudioRuntimeChunk"
-	Holder.Source = `return function()\n{Code}\nend`
-	Holder.Parent = ReplicatedStorage
-
+const function Run(Code: string): any
 	const Said = {}
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
 		if #Said < 200 and Kind ~= Enum.MessageType.MessageInfo then
@@ -23,29 +17,42 @@ Remote.OnClientInvoke = function(Code: string): any
 		end
 	end)
 
-	const Built, Made = pcall(require, Holder)
-
-	if not Built then
+	const function Finish(Answer: {[string]: any}): any
 		task.wait(0.1)
 		Listening:Disconnect()
-		Holder:Destroy()
 
-		return {error = "That did not compile.", output = Said}
+		if #Said > 0 then
+			Answer.output = Said
+		end
+
+		return Answer
 	end
 
-	const Ok, Result = pcall(Made)
+	if typeof(loadstring) ~= "function" then
+		return Finish({error = "Running code here needs loadstring, which this session does not have."})
+	end
 
-	task.wait(0.1)
-	Listening:Disconnect()
-	Holder:Destroy()
+	const Made, Trouble = loadstring(`return function()\n{Code}\nend`)
+
+	if not Made then
+		return Finish({error = `That did not compile: {tostring(Trouble)}`})
+	end
+
+	const Built, Body = pcall(Made)
+
+	if not Built then
+		return Finish({error = tostring(Body)})
+	end
+
+	const Ok, Result = pcall(Body)
+
+	if not Ok then
+		return Finish({error = tostring(Result)})
+	end
 
 	const Answer: {[string]: any} = {}
 
-	if not Ok then
-		Answer.error = tostring(Result):gsub("[%w_%.]*ClaudioRuntimeChunk:(%d+):?%s*", function(Digits: string): string
-			return `line {tonumber(Digits) - 1}: `
-		end)
-	elseif Result ~= nil then
+	if Result ~= nil then
 		if typeof(Result) == "table" then
 			const Encoded, Text = pcall(HttpService.JSONEncode, HttpService, Result)
 
@@ -55,9 +62,9 @@ Remote.OnClientInvoke = function(Code: string): any
 		end
 	end
 
-	if #Said > 0 then
-		Answer.output = Said
-	end
+	return Finish(Answer)
+end
 
-	return Answer
+Remote.OnClientInvoke = function(Code: string): any
+	return Run(Code)
 end

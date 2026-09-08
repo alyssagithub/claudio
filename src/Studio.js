@@ -32,14 +32,20 @@ export function Request(Kind, Input, Timeout, Role) {
 
 const Heard = new Map();
 
-export function Seen(Role) {
+let CanRun = null;
+
+export function Seen(Role, Able) {
   Heard.set(Role || "edit", Date.now());
+
+  if (Able !== undefined) {
+    CanRun = Able;
+  }
 }
 
-export function Take(Role) {
+export function Take(Role, Able) {
   const Wanted = Role || "edit";
 
-  Seen(Wanted);
+  Seen(Wanted, Able);
 
   const At = Pending.findIndex((Job) => Job.Role === Wanted);
 
@@ -56,6 +62,7 @@ export function Presence() {
   return {
     lastSeen: Heard.get("edit") || 0,
     runtimeSeen: Heard.get("server") || 0,
+    canRun: CanRun,
     waiting: Waiting.size,
     queued: Pending.length,
   };

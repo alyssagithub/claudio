@@ -349,7 +349,9 @@ export function StartServer(Port) {
 
       if (Url.pathname === "/studio/job") {
         if (Request.method === "GET") {
-          SendJson(Response, 200, { job: TakeStudioJob(Url.searchParams.get("role") || "edit") });
+          const Able = Url.searchParams.get("canRun");
+
+          SendJson(Response, 200, { job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true") });
           return;
         }
 

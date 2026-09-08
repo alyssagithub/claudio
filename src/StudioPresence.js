@@ -45,7 +45,13 @@ export function Describe(Presence) {
       Busy.push(`${Presence.waiting} in flight`);
     }
 
-    return `Connected. The plugin checked in ${Math.round(Since / 1000)}s ago${Busy.length > 0 ? `, ${Busy.join(" and ")}` : ""}.`;
+    const Line = `Connected. The plugin checked in ${Math.round(Since / 1000)}s ago${Busy.length > 0 ? `, ${Busy.join(" and ")}` : ""}.`;
+
+    if (Live && Presence.canRun === false) {
+      return `${Line} It cannot run code, though, because loadstring is off for this place: select ServerScriptService in the Explorer and tick LoadStringEnabled in its Properties, then start the playtest again. Claudio cannot set it, because the property is not readable or writable from any script.`;
+    }
+
+    return Line;
   }
 
   if (Running === 0) {

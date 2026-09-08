@@ -66,6 +66,18 @@ const function Call(Method: string, Where: string, Body: any): (boolean, any)
 	return Read, Decoded
 end
 
+const function CanRun(): boolean
+	if typeof(loadstring) ~= "function" then
+		return false
+	end
+
+	const Ok, Made = pcall(function()
+		return loadstring("return 1")
+	end)
+
+	return Ok and Made ~= nil
+end
+
 const function Run(Code: string): any
 	const Said = {}
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
@@ -85,8 +97,8 @@ const function Run(Code: string): any
 		return Answer
 	end
 
-	if typeof(loadstring) ~= "function" then
-		return Finish({error = "Running code here needs loadstring, which this session does not have."})
+	if not CanRun() then
+		return Finish({error = "Running code inside the session needs loadstring, which is off for this place. Select ServerScriptService in the Explorer, tick LoadStringEnabled in its Properties, and start the playtest again. Claudio cannot set it, because the property is not readable or writable from any script."})
 	end
 
 	const Made, Trouble = loadstring(`return function()\n{Code}\nend`)
@@ -124,7 +136,7 @@ end
 
 task.spawn(function()
 	while RunService:IsRunning() and task.wait(1) do
-		const Ok, Reply = Call("GET", "/studio/job?role=server", nil)
+		const Ok, Reply = Call("GET", `/studio/job?role=server&canRun={CanRun()}`, nil)
 
 		if Ok and Reply and Reply.job then
 			const Job = Reply.job

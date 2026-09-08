@@ -5,10 +5,28 @@ const LogService = game:GetService("LogService")
 
 local Remote = ReplicatedStorage:FindFirstChild("ClaudioRuntime")
 
-while not Remote or not Remote:IsA("RemoteEvent") do
+const Deadline = os.clock() + 120
+
+while (not Remote or not Remote:IsA("RemoteEvent")) and os.clock() < Deadline do
 	task.wait(0.5)
 
 	Remote = ReplicatedStorage:FindFirstChild("ClaudioRuntime")
+end
+
+if not Remote or not Remote:IsA("RemoteEvent") then
+	return
+end
+
+const function CanRun(): boolean
+	if typeof(loadstring) ~= "function" then
+		return false
+	end
+
+	const Ok, Made = pcall(function()
+		return loadstring("return 1")
+	end)
+
+	return Ok and Made ~= nil
 end
 
 const function Pressed(Path: string): any
@@ -82,8 +100,8 @@ const function Run(Code: string): any
 		return Answer
 	end
 
-	if typeof(loadstring) ~= "function" then
-		return Finish({error = "Running code here needs loadstring, which this session does not have."})
+	if not CanRun() then
+		return Finish({error = "Running code inside the session needs loadstring, which is off for this place. Select ServerScriptService in the Explorer, tick LoadStringEnabled in its Properties, and start the playtest again. Claudio cannot set it, because the property is not readable or writable from any script."})
 	end
 
 	const Made, Trouble = loadstring(`return function()\n{Code}\nend`)

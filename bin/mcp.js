@@ -175,9 +175,15 @@ Server.tool(
 
 Server.tool(
   "execute",
-  "Run Luau inside the open place and get back what it returned, what it printed, and where it failed. Changes are recorded as one undo step; pass readOnly when you only want to look. Call _G.ClaudioFresh(module) to require past the cache.",
-  { code: z.string(), readOnly: z.boolean().optional(), label: z.string().optional() },
-  async (Input) => ({ content: [{ type: "text", text: ExecuteReport(await Ask("execute", { code: Input.code, readOnly: Input.readOnly === true, label: Input.label })) }] }),
+  "Run Luau inside the open place and get back what it returned, what it printed, and where it failed. target picks where: edit is the editor and the default, server and client are the running play session and need one open. Changes are recorded as one undo step; pass readOnly when you only want to look. Call _G.ClaudioFresh(module) to require past the cache.",
+  { code: z.string(), target: z.enum(["edit", "server", "client"]).optional(), readOnly: z.boolean().optional(), label: z.string().optional() },
+  async (Input) => {
+    const Where = Input.target || "edit";
+    const Sent = { code: Input.code, target: Where, readOnly: Input.readOnly === true, label: Input.label };
+    const Found = Where === "edit" ? await Ask("execute", Sent) : await AskAs("server", "execute", Sent);
+
+    return { content: [{ type: "text", text: ExecuteReport(Found) }] };
+  },
 );
 
 Server.tool(

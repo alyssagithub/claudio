@@ -98,6 +98,7 @@ task.spawn(function()
 
 		if Ok and Reply and Reply.job then
 			const Job = Reply.job
+			task.spawn(function()
 			const Done, Outcome = pcall(function(): any
 				if Job.kind == "playtest" then
 					const StudioTestService = game:GetService("StudioTestService")
@@ -142,7 +143,29 @@ task.spawn(function()
 						return {error = "Nobody is in the session, so there is no client to run on."}
 					end
 
-					return Remote:InvokeClient(Player, Job.input.code)
+					local Answer = nil
+						local Finished = false
+
+						task.spawn(function()
+							const Got, Result = pcall(function()
+								return Remote:InvokeClient(Player, Job.input.code)
+							end)
+
+							Answer = if Got then Result else {error = tostring(Result)}
+							Finished = true
+						end)
+
+						const Deadline = os.clock() + 20
+
+						while not Finished and os.clock() < Deadline do
+							task.wait(0.1)
+						end
+
+						if not Finished then
+							return {error = "The client did not answer within twenty seconds. Its agent may not have loaded."}
+						end
+
+						return Answer
 				end
 
 				return Run(Job.input.code)
@@ -151,6 +174,7 @@ task.spawn(function()
 			if not (Done and Outcome == nil) then
 				Call("POST", "/studio/job", {id = Job.id, result = if Done then Outcome else {error = tostring(Outcome)}})
 			end
+			end)
 		end
 	end
 end)

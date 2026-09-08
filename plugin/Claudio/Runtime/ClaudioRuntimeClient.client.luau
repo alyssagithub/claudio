@@ -3,10 +3,12 @@ const ReplicatedStorage = game:GetService("ReplicatedStorage")
 const HttpService = game:GetService("HttpService")
 const LogService = game:GetService("LogService")
 
-const Remote = ReplicatedStorage:WaitForChild("ClaudioRuntime", 30)
+local Remote = ReplicatedStorage:FindFirstChild("ClaudioRuntime")
 
-if not Remote or not Remote:IsA("RemoteFunction") then
-	return
+while not Remote or not Remote:IsA("RemoteFunction") do
+	task.wait(0.5)
+
+	Remote = ReplicatedStorage:FindFirstChild("ClaudioRuntime")
 end
 
 const function Run(Code: string): any

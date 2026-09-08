@@ -342,78 +342,6 @@ const function Playtest(Input: any): any
 	return {error = `Claudio does not know the playtest action "{tostring(Action)}".`}
 end
 
-const function State(): string
-		return if RunService:IsRunning() then "running" else "stopped"
-	end
-
-	if Action == "status" then
-		if State() == "running" then
-			return {text = "A playtest is running."}
-		end
-
-		return {text = "Nothing is running in the editor. A play session started from the toolbar runs in its own place and cannot be seen from here, so ask the instances tool whether one is reachable before concluding there is none."}
-	end
-
-	if Action == "pause" then
-		return {error = "Pausing is not offered, because Studio reports a paused place as stopped and Claudio will not report a state it cannot check. Stop it instead."}
-	end
-
-	const Before = State()
-
-	if Action == "start" then
-		if Before ~= "stopped" then
-			return {error = "A playtest is already running, so it was left alone. Stop it first if you want a fresh run."}
-		end
-
-		local Warning = nil
-
-		pcall(function()
-			const Runtime = require(script.Parent.Parent.Runtime)
-			const Reachable, Why = Runtime.Reachable()
-
-			Runtime.Install()
-
-			if not Reachable then
-				Warning = Why
-			end
-		end)
-
-		RunService:Run()
-
-		if Warning then
-			task.wait(1)
-
-			return {text = `Playtest started. {Warning}`}
-		end
-	elseif Action == "stop" then
-		if Before == "stopped" then
-			return {error = "No playtest was running, so nothing changed."}
-		end
-
-		RunService:Stop()
-
-		pcall(function()
-			require(script.Parent.Parent.Runtime).Remove()
-		end)
-	else
-		return {error = `Claudio does not know the playtest action "{Action}".`}
-	end
-
-	const Deadline = os.clock() + 5
-
-	while State() == Before and os.clock() < Deadline do
-		task.wait(0.1)
-	end
-
-	const After = State()
-
-	if After == Before then
-		return {error = `Studio accepted {Action} but the playtest is still {After}, so it did not take.`}
-	end
-
-	return {text = if After == "running" then "Playtest started." else "Playtest stopped."}
-end
-
 const function Resolve(Path: string): Instance?
 	local Object: Instance? = game
 
@@ -885,7 +813,9 @@ const function Marks(Entry: any, Owner: string?): string
 
 	const Permits = Entry.Permits or {}
 
-	if Permits.Read ~= nil and Permits.Write == nil then
+	if Permits.Read == nil then
+		table.insert(Notes, "cannot be read from here")
+	elseif Permits.Write == nil then
 		table.insert(Notes, "read only")
 	end
 

@@ -29,24 +29,6 @@ function Runtime.Remove()
 	end
 end
 
-function Runtime.Runnable(): (boolean, string?)
-	const ServerScriptService = game:GetService("ServerScriptService")
-
-	if ServerScriptService.LoadStringEnabled then
-		return true, nil
-	end
-
-	pcall(function()
-		ServerScriptService.LoadStringEnabled = true
-	end)
-
-	if ServerScriptService.LoadStringEnabled then
-		return true, nil
-	end
-
-	return false, "Running code inside the session needs LoadStringEnabled on ServerScriptService, which is off and could not be turned on from here."
-end
-
 function Runtime.Reachable(): (boolean, string?)
 	if HttpService.HttpEnabled then
 		return true, nil
@@ -65,8 +47,6 @@ end
 
 function Runtime.Install()
 	Runtime.Remove()
-
-	Runtime.Runnable()
 
 	const Server = (script :: any).ClaudioRuntimeServer:Clone()
 

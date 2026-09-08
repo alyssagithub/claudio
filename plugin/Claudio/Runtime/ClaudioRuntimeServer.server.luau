@@ -95,6 +95,34 @@ task.spawn(function()
 		if Ok and Reply and Reply.job then
 			const Job = Reply.job
 			const Done, Outcome = pcall(function(): any
+				if Job.kind == "playtest" then
+					const StudioTestService = game:GetService("StudioTestService")
+
+					if Job.input.action == "stop" then
+						StudioTestService:EndTest("stopped by Claudio")
+
+						return {text = "Playtest stopped."}
+					end
+
+					if Job.input.action == "players" then
+						const Wanted = math.clamp(tonumber(Job.input.players) or 1, 1, 8)
+						const Before = #game:GetService("Players"):GetPlayers()
+						const Added, Trouble = pcall(function()
+							StudioTestService:AddPlayers(Wanted)
+						end)
+
+						if not Added then
+							return {error = `Studio refused to add players: {tostring(Trouble)}. This only works in a multiplayer playtest.`}
+						end
+
+						task.wait(2)
+
+						return {text = `Players went from {Before} to {#game:GetService("Players"):GetPlayers()}.`}
+					end
+
+					return {error = `The runtime agent does not know the playtest action "{tostring(Job.input.action)}".`}
+				end
+
 				if Job.kind ~= "execute" then
 					return {error = `The runtime agent only runs execute, not "{tostring(Job.kind)}".`}
 				end

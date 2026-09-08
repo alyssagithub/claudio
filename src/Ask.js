@@ -201,10 +201,11 @@ const PressDescription = [
 ].join(" ");
 
 const PlaytestDescription = [
-  "Start, stop or inspect a playtest of the open place, so behaviour that only happens at runtime can be checked.",
+  "Start, stop, inspect or add players to a playtest of the open place, so behaviour that only happens at runtime can be checked.",
   "Always stop what you started: a place left running keeps executing scripts, holds the editor in a running state, and every later edit lands in a data model that is about to be thrown away.",
   "Check status first rather than assuming, and read the reply, because starting something already running and stopping something already stopped are both mistakes worth knowing about.",
-  "This runs the place without a player character, so server scripts, physics and module behaviour can be exercised but anything reading LocalPlayer or PlayerGui cannot.",
+  "play mode gives a real character and PlayerGui, run mode simulates without one, and multiplayer starts a server with several clients.",
+  "Stopping and adding players can only be done from inside the running session, so those need the place to allow HTTP requests before the playtest starts.",
 ].join(" ");
 
 const LintDescription = [
@@ -335,8 +336,24 @@ export function AskServerFor(Pose, Reach, ReachIn) {
 
         return { content: [{ type: "text", text: Found && Found.error ? Found.error : (Found && Found.text) || "Studio did not say what happened." }] };
       }),
-      tool("playtest", PlaytestDescription, { action: z.enum(["start", "stop", "status"]).describe("What to do. Use status to find out what is happening before changing it.") }, async (Input) => {
-        const Found = await Reach("playtest", { action: Input.action });
+      tool("playtest", PlaytestDescription, {
+        action: z.enum(["start", "stop", "status", "players"]).describe("What to do. Use status to find out what is happening before changing it."),
+        mode: z.enum(["play", "run", "multiplayer"]).optional().describe("How to start it. play gives a character, run simulates without one, multiplayer starts a server with several clients. Defaults to play."),
+        players: z.number().optional().describe("How many players, for multiplayer starts and for the players action."),
+      }, async (Input) => {
+        const Found = await Reach("playtest", { action: Input.action, mode: Input.mode, players: Input.players });
+
+        if (Found && Found.relay) {
+          const { RuntimeLive } = await import("./Studio.js");
+
+          if (!RuntimeLive()) {
+            return { content: [{ type: "text", text: `Studio only allows ${Found.relay} from inside the running session, and the session is not reachable. It needs Allow HTTP Requests turned on in Game Settings before the playtest starts, otherwise stop it from Studio's toolbar.` }] };
+          }
+
+          const Inside = await ReachIn("server", "playtest", { action: Found.relay, players: Found.players });
+
+          return { content: [{ type: "text", text: Inside && Inside.error ? Inside.error : (Inside && Inside.text) || "The session did not say what happened." }] };
+        }
 
         return { content: [{ type: "text", text: Found && Found.error ? Found.error : (Found && Found.text) || "Studio did not say what happened." }] };
       }),

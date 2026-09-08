@@ -27,6 +27,20 @@ async function Get(Where) {
   }
 }
 
+async function AskAs(Role, Kind, Input) {
+  try {
+    const Answer = await fetch(`http://127.0.0.1:${Port}/studio/enqueue`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-claudio-token": Key() },
+      body: JSON.stringify({ kind: Kind, input: Input, role: Role }),
+    });
+
+    return Answer.ok ? await Answer.json() : { error: `The Claudio bridge answered ${Answer.status}.` };
+  } catch (Trouble) {
+    return { error: `Could not reach the Claudio bridge: ${Trouble.message}` };
+  }
+}
+
 async function Ask(Kind, Input) {
   try {
     const Answer = await fetch(`http://127.0.0.1:${Port}/studio/enqueue`, {
@@ -169,8 +183,18 @@ Server.tool(
 Server.tool(
   "playtest",
   "Start, stop or inspect a playtest of the open place. Always stop what you started. Check status first rather than assuming. This runs without a player character, so LocalPlayer and PlayerGui are not available.",
-  { action: z.enum(["start", "stop", "status"]) },
-  async (Input) => ({ content: [{ type: "text", text: Say(await Ask("playtest", { action: Input.action })) }] }),
+  { action: z.enum(["start", "stop", "status", "players"]), mode: z.enum(["play", "run", "multiplayer"]).optional(), players: z.number().optional() },
+  async (Input) => {
+    const Found = await Ask("playtest", { action: Input.action, mode: Input.mode, players: Input.players });
+
+    if (Found && Found.relay) {
+      const Inside = await AskAs("server", "playtest", { action: Found.relay, players: Found.players });
+
+      return { content: [{ type: "text", text: Say(Inside) }] };
+    }
+
+    return { content: [{ type: "text", text: Say(Found) }] };
+  },
 );
 
 Server.tool(

@@ -6,7 +6,6 @@ import fs from "node:fs";
 import { DefaultPort, TokenFile } from "../src/Config.js";
 import { ExecuteReport, LintReport, ReadReport, PropertyReport } from "../src/Ask.js";
 import { Describe as DescribePresence } from "../src/StudioPresence.js";
-import { PropertiesFor } from "../src/ApiDump.js";
 
 const Port = Number(process.env.CLAUDIO_PORT) || DefaultPort;
 
@@ -93,20 +92,39 @@ Server.tool(
   "properties",
   "Read an instance's properties, listing every property its class actually has and naming any that could not be read, so a missing one is never mistaken for an unset one.",
   { path: z.string(), names: z.array(z.string()).optional() },
+  async (Input) => ({ content: [{ type: "text", text: PropertyReport(await Ask("properties", { path: Input.path, names: Input.names })) }] }),
+);
+
+Server.tool(
+  "api",
+  "Ask the running engine what a class has: its properties, methods and events. This is the version of Roblox actually installed, so prefer it over remembering an API. Leave className out to list every class.",
+  { className: z.string().optional() },
   async (Input) => {
-    const Found = await Ask("properties", { path: Input.path });
+    const Found = await Ask("api", { className: Input.className });
 
     if (!Found || Found.error) {
       return { content: [{ type: "text", text: (Found && Found.error) || "Studio did not answer." }] };
     }
 
-    const Names = Input.names || (await PropertiesFor(Found.className));
-
-    if (!Names) {
-      return { content: [{ type: "text", text: `${Found.path} [${Found.className}] — could not fetch the API dump, so name the properties you want.` }] };
+    if (Found.classes) {
+      return { content: [{ type: "text", text: Found.classes.join(" ") }] };
     }
 
-    return { content: [{ type: "text", text: PropertyReport(await Ask("properties", { path: Input.path, names: Names })) }] };
+    const Parts = [Found.className];
+
+    if (Found.properties.length > 0) {
+      Parts.push(`properties: ${Found.properties.join(" ")}`);
+    }
+
+    if (Found.methods.length > 0) {
+      Parts.push(`methods: ${Found.methods.join(" ")}`);
+    }
+
+    if (Found.events.length > 0) {
+      Parts.push(`events: ${Found.events.join(" ")}`);
+    }
+
+    return { content: [{ type: "text", text: Parts.join("\n") }] };
   },
 );
 

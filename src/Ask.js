@@ -189,20 +189,36 @@ export function AskServerFor(Pose, Reach, ReachIn) {
         path: z.string().describe("Full instance path."),
         names: z.array(z.string()).optional().describe("Only these properties. Omit for all of them."),
       }, async (Input) => {
-        const Found = await Reach("properties", { path: Input.path });
+        return { content: [{ type: "text", text: PropertyReport(await Reach("properties", { path: Input.path, names: Input.names })) }] };
+      }),
+      tool("api", "Ask the running engine what a class has: its properties, methods and events. This is the version of Roblox actually installed, so prefer it over remembering an API. Leave className out to list every class.", {
+        className: z.string().optional().describe("Class to describe, such as Lighting."),
+      }, async (Input) => {
+        const Found = await Reach("api", { className: Input.className });
 
         if (!Found || Found.error) {
           return { content: [{ type: "text", text: (Found && Found.error) || "Studio did not answer." }] };
         }
 
-        const { PropertiesFor } = await import("./ApiDump.js");
-        const Names = Input.names || (await PropertiesFor(Found.className));
-
-        if (!Names) {
-          return { content: [{ type: "text", text: `${Found.path} [${Found.className}] — could not fetch the API dump, so name the properties you want.` }] };
+        if (Found.classes) {
+          return { content: [{ type: "text", text: Found.classes.join(" ") }] };
         }
 
-        return { content: [{ type: "text", text: PropertyReport(await Reach("properties", { path: Input.path, names: Names })) }] };
+        const Parts = [`${Found.className}`];
+
+        if (Found.properties.length > 0) {
+          Parts.push(`properties: ${Found.properties.join(" ")}`);
+        }
+
+        if (Found.methods.length > 0) {
+          Parts.push(`methods: ${Found.methods.join(" ")}`);
+        }
+
+        if (Found.events.length > 0) {
+          Parts.push(`events: ${Found.events.join(" ")}`);
+        }
+
+        return { content: [{ type: "text", text: Parts.join("\n") }] };
       }),
       tool("modify", "Change the place with one undo step: set properties, create, delete, rename or reparent. Prefer this over writing a script for a change this can express, because the arguments are checked and the change is reversible.", {
         action: z.enum(["set", "create", "delete", "rename", "reparent"]),

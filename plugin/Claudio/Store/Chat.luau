@@ -756,6 +756,66 @@ const function Frame(Input: any): any
 	return Answer
 end
 
+const function Api(Input: any): any
+	const Reflection = game:GetService("ReflectionService")
+	const Class = Input.className
+
+	if not Class or Class == "" then
+		const Listed, Classes = pcall(function(): any
+			return Reflection:GetClasses({})
+		end)
+
+		if not Listed then
+			return {error = `Could not list classes: {tostring(Classes)}`}
+		end
+
+		const Names = {}
+
+		for _, Entry in Classes do
+			table.insert(Names, tostring(Entry.Name))
+		end
+
+		table.sort(Names)
+
+		return {classes = Names}
+	end
+
+	const function Members(Method: string): {string}
+		const Ok, Listed = pcall(function(): any
+			return (Reflection :: any)[Method](Reflection, Class, {})
+		end)
+
+		if not Ok then
+			return {}
+		end
+
+		const Names = {}
+
+		for _, Entry in Listed do
+			table.insert(Names, tostring(Entry.Name))
+		end
+
+		table.sort(Names)
+
+		return Names
+	end
+
+	const Properties = Members("GetPropertiesOfClass")
+	const Methods = Members("GetMethodsOfClass")
+	const Events = Members("GetEventsOfClass")
+
+	if #Properties == 0 and #Methods == 0 and #Events == 0 then
+		return {error = `The engine does not know a class called "{Class}".`}
+	end
+
+	return {
+		className = Class,
+		properties = Properties,
+		methods = Methods,
+		events = Events,
+	}
+end
+
 const function Properties(Input: any): any
 	const Object = Resolve(Input.path)
 
@@ -763,14 +823,36 @@ const function Properties(Input: any): any
 		return {error = `Nothing at "{tostring(Input.path)}".`}
 	end
 
-	if not Input.names then
-		return {className = Object.ClassName, name = Object.Name, path = Object:GetFullName()}
+	local Names = Input.names
+
+	if not Names then
+		const Asked, Listed = pcall(function(): any
+			return game:GetService("ReflectionService"):GetPropertiesOfClass(Object.ClassName, {})
+		end)
+
+		if not Asked then
+			return {error = `Could not ask the engine what a {Object.ClassName} has: {tostring(Listed)}. Name the properties you want instead.`}
+		end
+
+		const Found = {}
+
+		for _, Entry in Listed do
+			const Name = tostring(Entry.Name)
+
+			if Name:sub(1, 1) == Name:sub(1, 1):upper() then
+				table.insert(Found, Name)
+			end
+		end
+
+		table.sort(Found)
+
+		Names = Found
 	end
 
 	const Values = {}
 	const Unreadable = {}
 
-	for _, Name in Input.names do
+	for _, Name in Names do
 		const Ok, Value = pcall(function(): any
 			return (Object :: any)[Name]
 		end)
@@ -1199,6 +1281,10 @@ const function RunStudioJob(Job: any)
 
 			if Job.kind == "properties" then
 				return Properties(Job.input)
+			end
+
+			if Job.kind == "api" then
+				return Api(Job.input)
 			end
 
 			if Job.kind == "frame" then

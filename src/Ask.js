@@ -83,6 +83,58 @@ export function PropertyReport(Found) {
   return Parts.join("\n");
 }
 
+export function ApiReport(Found) {
+  if (!Found) {
+    return "Studio did not answer.";
+  }
+
+  if (Found.error) {
+    return Found.error;
+  }
+
+  if (Found.classes) {
+    return Found.classes.join(" ");
+  }
+
+  if (Found.items) {
+    return `${Found.enumName}\n${Found.items.join("\n")}`;
+  }
+
+  if (Found.hits) {
+    return Found.hits.length > 0 ? Found.hits.join("\n") : `Nothing matches "${Found.search}".`;
+  }
+
+  const Parts = [];
+  const Head = [Found.className];
+
+  if (Found.inherits && Found.inherits.length > 0) {
+    Head.push(`inherits ${Found.inherits.join(" < ")}`);
+  }
+
+  if (!Found.creatable) {
+    Head.push("not creatable");
+  }
+
+  Parts.push(Head.join(", "));
+
+  if (Found.member && Found.properties.length === 0 && Found.methods.length === 0 && Found.events.length === 0) {
+    return `${Found.className} has no member called "${Found.member}".`;
+  }
+
+  for (const [Label, Lines] of [["properties", Found.properties], ["methods", Found.methods], ["events", Found.events]]) {
+    if (Lines && Lines.length > 0) {
+      Parts.push(`${Label}:`);
+      Parts.push(Lines.map((Line) => `  ${Line}`).join("\n"));
+    }
+  }
+
+  if (Found.subclasses && Found.subclasses.length > 0 && !Found.member) {
+    Parts.push(`subclasses: ${Found.subclasses.join(" ")}`);
+  }
+
+  return Parts.join("\n");
+}
+
 export function ExecuteReport(Found) {
   if (!Found) {
     return "Studio did not answer.";
@@ -191,34 +243,15 @@ export function AskServerFor(Pose, Reach, ReachIn) {
       }, async (Input) => {
         return { content: [{ type: "text", text: PropertyReport(await Reach("properties", { path: Input.path, names: Input.names })) }] };
       }),
-      tool("api", "Ask the running engine what a class has: its properties, methods and events. This is the version of Roblox actually installed, so prefer it over remembering an API. Leave className out to list every class.", {
-        className: z.string().optional().describe("Class to describe, such as Lighting."),
+      tool("api", "Ask the running engine about the Roblox API: a class's properties, methods and events with full signatures, parameter names, return types, what it inherits and what inherits from it, which members are deprecated or read only, and what security each needs. This is the version of Roblox actually installed, so prefer it over remembering an API or reading documentation that may describe a different version. Narrow with member for one member, search to find a class, enum or member by name, or enumName for an enum's items.", {
+        className: z.string().optional().describe("Class to describe, such as Lighting. Leave out to list every class."),
+        member: z.string().optional().describe("Only this member of the class."),
+        search: z.string().optional().describe("Find a class or enum whose name contains this. Pass className too to search that class's members."),
+        enumName: z.string().optional().describe("An enum to list the items of, such as Material."),
       }, async (Input) => {
-        const Found = await Reach("api", { className: Input.className });
+        const Found = await Reach("api", { className: Input.className, member: Input.member, search: Input.search, enumName: Input.enumName });
 
-        if (!Found || Found.error) {
-          return { content: [{ type: "text", text: (Found && Found.error) || "Studio did not answer." }] };
-        }
-
-        if (Found.classes) {
-          return { content: [{ type: "text", text: Found.classes.join(" ") }] };
-        }
-
-        const Parts = [`${Found.className}`];
-
-        if (Found.properties.length > 0) {
-          Parts.push(`properties: ${Found.properties.join(" ")}`);
-        }
-
-        if (Found.methods.length > 0) {
-          Parts.push(`methods: ${Found.methods.join(" ")}`);
-        }
-
-        if (Found.events.length > 0) {
-          Parts.push(`events: ${Found.events.join(" ")}`);
-        }
-
-        return { content: [{ type: "text", text: Parts.join("\n") }] };
+        return { content: [{ type: "text", text: ApiReport(Found) }] };
       }),
       tool("modify", "Change the place with one undo step: set properties, create, delete, rename or reparent. Prefer this over writing a script for a change this can express, because the arguments are checked and the change is reversible.", {
         action: z.enum(["set", "create", "delete", "rename", "reparent"]),

@@ -4,7 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import fs from "node:fs";
 import { DefaultPort, TokenFile } from "../src/Config.js";
-import { ExecuteReport, LintReport, ReadReport, PropertyReport } from "../src/Ask.js";
+import { ExecuteReport, LintReport, ReadReport, PropertyReport, ApiReport } from "../src/Ask.js";
 import { Describe as DescribePresence } from "../src/StudioPresence.js";
 
 const Port = Number(process.env.CLAUDIO_PORT) || DefaultPort;
@@ -97,35 +97,9 @@ Server.tool(
 
 Server.tool(
   "api",
-  "Ask the running engine what a class has: its properties, methods and events. This is the version of Roblox actually installed, so prefer it over remembering an API. Leave className out to list every class.",
-  { className: z.string().optional() },
-  async (Input) => {
-    const Found = await Ask("api", { className: Input.className });
-
-    if (!Found || Found.error) {
-      return { content: [{ type: "text", text: (Found && Found.error) || "Studio did not answer." }] };
-    }
-
-    if (Found.classes) {
-      return { content: [{ type: "text", text: Found.classes.join(" ") }] };
-    }
-
-    const Parts = [Found.className];
-
-    if (Found.properties.length > 0) {
-      Parts.push(`properties: ${Found.properties.join(" ")}`);
-    }
-
-    if (Found.methods.length > 0) {
-      Parts.push(`methods: ${Found.methods.join(" ")}`);
-    }
-
-    if (Found.events.length > 0) {
-      Parts.push(`events: ${Found.events.join(" ")}`);
-    }
-
-    return { content: [{ type: "text", text: Parts.join("\n") }] };
-  },
+  "Ask the running engine about the Roblox API: a class's properties, methods and events with full signatures, parameter names, return types, what it inherits and what inherits from it, which members are deprecated or read only, and what security each needs. This is the version of Roblox actually installed, so prefer it over remembering an API or reading documentation that may describe a different version. Narrow with member for one member, search to find a class, enum or member by name, or enumName for an enum's items.",
+  { className: z.string().optional(), member: z.string().optional(), search: z.string().optional(), enumName: z.string().optional() },
+  async (Input) => ({ content: [{ type: "text", text: ApiReport(await Ask("api", { className: Input.className, member: Input.member, search: Input.search, enumName: Input.enumName })) }] }),
 );
 
 Server.tool(

@@ -756,22 +756,129 @@ const function Frame(Input: any): any
 	return Answer
 end
 
+const function TypeName(Given: any): string
+	if typeof(Given) ~= "table" then
+		return "any"
+	end
+
+	return tostring(Given.ScriptType or Given.EngineType or "any")
+end
+
+const function Signature(Entry: any, Kind: string): string
+	const Parts = {}
+
+	for _, Parameter in Entry.Parameters or {} do
+		table.insert(Parts, `{tostring(Parameter.Name)}: {TypeName(Parameter.Type)}`)
+	end
+
+	const Call = `{tostring(Entry.Name)}({table.concat(Parts, ", ")})`
+
+	if Kind == "event" then
+		return Call
+	end
+
+	const Returns = TypeName(Entry.ReturnType)
+
+	return if Returns == "Void" or Returns == "any" then Call else `{Call} -> {Returns}`
+end
+
+const function Marks(Entry: any, Owner: string?): string
+	const Notes = {}
+	const Display = Entry.Display or {}
+
+	if Display.DeprecationMessage ~= nil then
+		table.insert(Notes, if Display.DeprecationMessage ~= "" then `deprecated, {Display.DeprecationMessage}` else "deprecated")
+	end
+
+	const Permits = Entry.Permits or {}
+
+	if Permits.Read ~= nil and Permits.Write == nil then
+		table.insert(Notes, "read only")
+	end
+
+	for _, Name in {"Read", "Write", "Call", "Listen", "New"} do
+		const Level = Permits[Name]
+
+		if Level ~= nil and tostring(Level) ~= "" then
+			table.insert(Notes, `{Name:lower()} needs {tostring(Level)}`)
+		end
+	end
+
+	if Entry.Owner and Owner and Entry.Owner ~= Owner then
+		table.insert(Notes, `from {tostring(Entry.Owner)}`)
+	end
+
+	return if #Notes == 0 then "" else ` [{table.concat(Notes, ", ")}]`
+end
+
 const function Api(Input: any): any
 	const Reflection = game:GetService("ReflectionService")
+
+	if Input.enumName then
+		const Wanted = tostring(Input.enumName)
+
+		for _, Given in Enum:GetEnums() do
+			if tostring(Given) == Wanted then
+				const Items = {}
+
+				for _, Item in Given:GetEnumItems() do
+					table.insert(Items, `{Item.Name} = {Item.Value}`)
+				end
+
+				return {enumName = Wanted, items = Items}
+			end
+		end
+
+		return {error = `There is no enum called "{Wanted}".`}
+	end
+
+	if Input.search then
+		const Needle = tostring(Input.search):lower()
+		const Hits = {}
+
+		for _, Class in Reflection:GetClasses({}) do
+			const Name = tostring(Class.Name)
+
+			if Name:lower():find(Needle, 1, true) then
+				table.insert(Hits, `class {Name}`)
+			end
+
+			if #Hits >= 60 then
+				break
+			end
+		end
+
+		for _, Given in Enum:GetEnums() do
+			if tostring(Given):lower():find(Needle, 1, true) and #Hits < 80 then
+				table.insert(Hits, `enum {tostring(Given)}`)
+			end
+		end
+
+		if Input.className then
+			for _, Method in {"GetPropertiesOfClass", "GetMethodsOfClass", "GetEventsOfClass"} do
+				const Ok, Listed = pcall(function(): any
+					return (Reflection :: any)[Method](Reflection, Input.className, {})
+				end)
+
+				if Ok then
+					for _, Entry in Listed do
+						if tostring(Entry.Name):lower():find(Needle, 1, true) and #Hits < 120 then
+							table.insert(Hits, `{Input.className}.{tostring(Entry.Name)}`)
+						end
+					end
+				end
+			end
+		end
+
+		return {search = Input.search, hits = Hits}
+	end
+
 	const Class = Input.className
 
 	if not Class or Class == "" then
-		const Listed, Classes = pcall(function(): any
-			return Reflection:GetClasses({})
-		end)
-
-		if not Listed then
-			return {error = `Could not list classes: {tostring(Classes)}`}
-		end
-
 		const Names = {}
 
-		for _, Entry in Classes do
+		for _, Entry in Reflection:GetClasses({}) do
 			table.insert(Names, tostring(Entry.Name))
 		end
 
@@ -780,7 +887,15 @@ const function Api(Input: any): any
 		return {classes = Names}
 	end
 
-	const function Members(Method: string): {string}
+	const Known, Described = pcall(function(): any
+		return Reflection:GetClass(Class, {})
+	end)
+
+	if not Known or typeof(Described) ~= "table" or Described.Name == nil then
+		return {error = `The engine does not know a class called "{Class}".`}
+	end
+
+	const function Gather(Method: string, Kind: string): {string}
 		const Ok, Listed = pcall(function(): any
 			return (Reflection :: any)[Method](Reflection, Class, {})
 		end)
@@ -789,30 +904,58 @@ const function Api(Input: any): any
 			return {}
 		end
 
-		const Names = {}
+		const Lines = {}
 
 		for _, Entry in Listed do
-			table.insert(Names, tostring(Entry.Name))
+			const Name = tostring(Entry.Name)
+
+			if Input.member and Name:lower() ~= tostring(Input.member):lower() then
+				continue
+			end
+
+			if Kind == "property" then
+				table.insert(Lines, `{Name}: {TypeName(Entry.Type)}{Marks(Entry, Class)}`)
+			else
+				table.insert(Lines, `{Signature(Entry, Kind)}{Marks(Entry, Class)}`)
+			end
 		end
 
-		table.sort(Names)
+		table.sort(Lines)
 
-		return Names
+		return Lines
 	end
 
-	const Properties = Members("GetPropertiesOfClass")
-	const Methods = Members("GetMethodsOfClass")
-	const Events = Members("GetEventsOfClass")
+	const Chain = {}
+	local Walking = Described
 
-	if #Properties == 0 and #Methods == 0 and #Events == 0 then
-		return {error = `The engine does not know a class called "{Class}".`}
+	while Walking and Walking.Superclass do
+		table.insert(Chain, tostring(Walking.Superclass))
+
+		const More, Next = pcall(function(): any
+			return Reflection:GetClass(tostring(Walking.Superclass), {})
+		end)
+
+		Walking = if More and typeof(Next) == "table" then Next else nil
 	end
+
+	const Subclasses = {}
+
+	for _, Sub in Described.Subclasses or {} do
+		table.insert(Subclasses, tostring(Sub))
+	end
+
+	table.sort(Subclasses)
 
 	return {
 		className = Class,
-		properties = Properties,
-		methods = Methods,
-		events = Events,
+		inherits = Chain,
+		subclasses = Subclasses,
+		creatable = (Described.Permits or {}).New ~= nil,
+		category = (Described.Display or {}).Category,
+		properties = Gather("GetPropertiesOfClass", "property"),
+		methods = Gather("GetMethodsOfClass", "method"),
+		events = Gather("GetEventsOfClass", "event"),
+		member = Input.member,
 	}
 end
 

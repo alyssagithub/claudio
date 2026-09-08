@@ -43,6 +43,64 @@ function Describe(Questions, Answers) {
   ].join(" ");
 }
 
+export function ExecuteReport(Found) {
+  if (!Found) {
+    return "Studio did not answer.";
+  }
+
+  const Parts = [];
+
+  if (Found.error) {
+    Parts.push(Found.error);
+
+    if (Found.line) {
+      Parts.push(Found.line);
+    }
+
+    if (Found.trace) {
+      Parts.push(Found.trace);
+    }
+  } else if (Found.result !== undefined) {
+    Parts.push(Found.result);
+  }
+
+  if (Found.output && Found.output.length > 0) {
+    Parts.push(Found.output.join("\n"));
+  }
+
+  if (Parts.length === 0) {
+    return Found.undo ? "Ran. Nothing returned or printed; undo will reverse it." : "Ran. Nothing returned or printed.";
+  }
+
+  return Parts.join("\n");
+}
+
+export function LintReport(Found) {
+  if (!Found) {
+    return "Studio did not answer.";
+  }
+
+  if (Found.error) {
+    return Found.error;
+  }
+
+  const Scripts = Found.scripts || [];
+  const Lines = Scripts.map((Entry) => [Entry.path].concat((Entry.lines || []).map((Warning) => `  ${Warning}`)).join("\n"));
+
+  if (Found.skipped && Found.skipped.length > 0) {
+    Lines.push(`Could not check: ${Found.skipped.join(", ")}`);
+  }
+
+  return Lines.length > 0 ? Lines.join("\n") : "No warnings.";
+}
+
+const ExecuteDescription = [
+  "Run Luau inside the open place and get back what it returned, what it printed, and where it failed.",
+  "Changes are recorded as one undo step, so the user can reverse them; pass readOnly when you only want to look, and nothing is recorded.",
+  "Anything the script prints or warns comes back with the result, so print what you want to see rather than returning one value at a time.",
+  "Call _G.ClaudioFresh(module) to require a module past its cache when you have just rewritten it.",
+].join(" ");
+
 const PressDescription = [
   "Press a button in the running experience by naming it, rather than by guessing screen coordinates.",
   "Give the full instance path, such as Players.Someone.PlayerGui.Menu.Play, and it works out where that lands on screen itself.",
@@ -51,7 +109,7 @@ const PressDescription = [
 ].join(" ");
 
 const PlaytestDescription = [
-  "Start, stop or inspect a simulation of the open place, so behaviour that only happens at runtime can be checked.",
+  "Start, stop or inspect a playtest of the open place, so behaviour that only happens at runtime can be checked.",
   "Always stop what you started: a place left running keeps executing scripts, holds the editor in a running state, and every later edit lands in a data model that is about to be thrown away.",
   "Check status first rather than assuming, and read the reply, because starting something already running and stopping something already stopped are both mistakes worth knowing about.",
   "This runs the place without a player character, so server scripts, physics and module behaviour can be exercised but anything reading LocalPlayer or PlayerGui cannot.",
@@ -64,32 +122,22 @@ const LintDescription = [
   "Pass paths to narrow it to part of the tree, or leave it empty to check everything.",
 ].join(" ");
 
-function Report(Found) {
-  if (Found.error) {
-    return Found.error;
-  }
 
-  const Scripts = Found.scripts || [];
-
-  if (Scripts.length === 0) {
-    return `Checked ${Found.checked === 1 ? "1 script" : `${Found.checked || 0} scripts`} and found no warnings.`;
-  }
-
-  const Lines = Scripts.map((Entry) => [Entry.path].concat((Entry.lines || []).map((Warning) => `  ${Warning}`)).join("\n"));
-  const Counted = Found.checked === 1 ? "1 script" : `${Found.checked || 0} scripts`;
-
-  return [
-    `Checked ${Counted}. ${Scripts.length === 1 ? "One carries" : `${Scripts.length} carry`} warnings, none introduced in this session:`,
-    Lines.join("\n"),
-    "Report these to the user rather than fixing them unasked, because they were already there and fixing them is a separate decision.",
-  ].join("\n");
-}
 
 export function AskServerFor(Pose, Reach) {
   return createSdkMcpServer({
     name: AskServerName,
     version: "1.0.0",
     tools: [
+      tool("execute", ExecuteDescription, {
+        code: z.string().describe("The Luau to run. Return a value to get it back."),
+        readOnly: z.boolean().optional().describe("Set when the script only reads, so no undo step is recorded."),
+        label: z.string().optional().describe("What the undo step should be called, such as \"Rename the doors\"."),
+      }, async (Input) => {
+        const Found = await Reach("execute", { code: Input.code, readOnly: Input.readOnly === true, label: Input.label });
+
+        return { content: [{ type: "text", text: ExecuteReport(Found) }] };
+      }),
       tool("press", PressDescription, { path: z.string().describe("Full instance path of the GuiObject to press.") }, async (Input) => {
         const Found = await Reach("press", { path: Input.path });
 
@@ -103,7 +151,7 @@ export function AskServerFor(Pose, Reach) {
       tool("lint", LintDescription, { paths: z.array(z.string()).optional().describe("Instance paths to check, such as ServerScriptService.Main. Omit to check the whole place.") }, async (Input) => {
         const Found = await Reach("lint", { paths: Input.paths || [] });
 
-        return { content: [{ type: "text", text: Report(Found || {}) }] };
+        return { content: [{ type: "text", text: LintReport(Found) }] };
       }),
       tool("ask", Description, { questions: z.array(Question).min(1).max(4) }, async (Input) => {
         const Answers = await Pose(Input.questions);

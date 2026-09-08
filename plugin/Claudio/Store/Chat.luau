@@ -254,7 +254,7 @@ const function Playtest(Action: string): any
 	end
 
 	if Action == "status" then
-		return {text = `The place is {State()}.`}
+		return {text = if State() == "running" then "A playtest is running." else "No playtest is running."}
 	end
 
 	if Action == "pause" then
@@ -265,13 +265,13 @@ const function Playtest(Action: string): any
 
 	if Action == "start" then
 		if Before ~= "stopped" then
-			return {error = `The place is already {Before}, so it was left alone. Stop it first if you want a fresh run.`}
+			return {error = "A playtest is already running, so it was left alone. Stop it first if you want a fresh run."}
 		end
 
 		RunService:Run()
 	elseif Action == "stop" then
 		if Before == "stopped" then
-			return {error = "The place was already stopped, so nothing changed."}
+			return {error = "No playtest was running, so nothing changed."}
 		end
 
 		RunService:Stop()
@@ -288,10 +288,160 @@ const function Playtest(Action: string): any
 	const After = State()
 
 	if After == Before then
-		return {error = `Studio accepted {Action} but the place is still {After}, so it did not take.`}
+		return {error = `Studio accepted {Action} but the playtest is still {After}, so it did not take.`}
 	end
 
-	return {text = `The place went from {Before} to {After}.`}
+	return {text = if After == "running" then "Playtest started." else "Playtest stopped."}
+end
+
+const function Execute(Input: any): any
+	const Code = Input.code
+
+	if typeof(Code) ~= "string" or Code == "" then
+		return {error = "Give some Luau to run."}
+	end
+
+	const LogService = game:GetService("LogService")
+	const ChangeHistoryService = game:GetService("ChangeHistoryService")
+	const Said = {}
+
+	const function Placed(Message: string): string
+		return (Message:gsub("[%w_%.]*ClaudioExecute:(%d+):?%s*", function(Digits: string): string
+			return `line {tonumber(Digits) - 1}: `
+		end))
+	end
+
+	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
+		if #Said >= 200 then
+			return
+		end
+
+		if Kind == Enum.MessageType.MessageOutput then
+			table.insert(Said, Placed(Message))
+		elseif Kind == Enum.MessageType.MessageWarning then
+			table.insert(Said, `warn: {Placed(Message)}`)
+		elseif Kind == Enum.MessageType.MessageError then
+			table.insert(Said, `error: {Placed(Message)}`)
+		end
+	end)
+
+	local Recording: string? = nil
+
+	if Input.readOnly ~= true then
+		Recording = ChangeHistoryService:TryBeginRecording("ClaudioExecute", Input.label or "Claudio ran a script")
+	end
+
+	_G.ClaudioFresh = function(Module: ModuleScript): any
+		const Where = Module.Parent
+		const Copy = Module:Clone()
+
+		Module:Destroy()
+
+		Copy.Parent = Where
+
+		return require(Copy)
+	end
+
+	const Holder = Instance.new("ModuleScript")
+
+	Holder.Name = "ClaudioExecute"
+	Holder.Source = `return function()\n{Code}\nend`
+	Holder.Parent = game:GetService("ServerStorage")
+
+	const function Finish(): ()
+		task.wait(0.15)
+
+		Holder:Destroy()
+		Listening:Disconnect()
+
+		_G.ClaudioFresh = nil
+	end
+
+	const function Trouble(Broke: any): any
+		return {Message = tostring(Broke), Trace = debug.traceback(nil, 2)}
+	end
+
+	const Built, Made = xpcall(function()
+		return require(Holder)
+	end, Trouble)
+
+	if not Built then
+		Finish()
+
+		if Recording then
+			ChangeHistoryService:FinishRecording(Recording, Enum.FinishRecordingOperation.Cancel)
+		end
+
+		const Failed: {[string]: any} = {error = "That did not compile."}
+
+		if #Said > 0 then
+			Failed.output = Said
+		end
+
+		return Failed
+	end
+
+	const Ok, Result = xpcall(Made :: any, Trouble)
+
+	Finish()
+
+	if Recording then
+		ChangeHistoryService:FinishRecording(Recording, if Ok then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel)
+	end
+
+	const Answer: {[string]: any} = {}
+
+	if not Ok then
+		const Broke = Result :: any
+		const Message = tostring(Broke.Message)
+
+		Answer.error = (Message:gsub("[%w_%.]*ClaudioExecute:(%d+):?%s*", function(Digits: string): string
+			return `line {tonumber(Digits) - 1}: `
+		end))
+
+		const Where = tonumber(Message:match("ClaudioExecute:(%d+)"))
+
+		if Where then
+			const Lines = string.split(Code, "\n")
+			const Real = Where - 1
+
+			if Lines[Real] then
+				Answer.line = `line {Real}: {Lines[Real]}`
+			end
+		end
+
+		const Frames = {}
+
+		for _, Frame in string.split(tostring(Broke.Trace), "\n") do
+			const Numbered = Frame:match("ClaudioExecute:(%d+)")
+
+			if Numbered then
+				table.insert(Frames, `line {tonumber(Numbered) - 1}`)
+			end
+		end
+
+		if #Frames > 1 then
+			Answer.trace = table.concat(Frames, " from ")
+		end
+	elseif Result ~= nil then
+		if typeof(Result) == "table" then
+			const Encoded, Text = pcall(game:GetService("HttpService").JSONEncode, game:GetService("HttpService"), Result)
+
+			Answer.result = if Encoded then Text else tostring(Result)
+		else
+			Answer.result = tostring(Result)
+		end
+	end
+
+	if #Said > 0 then
+		Answer.output = Said
+	end
+
+	if Ok and Recording then
+		Answer.undo = true
+	end
+
+	return Answer
 end
 
 const function Press(Path: string): any
@@ -369,6 +519,10 @@ const function RunStudioJob(Job: any)
 
 			if Job.kind == "press" then
 				return Press(Job.input.path)
+			end
+
+			if Job.kind == "execute" then
+				return Execute(Job.input)
 			end
 
 			return {error = `Claudio does not know how to do "{Job.kind}" in Studio.`}

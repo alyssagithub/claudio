@@ -993,7 +993,7 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
               }],
             }],
           },
-          mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions), RequestStudio) },
+          mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions), (Kind, Input) => RequestStudio(Kind, Input, Kind === "execute" ? 300000 : undefined)) },
           systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.Delegating) },
         },
       });

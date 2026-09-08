@@ -337,7 +337,7 @@ export function StartServer(Port) {
       if (Request.method === "POST" && Url.pathname === "/studio/enqueue") {
         const Wanted = await ReadBody(Request);
 
-        SendJson(Response, 200, await RequestStudio(Wanted.kind, Wanted.input || {}));
+        SendJson(Response, 200, await RequestStudio(Wanted.kind, Wanted.input || {}, Wanted.kind === "execute" ? 300000 : undefined));
         return;
       }
 

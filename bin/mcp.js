@@ -4,6 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import fs from "node:fs";
 import { DefaultPort, TokenFile } from "../src/Config.js";
+import { ExecuteReport, LintReport } from "../src/Ask.js";
 
 const Port = Number(process.env.CLAUDIO_PORT) || DefaultPort;
 
@@ -55,30 +56,19 @@ Server.tool(
   "lint",
   "Check scripts in the open place for analyzer warnings, including scripts nobody has edited. Pass paths to narrow it, or leave it empty to check everything. Report what it finds rather than fixing unasked, because pre-existing warnings were already there.",
   { paths: z.array(z.string()).optional() },
-  async (Input) => {
-    const Found = await Ask("lint", { paths: Input.paths || [] });
+  async (Input) => ({ content: [{ type: "text", text: LintReport(await Ask("lint", { paths: Input.paths || [] })) }] }),
+);
 
-    if (Found.error) {
-      return { content: [{ type: "text", text: Found.error }] };
-    }
-
-    const Scripts = Found.scripts || [];
-
-    const Counted = Found.checked === 1 ? "1 script" : `${Found.checked || 0} scripts`;
-
-    if (Scripts.length === 0) {
-      return { content: [{ type: "text", text: `Checked ${Counted} and found no warnings.` }] };
-    }
-
-    const Lines = Scripts.map((Entry) => [Entry.path].concat((Entry.lines || []).map((Warning) => `  ${Warning}`)).join("\n"));
-
-    return { content: [{ type: "text", text: `Checked ${Counted}. Warnings:\n${Lines.join("\n")}` }] };
-  },
+Server.tool(
+  "execute",
+  "Run Luau inside the open place and get back what it returned, what it printed, and where it failed. Changes are recorded as one undo step; pass readOnly when you only want to look. Call _G.ClaudioFresh(module) to require past the cache.",
+  { code: z.string(), readOnly: z.boolean().optional(), label: z.string().optional() },
+  async (Input) => ({ content: [{ type: "text", text: ExecuteReport(await Ask("execute", { code: Input.code, readOnly: Input.readOnly === true, label: Input.label })) }] }),
 );
 
 Server.tool(
   "playtest",
-  "Start, stop, pause or inspect a simulation of the open place. Always stop what you started. Check status first rather than assuming. This runs without a player character, so LocalPlayer and PlayerGui are not available.",
+  "Start, stop or inspect a playtest of the open place. Always stop what you started. Check status first rather than assuming. This runs without a player character, so LocalPlayer and PlayerGui are not available.",
   { action: z.enum(["start", "stop", "status"]) },
   async (Input) => ({ content: [{ type: "text", text: Say(await Ask("playtest", { action: Input.action })) }] }),
 );

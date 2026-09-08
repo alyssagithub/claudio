@@ -64,7 +64,7 @@ function Gallery.Messages(): {Types.Message}
 				{name = "get_script_source", input = "{\"path\":\"ServerScriptService.Main\"}", output = "42 lines", status = "done", milliseconds = 320},
 				{name = "execute_luau", input = "{\"code\":\"return 1\"}", output = "", status = "running", milliseconds = 0},
 				{name = "set_properties", input = "{\"path\":\"Workspace.Missing\"}", output = "Instance not found", status = "error", milliseconds = 120},
-			},
+			} :: {Types.ToolCall},
 			At = Now - 3100,
 		},
 		{

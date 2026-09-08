@@ -225,7 +225,7 @@ function Settings.TextSize(): number
 end
 
 function Settings.SmallText(): number
-	return math.max(11, Sources.TextSize() - 2)
+	return math.min(Sources.TextSize(), math.max(11, Sources.TextSize() - 2))
 end
 
 function Settings.Get(Key: string): any

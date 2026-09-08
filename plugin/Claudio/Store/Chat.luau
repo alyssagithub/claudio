@@ -258,8 +258,12 @@ const function Find(Input: any): any
 		return {error = "Give some text to look for."}
 	end
 
-	const Where = if Input.path then Resolve(Input.path) else game
-	const Root = Where or game
+	const Root = if Input.path then Resolve(Input.path) else game
+
+	if not Root then
+		return {error = `Nothing at "{tostring(Input.path)}", so there was nowhere to search. Leave path out to search the whole place.`}
+	end
+
 	const Lower = Needle:lower()
 	const Limit = math.clamp(tonumber(Input.limit) or 40, 1, 200)
 	const Hits = {}
@@ -293,6 +297,18 @@ const function Find(Input: any): any
 	return {hits = Hits, scanned = Scanned, more = More}
 end
 
+const Seen: {[string]: string} = {}
+
+local Committed = 0
+
+const function Fingerprint(Script: LuaSourceContainer): string
+	return game:GetService("EncodingService"):ComputeStringHash(Script.Source, Enum.HashAlgorithm.Sha256)
+end
+
+const function Remember(Script: LuaSourceContainer)
+	Seen[Script:GetFullName()] = Fingerprint(Script)
+end
+
 const function Source(Input: any): any
 	const Object = Resolve(Input.path)
 
@@ -303,6 +319,7 @@ const function Source(Input: any): any
 	const Script = Object :: LuaSourceContainer
 	const Lines = string.split(Script.Source, "\n")
 	const Action = Input.action or "get"
+	const Path = Script:GetFullName()
 
 	if Action == "get" then
 		const From = math.clamp(tonumber(Input.from) or 1, 1, math.max(1, #Lines))
@@ -313,17 +330,27 @@ const function Source(Input: any): any
 			table.insert(Window, `{Index}: {Lines[Index]}`)
 		end
 
-		return {path = Script:GetFullName(), total = #Lines, lines = Window}
+		Remember(Script)
+
+		return {path = Path, total = #Lines, lines = Window}
+	end
+
+	if Action ~= "set" or Script.Source ~= "" then
+		const Stamped = Seen[Path]
+
+		if Stamped ~= Fingerprint(Script) then
+			return {error = `Read {Path} before editing it, because {if Stamped then "it has changed since you last read it, so the line numbers you are holding point somewhere else now" else "nothing has read it yet, so its line numbers are a guess"}. Studio, Script Sync and other sessions all write to these scripts, and a stale line range edits the wrong lines instead of failing.`}
+		end
 	end
 
 	const ChangeHistoryService = game:GetService("ChangeHistoryService")
 	const Recording = ChangeHistoryService:TryBeginRecording("ClaudioSource", Input.label or `Claudio edited {Script.Name}`)
 
-	const Ok, Trouble = pcall(function()
+	const Ok, Trouble = pcall(function(): string
 		if Action == "set" then
 			Script.Source = tostring(Input.text)
 
-			return
+			return Script.Source
 		end
 
 		const From = math.clamp(tonumber(Input.from) or 1, 1, #Lines + 1)
@@ -353,6 +380,8 @@ const function Source(Input: any): any
 		end
 
 		Script.Source = table.concat(Lines, "\n")
+
+		return Script.Source
 	end)
 
 	if Recording then
@@ -363,7 +392,13 @@ const function Source(Input: any): any
 		return {error = tostring(Trouble)}
 	end
 
-	return {text = `{Script:GetFullName()} is now {#string.split(Script.Source, "\n")} lines.`, undo = Recording ~= nil}
+	Remember(Script)
+
+	if Recording then
+		Committed += 1
+	end
+
+	return {text = `{Path} is now {#string.split(Script.Source, "\n")} lines.`, undo = Recording ~= nil}
 end
 
 const function Selected(Input: any): any
@@ -429,6 +464,40 @@ const function Steps(Input: any): any
 		ChangeHistoryService:Redo()
 
 		return {text = "Redid one step."}
+	end
+
+	if Action == "mark" then
+		const Name = tostring(Input.name or "mark")
+
+		_G.ClaudioMarks = _G.ClaudioMarks or {}
+		;(_G.ClaudioMarks :: any)[Name] = Committed
+
+		return {text = `Marked "{Name}" at {Committed} edits. Undo back to it with action restore.`}
+	end
+
+	if Action == "restore" then
+		const Name = tostring(Input.name or "mark")
+		const Marks = _G.ClaudioMarks :: any
+		const At = if Marks then Marks[Name] else nil
+
+		if At == nil then
+			return {error = `There is no mark called "{Name}".`}
+		end
+
+		local Steps = 0
+
+		while Committed > At and ChangeHistoryService:GetCanUndo() do
+			ChangeHistoryService:Undo()
+
+			Committed -= 1
+			Steps += 1
+		end
+
+		if Committed > At then
+			return {error = `Only got {Steps} steps back before Studio ran out of undo history, so "{Name}" was not fully reached. Anything older than Studio's undo limit is gone.`}
+		end
+
+		return {text = `Undid {Steps} steps back to "{Name}".`}
 	end
 
 	return {error = `Claudio does not know the history action "{tostring(Action)}".`}
@@ -566,7 +635,7 @@ const function Playtest(Input: any): any
 		const Mode = Input.mode or "play"
 		const Players = math.clamp(tonumber(Input.players) or 2, 2, 8)
 
-		local Warning = nil
+		local Warning
 
 		pcall(function()
 			const Runtime = require(script.Parent.Parent.Runtime)
@@ -633,6 +702,494 @@ const function Playtest(Input: any): any
 	end
 
 	return {error = `Claudio does not know the playtest action "{tostring(Action)}".`}
+end
+
+const Caveats = "Two things the simulator does not do: it does not resize ScreenGui space to the simulated resolution, so measure AbsoluteSize against the ScreenGui rather than the viewport before calling scale-based UI broken, and UserInputService.TouchEnabled stays false, so a touch-only input path still needs a real device."
+
+const function Device(Input: any): any
+	const Simulator = game:GetService("StudioDeviceSimulatorService")
+	const Action = Input.action or "status"
+
+	const function Read(Method: string): any
+		const Ok, Value = pcall(function()
+			return (Simulator :: any)[Method](Simulator)
+		end)
+
+		return if Ok then Value else nil
+	end
+
+	const function Current(): string
+		return tostring(Read("GetDeviceAsync") or "default")
+	end
+
+	const function Devices(): {string}
+		const Ok, List = pcall(function()
+			return Simulator:GetDeviceListAsync()
+		end)
+
+		if not Ok then
+			return {}
+		end
+
+		const Names = {}
+
+		for Index, Entry in List do
+			const Id = if typeof(Entry) == "table" then Entry.DeviceId or Entry.Id else Entry
+
+			if Id ~= nil then
+				table.insert(Names, tostring(Id))
+			end
+		end
+
+		table.sort(Names)
+
+		return Names
+	end
+
+	const function Describe(): string
+		const Now = Current()
+
+		if Now == "default" then
+			return "Nothing is being simulated, so the viewport is the editor's own."
+		end
+
+		const Size = Read("GetResolutionAsync")
+		const Density = Read("GetPixelDensityAsync")
+		const Facing = Read("GetOrientationAsync")
+		const Scaling = Read("GetScalingModeAsync")
+		const Parts = {}
+
+		if Size then
+			table.insert(Parts, `{math.floor(Size.X)}x{math.floor(Size.Y)}`)
+		end
+
+		if Density then
+			table.insert(Parts, `density {string.format("%.1f", Density)}`)
+		end
+
+		if Facing then
+			table.insert(Parts, tostring(Facing.Name))
+		end
+
+		if Scaling then
+			table.insert(Parts, `{tostring(Scaling.Name)} scaling`)
+		end
+
+		return `Simulating {Now}{if #Parts > 0 then `, {table.concat(Parts, ", ")}` else ""}.`
+	end
+
+	if Action == "status" then
+		const Known = Devices()
+
+		if #Known == 0 then
+			return {text = `{Describe()} Studio did not return a device list, so no profile names can be offered.`}
+		end
+
+		return {text = `{Describe()} {#Known} profiles are available: {table.concat(Known, ", ")}`}
+	end
+
+	if Action == "stop" then
+		if Current() == "default" then
+			return {error = "Nothing is being simulated, so there was nothing to stop."}
+		end
+
+		const Stopped, Trouble = pcall(function()
+			Simulator:StopSimulationAsync()
+		end)
+
+		if not Stopped then
+			return {error = `Studio refused to stop the simulation: {tostring(Trouble)}`}
+		end
+
+		return {text = "Stopped simulating, so the viewport is the editor's own again."}
+	end
+
+	if Action == "network" then
+		const Settings = settings():GetService("NetworkSettings")
+		const Profiles = {
+			good = {50, 10, 0},
+			great = {15, 0, 0},
+			off = {0, 0, 0},
+			poor = {150, 100, 0.5},
+		}
+		const Wanted = tostring(Input.network or "status")
+
+		if Wanted == "status" then
+			return {text = `Network is {(Settings :: any).InboundNetworkMinDelayMs}ms in and {(Settings :: any).OutboundNetworkMinDelayMs}ms out, jitter {(Settings :: any).InboundNetworkJitterMs}ms, loss {(Settings :: any).InboundNetworkLossPercent}%.`}
+		end
+
+		const Chosen = Profiles[Wanted]
+
+		if not Chosen then
+			return {error = `"{Wanted}" is not a network profile. Studio takes great, good, poor or off.`}
+		end
+
+		const Applied, Trouble = pcall(function()
+			for Index, Name in {"InboundNetworkMinDelayMs", "OutboundNetworkMinDelayMs"} do
+				(Settings :: any)[Name] = Chosen[1]
+			end
+
+			for Index, Name in {"InboundNetworkJitterMs", "OutboundNetworkJitterMs"} do
+				(Settings :: any)[Name] = Chosen[2]
+			end
+
+			for Index, Name in {"InboundNetworkLossPercent", "OutboundNetworkLossPercent"} do
+				(Settings :: any)[Name] = Chosen[3]
+			end
+		end)
+
+		if not Applied then
+			return {error = `Studio refused the network profile: {tostring(Trouble)}`}
+		end
+
+		return {text = `Network set to {Wanted}: {Chosen[1]}ms delay, {Chosen[2]}ms jitter, {Chosen[3]}% loss, each way. This only shapes a running playtest.`}
+	end
+
+	if Action ~= "set" then
+		return {error = `Claudio does not know the device action "{tostring(Action)}".`}
+	end
+
+	const function Pick(Kind: Enum, Wanted: string, Label: string): (EnumItem?, string?)
+		const Names = {}
+
+		for Index, Item in (Kind :: any):GetEnumItems() do
+			if Item.Name:lower() == Wanted:lower() then
+				return Item, nil
+			end
+
+			table.insert(Names, Item.Name)
+		end
+
+		return nil, `"{Wanted}" is not a {Label}. Studio takes: {table.concat(Names, ", ")}`
+	end
+
+	const Applied = {}
+
+	if Input.device ~= nil then
+		const Wanted = tostring(Input.device)
+		const Known = Devices()
+
+		if #Known > 0 and not table.find(Known, Wanted) then
+			return {error = `"{Wanted}" is not a device Studio knows. It takes: {table.concat(Known, ", ")}`}
+		end
+
+		const Set, Trouble = pcall(function()
+			Simulator:SetDeviceAsync(Wanted)
+		end)
+
+		if not Set then
+			return {error = `Studio refused the device {Wanted}: {tostring(Trouble)}`}
+		end
+
+		table.insert(Applied, Wanted)
+	end
+
+	if Input.orientation ~= nil then
+		const Item, Trouble = Pick(Enum.ScreenOrientation, tostring(Input.orientation), "screen orientation")
+
+		if not Item then
+			return {error = Trouble}
+		end
+
+		const Set, Refused = pcall(function()
+			Simulator:SetOrientationAsync(Item)
+		end)
+
+		if not Set then
+			return {error = `Studio refused the orientation: {tostring(Refused)}`}
+		end
+
+		table.insert(Applied, tostring(Item.Name))
+	end
+
+	if Input.width ~= nil or Input.height ~= nil then
+		const Width = tonumber(Input.width)
+		const Height = tonumber(Input.height)
+
+		if not Width or not Height then
+			return {error = "A resolution needs both width and height."}
+		end
+
+		const Set, Trouble = pcall(function()
+			Simulator:SetResolutionAsync(Width, Height)
+		end)
+
+		if not Set then
+			return {error = `Studio refused the resolution {Width}x{Height}: {tostring(Trouble)}`}
+		end
+
+		table.insert(Applied, `{math.floor(Width)}x{math.floor(Height)}`)
+	end
+
+	if Input.density ~= nil then
+		const Density = tonumber(Input.density)
+
+		if not Density or Density <= 0 then
+			return {error = "A pixel density has to be a number above zero."}
+		end
+
+		const Set, Trouble = pcall(function()
+			Simulator:SetPixelDensityAsync(Density)
+		end)
+
+		if not Set then
+			return {error = `Studio refused the pixel density {Density}: {tostring(Trouble)}`}
+		end
+
+		table.insert(Applied, `density {Density}`)
+	end
+
+	if Input.scaling ~= nil then
+		const Item, Trouble = Pick(Enum.DeviceSimulatorScalingMode, tostring(Input.scaling), "scaling mode")
+
+		if not Item then
+			return {error = Trouble}
+		end
+
+		const Set, Refused = pcall(function()
+			Simulator:SetScalingModeAsync(Item)
+		end)
+
+		if not Set then
+			return {error = `Studio refused the scaling mode: {tostring(Refused)}`}
+		end
+
+		table.insert(Applied, `{tostring(Item.Name)} scaling`)
+	end
+
+	if #Applied == 0 then
+		return {error = "Nothing was asked for. Give a device, orientation, width and height, density or scaling, or use stop to end the simulation."}
+	end
+
+	return {text = `Set {table.concat(Applied, ", ")}. {Describe()} {Caveats}`}
+end
+
+const function Layout(Input: any): any
+	const Object = Resolve(Input.path)
+
+	if not Object or not Object:IsA("GuiObject") then
+		return {error = `Nothing drawable at "{tostring(Input.path)}". Give the path to a GuiObject.`}
+	end
+
+	const Target = Object :: GuiObject
+	const Size = Target.AbsoluteSize
+	const Lines = {`{math.floor(Size.X)}x{math.floor(Size.Y)} at {math.floor(Target.AbsolutePosition.X)}, {math.floor(Target.AbsolutePosition.Y)}`}
+
+	local Surface: Instance? = nil
+	local Hidden: string? = nil
+	local Clipped: string? = nil
+	local Ancestor: Instance? = Target.Parent
+
+	while Ancestor and Ancestor ~= game do
+		if Ancestor:IsA("LayerCollector") then
+			Surface = Ancestor
+
+			break
+		end
+
+		const Above = Ancestor :: any
+
+		if not Hidden and Above:IsA("GuiObject") and not Above.Visible then
+			Hidden = Above.Name
+		end
+
+		if not Clipped and Above:IsA("GuiObject") and Above.ClipsDescendants then
+			const Edge = Above.AbsolutePosition
+			const Reach = Edge + Above.AbsoluteSize
+			const Corner = Target.AbsolutePosition + Size
+
+			if Target.AbsolutePosition.X < Edge.X or Target.AbsolutePosition.Y < Edge.Y or Corner.X > Reach.X or Corner.Y > Reach.Y then
+				Clipped = Above.Name
+			end
+		end
+
+		Ancestor = Ancestor.Parent
+	end
+
+	if Surface then
+		const Space = (Surface :: any).AbsoluteSize
+
+		table.insert(Lines, `inside {Surface.Name} at {math.floor(Space.X)}x{math.floor(Space.Y)}, so {string.format("%.1f", Size.X / math.max(1, Space.X) * 100)}% wide and {string.format("%.1f", Size.Y / math.max(1, Space.Y) * 100)}% tall`)
+
+		if Target.AbsolutePosition.X + Size.X < 0 or Target.AbsolutePosition.Y + Size.Y < 0 or Target.AbsolutePosition.X > Space.X or Target.AbsolutePosition.Y > Space.Y then
+			table.insert(Lines, "off screen entirely")
+		end
+	else
+		table.insert(Lines, "no ScreenGui above it, so it is not being drawn anywhere")
+	end
+
+	if Size.X < 1 or Size.Y < 1 then
+		table.insert(Lines, "no size, so nothing of it is drawn")
+	end
+
+	if not Target.Visible then
+		table.insert(Lines, "Visible is false")
+	end
+
+	if Hidden then
+		table.insert(Lines, `hidden by {Hidden}`)
+	end
+
+	if Clipped then
+		table.insert(Lines, `clipped by {Clipped}`)
+	end
+
+	const Read, Simulating = pcall(function()
+		return tostring(game:GetService("StudioDeviceSimulatorService"):GetDeviceAsync()) ~= "default"
+	end)
+
+	if Read and Simulating and Surface then
+		table.insert(Lines, "measured against the ScreenGui, which a simulated device does not resize")
+	end
+
+	return {text = `{Target:GetFullName()}: {table.concat(Lines, ", ")}.`}
+end
+
+const function Memory(Input: any): any
+	const Stats = game:GetService("Stats")
+
+	if not Stats.MemoryTrackingEnabled then
+		return {error = "Memory tracking is off for this place, so nothing can be measured."}
+	end
+
+	const Least = tonumber(Input.least) or 1
+	const Rows = {}
+
+	for _, Tag in Enum.DeveloperMemoryTag:GetEnumItems() do
+		const Ok, Used = pcall(function()
+			return Stats:GetMemoryUsageMbForTag(Tag)
+		end)
+
+		if Ok and Used >= Least then
+			table.insert(Rows, {Name = Tag.Name, Used = Used})
+		end
+	end
+
+	table.sort(Rows, function(Left, Right)
+		return Left.Used > Right.Used
+	end)
+
+	const Lines = {}
+
+	for Index, Row in Rows do
+		if Index > 15 then
+			break
+		end
+
+		table.insert(Lines, `{Row.Name} {string.format("%.1f", Row.Used)}`)
+	end
+
+	if #Lines == 0 then
+		return {text = `{string.format("%.1f", Stats:GetTotalMemoryUsageMb())}MB total, and nothing reaches {Least}MB on its own.`}
+	end
+
+	return {text = `{string.format("%.1f", Stats:GetTotalMemoryUsageMb())}MB total, in MB: {table.concat(Lines, ", ")}`}
+end
+
+const function Rbxm(Input: any): any
+	const SerializationService = game:GetService("SerializationService")
+	const EncodingService = game:GetService("EncodingService")
+
+	if Input.base64 then
+		const Parent = Resolve(Input.path)
+
+		if not Parent then
+			return {error = `Nothing at "{tostring(Input.path)}" to put it under.`}
+		end
+
+		const Decoded, Bytes = pcall(function()
+			return EncodingService:Base64Decode(buffer.fromstring(Input.base64))
+		end)
+
+		if not Decoded then
+			return {error = `That file is not valid base64: {tostring(Bytes)}`}
+		end
+
+		const Built, Made = pcall(function()
+			return SerializationService:DeserializeInstancesAsync(Bytes)
+		end)
+
+		if not Built then
+			return {error = `Studio could not read that rbxm: {tostring(Made)}`}
+		end
+
+		const ChangeHistoryService = game:GetService("ChangeHistoryService")
+		const Recording = ChangeHistoryService:TryBeginRecording("ClaudioRbxm", Input.label or "Claudio loaded an rbxm")
+		const Names = {}
+
+		for _, Object in Made do
+			Object.Parent = Parent
+
+			table.insert(Names, Object.Name)
+		end
+
+		if Recording then
+			ChangeHistoryService:FinishRecording(Recording, Enum.FinishRecordingOperation.Commit)
+
+			Committed += 1
+		end
+
+		return {text = `Put {#Names} under {Parent:GetFullName()}: {table.concat(Names, ", ")}`}
+	end
+
+	const Wanted = {}
+
+	for _, Path in Input.paths or {} do
+		const Object = Resolve(Path)
+
+		if not Object then
+			return {error = `Nothing at "{tostring(Path)}".`}
+		end
+
+		table.insert(Wanted, Object)
+	end
+
+	if #Wanted == 0 then
+		return {error = "Give paths to save, or base64 and a path to load."}
+	end
+
+	const Saved, Bytes = pcall(function()
+		return SerializationService:SerializeInstancesAsync(Wanted)
+	end)
+
+	if not Saved then
+		return {error = `Studio could not write those out: {tostring(Bytes)}`}
+	end
+
+	const Encoded, Text = pcall(function()
+		return buffer.tostring(EncodingService:Base64Encode(Bytes))
+	end)
+
+	if not Encoded then
+		return {error = `Encoding failed: {tostring(Text)}`}
+	end
+
+	return {base64 = Text, count = #Wanted}
+end
+
+const function Changed(Input: any): any
+	const Watcher = require(script.Parent.Parent.Watcher)
+	const Mine, Theirs = Watcher.Peek()
+	const Limit = math.clamp(tonumber(Input.limit) or 40, 1, 200)
+	const Lines = {}
+
+	for _, Bucket in {Theirs, Mine} do
+		for _, Line in Bucket do
+			if #Lines >= Limit then
+				break
+			end
+
+			if not Line:find("Claudio", 1, true) then
+				table.insert(Lines, Line)
+			end
+		end
+	end
+
+	if #Lines == 0 then
+		return {text = "Nothing has changed in the place since the last turn started."}
+	end
+
+	return {lines = Lines}
 end
 
 const function Rendered(Object: Instance): boolean
@@ -815,7 +1372,6 @@ const function ScreenBounds(Object: Instance, Viewport: Vector2): any
 		}
 	end
 
-	local Middle: Vector3
 	local Half: Vector3
 	local Frame: CFrame
 
@@ -823,13 +1379,11 @@ const function ScreenBounds(Object: Instance, Viewport: Vector2): any
 		const Box, Size = (Object :: Model):GetBoundingBox()
 
 		Frame = Box
-		Middle = Box.Position
 		Half = Size / 2
 	elseif Object:IsA("BasePart") then
 		const Part = Object :: BasePart
 
 		Frame = Part.CFrame
-		Middle = Part.Position
 		Half = Part.Size / 2
 	else
 		return {error = `{Object.Name} is neither a GuiObject nor something with a position, so there is nothing to crop to.`}
@@ -868,7 +1422,7 @@ const function ScreenBounds(Object: Instance, Viewport: Vector2): any
 end
 
 const function Shoot(Input: any): any
-	local Staged = nil
+	local Staged
 
 	if Input.around then
 		const Target = Resolve(Input.around)
@@ -921,14 +1475,14 @@ const function Shoot(Input: any): any
 	const Whole = (Image :: any).Size
 	local Corner = Vector2.zero
 	local Span = Whole
-	local Around = nil
+	local Around
 
 	if Input.width and Input.height then
 		const Left = math.clamp(tonumber(Input.x) or 0, 0, Whole.X - 1)
 		const Top = math.clamp(tonumber(Input.y) or 0, 0, Whole.Y - 1)
 
 		Corner = Vector2.new(Left, Top)
-		Span = Vector2.new(math.clamp(tonumber(Input.width), 1, Whole.X - Left), math.clamp(tonumber(Input.height), 1, Whole.Y - Top))
+		Span = Vector2.new(math.clamp(tonumber(Input.width) or 1, 1, Whole.X - Left), math.clamp(tonumber(Input.height) or 1, 1, Whole.Y - Top))
 	elseif Staged then
 		const Wide = math.min((Staged :: any).width, Whole.X)
 		const Tall = math.min((Staged :: any).height, Whole.Y)
@@ -1216,10 +1770,16 @@ const function Api(Input: any): any
 				continue
 			end
 
+			const Noted = Marks(Entry, Class, Kind)
+
+			if Input.deprecated == true and not Noted:lower():find("deprecated", 1, true) then
+				continue
+			end
+
 			if Kind == "property" then
-				table.insert(Lines, `{Name}: {TypeName(Entry.Type)}{Marks(Entry, Class, Kind)}`)
+				table.insert(Lines, `{Name}: {TypeName(Entry.Type)}{Noted}`)
 			else
-				table.insert(Lines, `{Signature(Entry, Kind)}{Marks(Entry, Class, Kind)}`)
+				table.insert(Lines, `{Signature(Entry, Kind)}{Noted}`)
 			end
 		end
 
@@ -1364,6 +1924,7 @@ const function ReadPlace(Input: any): any
 
 				if not Wanted or Body:lower():find(Wanted, 1, true) or Child.Name:lower():find(Wanted, 1, true) then
 					table.insert(Sources, {path = Child:GetFullName(), source = Body})
+					Remember(Child :: LuaSourceContainer)
 				end
 			end
 
@@ -1372,6 +1933,12 @@ const function ReadPlace(Input: any): any
 	end
 
 	table.insert(Tree, `{Root.Name} [{Root.ClassName}]`)
+
+	if Root:IsA("LuaSourceContainer") and Root.Source ~= "" then
+		table.insert(Sources, {path = Root:GetFullName(), source = Root.Source})
+		Remember(Root :: LuaSourceContainer)
+	end
+
 	Walk(Root, 1, "  ")
 
 	return {
@@ -1439,7 +2006,7 @@ const function Modify(Input: any): any
 
 			const Where = Object:GetFullName()
 
-			Object:Destroy()
+			Object.Parent = nil
 
 			return {text = `Deleted {Where}`}
 		end
@@ -1476,6 +2043,10 @@ const function Modify(Input: any): any
 
 	if Recording then
 		ChangeHistoryService:FinishRecording(Recording, if Ok and not (Result :: any).error then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel)
+
+		if Ok and not (Result :: any).error then
+			Committed += 1
+		end
 	end
 
 	if not Ok then
@@ -1504,7 +2075,7 @@ const function Execute(Input: any): any
 
 	const function Placed(Message: string): string
 		return (Message:gsub("[%w_%.]*ClaudioExecute:(%d+):?%s*", function(Digits: string): string
-			return `line {tonumber(Digits) - 1}: `
+			return `line {(tonumber(Digits) or 1) - 1}: `
 		end))
 	end
 
@@ -1584,6 +2155,10 @@ const function Execute(Input: any): any
 
 	if Recording then
 		ChangeHistoryService:FinishRecording(Recording, if Ok then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel)
+
+		if Ok then
+			Committed += 1
+		end
 	end
 
 	const Answer: {[string]: any} = {}
@@ -1593,7 +2168,7 @@ const function Execute(Input: any): any
 		const Message = tostring(Broke.Message)
 
 		Answer.error = (Message:gsub("[%w_%.]*ClaudioExecute:(%d+):?%s*", function(Digits: string): string
-			return `line {tonumber(Digits) - 1}: `
+			return `line {(tonumber(Digits) or 1) - 1}: `
 		end))
 
 		const Where = tonumber(Message:match("ClaudioExecute:(%d+)"))
@@ -1613,7 +2188,7 @@ const function Execute(Input: any): any
 			const Numbered = Frame:match("ClaudioExecute:(%d+)")
 
 			if Numbered then
-				table.insert(Frames, `line {tonumber(Numbered) - 1}`)
+				table.insert(Frames, `line {(tonumber(Numbered) or 1) - 1}`)
 			end
 		end
 
@@ -1732,6 +2307,26 @@ const function RunStudioJob(Job: any)
 
 			if Job.kind == "playtest" then
 				return Playtest(Job.input)
+			end
+
+			if Job.kind == "device" then
+				return Device(Job.input)
+			end
+
+			if Job.kind == "layout" then
+				return Layout(Job.input)
+			end
+
+			if Job.kind == "memory" then
+				return Memory(Job.input)
+			end
+
+			if Job.kind == "changes" then
+				return Changed(Job.input)
+			end
+
+			if Job.kind == "rbxm" then
+				return Rbxm(Job.input)
 			end
 
 			if Job.kind == "press" then
@@ -2280,7 +2875,7 @@ function Chat.Refresh()
 		end
 	end
 
-	if Current and not Listed and not Chat.Sending() and not Client.ConversationExists(Current) and Chat.ConversationId() == Current and not Chat.Sending() then
+	if Current and not Listed and not Chat.Sending() and not Client.ConversationExists(Current) and Chat.ConversationId() == Current then
 		Chat.New()
 		Chat.Say("That chat was deleted, so this is a new one.")
 

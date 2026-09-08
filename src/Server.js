@@ -3,10 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { exec, execFile } from "node:child_process";
-import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
+import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, MostScriptsToCheck, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
-import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence } from "./Studio.js";
+import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving } from "./Studio.js";
+import { StudioTools } from "./Tools.js";
 import { StudioProcesses } from "./StudioPresence.js";
 import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
@@ -343,15 +344,20 @@ export function StartServer(Port) {
       if (Request.method === "POST" && Url.pathname === "/studio/enqueue") {
         const Wanted = await ReadBody(Request);
 
-        SendJson(Response, 200, await RequestStudio(Wanted.kind, Wanted.input || {}, Wanted.kind === "execute" ? 300000 : undefined, Wanted.role));
+        const Seconds = Number(Wanted.timeout);
+        const Limit = Number.isFinite(Seconds) && Seconds > 0 ? Math.min(Seconds, 1800) * 1000 : (Wanted.kind === "execute" ? 300000 : undefined);
+
+        SendJson(Response, 200, await RequestStudio(Wanted.kind, Wanted.input || {}, Limit, Wanted.role));
         return;
       }
 
       if (Url.pathname === "/studio/job") {
         if (Request.method === "GET") {
           const Able = Url.searchParams.get("canRun");
+          const Attached = Url.searchParams.get("clients");
+          const Plugin = Url.searchParams.get("plugin");
 
-          SendJson(Response, 200, { job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true") });
+          SendJson(Response, 200, { job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true", Attached === null ? undefined : Number(Attached), Plugin || undefined) });
           return;
         }
 
@@ -366,10 +372,22 @@ export function StartServer(Port) {
       if (Request.method === "POST" && Url.pathname === "/lint") {
         const Body = await ReadBody(Request);
         const Usable = (Entry) => Entry && typeof Entry.path === "string" && typeof Entry.source === "string" && Entry.source !== "";
-        const Wanted = (Array.isArray(Body.scripts) ? Body.scripts : []).filter(Usable).slice(0, 20);
+        const Wanted = (Array.isArray(Body.scripts) ? Body.scripts : []).filter(Usable);
         const Tree = (Array.isArray(Body.tree) ? Body.tree : []).filter(Usable).slice(0, 3000);
 
-        SendJson(Response, 200, { scripts: (await Analyze(Wanted, Body.raw === true, Tree)) || [] });
+        if (Wanted.length > MostScriptsToCheck) {
+          SendJson(Response, 413, { error: `${Wanted.length} scripts is more than the analyzer will check in one run. Narrow it with paths.` });
+          return;
+        }
+
+        const Checked = await Analyze(Wanted, Body.raw === true, Tree);
+
+        if (Checked === null) {
+          SendJson(Response, 500, { error: "The analyzer did not produce trustworthy output, so nothing was checked." });
+          return;
+        }
+
+        SendJson(Response, 200, { scripts: Checked });
         return;
       }
 
@@ -601,7 +619,17 @@ export function StartServer(Port) {
   Server.listen(Port, "127.0.0.1", () => {
     const Reached = HandToken();
 
+    const Root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+    const Tools = StudioTools({ Reach: async () => ({}), ReachIn: async () => ({}), Presence: async () => "", RuntimeLive: async () => false }).length + 1;
+
+    Serving(Version, Root, Tools);
+
     console.log(`Claudio bridge listening on http://127.0.0.1:${Port}`);
+    console.log(`Claudio ${Version} from ${Root}, serving ${Tools} tools`);
+
+    if (Tools < 2) {
+      console.error("No tools were built, so every Claudio tool will be missing from its sessions. This is a bug in Tools.js, not a configuration problem.");
+    }
     Warm().catch(() => {});
 
     if (Reached === 0) {

@@ -1,9 +1,10 @@
 import os from "node:os";
 import path from "node:path";
 
-export const Version = "1.2.0";
+export const Version = "1.3.0";
 export const ProtocolVersion = 1;
 export const DefaultPort = 47225;
+export const MostScriptsToCheck = 1200;
 export const AunId = "264787011452403712";
 export const LongPollMilliseconds = 10000;
 export const CoalesceMilliseconds = 120;

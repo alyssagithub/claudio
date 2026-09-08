@@ -125,7 +125,7 @@ function Client.AnswerQuestion(RequestId: string, QuestionId: string, Answers: {
 end
 
 function Client.TakeStudioJob(): (boolean, any)
-	return Http.Request("GET", `{BaseUrl()}/studio/job`)
+	return Http.Request("GET", `{BaseUrl()}/studio/job?plugin={Config.Version}`)
 end
 
 function Client.AnswerStudio(JobId: string, Result: any): (boolean, any)

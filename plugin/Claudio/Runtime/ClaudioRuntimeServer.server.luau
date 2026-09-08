@@ -1,6 +1,7 @@
 --!strict
 const HttpService = game:GetService("HttpService")
 const ReplicatedStorage = game:GetService("ReplicatedStorage")
+const ServerScriptService = game:GetService("ServerScriptService")
 const LogService = game:GetService("LogService")
 const RunService = game:GetService("RunService")
 
@@ -66,16 +67,28 @@ const function Call(Method: string, Where: string, Body: any): (boolean, any)
 	return Read, Decoded
 end
 
-const function CanRun(): boolean
-	if typeof(loadstring) ~= "function" then
-		return false
+const function Builder(): BindableFunction?
+	const Found = ServerScriptService:FindFirstChild("ClaudioBuild")
+
+	return if Found and Found:IsA("BindableFunction") then Found :: BindableFunction else nil
+end
+
+const function Explain(Trouble: string, Said: {string}): string
+	if not Trouble:find("experienced an error while loading", 1, true) then
+		return Trouble
 	end
 
-	const Ok, Made = pcall(function()
-		return loadstring("return 1")
-	end)
+	task.wait(0.05)
 
-	return Ok and Made ~= nil
+	for Index = #Said, 1, -1 do
+		const Line, Rest = Said[Index]:match("ClaudioPayload:(%d+): (.+)$")
+
+		if Line then
+			return `Line {math.max(1, (tonumber(Line) or 2) - 1)}: {Rest}`
+		end
+	end
+
+	return Trouble
 end
 
 const function Run(Code: string): any
@@ -97,20 +110,24 @@ const function Run(Code: string): any
 		return Answer
 	end
 
-	if not CanRun() then
-		return Finish({error = "Running code inside the session needs loadstring, which is off for this place. Select ServerScriptService in the Explorer, tick LoadStringEnabled in its Properties, and start the playtest again. Claudio cannot set it, because the property is not readable or writable from any script."})
+	const Making = Builder()
+
+	if not Making then
+		return Finish({error = "Claudio's plugin is not running inside this play session, so there is nothing to build the code with. Stop the playtest and start it again, and if that does not help, reinstall the plugin."})
 	end
 
-	const Made, Trouble = loadstring(`return function()\n{Code}\nend`)
+	const Payload = Making:Invoke(`return function()\n{Code}\nend`)
 
-	if not Made then
-		return Finish({error = `That did not compile: {tostring(Trouble)}`})
+	if not Payload then
+		return Finish({error = "Claudio could not turn that code into a module to run it."})
 	end
 
-	const Built, Body = pcall(Made)
+	const Built, Body = pcall(require, Payload)
+
+	Payload:Destroy()
 
 	if not Built then
-		return Finish({error = tostring(Body)})
+		return Finish({error = Explain(tostring(Body), Said)})
 	end
 
 	const Ok, Result = pcall(Body)
@@ -136,7 +153,7 @@ end
 
 task.spawn(function()
 	while RunService:IsRunning() and task.wait(1) do
-		const Ok, Reply = Call("GET", `/studio/job?role=server&canRun={CanRun()}`, nil)
+		const Ok, Reply = Call("GET", `/studio/job?role=server&canRun={Builder() ~= nil}&clients={#game:GetService("Players"):GetPlayers()}`, nil)
 
 		if Ok and Reply and Reply.job then
 			const Job = Reply.job
@@ -219,6 +236,47 @@ task.spawn(function()
 					end
 
 					return {lines = Lines, scanned = #History, skipped = 0}
+				end
+
+				if Job.kind == "memory" then
+					const Stats = game:GetService("Stats")
+
+					if not Stats.MemoryTrackingEnabled then
+						return {error = "Memory tracking is off for this place, so nothing can be measured."}
+					end
+
+					const Least = tonumber(Job.input.least) or 1
+					const Rows = {}
+
+					for _, Tag in Enum.DeveloperMemoryTag:GetEnumItems() do
+						const Ok, Used = pcall(function()
+							return Stats:GetMemoryUsageMbForTag(Tag)
+						end)
+
+						if Ok and Used >= Least then
+							table.insert(Rows, {Name = Tag.Name, Used = Used})
+						end
+					end
+
+					table.sort(Rows, function(Left, Right)
+						return Left.Used > Right.Used
+					end)
+
+					const Lines = {}
+
+					for Index, Row in Rows do
+						if Index > 15 then
+							break
+						end
+
+						table.insert(Lines, `{Row.Name} {string.format("%.1f", Row.Used)}`)
+					end
+
+					if #Lines == 0 then
+						return {text = `{string.format("%.1f", Stats:GetTotalMemoryUsageMb())}MB total, and nothing reaches {Least}MB on its own.`}
+					end
+
+					return {text = `{string.format("%.1f", Stats:GetTotalMemoryUsageMb())}MB total, in MB: {table.concat(Lines, ", ")}`}
 				end
 
 				if Job.kind ~= "execute" and Job.kind ~= "press" and Job.kind ~= "type" then

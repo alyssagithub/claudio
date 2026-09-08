@@ -7,9 +7,12 @@ if not plugin then
 	return
 end
 
+const Builder = require(script.Parent.Runtime.Builder)
+
 if Playing and RunService:IsServer() then
 	require(script.Parent.Settings).Load(plugin)
 	require(script.Parent.Client.Relay).Serve()
+	Builder.Serve()
 
 	return
 end
@@ -19,6 +22,10 @@ const Watcher = require(script.Parent.Watcher)
 const App = require(script.Parent.App.App)
 
 Settings.Load(plugin)
+
+if Playing then
+	Builder.Serve()
+end
 
 if not Playing then
 	if Settings.Get("RelayToken")() == "" then

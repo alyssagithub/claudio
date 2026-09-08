@@ -31,21 +31,41 @@ export function Request(Kind, Input, Timeout, Role) {
 }
 
 const Heard = new Map();
+const StartedAt = Date.now();
 
 let CanRun = null;
+let Clients = null;
+let PluginVersion = null;
+let BridgeVersion = null;
+let BridgeRoot = null;
+let ToolCount = null;
 
-export function Seen(Role, Able) {
+export function Serving(Version, Root, Tools) {
+  BridgeVersion = Version;
+  BridgeRoot = Root;
+  ToolCount = Tools;
+}
+
+export function Seen(Role, Able, Attached, Plugin) {
   Heard.set(Role || "edit", Date.now());
 
   if (Able !== undefined) {
     CanRun = Able;
   }
+
+  if (Attached !== undefined) {
+    Clients = Attached;
+  }
+
+  if (Plugin !== undefined) {
+    PluginVersion = Plugin;
+  }
 }
 
-export function Take(Role, Able) {
+export function Take(Role, Able, Attached, Plugin) {
   const Wanted = Role || "edit";
 
-  Seen(Wanted, Able);
+  Seen(Wanted, Able, Attached, Plugin);
 
   const At = Pending.findIndex((Job) => Job.Role === Wanted);
 
@@ -63,6 +83,13 @@ export function Presence() {
     lastSeen: Heard.get("edit") || 0,
     runtimeSeen: Heard.get("server") || 0,
     canRun: CanRun,
+    clients: Clients,
+    plugin: PluginVersion,
+    bridge: BridgeVersion,
+    from: BridgeRoot,
+    tools: ToolCount,
+    upSince: StartedAt,
+    peers: [...Heard.entries()].filter(([, At]) => Date.now() - At < 8000).map(([Role]) => Role),
     waiting: Waiting.size,
     queued: Pending.length,
   };

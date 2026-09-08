@@ -17,16 +17,28 @@ if not Remote or not Remote:IsA("RemoteEvent") then
 	return
 end
 
-const function CanRun(): boolean
-	if typeof(loadstring) ~= "function" then
-		return false
+const function Builder(): BindableFunction?
+	const Found = ReplicatedStorage:FindFirstChild("ClaudioBuild")
+
+	return if Found and Found:IsA("BindableFunction") then Found :: BindableFunction else nil
+end
+
+const function Explain(Trouble: string, Said: {string}): string
+	if not Trouble:find("experienced an error while loading", 1, true) then
+		return Trouble
 	end
 
-	const Ok, Made = pcall(function()
-		return loadstring("return 1")
-	end)
+	task.wait(0.05)
 
-	return Ok and Made ~= nil
+	for Index = #Said, 1, -1 do
+		const Line, Rest = Said[Index]:match("ClaudioPayload:(%d+): (.+)$")
+
+		if Line then
+			return `Line {math.max(1, (tonumber(Line) or 2) - 1)}: {Rest}`
+		end
+	end
+
+	return Trouble
 end
 
 const function Typed(Body: string): any
@@ -114,20 +126,24 @@ const function Run(Code: string): any
 		return Answer
 	end
 
-	if not CanRun() then
-		return Finish({error = "Running code inside the session needs loadstring, which is off for this place. Select ServerScriptService in the Explorer, tick LoadStringEnabled in its Properties, and start the playtest again. Claudio cannot set it, because the property is not readable or writable from any script."})
+	const Making = Builder()
+
+	if not Making then
+		return Finish({error = "Claudio's plugin is not running inside this play session, so there is nothing to build the code with. Stop the playtest and start it again, and if that does not help, reinstall the plugin."})
 	end
 
-	const Made, Trouble = loadstring(`return function()\n{Code}\nend`)
+	const Payload = Making:Invoke(`return function()\n{Code}\nend`)
 
-	if not Made then
-		return Finish({error = `That did not compile: {tostring(Trouble)}`})
+	if not Payload then
+		return Finish({error = "Claudio could not turn that code into a module to run it."})
 	end
 
-	const Built, Body = pcall(Made)
+	const Built, Body = pcall(require, Payload)
+
+	Payload:Destroy()
 
 	if not Built then
-		return Finish({error = tostring(Body)})
+		return Finish({error = Explain(tostring(Body), Said)})
 	end
 
 	const Ok, Result = pcall(Body)

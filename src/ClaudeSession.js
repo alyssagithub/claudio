@@ -134,12 +134,12 @@ export async function RefreshUsage(Session) {
     const Fresh = new Map();
 
     StoreWindow(Fresh, "five_hour", "5-hour limit", Windows.five_hour);
-    StoreWindow(Fresh, "seven_day", "Weekly - all models", Windows.seven_day);
-    StoreWindow(Fresh, "seven_day_opus", "Weekly - Opus", Windows.seven_day_opus);
-    StoreWindow(Fresh, "seven_day_sonnet", "Weekly - Sonnet", Windows.seven_day_sonnet);
+    StoreWindow(Fresh, "seven_day", "Weekly across all models", Windows.seven_day);
+    StoreWindow(Fresh, "seven_day_opus", "Weekly on Opus", Windows.seven_day_opus);
+    StoreWindow(Fresh, "seven_day_sonnet", "Weekly on Sonnet", Windows.seven_day_sonnet);
 
     for (const Scoped of Windows.model_scoped || []) {
-      StoreWindow(Fresh, "model:" + Scoped.display_name, "Weekly - " + Scoped.display_name, Scoped);
+      StoreWindow(Fresh, "model:" + Scoped.display_name, "Weekly on " + Scoped.display_name, Scoped);
     }
 
     Limits = Fresh;
@@ -993,7 +993,7 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
               }],
             }],
           },
-          mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions), (Kind, Input) => RequestStudio(Kind, Input, Kind === "execute" ? 300000 : undefined), (Role, Kind, Input) => RequestStudio(Kind, Input, Kind === "execute" ? 300000 : undefined, Role)) },
+          mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions), (Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined)), (Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined), Role)) },
           systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.Delegating) },
         },
       });

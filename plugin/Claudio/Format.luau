@@ -116,4 +116,66 @@ function Format.Amount(Tokens: number): string
 	return `{math.floor(Tokens / 1000 + 0.5)}k`
 end
 
+const Verbs: {[string]: {string}} = {
+	api = {"Looking up", "Looked up", "look up"},
+	capture = {"Taking a screenshot", "Took a screenshot", "take a screenshot"},
+	changes = {"Checking what changed", "Checked what changed", "check what changed"},
+	device = {"Simulating a device", "Simulated a device", "simulate a device"},
+	execute = {"Running code", "Ran code", "run code"},
+	find = {"Searching for", "Searched for", "search for"},
+	history = {"Stepping through history", "Stepped through history", "step through history"},
+	instances = {"Checking Studio", "Checked Studio", "check Studio"},
+	layout = {"Measuring", "Measured", "measure"},
+	lint = {"Checking the analyzer", "Checked the analyzer", "check the analyzer"},
+	logs = {"Reading the log", "Read the log", "read the log"},
+	memory = {"Reading memory", "Read memory", "read memory"},
+	modify = {"Changing", "Changed", "change"},
+	profile = {"Reading memory", "Read memory", "read memory"},
+	playtest = {"Starting a playtest", "Started a playtest", "start a playtest"},
+	press = {"Pressing", "Pressed", "press"},
+	properties = {"Reading properties of", "Read properties of", "read properties of"},
+	read = {"Reading", "Read", "read"},
+	rbxm = {"Saving", "Saved", "save"},
+	select = {"Selecting", "Selected", "select"},
+	source = {"Editing", "Edited", "edit"},
+	type = {"Typing", "Typed", "type"},
+}
+
+const Actions: {[string]: {[string]: {string}}} = {
+	device = {
+		status = {"Checking the device simulator", "Checked the device simulator", "check the device simulator"},
+		stop = {"Stopping the simulation", "Stopped the simulation", "stop the simulation"},
+	},
+	history = {
+		redo = {"Redoing a step", "Redid a step", "redo a step"},
+		status = {"Checking history", "Checked history", "check history"},
+		undo = {"Undoing a step", "Undid a step", "undo a step"},
+	},
+	playtest = {
+		players = {"Adding players", "Added players", "add players"},
+		status = {"Checking the playtest", "Checked the playtest", "check the playtest"},
+		stop = {"Stopping the playtest", "Stopped the playtest", "stop the playtest"},
+	},
+	source = {
+		get = {"Reading", "Read", "read"},
+	},
+}
+
+function Format.Tool(Name: string, Action: string?, Subject: string, Status: string): string
+	const Chosen = if Action and Actions[Name] and Actions[Name][Action] then Actions[Name][Action] else Verbs[Name]
+	const Tail = if Subject == "" then "" else ` {Subject}`
+
+	if not Chosen then
+		const Words = (Name:gsub("_", " "))
+
+		return `{Words:sub(1, 1):upper()}{Words:sub(2)}{Tail}`
+	end
+
+	if Status == "error" then
+		return `Failed to {Chosen[3]}{Tail}`
+	end
+
+	return `{Chosen[if Status == "running" then 1 else 2]}{Tail}`
+end
+
 return Format

@@ -24,6 +24,36 @@ export async function StudioProcesses() {
   return [];
 }
 
+function Health(Presence) {
+  if (!Presence.bridge) {
+    return "";
+  }
+
+  const Parts = [`Claudio ${Presence.bridge}`];
+
+  if (Presence.from) {
+    Parts.push(`from ${Presence.from}`);
+  }
+
+  if (Presence.upSince) {
+    const Minutes = Math.round((Date.now() - Presence.upSince) / 60000);
+
+    Parts.push(`up ${Minutes < 1 ? "under a minute" : `${Minutes}m`}`);
+  }
+
+  if (Presence.tools) {
+    Parts.push(`${Presence.tools} tools`);
+  }
+
+  const Line = ` ${Parts.join(", ")}.`;
+
+  if (Presence.plugin && Presence.plugin !== Presence.bridge) {
+    return `${Line} The plugin is ${Presence.plugin} and the bridge is ${Presence.bridge}, so they do not match: reinstall the plugin, or restart the bridge from the copy you meant to run, before trusting anything either of them says.`;
+  }
+
+  return Line;
+}
+
 export function Describe(Presence) {
   const Running = (Presence.processes || []).length;
   const Since = Presence.lastSeen ? Date.now() - Presence.lastSeen : null;
@@ -34,7 +64,9 @@ export function Describe(Presence) {
     const Busy = [];
 
     if (Live) {
-      Busy.push("a play session is running and reachable");
+      const Attached = Presence.clients;
+
+      Busy.push(`a play session is reachable${Attached ? ` with ${Attached === 1 ? "1 client" : `${Attached} clients`}` : " with no client attached yet"}`);
     }
 
     if (Presence.queued > 0) {
@@ -45,10 +77,10 @@ export function Describe(Presence) {
       Busy.push(`${Presence.waiting} in flight`);
     }
 
-    const Line = `Connected. The plugin checked in ${Math.round(Since / 1000)}s ago${Busy.length > 0 ? `, ${Busy.join(" and ")}` : ""}.`;
+    const Line = `Connected. The plugin checked in ${Math.round(Since / 1000)}s ago${Busy.length > 0 ? `, ${Busy.join(" and ")}` : ""}.${Health(Presence)}`;
 
     if (Live && Presence.canRun === false) {
-      return `${Line} It cannot run code, though, because loadstring is off for this place: select ServerScriptService in the Explorer and tick LoadStringEnabled in its Properties, then start the playtest again. Claudio cannot set it, because the property is not readable or writable from any script.`;
+      return `${Line} It cannot run code, though, because Claudio's plugin is not running inside the play session, so there is nothing to build the code with. Stop the playtest and start it again, and if that does not help, reinstall the plugin.`;
     }
 
     return Line;

@@ -439,6 +439,10 @@ function Watcher.GetUserChanges(): {string}
 	return Lines
 end
 
+function Watcher.Peek(): ({string}, {string})
+	return Render(Turn), Render(Idle)
+end
+
 function Watcher.Reset()
 	Recording = false
 	Busy = false

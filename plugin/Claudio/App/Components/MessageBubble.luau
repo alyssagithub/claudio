@@ -15,6 +15,7 @@ const IconButton = require(script.Parent.IconButton)
 const Button = require(script.Parent.Button)
 
 const TextService = game:GetService("TextService")
+const HttpService = game:GetService("HttpService")
 
 const Create = Vide.create
 
@@ -44,6 +45,25 @@ const function IsCommand(Name: string): boolean
 	return Name == "Bash" or Name == "PowerShell"
 end
 
+const function Details(Input: string): (string?, string)
+	const Ok, Parsed = pcall(function()
+		return HttpService:JSONDecode(Input)
+	end)
+
+	if not Ok or typeof(Parsed) ~= "table" then
+		return nil, ""
+	end
+
+	const Action = if typeof(Parsed.action) == "string" then Parsed.action else nil
+	const Named = Parsed.path or Parsed.device or Parsed.className or Parsed.enumName or Parsed.search or Parsed.text or Parsed.label
+
+	if typeof(Named) ~= "string" or Named == "" then
+		return Action, ""
+	end
+
+	return Action, if #Named > 48 then `{Named:sub(1, 48)}...` else Named
+end
+
 const function Describe(Entry: Types.ToolCall, Running: boolean): string
 	if Entry.delegate then
 		const Sent = Entry.delegate :: {name: string, model: string}
@@ -65,8 +85,15 @@ const function Describe(Entry: Types.ToolCall, Running: boolean): string
 	end
 
 	const Words = (Tool:gsub("_", " "))
+	const Titled = `{Words:sub(1, 1):upper()}{Words:sub(2)}`
 
-	return `{Verb} {Server}: {Words:sub(1, 1):upper()}{Words:sub(2)}`
+	if Server ~= "claudio" then
+		return `{Verb} {Server}: {Titled}`
+	end
+
+	const Action, Named = Details(Entry.input)
+
+	return Format.Tool(Tool, Action, Named, Entry.status)
 end
 
 const function Detail(Name: string, Text: () -> string, LayoutOrder: number)
@@ -254,7 +281,7 @@ return function(Props: Props)
 		end
 
 		for Question, Given in Entry.output:gmatch('"([^"]+)"="([^"]*)"') do
-			table.insert(Pairs, {Question = Question, Given = Given})
+			table.insert(Pairs, {Question = Question, Given = Given or ""})
 		end
 
 		return Pairs

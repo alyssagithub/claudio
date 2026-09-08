@@ -60,14 +60,41 @@ const function Note()
 	end
 end
 
+const function Owned(): (boolean, string)
+	const Folder = Beside()
+
+	if not Folder then
+		return false, "Nothing is mounted"
+	end
+
+	const Id = Import((Folder :: any).Store.Chat).ConversationId()
+
+	if Id == nil or State().Made[Id] then
+		return true, ""
+	end
+
+	return false, "Refused, because this chat was not started by the testing mount. The mount shares one conversation store with the real plugin, so a message sent here lands in a chat the user is reading and working in, and bills them for it. Call Testing.NewChat() to start one the mount owns, then ask again."
+end
+
+function Testing.NewChat(): string
+	const Folder = Beside()
+
+	if not Folder then
+		return "Nothing is mounted"
+	end
+
+	Import((Folder :: any).Store.Chat).New()
+
+	return "Started a chat the testing mount owns, so asking is allowed again"
+end
+
 function Testing.Refresh(): any
-	const Home = script.Parent
 	const Fresh = script:Clone()
+	const Loaded = Import(Fresh)
 
-	script:Destroy()
-	Fresh.Parent = Home
+	Fresh:Destroy()
 
-	return Import(Fresh)
+	return Loaded
 end
 
 function Testing.Leftovers(): string
@@ -142,6 +169,10 @@ function Testing.Open(Title: string): string
 
 	for _, Summary in Result.conversations do
 		if Summary.title:lower():find(Title:lower(), 1, true) then
+			if not State().Made[Summary.id] then
+				return `Refused, because "{Summary.title}" was not started by the testing mount. The mount shares one conversation store with the real plugin, so opening a chat the user owns puts the mount inside the conversation they are reading and working in, one send away from posting to it. Call Testing.NewChat() and test in a chat of your own.`
+			end
+
 			Import((Folder :: any).Store.Chat).Open(Summary.id)
 
 			return `Opened "{Summary.title}"`
@@ -328,6 +359,8 @@ function Testing.Mount(CurrentPlugin: Plugin): string
 
 		State().Snapshotted = true
 	end
+
+	Import(Copy.Store.Chat).New()
 
 	return `Mounted {Copy:GetFullName()}{if State().Snapshotted then "" else " — the bridge did not answer, so test chats will not be cleaned up automatically"}`
 end
@@ -620,6 +653,12 @@ function Testing.Ask(Text: string, Timeout: number?): string
 
 	if not Folder then
 		return "Nothing is mounted"
+	end
+
+	const Allowed, Why = Owned()
+
+	if not Allowed then
+		return Why
 	end
 
 	const Chat = Import((Folder :: any).Store.Chat)

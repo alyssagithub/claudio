@@ -254,7 +254,11 @@ const function Playtest(Action: string): any
 	end
 
 	if Action == "status" then
-		return {text = if State() == "running" then "A playtest is running." else "No playtest is running."}
+		if State() == "running" then
+			return {text = "A playtest is running."}
+		end
+
+		return {text = "Nothing is running in the editor. A play session started from the toolbar runs in its own place and cannot be seen from here, so ask the instances tool whether one is reachable before concluding there is none."}
 	end
 
 	if Action == "pause" then
@@ -268,7 +272,26 @@ const function Playtest(Action: string): any
 			return {error = "A playtest is already running, so it was left alone. Stop it first if you want a fresh run."}
 		end
 
+		local Warning = nil
+
+		pcall(function()
+			const Runtime = require(script.Parent.Parent.Runtime)
+			const Reachable, Why = Runtime.Reachable()
+
+			Runtime.Install()
+
+			if not Reachable then
+				Warning = Why
+			end
+		end)
+
 		RunService:Run()
+
+		if Warning then
+			task.wait(1)
+
+			return {text = `Playtest started. {Warning}`}
+		end
 	elseif Action == "stop" then
 		if Before == "stopped" then
 			return {error = "No playtest was running, so nothing changed."}

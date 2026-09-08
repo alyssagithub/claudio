@@ -164,7 +164,7 @@ const LintDescription = [
 
 
 
-export function AskServerFor(Pose, Reach) {
+export function AskServerFor(Pose, Reach, ReachIn) {
   return createSdkMcpServer({
     name: AskServerName,
     version: "1.0.0",
@@ -263,10 +263,21 @@ export function AskServerFor(Pose, Reach) {
       }),
       tool("execute", ExecuteDescription, {
         code: z.string().describe("The Luau to run. Return a value to get it back."),
-        readOnly: z.boolean().optional().describe("Set when the script only reads, so no undo step is recorded."),
+        target: z.enum(["edit", "server", "client"]).optional().describe("Where to run it. edit is the editor itself and the default; server and client are the running play session and need one to be open."),
+        readOnly: z.boolean().optional().describe("Set when the script only reads, so no undo step is recorded. Only meaningful in edit."),
         label: z.string().optional().describe("What the undo step should be called, such as \"Rename the doors\"."),
       }, async (Input) => {
-        const Found = await Reach("execute", { code: Input.code, readOnly: Input.readOnly === true, label: Input.label });
+        const Where = Input.target || "edit";
+
+        if (Where !== "edit") {
+          const { RuntimeLive } = await import("./Studio.js");
+
+          if (!RuntimeLive()) {
+            return { content: [{ type: "text", text: "No play session is reachable. Start one with the playtest tool, or from the toolbar, and give it a moment to connect." }] };
+          }
+        }
+
+        const Found = await ReachIn(Where === "edit" ? "edit" : "server", "execute", { code: Input.code, target: Where, readOnly: Input.readOnly === true, label: Input.label });
 
         return { content: [{ type: "text", text: ExecuteReport(Found) }] };
       }),

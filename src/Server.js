@@ -343,13 +343,13 @@ export function StartServer(Port) {
       if (Request.method === "POST" && Url.pathname === "/studio/enqueue") {
         const Wanted = await ReadBody(Request);
 
-        SendJson(Response, 200, await RequestStudio(Wanted.kind, Wanted.input || {}, Wanted.kind === "execute" ? 300000 : undefined));
+        SendJson(Response, 200, await RequestStudio(Wanted.kind, Wanted.input || {}, Wanted.kind === "execute" ? 300000 : undefined, Wanted.role));
         return;
       }
 
       if (Url.pathname === "/studio/job") {
         if (Request.method === "GET") {
-          SendJson(Response, 200, { job: TakeStudioJob() });
+          SendJson(Response, 200, { job: TakeStudioJob(Url.searchParams.get("role") || "edit") });
           return;
         }
 

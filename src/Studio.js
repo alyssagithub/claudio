@@ -3,7 +3,7 @@ const Waiting = new Map();
 
 let Counter = 0;
 
-export function Request(Kind, Input, Timeout) {
+export function Request(Kind, Input, Timeout, Role) {
   return new Promise((Resolve) => {
     const Id = `job-${Counter += 1}-${Math.random().toString(36).slice(2, 8)}`;
     const Give = (Result) => {
@@ -16,7 +16,7 @@ export function Request(Kind, Input, Timeout) {
     };
 
     Waiting.set(Id, Give);
-    Pending.push({ Id, Kind, Input });
+    Pending.push({ Id, Kind, Input, Role: Role || "edit" });
 
     setTimeout(() => {
       const Index = Pending.findIndex((Job) => Job.Id === Id);
@@ -30,22 +30,41 @@ export function Request(Kind, Input, Timeout) {
   });
 }
 
-let LastSeen = 0;
+const Heard = new Map();
 
-export function Seen() {
-  LastSeen = Date.now();
+export function Seen(Role) {
+  Heard.set(Role || "edit", Date.now());
 }
 
-export function Take() {
-  Seen();
+export function Take(Role) {
+  const Wanted = Role || "edit";
 
-  const Job = Pending.shift();
+  Seen(Wanted);
 
-  return Job ? { id: Job.Id, kind: Job.Kind, input: Job.Input } : null;
+  const At = Pending.findIndex((Job) => Job.Role === Wanted);
+
+  if (At < 0) {
+    return null;
+  }
+
+  const [Job] = Pending.splice(At, 1);
+
+  return { id: Job.Id, kind: Job.Kind, input: Job.Input };
 }
 
 export function Presence() {
-  return { lastSeen: LastSeen, waiting: Waiting.size, queued: Pending.length };
+  return {
+    lastSeen: Heard.get("edit") || 0,
+    runtimeSeen: Heard.get("server") || 0,
+    waiting: Waiting.size,
+    queued: Pending.length,
+  };
+}
+
+export function RuntimeLive() {
+  const Last = Heard.get("server") || 0;
+
+  return Date.now() - Last < 6000;
 }
 
 export function Deliver(Id, Result) {

@@ -30,7 +30,12 @@ export function Describe(Presence) {
   const Fresh = Since !== null && Since < 8000;
 
   if (Fresh) {
+    const Live = Presence.runtimeSeen && Date.now() - Presence.runtimeSeen < 6000;
     const Busy = [];
+
+    if (Live) {
+      Busy.push("a play session is running and reachable");
+    }
 
     if (Presence.queued > 0) {
       Busy.push(`${Presence.queued} queued`);

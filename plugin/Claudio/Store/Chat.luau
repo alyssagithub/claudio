@@ -2216,58 +2216,6 @@ const function Execute(Input: any): any
 	return Answer
 end
 
-const function Press(Path: string): any
-	const UserInputService = game:GetService("UserInputService")
-	const Players = game:GetService("Players")
-	const Player = Players.LocalPlayer
-
-	if not Player then
-		return {error = "Nothing is being played, so there is no interface to press. Start a playtest first."}
-	end
-
-	local Object: Instance? = game
-
-	for _, Step in string.split(Path, ".") do
-		if Object then
-			Object = (Object :: Instance):FindFirstChild(Step)
-		end
-	end
-
-	if not Object or not Object:IsA("GuiObject") then
-		return {error = `Nothing usable at "{Path}". Give the full path to a GuiObject, such as Players.Someone.PlayerGui.Menu.Play.`}
-	end
-
-	const Target = Object :: GuiObject
-
-	if Target.AbsoluteSize.X < 1 or Target.AbsoluteSize.Y < 1 then
-		return {error = `{Target.Name} has no size on screen, so a press would land on whatever is behind it.`}
-	end
-
-	local Ancestor: Instance? = Target
-
-	while Ancestor and Ancestor ~= game do
-		if Ancestor:IsA("GuiObject") and not (Ancestor :: GuiObject).Visible then
-			return {error = `{Target.Name} is not being drawn because {Ancestor.Name} is hidden, so a press would do nothing.`}
-		end
-
-		Ancestor = Ancestor.Parent
-	end
-
-	const Centre = Target.AbsolutePosition + Target.AbsoluteSize / 2 + game:GetService("GuiService"):GetGuiInset()
-	const Virtual = (UserInputService :: any):CreateVirtualInput()
-	const Sent, Trouble = pcall(function()
-		Virtual:SendMouseButton(Centre, Enum.UserInputType.MouseButton1, true)
-		task.wait(0.05)
-		Virtual:SendMouseButton(Centre, Enum.UserInputType.MouseButton1, false)
-	end)
-
-	if not Sent then
-		return {error = `The press was refused at {Centre}: {tostring(Trouble)}`}
-	end
-
-	return {text = `Pressed {Target.Name} at {math.floor(Centre.X)}, {math.floor(Centre.Y)}. Read the place to confirm what it did, because a press that lands on nothing still reports as sent.`}
-end
-
 const function RunStudioJob(Job: any)
 	if typeof(Job) ~= "table" or typeof(Job.id) ~= "string" then
 		return
@@ -2327,10 +2275,6 @@ const function RunStudioJob(Job: any)
 
 			if Job.kind == "rbxm" then
 				return Rbxm(Job.input)
-			end
-
-			if Job.kind == "press" then
-				return Press(Job.input.path)
 			end
 
 			if Job.kind == "execute" then

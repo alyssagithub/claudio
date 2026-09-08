@@ -9,10 +9,13 @@ const ExecuteDescription = [
   "Call _G.ClaudioFresh(module) to require past the cache.",
 ].join(" ");
 
-const PressDescription = [
-  "Press a button in the running experience by naming its instance path, rather than by guessing screen coordinates.",
+const InputDescription = [
+  "Send input to the running experience: press, type, key, hover, scroll or drag.",
+  "Interface actions name an instance path instead of guessing screen coordinates.",
+  "press clicks the middle of a GuiObject, type sends text to whatever has keyboard focus, key presses and releases a KeyCode by name.",
+  "hover moves the pointer onto a GuiObject, scroll turns the wheel over one, and drag holds the button from a GuiObject to another path or by an x and y offset.",
   "Needs a play session with a character.",
-  "A press that reaches nothing still reports as sent, so check the place afterwards.",
+  "Input that reaches nothing still reports as sent, so check the place afterwards.",
 ].join(" ");
 
 const PlaytestDescription = [
@@ -177,31 +180,42 @@ export function StudioTools(Deps) {
       },
     },
     {
-      Name: "press",
-      Description: PressDescription,
-      Schema: { path: z.string().describe("Full instance path of the GuiObject to press.") },
-      Run: async (Input) => {
-        const Missing = await NeedsSession("No play session is reachable, and a press has to happen on the client where the interface lives. Start one with the playtest tool and give it a moment to connect.");
-
-        if (Missing) {
-          return { content: [{ type: "text", text: Missing }] };
-        }
-
-        return { content: [{ type: "text", text: Said(await ReachIn("server", "press", { path: Input.path }), "Studio did not say what happened.") }] };
+      Name: "input",
+      Description: InputDescription,
+      Schema: {
+        action: z.enum(["press", "type", "key", "hover", "scroll", "drag"]).describe("What to send."),
+        path: z.string().optional().describe("Full instance path of the GuiObject for press, hover, scroll and drag."),
+        text: z.string().optional().describe("The text to type, for type."),
+        key: z.string().optional().describe("KeyCode name to press and release, such as Return or E, for key."),
+        amount: z.number().optional().describe("Wheel amount for scroll, negative scrolls down. Defaults to -1."),
+        to: z.string().optional().describe("Full instance path to drag onto, for drag."),
+        x: z.number().optional().describe("Pixels to drag sideways when there is no to path."),
+        y: z.number().optional().describe("Pixels to drag down when there is no to path."),
       },
-    },
-    {
-      Name: "type",
-      Description: "Type text into whatever has keyboard focus in the running experience, such as a TextBox you have just pressed. Needs a play session. Check the place afterwards, because typing that reaches nothing still reports as sent.",
-      Schema: { text: z.string().describe("The text to type.") },
       Run: async (Input) => {
-        const Missing = await NeedsSession("No play session is reachable, and typing has to happen on the client. Start one with the playtest tool.");
+        if (Input.action === "type" && !Input.text) {
+          return { content: [{ type: "text", text: "Typing needs text." }] };
+        }
+
+        if (Input.action === "key" && !Input.key) {
+          return { content: [{ type: "text", text: "A key press needs key, the name of a KeyCode such as Return or E." }] };
+        }
+
+        if (Input.action !== "type" && Input.action !== "key" && !Input.path) {
+          return { content: [{ type: "text", text: `${Input.action} needs path, the full instance path of the GuiObject to act on.` }] };
+        }
+
+        if (Input.action === "drag" && !Input.to && Input.x === undefined && Input.y === undefined) {
+          return { content: [{ type: "text", text: "A drag needs somewhere to go: to for another GuiObject, or x and y to move by." }] };
+        }
+
+        const Missing = await NeedsSession("No play session is reachable, and input has to happen on the client where the interface lives. Start one with the playtest tool and give it a moment to connect.");
 
         if (Missing) {
           return { content: [{ type: "text", text: Missing }] };
         }
 
-        return { content: [{ type: "text", text: Said(await ReachIn("server", "type", { text: Input.text }), "The session did not say what happened.") }] };
+        return { content: [{ type: "text", text: Said(await ReachIn("server", "input", { action: Input.action, path: Input.path, text: Input.text, key: Input.key, amount: Input.amount, to: Input.to, x: Input.x, y: Input.y }), "Studio did not say what happened.") }] };
       },
     },
     {

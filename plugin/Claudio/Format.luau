@@ -132,16 +132,23 @@ const Verbs: {[string]: {string}} = {
 	modify = {"Changing", "Changed", "change"},
 	profile = {"Reading memory", "Read memory", "read memory"},
 	playtest = {"Starting a playtest", "Started a playtest", "start a playtest"},
-	press = {"Pressing", "Pressed", "press"},
+	input = {"Sending input", "Sent input", "send input"},
 	properties = {"Reading properties of", "Read properties of", "read properties of"},
 	read = {"Reading", "Read", "read"},
 	rbxm = {"Saving", "Saved", "save"},
 	select = {"Selecting", "Selected", "select"},
 	source = {"Editing", "Edited", "edit"},
-	type = {"Typing", "Typed", "type"},
 }
 
 const Actions: {[string]: {[string]: {string}}} = {
+	input = {
+		drag = {"Dragging", "Dragged", "drag"},
+		hover = {"Hovering over", "Hovered over", "hover over"},
+		key = {"Pressing a key", "Pressed a key", "press a key"},
+		press = {"Pressing", "Pressed", "press"},
+		scroll = {"Scrolling over", "Scrolled over", "scroll over"},
+		type = {"Typing", "Typed", "type"},
+	},
 	device = {
 		status = {"Checking the device simulator", "Checked the device simulator", "check the device simulator"},
 		stop = {"Stopping the simulation", "Stopped the simulation", "stop the simulation"},

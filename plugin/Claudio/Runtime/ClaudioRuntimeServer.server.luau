@@ -285,18 +285,18 @@ task.spawn(function()
 					return {text = `{string.format("%.1f", Stats:GetTotalMemoryUsageMb())}MB total, in MB: {table.concat(Lines, ", ")}`}
 				end
 
-				if Job.kind ~= "execute" and Job.kind ~= "press" and Job.kind ~= "type" then
+				if Job.kind ~= "execute" and Job.kind ~= "input" then
 					return {error = `The runtime agent does not handle "{tostring(Job.kind)}".`}
 				end
 
-				if Job.kind == "press" or Job.kind == "type" or Job.input.target == "client" then
+				if Job.kind == "input" or Job.input.target == "client" then
 					const Player = game:GetService("Players"):GetPlayers()[1]
 
 					if not Player then
 						return {error = "Nobody is in the session, so there is no client to run on."}
 					end
 
-					return AskClient(Player, if Job.kind == "press" or Job.kind == "type" then Job.kind else "execute", if Job.kind == "press" then Job.input.path elseif Job.kind == "type" then Job.input.text else Job.input.code)
+					return AskClient(Player, if Job.kind == "input" then "input" else "execute", if Job.kind == "input" then HttpService:JSONEncode(Job.input) else Job.input.code)
 				end
 
 				return Run(Job.input.code)

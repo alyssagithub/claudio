@@ -47,23 +47,7 @@ const function Explain(Trouble: string, Said: {string}): string
 	return Trouble
 end
 
-const function Typed(Body: string): any
-	const UserInputService = game:GetService("UserInputService")
-	const Virtual = (UserInputService :: any):CreateVirtualInput()
-	const Ok, Trouble = pcall(function()
-		Virtual:SendTextInput(Body)
-	end)
-
-	if not Ok then
-		return {error = `Studio refused the typing: {tostring(Trouble)}`}
-	end
-
-	return {text = `Typed {#Body} characters into whatever has focus. Check the place to confirm where they landed.`}
-end
-
-const function Pressed(Path: string): any
-	const UserInputService = game:GetService("UserInputService")
-
+const function Find(Path: string): (GuiObject?, string?)
 	local Object: Instance? = game
 
 	for Index, Step in string.split(Path, ".") do
@@ -72,45 +56,188 @@ const function Pressed(Path: string): any
 		end
 
 		if not Object then
-			return {error = `Nothing at "{Path}".`}
+			return nil, `Nothing at "{Path}".`
 		end
 
 		Object = (Object :: Instance):FindFirstChild(Step)
 	end
 
 	if not Object or not Object:IsA("GuiObject") then
-		return {error = `Nothing usable at "{Path}". Give the full path to a GuiObject, such as Players.Someone.PlayerGui.Menu.Play.`}
+		return nil, `Nothing usable at "{Path}". Give the full path to a GuiObject, such as Players.Someone.PlayerGui.Menu.Play.`
 	end
 
 	const Target = Object :: GuiObject
 
 	if Target.AbsoluteSize.X < 1 or Target.AbsoluteSize.Y < 1 then
-		return {error = `{Target.Name} has no size on screen, so a press would land on whatever is behind it.`}
+		return nil, `{Target.Name} has no size on screen, so input would land on whatever is behind it.`
 	end
 
 	local Ancestor: Instance? = Target
 
 	while Ancestor and Ancestor ~= game do
 		if Ancestor:IsA("GuiObject") and not (Ancestor :: GuiObject).Visible then
-			return {error = `{Target.Name} is not being drawn because {Ancestor.Name} is hidden, so a press would do nothing.`}
+			return nil, `{Target.Name} is not being drawn because {Ancestor.Name} is hidden, so input would do nothing.`
 		end
 
 		Ancestor = Ancestor.Parent
 	end
 
-	const Centre = Target.AbsolutePosition + Target.AbsoluteSize / 2 + game:GetService("GuiService"):GetGuiInset()
-	const Virtual = (UserInputService :: any):CreateVirtualInput()
-	const Sent, Trouble = pcall(function()
-		Virtual:SendMouseButton(Centre, Enum.UserInputType.MouseButton1, true)
-		task.wait(0.05)
-		Virtual:SendMouseButton(Centre, Enum.UserInputType.MouseButton1, false)
+	return Target, nil
+end
+
+const function Centre(Target: GuiObject): Vector2
+	return Target.AbsolutePosition + Target.AbsoluteSize / 2 + game:GetService("GuiService"):GetGuiInset()
+end
+
+const function Where(Target: GuiObject): string
+	const Point = Centre(Target)
+
+	return `{math.floor(Point.X)}, {math.floor(Point.Y)}`
+end
+
+const function Interact(Body: string): any
+	const Read, Input = pcall(function(): any
+		return HttpService:JSONDecode(Body)
+	end)
+
+	if not Read or typeof(Input) ~= "table" then
+		return {error = "Claudio could not read what input to send."}
+	end
+
+	const Action = tostring(Input.action)
+	const Virtual = ((game:GetService("UserInputService")) :: any):CreateVirtualInput()
+
+	if Action == "type" then
+		if typeof(Input.text) ~= "string" or Input.text == "" then
+			return {error = "Typing needs text."}
+		end
+
+		const Ok, Trouble = pcall(function()
+			Virtual:SendTextInput(Input.text)
+		end)
+
+		if not Ok then
+			return {error = `Studio refused the typing: {tostring(Trouble)}`}
+		end
+
+		return {text = `Typed {#Input.text} characters into whatever has focus. Check the place to confirm where they landed.`}
+	end
+
+	if Action == "key" then
+		if typeof(Input.key) ~= "string" then
+			return {error = "A key press needs the name of a KeyCode, such as Return or E."}
+		end
+
+		const Named, Code = pcall(function(): any
+			return (Enum.KeyCode :: any)[Input.key]
+		end)
+
+		if not Named or not Code then
+			return {error = `"{Input.key}" is not a KeyCode. Use the name Roblox gives it, such as Return, Escape, E or LeftShift.`}
+		end
+
+		const Ok, Trouble = pcall(function()
+			Virtual:SendKey(true, Code, false)
+			task.wait(0.05)
+			Virtual:SendKey(false, Code, false)
+		end)
+
+		if not Ok then
+			return {error = `Studio refused the key {Input.key}: {tostring(Trouble)}`}
+		end
+
+		return {text = `Pressed and released {Input.key}. Check the place to confirm what it did.`}
+	end
+
+	if typeof(Input.path) ~= "string" then
+		return {error = `{Action} needs a path to the GuiObject to act on.`}
+	end
+
+	const Target, Trouble = Find(Input.path)
+
+	if not Target then
+		return {error = Trouble}
+	end
+
+	const Point = Centre(Target)
+
+	if Action == "press" then
+		const Sent, Refused = pcall(function()
+			Virtual:SendMouseButton(Point, Enum.UserInputType.MouseButton1, true, 0)
+			task.wait(0.05)
+			Virtual:SendMouseButton(Point, Enum.UserInputType.MouseButton1, false, 0)
+		end)
+
+		if not Sent then
+			return {error = `The press was refused at {Where(Target)}: {tostring(Refused)}`}
+		end
+
+		return {text = `Pressed {Target.Name} at {Where(Target)}. Check the place to confirm what it did, because a press that lands on nothing still reports as sent.`}
+	end
+
+	if Action == "hover" then
+		const Sent, Refused = pcall(function()
+			Virtual:SendMousePosition(Point)
+		end)
+
+		if not Sent then
+			return {error = `The pointer could not be moved to {Where(Target)}: {tostring(Refused)}`}
+		end
+
+		return {text = `Moved the pointer onto {Target.Name} at {Where(Target)}.`}
+	end
+
+	if Action == "scroll" then
+		const Amount = tonumber(Input.amount) or -1
+		const Sent, Refused = pcall(function()
+			Virtual:SendMousePosition(Point)
+			Virtual:SendPointerAction(Point, {Wheel = Amount, Pan = Vector2.zero, Pinch = 0})
+		end)
+
+		if not Sent then
+			return {error = `Scrolling over {Target.Name} was refused: {tostring(Refused)}`}
+		end
+
+		return {text = `Scrolled {if Amount < 0 then "down" else "up"} over {Target.Name}. Read the canvas position back to see how far it moved.`}
+	end
+
+	if Action ~= "drag" then
+		return {error = `Claudio does not know the input action "{Action}".`}
+	end
+
+	local Finish = Point
+
+	if typeof(Input.to) == "string" then
+		const Second, Missing = Find(Input.to)
+
+		if not Second then
+			return {error = Missing}
+		end
+
+		Finish = Centre(Second)
+	elseif tonumber(Input.x) or tonumber(Input.y) then
+		Finish = Point + Vector2.new(tonumber(Input.x) or 0, tonumber(Input.y) or 0)
+	else
+		return {error = "A drag needs somewhere to go: give to for another GuiObject, or x and y to move by."}
+	end
+
+	const Sent, Refused = pcall(function()
+		Virtual:SendMousePosition(Point)
+		Virtual:SendMouseButton(Point, Enum.UserInputType.MouseButton1, true, 0)
+
+		for Step = 1, 10 do
+			Virtual:SendMousePosition(Point:Lerp(Finish, Step / 10))
+			task.wait(0.02)
+		end
+
+		Virtual:SendMouseButton(Finish, Enum.UserInputType.MouseButton1, false, 0)
 	end)
 
 	if not Sent then
-		return {error = `The press was refused at {math.floor(Centre.X)}, {math.floor(Centre.Y)}: {tostring(Trouble)}`}
+		return {error = `The drag from {Where(Target)} was refused: {tostring(Refused)}`}
 	end
 
-	return {text = `Pressed {Target.Name} at {math.floor(Centre.X)}, {math.floor(Centre.Y)}. Check the place to confirm what it did, because a press that lands on nothing still reports as sent.`}
+	return {text = `Dragged {Target.Name} from {math.floor(Point.X)}, {math.floor(Point.Y)} to {math.floor(Finish.X)}, {math.floor(Finish.Y)}.`}
 end
 
 const function Run(Code: string): any
@@ -175,12 +302,8 @@ end
 
 Remote.OnClientEvent:Connect(function(Id: string, Kind: string, Body: string)
 	const Ok, Result = pcall(function(): any
-		if Kind == "press" then
-			return Pressed(Body)
-		end
-
-		if Kind == "type" then
-			return Typed(Body)
+		if Kind == "input" then
+			return Interact(Body)
 		end
 
 		return Run(Body)

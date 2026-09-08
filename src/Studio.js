@@ -30,10 +30,22 @@ export function Request(Kind, Input, Timeout) {
   });
 }
 
+let LastSeen = 0;
+
+export function Seen() {
+  LastSeen = Date.now();
+}
+
 export function Take() {
+  Seen();
+
   const Job = Pending.shift();
 
   return Job ? { id: Job.Id, kind: Job.Kind, input: Job.Input } : null;
+}
+
+export function Presence() {
+  return { lastSeen: LastSeen, waiting: Waiting.size, queued: Pending.length };
 }
 
 export function Deliver(Id, Result) {

@@ -294,6 +294,356 @@ const function Playtest(Action: string): any
 	return {text = if After == "running" then "Playtest started." else "Playtest stopped."}
 end
 
+const function Resolve(Path: string): Instance?
+	local Object: Instance? = game
+
+	for Index, Step in string.split(Path, ".") do
+		if Index == 1 and (Step == "game" or Step == "Game") then
+			continue
+		end
+
+		if not Object then
+			return nil
+		end
+
+		const Service = if Object == game then pcall(game.GetService, game, Step) else false
+		local Next = (Object :: Instance):FindFirstChild(Step)
+
+		if not Next and Service then
+			Next = select(2, pcall(game.GetService, game, Step))
+		end
+
+		Object = Next
+	end
+
+	return Object
+end
+
+const function Shoot(Input: any): any
+	const CaptureService = game:GetService("CaptureService")
+	const AssetService = game:GetService("AssetService")
+	const Base64 = require(script.Parent.Parent.Base64)
+
+	local Captured: any = nil
+	local Done = false
+
+	CaptureService:CaptureScreenshot(function(Content: any)
+		Captured = Content
+		Done = true
+	end)
+
+	const Deadline = os.clock() + 8
+
+	while not Done and os.clock() < Deadline do
+		task.wait(0.05)
+	end
+
+	if not Captured then
+		return {error = "Studio did not return a screenshot."}
+	end
+
+	const Made, Image = pcall(function(): any
+		return AssetService:CreateEditableImageAsync(Content.fromUri(Captured))
+	end)
+
+	if not Made then
+		return {error = `Could not read the screenshot: {tostring(Image)}`}
+	end
+
+	const Whole = (Image :: any).Size
+	local Corner = Vector2.zero
+	local Span = Whole
+
+	if Input.width and Input.height then
+		const Left = math.clamp(tonumber(Input.x) or 0, 0, Whole.X - 1)
+		const Top = math.clamp(tonumber(Input.y) or 0, 0, Whole.Y - 1)
+
+		Corner = Vector2.new(Left, Top)
+		Span = Vector2.new(math.clamp(tonumber(Input.width), 1, Whole.X - Left), math.clamp(tonumber(Input.height), 1, Whole.Y - Top))
+	end
+
+	const Read, Pixels = pcall(function(): any
+		return (Image :: any):ReadPixelsBuffer(Corner, Span)
+	end)
+
+	if not Read then
+		return {error = `Could not read those pixels: {tostring(Pixels)}`}
+	end
+
+	return {
+		width = math.floor(Span.X),
+		height = math.floor(Span.Y),
+		viewport = `{math.floor(Whole.X)}x{math.floor(Whole.Y)}`,
+		pixels = Base64.Encode(buffer.tostring(Pixels)),
+	}
+end
+
+const function Frame(Input: any): any
+	const Camera = workspace.CurrentCamera
+
+	if Input.restore then
+		const Saved = _G.ClaudioFrameCamera :: any
+
+		if Saved then
+			Camera.CFrame = Saved.CFrame
+			Camera.FieldOfView = Saved.FieldOfView
+			_G.ClaudioFrameCamera = nil
+
+			return {text = "Camera put back."}
+		end
+
+		return {text = "The camera had not been moved."}
+	end
+
+	const Object = if Input.path then Resolve(Input.path) else nil
+
+	if Input.path and not Object then
+		return {error = `Nothing at "{tostring(Input.path)}".`}
+	end
+
+	const Viewport = Camera.ViewportSize
+	const Answer: {[string]: any} = {viewport = `{math.floor(Viewport.X)}x{math.floor(Viewport.Y)}`}
+
+	if Object then
+		if not _G.ClaudioFrameCamera then
+			_G.ClaudioFrameCamera = {CFrame = Camera.CFrame, FieldOfView = Camera.FieldOfView}
+		end
+
+		const Model = if Object:IsA("Model") then Object :: Model else nil
+		local Middle: Vector3
+		local Reach: number
+
+		if Model then
+			const Box, Size = Model:GetBoundingBox()
+
+			Middle = Box.Position
+			Reach = Size.Magnitude
+		elseif Object:IsA("BasePart") then
+			Middle = (Object :: BasePart).Position
+			Reach = (Object :: BasePart).Size.Magnitude
+		else
+			return {error = `{Object.Name} is not something with a position, so the camera cannot frame it.`}
+		end
+
+		const Away = math.max(Reach, 1) / (2 * math.tan(math.rad(Camera.FieldOfView / 2))) * 1.6
+
+		Camera.CFrame = CFrame.lookAt(Middle + Vector3.new(Away, Away * 0.5, Away), Middle)
+
+		task.wait(0.2)
+
+		Answer.framed = Object:GetFullName()
+		Answer.restore = true
+	end
+
+	return Answer
+end
+
+const function Properties(Input: any): any
+	const Object = Resolve(Input.path)
+
+	if not Object then
+		return {error = `Nothing at "{tostring(Input.path)}".`}
+	end
+
+	if not Input.names then
+		return {className = Object.ClassName, name = Object.Name, path = Object:GetFullName()}
+	end
+
+	const Values = {}
+	const Unreadable = {}
+
+	for _, Name in Input.names do
+		const Ok, Value = pcall(function(): any
+			return (Object :: any)[Name]
+		end)
+
+		if not Ok then
+			table.insert(Unreadable, Name)
+
+			continue
+		end
+
+		if typeof(Value) == "Instance" then
+			table.insert(Values, `{Name} = {Value:GetFullName()}`)
+		elseif typeof(Value) == "EnumItem" then
+			table.insert(Values, `{Name} = {tostring(Value)}`)
+		elseif typeof(Value) == "string" then
+			table.insert(Values, `{Name} = {if #Value > 200 then `{Value:sub(1, 200)}...` else Value}`)
+		else
+			table.insert(Values, `{Name} = {tostring(Value)}`)
+		end
+	end
+
+	return {
+		className = Object.ClassName,
+		path = Object:GetFullName(),
+		values = Values,
+		unreadable = Unreadable,
+	}
+end
+
+const function ReadPlace(Input: any): any
+	const Root = Resolve(Input.path or "game")
+
+	if not Root then
+		return {error = `Nothing at "{tostring(Input.path)}".`}
+	end
+
+	const Depth = tonumber(Input.depth) or 3
+	const Wanted = if typeof(Input.contains) == "string" and Input.contains ~= "" then Input.contains:lower() else nil
+	const Tree = {}
+	const Sources = {}
+	local Counted = 0
+	local Cut = false
+
+	const function Walk(Object: Instance, Level: number, Indent: string)
+		if Level > Depth then
+			return
+		end
+
+		for _, Child in Object:GetChildren() do
+			if Counted >= 400 then
+				Cut = true
+
+				return
+			end
+
+			Counted += 1
+
+			table.insert(Tree, `{Indent}{Child.Name} [{Child.ClassName}]`)
+
+			if Child:IsA("LuaSourceContainer") and Child.Source ~= "" then
+				const Body = Child.Source
+
+				if not Wanted or Body:lower():find(Wanted, 1, true) or Child.Name:lower():find(Wanted, 1, true) then
+					table.insert(Sources, {path = Child:GetFullName(), source = Body})
+				end
+			end
+
+			Walk(Child, Level + 1, `{Indent}  `)
+		end
+	end
+
+	table.insert(Tree, `{Root.Name} [{Root.ClassName}]`)
+	Walk(Root, 1, "  ")
+
+	return {
+		tree = Tree,
+		sources = Sources,
+		truncated = Cut,
+	}
+end
+
+const function Modify(Input: any): any
+	const ChangeHistoryService = game:GetService("ChangeHistoryService")
+	const Recording = ChangeHistoryService:TryBeginRecording("ClaudioModify", Input.label or "Claudio changed the place")
+
+	const Ok, Result = pcall(function(): any
+		const Action = Input.action
+
+		if Action == "set" then
+			const Object = Resolve(Input.path)
+
+			if not Object then
+				return {error = `Nothing at "{tostring(Input.path)}".`}
+			end
+
+			const Changed = {}
+
+			for Name, Value in Input.properties or {} do
+				const Applied, Trouble = pcall(function()
+					(Object :: any)[Name] = Value
+				end)
+
+				table.insert(Changed, if Applied then `{Name} set` else `{Name} refused: {tostring(Trouble)}`)
+			end
+
+			return {text = `{Object:GetFullName()}: {table.concat(Changed, ", ")}`}
+		end
+
+		if Action == "create" then
+			const Parent = Resolve(Input.parent)
+
+			if not Parent then
+				return {error = `No parent at "{tostring(Input.parent)}".`}
+			end
+
+			const Made = Instance.new(Input.className)
+
+			Made.Name = Input.name or Input.className
+
+			for Name, Value in Input.properties or {} do
+				pcall(function()
+					(Made :: any)[Name] = Value
+				end)
+			end
+
+			Made.Parent = Parent
+
+			return {text = `Created {Made:GetFullName()}`}
+		end
+
+		if Action == "delete" then
+			const Object = Resolve(Input.path)
+
+			if not Object then
+				return {error = `Nothing at "{tostring(Input.path)}".`}
+			end
+
+			const Where = Object:GetFullName()
+
+			Object:Destroy()
+
+			return {text = `Deleted {Where}`}
+		end
+
+		if Action == "rename" then
+			const Object = Resolve(Input.path)
+
+			if not Object then
+				return {error = `Nothing at "{tostring(Input.path)}".`}
+			end
+
+			const Was = Object.Name
+
+			Object.Name = Input.name
+
+			return {text = `Renamed {Was} to {Object.Name}`}
+		end
+
+		if Action == "reparent" then
+			const Object = Resolve(Input.path)
+			const Parent = Resolve(Input.parent)
+
+			if not Object or not Parent then
+				return {error = "Give a path and a parent that both exist."}
+			end
+
+			Object.Parent = Parent
+
+			return {text = `Moved {Object.Name} into {Parent:GetFullName()}`}
+		end
+
+		return {error = `Claudio does not know the action "{tostring(Action)}".`}
+	end)
+
+	if Recording then
+		ChangeHistoryService:FinishRecording(Recording, if Ok and not (Result :: any).error then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel)
+	end
+
+	if not Ok then
+		return {error = tostring(Result)}
+	end
+
+	const Answer = Result :: any
+
+	if Recording and not Answer.error then
+		Answer.undo = true
+	end
+
+	return Answer
+end
+
 const function Execute(Input: any): any
 	const Code = Input.code
 
@@ -523,6 +873,26 @@ const function RunStudioJob(Job: any)
 
 			if Job.kind == "execute" then
 				return Execute(Job.input)
+			end
+
+			if Job.kind == "read" then
+				return ReadPlace(Job.input)
+			end
+
+			if Job.kind == "properties" then
+				return Properties(Job.input)
+			end
+
+			if Job.kind == "frame" then
+				return Frame(Job.input)
+			end
+
+			if Job.kind == "shoot" then
+				return Shoot(Job.input)
+			end
+
+			if Job.kind == "modify" then
+				return Modify(Job.input)
 			end
 
 			return {error = `Claudio does not know how to do "{Job.kind}" in Studio.`}

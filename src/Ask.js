@@ -43,6 +43,46 @@ function Describe(Questions, Answers) {
   ].join(" ");
 }
 
+export function ReadReport(Found) {
+  if (!Found) {
+    return "Studio did not answer.";
+  }
+
+  if (Found.error) {
+    return Found.error;
+  }
+
+  const Parts = [(Found.tree || []).join("\n")];
+
+  for (const Entry of Found.sources || []) {
+    Parts.push(`--- ${Entry.path}\n${Entry.source}`);
+  }
+
+  if (Found.truncated) {
+    Parts.push("Stopped at 400 instances. Narrow the path or lower the depth to see the rest.");
+  }
+
+  return Parts.join("\n");
+}
+
+export function PropertyReport(Found) {
+  if (!Found) {
+    return "Studio did not answer.";
+  }
+
+  if (Found.error) {
+    return Found.error;
+  }
+
+  const Parts = [`${Found.path} [${Found.className}]`, ...(Found.values || [])];
+
+  if (Found.unreadable && Found.unreadable.length > 0) {
+    Parts.push(`Could not read: ${Found.unreadable.join(", ")}`);
+  }
+
+  return Parts.join("\n");
+}
+
 export function ExecuteReport(Found) {
   if (!Found) {
     return "Studio did not answer.";
@@ -129,6 +169,96 @@ export function AskServerFor(Pose, Reach) {
     name: AskServerName,
     version: "1.0.0",
     tools: [
+      tool("instances", "Say whether Studio is open and whether the Claudio plugin has checked in. Ask this before assuming nothing is connected, and never open Studio yourself on the strength of an empty answer.", {}, async () => {
+        const { Describe } = await import("./StudioPresence.js");
+        const { Presence } = await import("./Studio.js");
+        const { StudioProcesses } = await import("./StudioPresence.js");
+
+        return { content: [{ type: "text", text: Describe({ ...Presence(), processes: await StudioProcesses() }) }] };
+      }),
+      tool("read", "Read a part of the open place in one call: the instance tree under a path, plus the source of scripts in it. Prefer this over walking the tree with separate calls.", {
+        path: z.string().optional().describe("Where to start, such as ServerScriptService. Defaults to the whole place."),
+        depth: z.number().optional().describe("How many levels deep, 3 by default."),
+        contains: z.string().optional().describe("Only return script sources containing this text."),
+      }, async (Input) => {
+        const Found = await Reach("read", { path: Input.path || "game", depth: Input.depth, contains: Input.contains });
+
+        return { content: [{ type: "text", text: ReadReport(Found) }] };
+      }),
+      tool("properties", "Read an instance's properties, listing every property its class actually has and naming any that could not be read, so a missing one is never mistaken for an unset one.", {
+        path: z.string().describe("Full instance path."),
+        names: z.array(z.string()).optional().describe("Only these properties. Omit for all of them."),
+      }, async (Input) => {
+        const Found = await Reach("properties", { path: Input.path });
+
+        if (!Found || Found.error) {
+          return { content: [{ type: "text", text: (Found && Found.error) || "Studio did not answer." }] };
+        }
+
+        const { PropertiesFor } = await import("./ApiDump.js");
+        const Names = Input.names || (await PropertiesFor(Found.className));
+
+        if (!Names) {
+          return { content: [{ type: "text", text: `${Found.path} [${Found.className}] — could not fetch the API dump, so name the properties you want.` }] };
+        }
+
+        return { content: [{ type: "text", text: PropertyReport(await Reach("properties", { path: Input.path, names: Names })) }] };
+      }),
+      tool("modify", "Change the place with one undo step: set properties, create, delete, rename or reparent. Prefer this over writing a script for a change this can express, because the arguments are checked and the change is reversible.", {
+        action: z.enum(["set", "create", "delete", "rename", "reparent"]),
+        path: z.string().optional().describe("The instance to act on."),
+        parent: z.string().optional().describe("Parent path, for create and reparent."),
+        className: z.string().optional().describe("Class to create."),
+        name: z.string().optional().describe("Name to give it, for create and rename."),
+        properties: z.record(z.any()).optional().describe("Property names and values, for set and create."),
+        label: z.string().optional().describe("What the undo step should be called."),
+      }, async (Input) => {
+        const Found = await Reach("modify", Input);
+
+        return { content: [{ type: "text", text: Found && Found.error ? Found.error : (Found && Found.text) || "Studio did not say what happened." }] };
+      }),
+      tool("capture", "Take a picture of Studio. Point it at an instance to frame that instance first, or give a region so only the pixels you need come back, since a full window costs far more to look at than a crop. The camera is always put back where it was.", {
+        path: z.string().optional().describe("Instance to frame before shooting, such as Workspace.Model."),
+        x: z.number().optional().describe("Left edge of the region, in pixels from the left of the Studio window."),
+        y: z.number().optional().describe("Top edge of the region."),
+        width: z.number().optional().describe("Region width. Give width and height together to crop."),
+        height: z.number().optional().describe("Region height."),
+      }, async (Input) => {
+        const { EncodePixels } = await import("./Capture.js");
+
+        let Framed = null;
+
+        if (Input.path) {
+          Framed = await Reach("frame", { path: Input.path });
+
+          if (Framed && Framed.error) {
+            return { content: [{ type: "text", text: Framed.error }] };
+          }
+        }
+
+        const Shot = await Reach("shoot", { x: Input.x, y: Input.y, width: Input.width, height: Input.height });
+
+        if (Framed && Framed.restore) {
+          await Reach("frame", { restore: true });
+        }
+
+        if (!Shot || Shot.error) {
+          return { content: [{ type: "text", text: (Shot && Shot.error) || "Studio did not answer." }] };
+        }
+
+        const Made = EncodePixels(Shot.width, Shot.height, Shot.pixels);
+
+        if (Made.error) {
+          return { content: [{ type: "text", text: Made.error }] };
+        }
+
+        return {
+          content: [
+            { type: "image", data: Made.data, mimeType: "image/png" },
+            { type: "text", text: `${Shot.width}x${Shot.height} of the ${Shot.viewport} viewport${Framed && Framed.framed ? `, framed on ${Framed.framed}` : ""}` },
+          ],
+        };
+      }),
       tool("execute", ExecuteDescription, {
         code: z.string().describe("The Luau to run. Return a value to get it back."),
         readOnly: z.boolean().optional().describe("Set when the script only reads, so no undo step is recorded."),

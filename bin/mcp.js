@@ -4,7 +4,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import fs from "node:fs";
 import { DefaultPort, TokenFile } from "../src/Config.js";
-import { ExecuteReport, LintReport } from "../src/Ask.js";
+import { ExecuteReport, LintReport, ReadReport, PropertyReport } from "../src/Ask.js";
+import { Describe as DescribePresence } from "../src/StudioPresence.js";
+import { PropertiesFor } from "../src/ApiDump.js";
 
 const Port = Number(process.env.CLAUDIO_PORT) || DefaultPort;
 
@@ -13,6 +15,16 @@ function Key() {
     return JSON.parse(fs.readFileSync(TokenFile, "utf8").replace(/^﻿/, "")).token || "";
   } catch {
     return "";
+  }
+}
+
+async function Get(Where) {
+  try {
+    const Answer = await fetch(`http://127.0.0.1:${Port}${Where}`, { headers: { "x-claudio-token": Key() } });
+
+    return Answer.ok ? await Answer.json() : null;
+  } catch {
+    return null;
   }
 }
 
@@ -57,6 +69,102 @@ Server.tool(
   "Check scripts in the open place for analyzer warnings, including scripts nobody has edited. Pass paths to narrow it, or leave it empty to check everything. Report what it finds rather than fixing unasked, because pre-existing warnings were already there.",
   { paths: z.array(z.string()).optional() },
   async (Input) => ({ content: [{ type: "text", text: LintReport(await Ask("lint", { paths: Input.paths || [] })) }] }),
+);
+
+Server.tool(
+  "instances",
+  "Say whether Studio is open and whether the Claudio plugin has checked in. Ask this before assuming nothing is connected, and never open Studio yourself on the strength of an empty answer.",
+  {},
+  async () => {
+    const Found = await Get("/studio/presence");
+
+    return { content: [{ type: "text", text: Found ? DescribePresence(Found) : "The Claudio bridge is not answering, so nothing can be said about Studio." }] };
+  },
+);
+
+Server.tool(
+  "read",
+  "Read a part of the open place in one call: the instance tree under a path, plus the source of scripts in it. Prefer this over walking the tree with separate calls.",
+  { path: z.string().optional(), depth: z.number().optional(), contains: z.string().optional() },
+  async (Input) => ({ content: [{ type: "text", text: ReadReport(await Ask("read", { path: Input.path || "game", depth: Input.depth, contains: Input.contains })) }] }),
+);
+
+Server.tool(
+  "properties",
+  "Read an instance's properties, listing every property its class actually has and naming any that could not be read, so a missing one is never mistaken for an unset one.",
+  { path: z.string(), names: z.array(z.string()).optional() },
+  async (Input) => {
+    const Found = await Ask("properties", { path: Input.path });
+
+    if (!Found || Found.error) {
+      return { content: [{ type: "text", text: (Found && Found.error) || "Studio did not answer." }] };
+    }
+
+    const Names = Input.names || (await PropertiesFor(Found.className));
+
+    if (!Names) {
+      return { content: [{ type: "text", text: `${Found.path} [${Found.className}] — could not fetch the API dump, so name the properties you want.` }] };
+    }
+
+    return { content: [{ type: "text", text: PropertyReport(await Ask("properties", { path: Input.path, names: Names })) }] };
+  },
+);
+
+Server.tool(
+  "modify",
+  "Change the place with one undo step: set properties, create, delete, rename or reparent. Prefer this over writing a script for a change this can express, because the arguments are checked and the change is reversible.",
+  {
+    action: z.enum(["set", "create", "delete", "rename", "reparent"]),
+    path: z.string().optional(),
+    parent: z.string().optional(),
+    className: z.string().optional(),
+    name: z.string().optional(),
+    properties: z.record(z.any()).optional(),
+    label: z.string().optional(),
+  },
+  async (Input) => ({ content: [{ type: "text", text: Say(await Ask("modify", Input)) }] }),
+);
+
+Server.tool(
+  "capture",
+  "Take a picture of Studio. Point it at an instance to frame that instance first, or give a region so only the pixels you need come back, since a full window costs far more to look at than a crop. The camera is always put back where it was.",
+  { path: z.string().optional(), x: z.number().optional(), y: z.number().optional(), width: z.number().optional(), height: z.number().optional() },
+  async (Input) => {
+    const { EncodePixels } = await import("../src/Capture.js");
+
+    let Framed = null;
+
+    if (Input.path) {
+      Framed = await Ask("frame", { path: Input.path });
+
+      if (Framed && Framed.error) {
+        return { content: [{ type: "text", text: Framed.error }] };
+      }
+    }
+
+    const Shot = await Ask("shoot", { x: Input.x, y: Input.y, width: Input.width, height: Input.height });
+
+    if (Framed && Framed.restore) {
+      await Ask("frame", { restore: true });
+    }
+
+    if (!Shot || Shot.error) {
+      return { content: [{ type: "text", text: (Shot && Shot.error) || "Studio did not answer." }] };
+    }
+
+    const Made = EncodePixels(Shot.width, Shot.height, Shot.pixels);
+
+    if (Made.error) {
+      return { content: [{ type: "text", text: Made.error }] };
+    }
+
+    return {
+      content: [
+        { type: "image", data: Made.data, mimeType: "image/png" },
+        { type: "text", text: `${Shot.width}x${Shot.height} of the ${Shot.viewport} viewport${Framed && Framed.framed ? `, framed on ${Framed.framed}` : ""}` },
+      ],
+    };
+  },
 );
 
 Server.tool(

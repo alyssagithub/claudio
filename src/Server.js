@@ -6,7 +6,8 @@ import { exec, execFile } from "node:child_process";
 import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
-import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio } from "./Studio.js";
+import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence } from "./Studio.js";
+import { StudioProcesses } from "./StudioPresence.js";
 import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
@@ -331,6 +332,11 @@ export function StartServer(Port) {
           Place: Body.place && typeof Body.place === "object" ? Body.place : null,
           Folder: typeof Body.workingDirectory === "string" ? Body.workingDirectory : null,
         })));
+        return;
+      }
+
+      if (Request.method === "GET" && Url.pathname === "/studio/presence") {
+        SendJson(Response, 200, { ...StudioPresence(), processes: await StudioProcesses() });
         return;
       }
 

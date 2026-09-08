@@ -23,9 +23,15 @@ const function Builder(): BindableFunction?
 	return if Found and Found:IsA("BindableFunction") then Found :: BindableFunction else nil
 end
 
+const function Placed(Message: string): string
+	return (Message:gsub("[%w_%.]*ClaudioPayload:(%d+):?%s*", function(Digits: string): string
+		return `line {math.max(1, (tonumber(Digits) or 2) - 1)}: `
+	end))
+end
+
 const function Explain(Trouble: string, Said: {string}): string
 	if not Trouble:find("experienced an error while loading", 1, true) then
-		return Trouble
+		return Placed(Trouble)
 	end
 
 	task.wait(0.05)
@@ -149,7 +155,7 @@ const function Run(Code: string): any
 	const Ok, Result = pcall(Body)
 
 	if not Ok then
-		return Finish({error = tostring(Result)})
+		return Finish({error = Placed(tostring(Result))})
 	end
 
 	const Answer: {[string]: any} = {}

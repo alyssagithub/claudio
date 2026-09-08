@@ -2377,9 +2377,11 @@ function Chat.WatchStudioJobs()
 
 	Watching = true
 
+	const Mounted = script:IsDescendantOf(game)
+
 	task.spawn(function()
 		while Watching and task.wait(1) do
-			if not script:IsDescendantOf(game) then
+			if Mounted and not script:IsDescendantOf(game) then
 				Watching = false
 
 				break

@@ -4,7 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import fs from "node:fs";
 import { DefaultPort, TokenFile } from "../src/Config.js";
-import { ExecuteReport, LintReport, ReadReport, PropertyReport, ApiReport, LogReport } from "../src/Ask.js";
+import { ExecuteReport, LintReport, ReadReport, PropertyReport, ApiReport, LogReport, FindReport, SourceReport, SelectReport } from "../src/Ask.js";
 import { Describe as DescribePresence } from "../src/StudioPresence.js";
 
 const Port = Number(process.env.CLAUDIO_PORT) || DefaultPort;
@@ -76,6 +76,41 @@ function Say(Found) {
 }
 
 const Server = new McpServer({ name: "claudio", version: "1.0.0" });
+
+Server.tool(
+  "find",
+  "Search every script in the place, or under a path, for a piece of text. Returns each match as a path, a line number and the line, so it can be read without opening anything.",
+  { text: z.string(), path: z.string().optional(), limit: z.number().optional() },
+  async (Input) => ({ content: [{ type: "text", text: FindReport(await Ask("find", { text: Input.text, path: Input.path, limit: Input.limit })) }] }),
+);
+
+Server.tool(
+  "source",
+  "Read or change a script's source by line. get returns a numbered window, set replaces the whole thing, and insert, replace and delete work on line ranges. Every change is one undo step.",
+  { path: z.string(), action: z.enum(["get", "set", "insert", "replace", "delete"]).optional(), from: z.number().optional(), to: z.number().optional(), text: z.string().optional(), label: z.string().optional() },
+  async (Input) => ({ content: [{ type: "text", text: SourceReport(await Ask("source", Input)) }] }),
+);
+
+Server.tool(
+  "select",
+  "Read or set what is selected in Studio. Selecting is how you show the user what you are talking about, and reading it is how you find out what they mean by \"this\".",
+  { paths: z.array(z.string()).optional() },
+  async (Input) => ({ content: [{ type: "text", text: SelectReport(await Ask("select", { paths: Input.paths })) }] }),
+);
+
+Server.tool(
+  "history",
+  "Undo or redo a step in Studio, or ask what is available. Use this to take back a change you just made rather than trying to write the reverse of it.",
+  { action: z.enum(["status", "undo", "redo"]).optional() },
+  async (Input) => ({ content: [{ type: "text", text: Say(await Ask("history", { action: Input.action })) }] }),
+);
+
+Server.tool(
+  "type",
+  "Type text into whatever has keyboard focus in the running experience, such as a TextBox you have just pressed. Needs a play session.",
+  { text: z.string() },
+  async (Input) => ({ content: [{ type: "text", text: Say(await AskAs("server", "type", { text: Input.text })) }] }),
+);
 
 Server.tool(
   "logs",

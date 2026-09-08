@@ -103,6 +103,56 @@ export function LogReport(Found) {
   return `${Lines.join("\n")}${Tail}`;
 }
 
+export function FindReport(Found) {
+  if (!Found) {
+    return "Studio did not answer.";
+  }
+
+  if (Found.error) {
+    return Found.error;
+  }
+
+  const Hits = Found.hits || [];
+
+  if (Hits.length === 0) {
+    return `No match in ${Found.scanned} scripts.`;
+  }
+
+  return `${Hits.join("\n")}${Found.more > 0 ? `\n${Found.more} more matches not shown; raise limit to see them.` : ""}`;
+}
+
+export function SourceReport(Found) {
+  if (!Found) {
+    return "Studio did not answer.";
+  }
+
+  if (Found.error) {
+    return Found.error;
+  }
+
+  if (Found.lines) {
+    return `${Found.path}, ${Found.total} lines\n${Found.lines.join("\n")}`;
+  }
+
+  return Found.text || "Done.";
+}
+
+export function SelectReport(Found) {
+  if (!Found) {
+    return "Studio did not answer.";
+  }
+
+  if (Found.error) {
+    return Found.error;
+  }
+
+  if (Found.paths) {
+    return Found.paths.length > 0 ? Found.paths.join("\n") : "Nothing is selected.";
+  }
+
+  return Found.text || "Done.";
+}
+
 export function ApiReport(Found) {
   if (!Found) {
     return "Studio did not answer.";
@@ -387,6 +437,54 @@ export function AskServerFor(Pose, Reach, ReachIn) {
         }
 
         return { content: [{ type: "text", text: Found && Found.error ? Found.error : (Found && Found.text) || "Studio did not say what happened." }] };
+      }),
+      tool("find", "Search every script in the place, or under a path, for a piece of text. Returns each match as a path, a line number and the line, so it can be read without opening anything.", {
+        text: z.string().describe("The text to look for. Case is ignored."),
+        path: z.string().optional().describe("Only search under here, such as ServerScriptService."),
+        limit: z.number().optional().describe("How many matches to return, forty by default."),
+      }, async (Input) => {
+        const Found = await Reach("find", { text: Input.text, path: Input.path, limit: Input.limit });
+
+        return { content: [{ type: "text", text: FindReport(Found) }] };
+      }),
+      tool("source", "Read or change a script's source by line. get returns a numbered window, set replaces the whole thing, and insert, replace and delete work on line ranges. Every change is one undo step. Prefer this over rewriting a whole script when only part of it changes.", {
+        path: z.string().describe("The script's full instance path."),
+        action: z.enum(["get", "set", "insert", "replace", "delete"]).optional().describe("What to do. Defaults to get."),
+        from: z.number().optional().describe("First line, counting from one."),
+        to: z.number().optional().describe("Last line, for get, replace and delete."),
+        text: z.string().optional().describe("The new source, for set, insert and replace."),
+        label: z.string().optional().describe("What the undo step should be called."),
+      }, async (Input) => {
+        const Found = await Reach("source", Input);
+
+        return { content: [{ type: "text", text: SourceReport(Found) }] };
+      }),
+      tool("select", "Read or set what is selected in Studio. Selecting is how you show the user what you are talking about, and reading it is how you find out what they mean by \"this\".", {
+        paths: z.array(z.string()).optional().describe("Instance paths to select. Leave out to read the current selection."),
+      }, async (Input) => {
+        const Found = await Reach("select", { paths: Input.paths });
+
+        return { content: [{ type: "text", text: SelectReport(Found) }] };
+      }),
+      tool("history", "Undo or redo a step in Studio, or ask what is available. Use this to take back a change you just made rather than trying to write the reverse of it.", {
+        action: z.enum(["status", "undo", "redo"]).optional().describe("Defaults to status."),
+      }, async (Input) => {
+        const Found = await Reach("history", { action: Input.action });
+
+        return { content: [{ type: "text", text: Found && Found.error ? Found.error : (Found && Found.text) || "Studio did not say what happened." }] };
+      }),
+      tool("type", "Type text into whatever has keyboard focus in the running experience, such as a TextBox you have just pressed. Needs a play session. Check the place afterwards, because typing that reaches nothing still reports as sent.", {
+        text: z.string().describe("The text to type."),
+      }, async (Input) => {
+        const { RuntimeLive } = await import("./Studio.js");
+
+        if (!RuntimeLive()) {
+          return { content: [{ type: "text", text: "No play session is reachable, and typing has to happen on the client. Start one with the playtest tool." }] };
+        }
+
+        const Found = await ReachIn("server", "type", { text: Input.text });
+
+        return { content: [{ type: "text", text: Found && Found.error ? Found.error : (Found && Found.text) || "The session did not say what happened." }] };
       }),
       tool("logs", "Read the output log of the open place, filtered in Studio so only what you ask for crosses the wire. Use level problems for just warnings and errors, contains to search, and limit to cap how much comes back, which defaults to forty of the most recent. Point it at the session with target when a playtest is running, because the editor and the session keep separate logs.", {
         level: z.enum(["all", "print", "warn", "error", "info", "problems"]).optional().describe("Which kinds to return. problems means warnings and errors."),

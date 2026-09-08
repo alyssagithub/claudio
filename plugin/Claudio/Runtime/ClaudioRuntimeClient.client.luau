@@ -29,6 +29,20 @@ const function CanRun(): boolean
 	return Ok and Made ~= nil
 end
 
+const function Typed(Body: string): any
+	const UserInputService = game:GetService("UserInputService")
+	const Virtual = (UserInputService :: any):CreateVirtualInput()
+	const Ok, Trouble = pcall(function()
+		Virtual:SendTextInput(Body)
+	end)
+
+	if not Ok then
+		return {error = `Studio refused the typing: {tostring(Trouble)}`}
+	end
+
+	return {text = `Typed {#Body} characters into whatever has focus. Check the place to confirm where they landed.`}
+end
+
 const function Pressed(Path: string): any
 	const UserInputService = game:GetService("UserInputService")
 
@@ -141,6 +155,10 @@ Remote.OnClientEvent:Connect(function(Id: string, Kind: string, Body: string)
 	const Ok, Result = pcall(function(): any
 		if Kind == "press" then
 			return Pressed(Body)
+		end
+
+		if Kind == "type" then
+			return Typed(Body)
 		end
 
 		return Run(Body)

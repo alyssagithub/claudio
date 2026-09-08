@@ -210,6 +210,230 @@ end
 const Running: {[string]: boolean} = {}
 local Watching = false
 
+const function Resolve(Path: string): Instance?
+	local Object: Instance? = game
+
+	for Index, Step in string.split(Path, ".") do
+		if Index == 1 and (Step == "game" or Step == "Game") then
+			continue
+		end
+
+		if not Object then
+			return nil
+		end
+
+		const Service = if Object == game then pcall(game.GetService, game, Step) else false
+		local Next = (Object :: Instance):FindFirstChild(Step)
+
+		if not Next and Service then
+			Next = select(2, pcall(game.GetService, game, Step))
+		end
+
+		Object = Next
+	end
+
+	return Object
+end
+
+const function Sources(Root: Instance): {LuaSourceContainer}
+	const Found = {}
+
+	if Root:IsA("LuaSourceContainer") then
+		table.insert(Found, Root)
+	end
+
+	for _, Object in Root:GetDescendants() do
+		if Object:IsA("LuaSourceContainer") then
+			table.insert(Found, Object)
+		end
+	end
+
+	return Found
+end
+
+const function Find(Input: any): any
+	const Needle = tostring(Input.text or "")
+
+	if Needle == "" then
+		return {error = "Give some text to look for."}
+	end
+
+	const Where = if Input.path then Resolve(Input.path) else game
+	const Root = Where or game
+	const Lower = Needle:lower()
+	const Limit = math.clamp(tonumber(Input.limit) or 40, 1, 200)
+	const Hits = {}
+	local Scanned = 0
+	local More = 0
+
+	for _, Script in Sources(Root) do
+		const Body = Script.Source
+
+		if Body == "" then
+			continue
+		end
+
+		Scanned += 1
+
+		local Line = 0
+
+		for _, Text in string.split(Body, "\n") do
+			Line += 1
+
+			if Text:lower():find(Lower, 1, true) then
+				if #Hits >= Limit then
+					More += 1
+				else
+					table.insert(Hits, `{Script:GetFullName()}:{Line}: {Text:gsub("^%s+", ""):sub(1, 160)}`)
+				end
+			end
+		end
+	end
+
+	return {hits = Hits, scanned = Scanned, more = More}
+end
+
+const function Source(Input: any): any
+	const Object = Resolve(Input.path)
+
+	if not Object or not Object:IsA("LuaSourceContainer") then
+		return {error = `Nothing scriptable at "{tostring(Input.path)}".`}
+	end
+
+	const Script = Object :: LuaSourceContainer
+	const Lines = string.split(Script.Source, "\n")
+	const Action = Input.action or "get"
+
+	if Action == "get" then
+		const From = math.clamp(tonumber(Input.from) or 1, 1, math.max(1, #Lines))
+		const To = math.clamp(tonumber(Input.to) or #Lines, From, #Lines)
+		const Window = {}
+
+		for Index = From, To do
+			table.insert(Window, `{Index}: {Lines[Index]}`)
+		end
+
+		return {path = Script:GetFullName(), total = #Lines, lines = Window}
+	end
+
+	const ChangeHistoryService = game:GetService("ChangeHistoryService")
+	const Recording = ChangeHistoryService:TryBeginRecording("ClaudioSource", Input.label or `Claudio edited {Script.Name}`)
+
+	const Ok, Trouble = pcall(function()
+		if Action == "set" then
+			Script.Source = tostring(Input.text)
+
+			return
+		end
+
+		const From = math.clamp(tonumber(Input.from) or 1, 1, #Lines + 1)
+
+		if Action == "insert" then
+			const Added = string.split(tostring(Input.text), "\n")
+
+			for Offset = #Added, 1, -1 do
+				table.insert(Lines, From, Added[Offset])
+			end
+		elseif Action == "replace" or Action == "delete" then
+			const To = math.clamp(tonumber(Input.to) or From, From, #Lines)
+
+			for _ = From, To do
+				table.remove(Lines, From)
+			end
+
+			if Action == "replace" then
+				const Added = string.split(tostring(Input.text), "\n")
+
+				for Offset = #Added, 1, -1 do
+					table.insert(Lines, From, Added[Offset])
+				end
+			end
+		else
+			error(`Claudio does not know the source action "{tostring(Action)}"`)
+		end
+
+		Script.Source = table.concat(Lines, "\n")
+	end)
+
+	if Recording then
+		ChangeHistoryService:FinishRecording(Recording, if Ok then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel)
+	end
+
+	if not Ok then
+		return {error = tostring(Trouble)}
+	end
+
+	return {text = `{Script:GetFullName()} is now {#string.split(Script.Source, "\n")} lines.`, undo = Recording ~= nil}
+end
+
+const function Selected(Input: any): any
+	const Selection = game:GetService("Selection")
+
+	if Input.paths then
+		const Wanted = {}
+		const Missing = {}
+
+		for _, Path in Input.paths do
+			const Object = Resolve(Path)
+
+			if Object then
+				table.insert(Wanted, Object)
+			else
+				table.insert(Missing, Path)
+			end
+		end
+
+		Selection:Set(Wanted)
+
+		if #Missing > 0 then
+			return {text = `Selected {#Wanted}. Could not find: {table.concat(Missing, ", ")}`}
+		end
+
+		return {text = `Selected {#Wanted}.`}
+	end
+
+	const Paths = {}
+
+	for _, Object in Selection:Get() do
+		table.insert(Paths, Object:GetFullName())
+	end
+
+	return {paths = Paths}
+end
+
+const function Steps(Input: any): any
+	const ChangeHistoryService = game:GetService("ChangeHistoryService")
+	const Action = Input.action or "status"
+	const CanUndo = ChangeHistoryService:GetCanUndo()
+	const CanRedo = ChangeHistoryService:GetCanRedo()
+
+	if Action == "status" then
+		return {text = `Undo available: {CanUndo}. Redo available: {CanRedo}.`}
+	end
+
+	if Action == "undo" then
+		if not CanUndo then
+			return {error = "There is nothing to undo."}
+		end
+
+		ChangeHistoryService:Undo()
+
+		return {text = "Undid one step."}
+	end
+
+	if Action == "redo" then
+		if not CanRedo then
+			return {error = "There is nothing to redo."}
+		end
+
+		ChangeHistoryService:Redo()
+
+		return {text = "Redid one step."}
+	end
+
+	return {error = `Claudio does not know the history action "{tostring(Action)}".`}
+end
+
 const function Logs(Input: any): any
 	const LogService = game:GetService("LogService")
 	const Ok, History = pcall(function(): any
@@ -409,31 +633,6 @@ const function Playtest(Input: any): any
 	end
 
 	return {error = `Claudio does not know the playtest action "{tostring(Action)}".`}
-end
-
-const function Resolve(Path: string): Instance?
-	local Object: Instance? = game
-
-	for Index, Step in string.split(Path, ".") do
-		if Index == 1 and (Step == "game" or Step == "Game") then
-			continue
-		end
-
-		if not Object then
-			return nil
-		end
-
-		const Service = if Object == game then pcall(game.GetService, game, Step) else false
-		local Next = (Object :: Instance):FindFirstChild(Step)
-
-		if not Next and Service then
-			Next = select(2, pcall(game.GetService, game, Step))
-		end
-
-		Object = Next
-	end
-
-	return Object
 end
 
 const function Rendered(Object: Instance): boolean
@@ -888,12 +1087,6 @@ const function Marks(Entry: any, Owner: string?, Kind: string?): string
 		elseif Permits.Write == nil then
 			table.insert(Notes, "read only")
 		end
-	elseif Kind == "event" then
-		if Permits.Listen == nil then
-			table.insert(Notes, "cannot be listened to from here")
-		end
-	elseif Permits.Call == nil then
-		table.insert(Notes, "cannot be called from here")
 	end
 
 	for _, Name in {"Read", "Write", "Call", "Listen", "New"} do
@@ -1513,6 +1706,22 @@ const function RunStudioJob(Job: any)
 
 	task.spawn(function()
 		const Ok, Outcome = pcall(function()
+			if Job.kind == "find" then
+				return Find(Job.input)
+			end
+
+			if Job.kind == "source" then
+				return Source(Job.input)
+			end
+
+			if Job.kind == "select" then
+				return Selected(Job.input)
+			end
+
+			if Job.kind == "history" then
+				return Steps(Job.input)
+			end
+
 			if Job.kind == "logs" then
 				return Logs(Job.input)
 			end

@@ -2113,7 +2113,7 @@ const function Execute(Input: any): any
 	const Holder = Instance.new("ModuleScript")
 
 	Holder.Name = "ClaudioExecute"
-	Holder.Source = `return function()\n{Code}\nend`
+	Holder.Source = `return function(plugin)\n{Code}\nend`
 	Holder.Parent = game:GetService("ServerStorage")
 
 	const function Finish(): ()
@@ -2149,7 +2149,7 @@ const function Execute(Input: any): any
 		return Failed
 	end
 
-	const Ok, Result = xpcall(Made :: any, Trouble)
+	const Ok, Result = xpcall(Made :: any, Trouble, Settings.Plugin())
 
 	Finish()
 

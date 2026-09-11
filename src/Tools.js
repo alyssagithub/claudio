@@ -6,7 +6,7 @@ const ExecuteDescription = [
   "target picks where: edit is the editor and the default, server and client are the running play session and need one open.",
   "Changes are recorded as one undo step; pass readOnly when you only want to look.",
   "Set timeout in seconds when the code is expected to take a while, up to thirty minutes; it defaults to five.",
-  "Call _G.ClaudioFresh(module) to require past the cache.",
+  "In edit, plugin is Claudio's own Plugin object, so plugin APIs and plugin-development harnesses work. Call _G.ClaudioFresh(module) to require past the cache.",
 ].join(" ");
 
 const InputDescription = [

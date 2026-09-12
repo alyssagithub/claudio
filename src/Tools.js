@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { z } from "zod/v3";
 import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport } from "./Ask.js";
 
@@ -105,8 +106,10 @@ export function StudioTools(Deps) {
     },
     {
       Name: "capture",
-      Description: "Take a picture of the Studio viewport. Give around with an instance path to crop tightly to that thing, which works for a part, a model or any on screen GuiObject, and costs a fraction of a whole viewport to look at. Give path to point the camera at something first, or x, y, width and height to crop by hand. The camera is always put back where it was. Plugin windows are not in the viewport, so they cannot be captured this way.",
+      Description: "Take a picture of Studio. of picks what: viewport is the rendered 3D view and the default; window is the whole Studio window as the user sees it, dock widgets included, at true colours, so it is the way to look at a plugin's own interface. Give around with an instance path to crop the viewport tightly to that thing, or window to pick a floating Studio window by part of its title. Give path to point the camera at something first, or x, y, width and height to crop by hand. The camera is always put back where it was.",
       Schema: {
+        of: z.enum(["viewport", "window"]).optional().describe("What to capture. viewport by default."),
+        window: z.string().optional().describe("Part of a Studio window title to capture instead of the main one, such as a floating dock widget's title. Only for of window."),
         around: z.string().optional().describe("Instance to crop tightly around, such as Workspace.Model or a GuiObject path."),
         padding: z.number().optional().describe("Pixels of margin around it, 8 by default."),
         path: z.string().optional().describe("Instance to frame the camera on before shooting."),
@@ -114,8 +117,33 @@ export function StudioTools(Deps) {
         y: z.number().optional().describe("Top edge of the region."),
         width: z.number().optional().describe("Region width. Give width and height together to crop."),
         height: z.number().optional().describe("Region height."),
+        file: z.string().optional().describe("Also save the picture to this path as a PNG, for comparing pixels or keeping a record."),
       },
       Run: async (Input) => {
+        const Picture = (Data, Text) => {
+          if (Input.file) {
+            try {
+              fs.writeFileSync(Input.file, Buffer.from(Data, "base64"));
+              Text += `, saved to ${Input.file}`;
+            } catch (Trouble) {
+              Text += `, but could not save to ${Input.file}: ${Trouble.message}`;
+            }
+          }
+
+          return { content: [{ type: "image", data: Data, mimeType: "image/png" }, { type: "text", text: Text }] };
+        };
+
+        if (Input.of === "window") {
+          const { CaptureWindow } = await import("./Window.js");
+          const Taken = await CaptureWindow(Input.window, { x: Input.x, y: Input.y, width: Input.width, height: Input.height });
+
+          if (Taken.error) {
+            return { content: [{ type: "text", text: Taken.error }] };
+          }
+
+          return Picture(Taken.data, `${Taken.width}x${Taken.height} of the window "${Taken.title}"${Input.width && Input.height ? `, cropped at ${Input.x || 0}, ${Input.y || 0}` : ""}`);
+        }
+
         const { EncodePixels } = await import("./Capture.js");
 
         let Framed = null;
@@ -144,12 +172,7 @@ export function StudioTools(Deps) {
           return { content: [{ type: "text", text: Made.error }] };
         }
 
-        return {
-          content: [
-            { type: "image", data: Made.data, mimeType: "image/png" },
-            { type: "text", text: `${Shot.width}x${Shot.height} of the ${Shot.viewport} viewport${Shot.around ? `, cropped to ${Shot.around}` : ""}${Framed && Framed.framed ? `, framed on ${Framed.framed}` : ""}` },
-          ],
-        };
+        return Picture(Made.data, `${Shot.width}x${Shot.height} of the ${Shot.viewport} viewport${Shot.around ? `, cropped to ${Shot.around}` : ""}${Framed && Framed.framed ? `, framed on ${Framed.framed}` : ""}`);
       },
     },
     {
@@ -341,8 +364,6 @@ export function StudioTools(Deps) {
         label: z.string().optional().describe("What the undo step should be called, when loading."),
       },
       Run: async (Input) => {
-        const fs = await import("node:fs");
-
         if (Input.paths && Input.paths.length > 0) {
           const Found = await Reach("rbxm", { paths: Input.paths });
 

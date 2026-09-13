@@ -456,7 +456,7 @@ function Testing.Show(Name: string?, Narrowed: number?): string
 		end
 	end
 
-	_G.ClaudioShotLighting = {
+	_G.ClaudioShotLighting = _G.ClaudioShotLighting or {
 		Properties = {
 			Ambient = Lighting.Ambient,
 			OutdoorAmbient = Lighting.OutdoorAmbient,
@@ -468,7 +468,7 @@ function Testing.Show(Name: string?, Narrowed: number?): string
 		Effects = Effects,
 	}
 
-	for _, Held in Effects do
+	for _, Held in _G.ClaudioShotLighting.Effects do
 		if Held.Parent then
 			Held.Object.Parent = nil
 		else

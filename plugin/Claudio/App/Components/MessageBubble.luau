@@ -356,7 +356,7 @@ return function(Props: Props)
 	const CodeFields: {[string]: boolean} = {code = true, text = true, source = true, command = true, content = true, old_string = true, new_string = true, prompt = true}
 
 	const function Call(Value: () -> Types.ToolCall, Index: number)
-		const Open = Vide.source(Chat.Thinking())
+		const Open = Vide.source(false)
 
 		const function Title(): string
 			const Name = Value().name
@@ -762,16 +762,14 @@ return function(Props: Props)
 	const Blank: Types.ToolCall = {name = "", input = "", output = "", status = "done", milliseconds = 0}
 
 	const function Group(Value: () -> Block, Index: number)
-		const Listed = Vide.source(Chat.Thinking())
+		const Listed = Vide.source(false)
 
 		const function Kind(): string
 			return Value().Kind
 		end
 
 		const function Many(): boolean
-			const Chosen = Value().Calls
-
-			return Chosen ~= nil and #Chosen > 1
+			return Value().Calls ~= nil
 		end
 
 		return Create "Frame" {

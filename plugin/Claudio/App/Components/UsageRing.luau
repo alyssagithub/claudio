@@ -100,6 +100,7 @@ return function()
 	const Hovered = Vide.source(false)
 	const Shown = Vide.source(false)
 	const Shift = Vide.source(0)
+	const Rightmost = Vide.source(0)
 	const Room = Vide.source(220)
 	const Waited = Vide.source(false)
 	local Waiting = 0
@@ -111,11 +112,16 @@ return function()
 			return
 		end
 
-		Shift(Row.AbsolutePosition.X + Row.AbsoluteSize.X - Object.AbsolutePosition.X)
+		Shift(Row.AbsolutePosition.X - Object.AbsolutePosition.X)
+		Rightmost(Row.AbsolutePosition.X + Row.AbsoluteSize.X - Object.AbsolutePosition.X)
 		Room(math.max(160, Row.AbsoluteSize.X))
 	end
 
 	const function Wait(Over: boolean)
+		if Over == Vide.untrack(Hovered) then
+			return
+		end
+
 		Waiting += 1
 		Hovered(Over)
 
@@ -132,6 +138,11 @@ return function()
 				Waited(true)
 			end
 		end)
+	end
+
+	const function Forget()
+		Waiting += 1
+		Waited(false)
 	end
 
 	const Expanded = Vide.source(false)
@@ -264,6 +275,7 @@ return function()
 		AutoButtonColor = false,
 		LayoutOrder = 6,
 		Activated = function()
+			Forget()
 			Shown(not Shown())
 		end,
 		MouseEnter = function()
@@ -305,7 +317,7 @@ return function()
 			end,
 			AnchorPoint = Vector2.new(1, 1),
 			Position = function()
-				return UDim2.new(0, Shift(), 0, -10)
+				return UDim2.new(0, Rightmost(), 0, -10)
 			end,
 			BackgroundColor3 = Theme.Colors.Panel,
 			ZIndex = 20,
@@ -314,7 +326,7 @@ return function()
 			end,
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-			Create "UIStroke" {Color = Theme.Colors.Border},
+			Create "UIStroke" {Color = Theme.Colors.Button, Thickness = 1.5},
 			Create "UISizeConstraint" {
 				MaxSize = function()
 					return Vector2.new(math.min(Room(), 240), math.huge)

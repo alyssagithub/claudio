@@ -55,15 +55,19 @@ const function Choice(Definition: Settings.Definition)
 		}
 	end
 
+	const Many = #(Definition.Options :: {string}) > 2
+
 	return Create "Frame" {
 		Name = "Choice",
-		AutomaticSize = Enum.AutomaticSize.X,
-		Size = UDim2.fromOffset(0, 22),
+		LayoutOrder = 2,
+		AutomaticSize = if Many then Enum.AutomaticSize.Y else Enum.AutomaticSize.X,
+		Size = if Many then UDim2.fromScale(1, 0) else UDim2.fromOffset(0, 22),
 		BackgroundTransparency = 1,
 
 		Create "UIListLayout" {
 			FillDirection = Enum.FillDirection.Horizontal,
 			SortOrder = Enum.SortOrder.LayoutOrder,
+			Wraps = Many,
 			Padding = UDim.new(0, 4),
 		},
 		Vide.indexes(function()
@@ -114,13 +118,14 @@ const function Row(Definition: Settings.Definition, LayoutOrder: number)
 		LayoutOrder = LayoutOrder,
 
 		Create "UIListLayout" {
-			FillDirection = Enum.FillDirection.Horizontal,
+			FillDirection = if Definition.Options and #Definition.Options > 2 then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
+			HorizontalFlex = if Definition.Options and #Definition.Options > 2 then Enum.UIFlexAlignment.Fill else Enum.UIFlexAlignment.None,
 			Padding = UDim.new(0, 8),
 		},
 		Create "Frame" {
 			Name = "Labels",
-			Size = UDim2.fromScale(0, 0),
+			Size = if Definition.Options and #Definition.Options > 2 then UDim2.fromScale(1, 0) else UDim2.fromScale(0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = 1,

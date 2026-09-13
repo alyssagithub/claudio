@@ -2876,6 +2876,7 @@ const function Loaded(Given: {any}): {Types.Message}
 			Role = if Message.role == "user" then "user" else "assistant",
 			Text = Message.text,
 			Activity = Message.activity,
+			Calls = Message.calls,
 			ImageIds = Message.images,
 			At = Message.at,
 			Tokens = Message.tokens,

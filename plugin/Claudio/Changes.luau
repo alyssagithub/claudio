@@ -51,7 +51,9 @@ const function Line(Call: Types.ToolCall): Types.Change?
 
 		const Done = Past[Action] or {Kind = "changed", Word = "Changed"}
 
-		const Path = Field(Input, "instancePath") or Field(Input, "path") or Field(Input, "parentPath") or Field(Input, "parent") or Field(Input, "className")
+		const Made = Field(Input, "name")
+		const Under = Field(Input, "parentPath") or Field(Input, "parent")
+		const Path = Field(Input, "instancePath") or Field(Input, "path") or (if Made and Under then `{Under}.{Made}` else nil) or Under or Field(Input, "className")
 
 		return {Kind = Done.Kind, Text = `{Done.Word} {Format.Path(Path)}`, Path = Path}
 	end

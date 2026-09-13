@@ -81,6 +81,13 @@ const Message = Typed.table({
 	role = Typed.string(),
 	text = Typed.string(),
 	activity = Typed.optional(Typed.array(Typed.string())),
+	calls = Typed.optional(Typed.array(Typed.table({
+		name = Typed.string(),
+		input = Typed.string(),
+		output = Typed.string(),
+		status = Typed.string(),
+		milliseconds = Typed.number(),
+	}))),
 	images = Typed.optional(Typed.array(Typed.number())),
 	at = Typed.optional(Typed.number()),
 	tokens = Typed.optional(Tokens),

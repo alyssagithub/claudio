@@ -202,6 +202,17 @@ export function RememberOwnSession(Id) {
   WriteOwnSessions(Own);
 }
 
+function InputOf(Input) {
+  if (!Input || typeof Input !== "object" || Array.isArray(Input)) {
+    return String(Input === undefined ? "" : Input);
+  }
+
+  return Object.entries(Input)
+    .map(([Name, Value]) => `${Name}: ${typeof Value === "string" ? Value : JSON.stringify(Value)}`)
+    .join("\n")
+    .slice(0, 4000);
+}
+
 function TextOf(Content) {
   if (typeof Content === "string") {
     return Content;
@@ -548,6 +559,8 @@ export function GetConversation(Id) {
 
   const Messages = [];
   let PendingTools = [];
+  let PendingCalls = [];
+  const Results = new Map();
   let PendingImages = [];
   let ImageIndex = 0;
   const Priced = new Set();
@@ -568,8 +581,15 @@ export function GetConversation(Id) {
 
       Messages.push({ role: "user", text: StripContext(TextOf(Line.message.content)), images: Attached, at: TimeOf(Line) });
       PendingTools = [];
+      PendingCalls = [];
       PendingImages = [];
     } else if (Line.type === "user") {
+      for (const Block of Line.message.content || []) {
+        if (Block.type === "tool_result") {
+          Results.set(Block.tool_use_id, { Output: TextOf(Block.content).slice(0, 2000), Failed: Block.is_error === true });
+        }
+      }
+
       for (const Image of ImagesInContent(Line.message.content)) {
         ImageIndex += 1;
         PendingImages.push(ImageIndex);
@@ -585,6 +605,7 @@ export function GetConversation(Id) {
       }
 
       PendingTools = PendingTools.concat(Content.filter((Block) => Block.type === "tool_use").map((Block) => Block.name));
+      PendingCalls = PendingCalls.concat(Content.filter((Block) => Block.type === "tool_use").map((Block) => ({ Id: Block.id, name: Block.name, input: InputOf(Block.input) })));
 
       if (Text === "") {
         continue;
@@ -603,17 +624,25 @@ export function GetConversation(Id) {
         }
       }
 
+      const Calls = PendingCalls.map((Call) => {
+        const Result = Results.get(Call.Id);
+
+        return { name: Call.name, input: Call.input, output: Result ? Result.Output : "", status: Result && Result.Failed ? "error" : "done", milliseconds: 0 };
+      });
+
       if (Last && Last.role === "assistant") {
         Last.text = `${Last.text}\n\n${Text}`;
         Last.activity = Last.activity.concat(PendingTools);
+        Last.calls = Last.calls.concat(Calls);
         Last.images = Last.images.concat(PendingImages);
         Last.tokens = Used || Last.tokens;
         Last.cost = (Last.cost || 0) + (Spent || 0);
       } else {
-        Messages.push({ role: "assistant", text: Text, activity: PendingTools, images: PendingImages, at: TimeOf(Line), tokens: Used, cost: Spent, estimated: true });
+        Messages.push({ role: "assistant", text: Text, activity: PendingTools, calls: Calls, images: PendingImages, at: TimeOf(Line), tokens: Used, cost: Spent, estimated: true });
       }
 
       PendingTools = [];
+      PendingCalls = [];
       PendingImages = [];
     }
   }

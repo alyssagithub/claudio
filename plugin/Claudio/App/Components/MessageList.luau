@@ -38,6 +38,7 @@ end
 
 const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 	const Hovered = Vide.source(false)
+	const Room = Vide.source(0)
 
 	return Create "Frame" {
 		Name = "Queued",
@@ -52,21 +53,31 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 			Hovered(false)
 		end,
 
+		Vide.action(function(Frame: Frame)
+			Room(Frame.AbsoluteSize.X)
+			Vide.cleanup(Frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				Room(Frame.AbsoluteSize.X)
+			end))
+		end),
 		Create "UIListLayout" {
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			HorizontalAlignment = Enum.HorizontalAlignment.Right,
-			Padding = UDim.new(0, 2),
+			Padding = UDim.new(0, 6),
 		},
 		Create "TextButton" {
 			Name = "Bubble",
-			Size = UDim2.fromScale(0.85, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.fromOffset(0, 0),
+			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundColor3 = Theme.Colors.Panel,
-			BackgroundTransparency = 0.35,
 			AutoButtonColor = false,
 			Text = "",
 			LayoutOrder = 1,
 
+			Create "UISizeConstraint" {
+				MaxSize = function()
+					return Vector2.new(math.max(40, math.floor(Room() * 0.85)), math.huge)
+				end,
+			},
 			Create "UICorner" {CornerRadius = UDim.new(0, 8)},
 			Create "UIPadding" {
 				PaddingLeft = UDim.new(0, 10),
@@ -76,10 +87,10 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 			},
 			Create "TextBox" {
 				Name = "Text",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
+				Size = UDim2.fromOffset(0, 0),
+				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundTransparency = 1,
-				TextColor3 = Theme.Colors.DimText,
+				TextColor3 = Theme.Colors.Text,
 				TextSize = Settings.TextSize,
 				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 				TextWrapped = true,
@@ -89,6 +100,11 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 					return Entry().Display
 				end,
 
+				Create "UISizeConstraint" {
+					MaxSize = function()
+						return Vector2.new(math.max(20, math.floor(Room() * 0.85) - 20), math.huge)
+					end,
+				},
 				Vide.action(function(Box: TextBox)
 					Vide.cleanup(Box.FocusLost:Connect(function()
 						Chat.EditQueued(Index, Box.Text)
@@ -105,16 +121,27 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 			Create "UIListLayout" {
 				FillDirection = Enum.FillDirection.Horizontal,
 				VerticalAlignment = Enum.VerticalAlignment.Center,
-				HorizontalAlignment = Enum.HorizontalAlignment.Right,
+				HorizontalAlignment = function()
+					return if Hovered() then Enum.HorizontalAlignment.Right else Enum.HorizontalAlignment.Center
+				end,
 				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, 4),
+				Padding = UDim.new(0, 10),
+			},
+			IconButton {
+				Icon = Config.Icons.Copy,
+				LayoutOrder = 1,
+				Size = Settings.SmallText,
+				Visible = Hovered,
+				OnClick = function()
+					task.spawn(Chat.Copy, Entry().Display)
+				end,
 			},
 			IconButton {
 				Icon = Config.Icons.Up,
-				LayoutOrder = 1,
+				LayoutOrder = 2,
 				Size = Settings.SmallText,
 				Visible = function()
-					return Hovered() and #Chat.Queue() > 1
+					return Hovered() and Index > 1
 				end,
 				OnClick = function()
 					Chat.MoveQueued(Index, -1)
@@ -122,28 +149,13 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 			},
 			IconButton {
 				Icon = Config.Icons.Down,
-				LayoutOrder = 2,
+				LayoutOrder = 3,
 				Size = Settings.SmallText,
 				Visible = function()
-					return Hovered() and #Chat.Queue() > 1
+					return Hovered() and Index < #Chat.Queue()
 				end,
 				OnClick = function()
 					Chat.MoveQueued(Index, 1)
-				end,
-			},
-			Create "TextButton" {
-				Name = "Interrupt",
-				AutomaticSize = Enum.AutomaticSize.XY,
-				BackgroundTransparency = 1,
-				TextColor3 = Theme.Colors.DimText,
-				TextSize = Settings.SmallText,
-				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				AutoButtonColor = false,
-				LayoutOrder = 3,
-				Visible = Hovered,
-				Text = "Interrupt",
-				Activated = function()
-					Chat.InterruptWith(Index)
 				end,
 			},
 			IconButton {
@@ -153,6 +165,22 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 				Visible = Hovered,
 				OnClick = function()
 					Chat.RemoveQueued(Index)
+				end,
+			},
+			Create "TextButton" {
+				Name = "SendNow",
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				TextColor3 = function()
+					return if Hovered() then Theme.Colors.Text() else Theme.Colors.DimText()
+				end,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+				AutoButtonColor = false,
+				LayoutOrder = 5,
+				Text = "Send now",
+				Activated = function()
+					Chat.InterruptWith(Index)
 				end,
 			},
 		},
@@ -452,6 +480,12 @@ return function()
 				Thinking = Chat.StreamingThinking,
 				Calls = Chat.Calls,
 				Images = Chat.StreamingImages,
+				Model = function()
+					const Pick = Chat.StreamingPick()
+
+					return if Pick then Describe(Pick.Model, Pick.Effort, true) else nil
+				end,
+				Live = true,
 				LayoutOrder = 1,
 			},
 			Working(),

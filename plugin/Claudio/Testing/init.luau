@@ -415,9 +415,13 @@ function Testing.Show(Name: string?, Narrowed: number?): string
 	local Target: GuiObject?
 
 	if Name then
-		const Found = Widget:FindFirstChild(Name, true)
+		for _, Found in Widget:GetDescendants() do
+			if Found.Name == Name and Found:IsA("GuiObject") and Found.AbsoluteSize.X >= 1 and Found.AbsoluteSize.Y >= 1 then
+				Target = Found
 
-		Target = if Found and Found:IsA("GuiObject") then Found else nil
+				break
+			end
+		end
 	else
 		for _, Child in Widget:GetChildren() do
 			if Child:IsA("GuiObject") and Child.Name ~= "DropTarget" then

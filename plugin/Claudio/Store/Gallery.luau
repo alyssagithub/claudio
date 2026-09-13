@@ -53,7 +53,11 @@ function Gallery.Messages(): {Types.Message}
 		{
 			Role = "assistant",
 			Text = "A reply that changed things in the place.",
-			Edits = {"Workspace.Baseplate", "ServerScriptService.Main", "ReplicatedStorage.Shared.Config"},
+			Edits = {
+				{Kind = "changed", Text = "Edited ServerScriptService.Main", Path = "ServerScriptService.Main", Added = 108, Removed = 12} :: Types.Change,
+				{Kind = "added", Text = "Created Workspace.Baseplate.Sign (Part)", Path = "Workspace.Baseplate.Sign"} :: Types.Change,
+				{Kind = "removed", Text = "Deleted ReplicatedStorage.Shared.Config", Path = "ReplicatedStorage.Shared.Config"} :: Types.Change,
+			},
 			Checkpoint = 3,
 			At = Now - 3200,
 		},

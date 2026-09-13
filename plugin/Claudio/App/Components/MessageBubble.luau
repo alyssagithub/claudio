@@ -7,6 +7,7 @@ const Format = require(script.Parent.Parent.Parent.Format)
 const Changes = require(script.Parent.Parent.Parent.Changes)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
+const Navigate = require(script.Parent.Parent.Parent.Navigate)
 const Theme = require(script.Parent.Parent.Theme)
 const ImageView = require(script.Parent.ImageView)
 const Paragraph = require(script.Parent.Paragraph)
@@ -25,7 +26,7 @@ type Props = {
 	Activity: () -> {string},
 	Thinking: (() -> string?)?,
 	Calls: (() -> {Types.ToolCall})?,
-	Edits: (() -> {string}?)?,
+	Edits: (() -> {Types.Change}?)?,
 	Tokens: (() -> Types.Tokens?)?,
 	Milliseconds: (() -> number?)?,
 	Failed: (() -> boolean)?,
@@ -37,6 +38,7 @@ type Props = {
 	Attachments: (() -> {string})?,
 	Images: (() -> {EditableImage})?,
 	Model: (() -> string?)?,
+	Live: boolean?,
 	Checkpoint: (() -> number?)?,
 	LayoutOrder: any,
 }
@@ -124,7 +126,7 @@ const function Detail(Name: string, Text: () -> string, LayoutOrder: number)
 	}
 end
 
-const function Note(Name: string, LayoutOrder: number, Text: () -> string, Visible: () -> boolean)
+const function Note(Name: string, LayoutOrder: any, Text: () -> string, Visible: () -> boolean)
 	return Create "TextLabel" {
 		Name = Name,
 		Size = UDim2.fromScale(1, 0),
@@ -260,13 +262,13 @@ return function(Props: Props)
 	const function Trimmed(): {Types.Change}
 		const All = Written()
 
-		if Expanded() or #All <= 8 then
+		if Expanded() or #All <= 5 then
 			return All
 		end
 
 		const Some = {}
 
-		for Index = 1, 8 do
+		for Index = 1, 5 do
 			table.insert(Some, All[Index])
 		end
 
@@ -533,7 +535,7 @@ return function(Props: Props)
 				BackgroundTransparency = 1,
 				LayoutOrder = -1,
 				Visible = function()
-					return Chat.Thinking() and Props.Thinking ~= nil and (Props.Thinking() or "") ~= ""
+					return Chat.Thinking() and Props.Thinking ~= nil and (Props.Thinking() or ""):match("%S") ~= nil
 				end,
 
 				Create "UIPadding" {
@@ -563,7 +565,7 @@ return function(Props: Props)
 					TextXAlignment = Enum.TextXAlignment.Left,
 					TextYAlignment = Enum.TextYAlignment.Top,
 					Text = function()
-						return if Props.Thinking then Props.Thinking() or "" else ""
+						return ((if Props.Thinking then Props.Thinking() or "" else ""):gsub("^%s+", ""):gsub("%s+$", ""))
 					end,
 				},
 			},
@@ -708,106 +710,227 @@ return function(Props: Props)
 					return #Written() > 0
 				end,
 
-				Create "UICorner" {CornerRadius = UDim.new(0, 6)},
+				Create "UICorner" {CornerRadius = UDim.new(0, 8)},
 				Create "UIStroke" {Color = Theme.Colors.Border},
 				Create "UIPadding" {
-					PaddingLeft = UDim.new(0, 8),
-					PaddingRight = UDim.new(0, 8),
-					PaddingTop = UDim.new(0, 6),
-					PaddingBottom = UDim.new(0, 6),
+					PaddingLeft = UDim.new(0, 10),
+					PaddingRight = UDim.new(0, 10),
+					PaddingTop = UDim.new(0, 8),
+					PaddingBottom = UDim.new(0, 8),
 				},
 				Create "UIListLayout" {
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					HorizontalFlex = Enum.UIFlexAlignment.Fill,
 					Padding = UDim.new(0, 2),
 				},
-				Create "TextLabel" {
+				Create "Frame" {
 					Name = "Heading",
-					Size = UDim2.fromScale(1, 0),
-					AutomaticSize = Enum.AutomaticSize.Y,
+					Size = UDim2.new(1, 0, 0, 24),
 					BackgroundTransparency = 1,
-					TextColor3 = Theme.Colors.Text,
-					TextSize = Settings.SmallText,
-					FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
-					TextXAlignment = Enum.TextXAlignment.Left,
 					LayoutOrder = 1,
-					Text = function()
-						const Lines = Written()
-						const Count = `{#Lines} change{if #Lines == 1 then "" else "s"} in Studio`
 
-						return if IsUser() then `You made {Count}` else `Made {Count}`
-					end,
+					Create "UIListLayout" {
+						FillDirection = Enum.FillDirection.Horizontal,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, 8),
+					},
+					Create "TextLabel" {
+						Name = "Title",
+						AutomaticSize = Enum.AutomaticSize.XY,
+						BackgroundTransparency = 1,
+						TextColor3 = Theme.Colors.Text,
+						TextSize = Settings.TextSize,
+						FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+						TextXAlignment = Enum.TextXAlignment.Left,
+						LayoutOrder = 1,
+						Text = function()
+							local Scripts = 0
+							local Total = 0
+
+							for _, Change in Written() do
+								if Change.Path then
+									Total += 1
+								end
+
+								if Change.Added or Change.Removed then
+									Scripts += 1
+								end
+							end
+
+							const Verb = if Scripts == Total then "Edited" else "Changed"
+							const Noun = if Scripts == Total then "script" else "instance"
+
+							return `{if IsUser() then "You " else ""}{if IsUser() then Verb:lower() else Verb} {Total} {Noun}{if Total == 1 then "" else "s"}`
+						end,
+					},
+					Create "Frame" {
+						Name = "Spacer",
+						Size = UDim2.fromOffset(0, 0),
+						BackgroundTransparency = 1,
+						LayoutOrder = 2,
+
+						Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
+					},
+					Button {
+						Text = "View changes",
+						LayoutOrder = 3,
+						OnClick = function()
+							const Chosen = {}
+
+							for _, Change in Written() do
+								const Object = if Change.Path then Navigate.Resolve(Change.Path) else nil
+
+								if Object then
+									table.insert(Chosen, Object)
+								end
+							end
+
+							game:GetService("Selection"):Set(Chosen)
+						end,
+					},
 				},
 				Vide.indexes(Trimmed, function(Entry: () -> Types.Change, Index: number)
-					const function Tint(): Color3
-						const Kind = Entry().Kind
+					const Hovered = Vide.source(false)
 
-						if Kind == "added" then
-							return Theme.Colors.Added()
-						end
-
-						return if Kind == "removed" then Theme.Colors.Removed() else Theme.Colors.Altered()
+					const function Counted(): boolean
+						return Entry().Added ~= nil or Entry().Removed ~= nil
 					end
 
-					return Create "Frame" {
+					return Create "TextButton" {
 						Name = "Change",
-						Size = UDim2.fromScale(1, 0),
-						AutomaticSize = Enum.AutomaticSize.Y,
-						BackgroundColor3 = Tint,
-						BorderSizePixel = 0,
+						Size = UDim2.new(1, 0, 0, 24),
+						BackgroundColor3 = Theme.Colors.Button,
+						BackgroundTransparency = function()
+							return if Hovered() then 0.5 else 1
+						end,
+						AutoButtonColor = false,
+						Text = "",
 						LayoutOrder = Index + 1,
+						MouseEnter = function()
+							Hovered(true)
+						end,
+						MouseLeave = function()
+							Hovered(false)
+						end,
+						Activated = function()
+							const Path = Entry().Path
+
+							if Path then
+								task.spawn(Navigate.Go, {Path = Path})
+							end
+						end,
 
 						Create "UICorner" {CornerRadius = UDim.new(0, 4)},
 						Create "UIPadding" {
 							PaddingLeft = UDim.new(0, 4),
 							PaddingRight = UDim.new(0, 4),
-							PaddingTop = UDim.new(0, 2),
-							PaddingBottom = UDim.new(0, 2),
 						},
-						Create "TextLabel" {
-							Name = "Sign",
-							Size = UDim2.fromOffset(12, 14),
-							Position = UDim2.fromOffset(0, 0),
-							BackgroundTransparency = 1,
-							TextColor3 = Theme.Colors.DiffText,
-							TextSize = Settings.SmallText,
-							FontFace = Font.fromEnum(Enum.Font.Code),
-							TextXAlignment = Enum.TextXAlignment.Left,
-							TextYAlignment = Enum.TextYAlignment.Top,
-							ZIndex = 2,
-							Text = function()
-								const Kind = Entry().Kind
+						Create "UIListLayout" {
+							FillDirection = Enum.FillDirection.Horizontal,
+							VerticalAlignment = Enum.VerticalAlignment.Center,
+							SortOrder = Enum.SortOrder.LayoutOrder,
+							Padding = UDim.new(0, 6),
+						},
+						Icon {
+							Name = function()
+								const Path = Entry().Path or ""
 
-								if Kind == "added" then
-									return "+"
+								if Path == "" then
+									return ""
 								end
 
-								return if Kind == "removed" then "-" else "~"
+								if Path:find("[/\\]") then
+									return Config.Icons.File
+								end
+
+								return if Counted() then Config.Icons.Script else Config.Icons.Instance
 							end,
+							Size = Settings.SmallText,
+							Colour = Theme.Colors.DimText,
+							LayoutOrder = 1,
 						},
 						Create "TextLabel" {
-							Name = "Body",
-							Size = UDim2.fromScale(1, 0),
-							AutomaticSize = Enum.AutomaticSize.Y,
+							Name = "Name",
+							AutomaticSize = Enum.AutomaticSize.X,
+							Size = UDim2.fromOffset(0, 24),
 							BackgroundTransparency = 1,
-							TextColor3 = Theme.Colors.DiffText,
-							TextSize = Settings.SmallText,
-							FontFace = Font.fromEnum(Enum.Font.Code),
-							TextWrapped = true,
+							TextColor3 = Theme.Colors.Text,
+							TextSize = Settings.TextSize,
+							FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+							TextTruncate = Enum.TextTruncate.AtEnd,
 							TextXAlignment = Enum.TextXAlignment.Left,
-							TextYAlignment = Enum.TextYAlignment.Top,
+							LayoutOrder = 2,
 							Text = function()
-								return Entry().Text
+								const Path = Entry().Path
+
+								return if Path then (Path:match("[^%./\\]+$") or Path) else Entry().Text
 							end,
 
-							Create "UIPadding" {PaddingLeft = UDim.new(0, 12)},
+							Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Shrink},
+						},
+						Create "TextLabel" {
+							Name = "Detail",
+							AutomaticSize = Enum.AutomaticSize.X,
+							Size = UDim2.fromOffset(0, 24),
+							BackgroundTransparency = 1,
+							TextColor3 = Theme.Colors.DimText,
+							TextSize = Settings.SmallText,
+							FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+							TextTruncate = Enum.TextTruncate.AtEnd,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							LayoutOrder = 3,
+							Visible = function()
+								return Entry().Path ~= nil and not Counted()
+							end,
+							Text = function()
+								return (Entry().Text:match("^(%a+)") or ""):lower()
+							end,
+
+							Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Shrink},
+						},
+						Create "Frame" {
+							Name = "Spacer",
+							Size = UDim2.fromOffset(0, 0),
+							BackgroundTransparency = 1,
+							LayoutOrder = 4,
+
+							Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
+						},
+						Create "TextLabel" {
+							Name = "Lines",
+							AutomaticSize = Enum.AutomaticSize.X,
+							Size = UDim2.fromOffset(0, 24),
+							BackgroundTransparency = 1,
+							TextColor3 = Theme.Colors.Text,
+							TextSize = Settings.SmallText,
+							FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+							RichText = true,
+							TextXAlignment = Enum.TextXAlignment.Right,
+							LayoutOrder = 5,
+							Visible = Counted,
+							Text = function()
+								const function Hex(Colour: Color3): string
+									return `#{Colour:ToHex()}`
+								end
+
+								return `<font color="{Hex(Theme.Colors.AddedText())}">+{Entry().Added or 0}</font> <font color="{Hex(Theme.Colors.Error())}">-{Entry().Removed or 0}</font>`
+							end,
+						},
+						Icon {
+							Name = Config.Icons.Right,
+							Size = Settings.SmallText,
+							Colour = Theme.Colors.DimText,
+							LayoutOrder = 6,
+							Visible = function()
+								return Entry().Path ~= nil
+							end,
 						},
 					}
 				end),
 				Create "TextButton" {
 					Name = "More",
-					Size = UDim2.fromScale(1, 0),
-					AutomaticSize = Enum.AutomaticSize.Y,
+					Size = UDim2.new(1, 0, 0, 22),
 					BackgroundTransparency = 1,
 					TextColor3 = Theme.Colors.DimText,
 					TextSize = Settings.SmallText,
@@ -816,19 +939,19 @@ return function(Props: Props)
 					AutoButtonColor = false,
 					LayoutOrder = 1000000,
 					Visible = function()
-						return #Written() > 8
+						return #Written() > 5
 					end,
 					Text = function()
-						return if Expanded() then "Show fewer" else `Show all {#Written()}`
+						return if Expanded() then "Show fewer" else `Show {#Written() - 5} more  >`
 					end,
 					Activated = function()
 						Expanded(not Expanded())
 					end,
 
-					Create "UIPadding" {PaddingTop = UDim.new(0, 4)},
+					Create "UIPadding" {PaddingLeft = UDim.new(0, 4)},
 				},
 			},
-			Note("Model", 1000002, function()
+			Note("Model", if Props.Live then -2 else 1000002, function()
 				return if Props.Model then Props.Model() or "" else ""
 			end, function()
 				return Props.Model ~= nil and Props.Model() ~= nil

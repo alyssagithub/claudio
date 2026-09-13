@@ -34,7 +34,7 @@ export type Message = {
 	Effort: string?,
 	Auto: boolean?,
 	Checkpoint: number?,
-	Edits: {string}?,
+	Edits: {Change}?,
 	Calls: {ToolCall}?,
 	Tokens: Tokens?,
 	Milliseconds: number?,
@@ -70,7 +70,7 @@ export type QueuedMessage = {
 	Attachments: {string},
 	Images: {ImageUpload},
 	Previews: {EditableImage},
-	Edits: {string}?,
+	Edits: {Change}?,
 }
 
 export type Choice = {
@@ -110,6 +110,9 @@ export type ModelInfo = {
 export type Change = {
 	Kind: "added" | "removed" | "changed",
 	Text: string,
+	Path: string?,
+	Added: number?,
+	Removed: number?,
 }
 
 export type ToolCall = {
@@ -120,6 +123,7 @@ export type ToolCall = {
 	milliseconds: number,
 	steps: {string}?,
 	delegate: {name: string, model: string}?,
+	lines: {added: number, removed: number}?,
 }
 
 export type Release = {

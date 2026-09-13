@@ -9,6 +9,7 @@ import { CapToolOutput } from "./ResultCap.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
 import { Request as RequestStudio } from "./Studio.js";
 import { ReadPluginSetting } from "./PluginSettings.js";
+import { CountLines, EditedFile, ReadFileText } from "./Lines.js";
 import { ChooseModel, GetModels, NextEffort, RecordTurnOutcome, RememberModels, SupportsEffort } from "./Models.js";
 
 const Turns = new Map();
@@ -783,6 +784,7 @@ function RouteMessage(Session, Message) {
           Output: CleanOutput(Call.Name, Describe(Result.content)),
           Status: Result.is_error ? "error" : "done",
           Milliseconds: Date.now() - Call.StartedAt,
+          Lines: Session.LineCounts.get(Call.Id) || null,
         };
       });
     }
@@ -865,6 +867,8 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
     Mode: PermissionModeFor(Mode, Bypass),
     Delegating: Delegating === true,
     GuardTools: false,
+    FilesBefore: new Map(),
+    LineCounts: new Map(),
     CurrentTurn: null,
     LastUsedAt: Date.now(),
     Query: null,
@@ -943,6 +947,12 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
           hooks: {
             PreToolUse: [{
               hooks: [async (HookInput, ToolUseId, Options) => {
+                const Edited = EditedFile(HookInput.tool_name, HookInput.tool_input);
+
+                if (Edited && ToolUseId) {
+                  Session.FilesBefore.set(ToolUseId, ReadFileText(Edited));
+                }
+
                 if ((IsAllowedTool(HookInput.tool_name) || !Session.AskForTools) && !(Session.GuardTools && IsRisky(HookInput.tool_name, HookInput.tool_input))) {
                   return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
                 }
@@ -988,7 +998,14 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
               }],
             }],
             PostToolUse: [{
-              hooks: [async (HookInput) => {
+              hooks: [async (HookInput, ToolUseId) => {
+                const Edited = EditedFile(HookInput.tool_name, HookInput.tool_input);
+
+                if (Edited && ToolUseId && Session.FilesBefore.has(ToolUseId)) {
+                  Session.LineCounts.set(ToolUseId, CountLines(Session.FilesBefore.get(ToolUseId), ReadFileText(Edited)));
+                  Session.FilesBefore.delete(ToolUseId);
+                }
+
                 if (!Session.CapResults) {
                   return {};
                 }
@@ -1336,6 +1353,7 @@ export function DescribeTurn(Turn) {
       steps: Call.Steps || [],
       milliseconds: Call.Milliseconds,
       delegate: Call.Delegate || null,
+      lines: Call.Lines || null,
     })),
     tasks: Turn.Tasks.map((Task) => ({
       id: Task.Id,

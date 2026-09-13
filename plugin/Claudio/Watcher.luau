@@ -1,6 +1,7 @@
 --!strict
 const Settings = require(script.Parent.Settings)
 const Format = require(script.Parent.Format)
+const Types = require(script.Parent.Types)
 
 export type Entry = {
 	Object: Instance?,
@@ -8,6 +9,7 @@ export type Entry = {
 	Verb: string,
 	Class: string?,
 	Fields: {string},
+	Before: string?,
 }
 
 export type Bucket = {
@@ -115,6 +117,7 @@ end
 
 local Watching = false
 local Listeners: {[Instance]: RBXScriptConnection} = {}
+local Sources: {[Instance]: string} = {}
 local Connections: {RBXScriptConnection} = {}
 local Turn = NewBucket()
 local Idle = NewBucket()
@@ -221,6 +224,10 @@ const function AddListener(Object: Instance)
 		return
 	end
 
+	if Object:IsA("LuaSourceContainer") then
+		Sources[Object] = (Object :: any).Source
+	end
+
 	Listeners[Object] = Object.Changed:Connect(function(Field: string)
 		if Paused or Noise[Field] or StudioOwns(Object, Field) then
 			return
@@ -237,6 +244,18 @@ const function AddListener(Object: Instance)
 		end
 
 		Record(Object, Object:GetFullName(), Verbs[Field] or "Changed", nil, Field)
+
+		if Field ~= "Source" then
+			return
+		end
+
+		const Made = Where.Keys[`{Object:GetDebugId()}|Edited`]
+
+		if Made and Made.Before == nil then
+			Made.Before = Sources[Object] or ""
+		end
+
+		Sources[Object] = (Object :: any).Source
 	end)
 end
 
@@ -275,6 +294,7 @@ const function OnDescendantRemoving(Object: Instance)
 	if Listener then
 		Listener:Disconnect()
 		Listeners[Object] = nil
+		Sources[Object] = nil
 	end
 
 	if Paused or not IsWatched(Object) then
@@ -341,6 +361,75 @@ const function Render(Where: Bucket): {string}
 	return Kept
 end
 
+const function CountLines(Before: string, After: string): (number, number)
+	const Old = if Before == "" then {} else Before:split("\n")
+	const New = if After == "" then {} else After:split("\n")
+	local Start = 1
+
+	while Start <= #Old and Start <= #New and Old[Start] == New[Start] do
+		Start += 1
+	end
+
+	local OldEnd = #Old
+	local NewEnd = #New
+
+	while OldEnd >= Start and NewEnd >= Start and Old[OldEnd] == New[NewEnd] do
+		OldEnd -= 1
+		NewEnd -= 1
+	end
+
+	const Removed = OldEnd - Start + 1
+	const Added = NewEnd - Start + 1
+
+	if Removed == 0 or Added == 0 or Removed * Added > 4000000 then
+		return Added, Removed
+	end
+
+	local Row = table.create(Added + 1, 0)
+
+	for Left = Start, OldEnd do
+		const Next = table.create(Added + 1, 0)
+
+		for Right = Start, NewEnd do
+			const At = Right - Start + 2
+
+			Next[At] = if Old[Left] == New[Right] then Row[At - 1] + 1 else math.max(Row[At], Next[At - 1])
+		end
+
+		Row = Next
+	end
+
+	return Added - Row[Added + 1], Removed - Row[Added + 1]
+end
+
+const function Describe(Where: Bucket): {Types.Change}
+	const Found: {Types.Change} = {}
+
+	for Index, Item in Where.Entries do
+		if Index > Cap then
+			table.insert(Found, {Kind = "changed", Text = `and {#Where.Entries - Cap} more changes`} :: Types.Change)
+
+			break
+		end
+
+		const Object = Item.Object
+		const Path = Format.Path(if Object and Object.Parent then Object:GetFullName() else Item.Path)
+		const Change: Types.Change = {
+			Kind = if Item.Verb == "Created" then "added" elseif Item.Verb == "Deleted" then "removed" else "changed",
+			Text = Render({Entries = {Item}, Keys = {}, Created = {}, Deleted = {}})[1],
+			Path = Path,
+		}
+
+		if Item.Before and Object then
+			Change.Added, Change.Removed = CountLines(Item.Before, (Object :: any).Source)
+		end
+
+		table.insert(Found, Change)
+	end
+
+	return Found
+end
+
 const function Clear(Where: Bucket)
 	table.clear(Where.Entries)
 	table.clear(Where.Keys)
@@ -402,6 +491,7 @@ function Watcher.Stop()
 
 	table.clear(Connections)
 	table.clear(Listeners)
+	table.clear(Sources)
 	Clear(Turn)
 	Clear(Idle)
 end
@@ -420,23 +510,23 @@ function Watcher.SetBusy(Value: boolean)
 	Busy = Value
 end
 
-function Watcher.GetTurnChanges(): {string}?
+function Watcher.GetTurnChanges(): {Types.Change}?
 	Recording = false
 	Busy = false
 
-	const Lines = if Settings.Get("WatchChanges")() then Render(Turn) else nil
+	const Found = if Settings.Get("WatchChanges")() then Describe(Turn) else nil
 
 	Clear(Turn)
 
-	return Lines
+	return Found
 end
 
-function Watcher.GetUserChanges(): {string}
-	const Lines = if Settings.Get("WatchChanges")() then Render(Idle) else {}
+function Watcher.GetUserChanges(): {Types.Change}
+	const Found = if Settings.Get("WatchChanges")() then Describe(Idle) else {}
 
 	Clear(Idle)
 
-	return Lines
+	return Found
 end
 
 function Watcher.Peek(): ({string}, {string})

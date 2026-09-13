@@ -53,7 +53,7 @@ const function Add(Chip: Types.Chip): string
 end
 
 function Context.NextImageToken(): string
-	return Unique("Pasted image")
+	return Unique("Image")
 end
 
 function Context.AddSelection(): string?

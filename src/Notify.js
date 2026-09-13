@@ -106,16 +106,37 @@ function RunClipboard(Mode, Marker) {
   });
 }
 
+let Armed = null;
+
+function Picture(Data) {
+  return {
+    data: Data,
+    mediaType: "image/png",
+    id: crypto.createHash("sha1").update(Data).digest("hex").slice(0, 16),
+  };
+}
+
 export async function ArmClipboard(Marker) {
-  return await RunClipboard("arm", Marker);
+  const [Outcome, Data] = (await RunClipboard("arm", Marker)).split(/\r?\n/);
+
+  if (Outcome === "armed" && Data && Data.length >= 64) {
+    Armed = { Marker, Image: Picture(Data.trim()) };
+  }
+
+  return Outcome;
 }
 
 export async function DisarmClipboard(Marker) {
   return await RunClipboard("disarm", Marker);
 }
 
-export function ReadClipboardImage() {
+export function ReadClipboardImage(Marker) {
   return new Promise((Resolve) => {
+    if (Marker && Armed && Armed.Marker === Marker) {
+      Resolve(Armed.Image);
+      return;
+    }
+
     if (process.platform !== "win32") {
       Resolve(null);
       return;
@@ -133,11 +154,7 @@ export function ReadClipboardImage() {
         return;
       }
 
-      Resolve({
-        data: Data,
-        mediaType: "image/png",
-        id: crypto.createHash("sha1").update(Data).digest("hex").slice(0, 16),
-      });
+      Resolve(Picture(Data));
     });
   });
 }

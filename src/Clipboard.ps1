@@ -42,6 +42,24 @@ function Get-ClipboardText {
     return $null
 }
 
+function Get-Png {
+    param($Picture)
+
+    $Limit = 1400
+
+    if ($Picture.Width -gt $Limit -or $Picture.Height -gt $Limit) {
+        $Scale = [Math]::Min($Limit / $Picture.Width, $Limit / $Picture.Height)
+        $Picture = New-Object System.Drawing.Bitmap($Picture, [int] ($Picture.Width * $Scale), [int] ($Picture.Height * $Scale))
+    }
+
+    $Stream = New-Object System.IO.MemoryStream
+    $Picture.Save($Stream, [System.Drawing.Imaging.ImageFormat]::Png)
+    $Encoded = [Convert]::ToBase64String($Stream.ToArray())
+    $Stream.Dispose()
+
+    return $Encoded
+}
+
 if ($Mode -eq "arm") {
     $Picture = Get-ClipboardImage
 
@@ -60,8 +78,9 @@ if ($Mode -eq "arm") {
     $Bundle.SetImage($Picture)
     $Bundle.SetText($Marker)
     Set-PrivateClipboard $Bundle
-    $Picture.Dispose()
     "armed"
+    Get-Png $Picture
+    $Picture.Dispose()
     exit
 }
 
@@ -93,18 +112,5 @@ if (-not $Picture) {
     exit
 }
 
-$Limit = 1400
-
-if ($Picture.Width -gt $Limit -or $Picture.Height -gt $Limit) {
-    $Scale = [Math]::Min($Limit / $Picture.Width, $Limit / $Picture.Height)
-    $Resized = New-Object System.Drawing.Bitmap($Picture, [int] ($Picture.Width * $Scale), [int] ($Picture.Height * $Scale))
-    $Picture.Dispose()
-    $Picture = $Resized
-}
-
-$Stream = New-Object System.IO.MemoryStream
-$Picture.Save($Stream, [System.Drawing.Imaging.ImageFormat]::Png)
+Get-Png $Picture
 $Picture.Dispose()
-
-[Convert]::ToBase64String($Stream.ToArray())
-$Stream.Dispose()

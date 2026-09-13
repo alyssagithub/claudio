@@ -456,7 +456,7 @@ export function StartServer(Port) {
       }
 
       if (Request.method === "GET" && Url.pathname === "/clipboard") {
-        const Image = await ReadClipboardImage();
+        const Image = await ReadClipboardImage(Url.searchParams.get("marker") || "");
 
         SendJson(Response, 200, Image || { data: null, id: null });
         return;

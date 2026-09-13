@@ -60,30 +60,31 @@ end
 local ThemeConnection: RBXScriptConnection?
 local Painted: StudioTheme?
 
-function Theme.Paint(Chosen: StudioTheme?)
-	Painted = Chosen
+const function Apply()
+	const Source = Painted or Current()
 
 	for Name, Color in Guide do
-		Theme.Colors[Name]((Painted or Current()):GetColor(Color))
+		Theme.Colors[Name](Source:GetColor(Color))
 	end
 
-	Theme.Colors.DimText(Readable(Painted or Current()))
+	Theme.Colors.DimText(Readable(Source))
+	Theme.Colors.AddedText(if Luminance(Source:GetColor(Enum.StudioStyleGuideColor.MainBackground)) < 0.5 then Color3.fromRGB(98, 199, 118) else Color3.fromRGB(24, 128, 56))
+end
+
+function Theme.Paint(Chosen: StudioTheme?)
+	Painted = Chosen
+	Apply()
 end
 
 function Theme.Init()
-	for Name, Color in Guide do
-		Theme.Colors[Name] = Vide.source(Current():GetColor(Color))
+	for Name in Guide do
+		Theme.Colors[Name] = Vide.source(Color3.new())
 	end
 
-	Theme.Colors.DimText(Readable(Current()))
+	Theme.Colors.AddedText = Vide.source(Color3.new())
+	Apply()
 
-	ThemeConnection = (Studio :: any).ThemeChanged:Connect(function()
-		for Name, Color in Guide do
-			Theme.Colors[Name]((Painted or Current()):GetColor(Color))
-		end
-
-		Theme.Colors.DimText(Readable(Painted or Current()))
-	end)
+	ThemeConnection = (Studio :: any).ThemeChanged:Connect(Apply)
 end
 
 function Theme.Destroy()

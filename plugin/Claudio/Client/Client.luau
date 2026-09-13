@@ -8,6 +8,8 @@ const Connection = require(script.Parent.Parent.Store.Connection)
 const Typed = require(script.Parent.Parent.Packages.typed)
 const Schemas = require(script.Parent.Schemas)
 
+const HttpService = game:GetService("HttpService")
+
 const function BaseUrl(): string
 	return `http://127.0.0.1:{Settings.Get("Port")()}`
 end
@@ -151,8 +153,8 @@ function Client.GetPicker(): (boolean, any)
 	return Http.Request("GET", `{BaseUrl()}/picker?take=1`)
 end
 
-function Client.GetClipboardImage(): (boolean, any)
-	return Http.Request("GET", `{BaseUrl()}/clipboard`)
+function Client.GetClipboardImage(Marker: string?): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/clipboard?marker={HttpService:UrlEncode(Marker or "")}`)
 end
 
 function Client.ArmClipboard(Marker: string): (boolean, any)

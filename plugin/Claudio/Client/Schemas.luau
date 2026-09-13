@@ -18,6 +18,10 @@ const Call = Typed.table({
 		name = Typed.string(),
 		model = Typed.string(),
 	})),
+	lines = Typed.optional(Typed.table({
+		added = Typed.number(),
+		removed = Typed.number(),
+	})),
 })
 
 const Asked = Typed.table({

@@ -23,6 +23,7 @@ const Chat = {
 	Draft = Vide.source(""),
 	StreamingText = Vide.source(""),
 	StreamingThinking = Vide.source(""),
+	StreamingPick = Vide.source(nil :: {Model: string, Effort: string?}?),
 	StreamingImages = Vide.source({} :: {EditableImage}),
 	Activity = Vide.source({} :: {string}),
 	Permission = Vide.source(nil :: Types.Permission?),
@@ -107,6 +108,7 @@ const function Reset()
 	Chat.Queue({})
 	Chat.StreamingText("")
 	Chat.StreamingThinking("")
+	Chat.StreamingPick(nil)
 	Chat.StreamingImages({})
 	Chat.Activity({})
 	Chat.Calls({})
@@ -2413,6 +2415,7 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		Version = State.version
 		Chat.StreamingText(State.text or "")
 		Chat.StreamingThinking(State.thinking or "")
+		Chat.StreamingPick(if State.auto and State.model then {Model = State.model, Effort = State.effort} else nil)
 		Chat.Limits(State.limits or Chat.Limits())
 		Chat.Tasks(State.tasks or {})
 		Chat.Planning(State.planning == true)
@@ -2511,6 +2514,7 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 
 	Chat.StreamingText("")
 	Chat.StreamingThinking("")
+	Chat.StreamingPick(nil)
 	Chat.StreamingImages({})
 	Chat.Activity({})
 	Chat.Permission(nil)
@@ -3100,7 +3104,7 @@ function Chat.Send(Text: string, Quiet: string?)
 
 	const Block, Labels, Images, Previews = Context.Take(Full)
 	local Sent = if Block == "" then Full else `{Full}\n\n{Block}`
-	local Edits: {string}?
+	local Edits: {Types.Change}?
 
 	if Quiet then
 		Sent = `{Sent}\n\n{Quiet}`
@@ -3110,8 +3114,14 @@ function Chat.Send(Text: string, Quiet: string?)
 		const Mine = Watcher.GetUserChanges()
 
 		if #Mine > 0 then
+			const Lines = {}
+
+			for _, Change in Mine do
+				table.insert(Lines, Change.Text)
+			end
+
 			Edits = Mine
-			Sent = `{Sent}\n\n<studio_edits>\nI changed these in Studio myself since my last message:\n- {table.concat(Mine, "\n- ")}\n</studio_edits>`
+			Sent = `{Sent}\n\n<studio_edits>\nI changed these in Studio myself since my last message:\n- {table.concat(Lines, "\n- ")}\n</studio_edits>`
 		end
 	end
 
@@ -3238,7 +3248,7 @@ function Chat.PasteImage()
 		return
 	end
 
-	const Token = Context.AddImage("Pasted image", Image.data, Image.mediaType)
+	const Token = Context.AddImage("Image", Image.data, Image.mediaType)
 	const Draft = Chat.Draft()
 	const Spacer = if Draft ~= "" and Draft:sub(-1) ~= " " then " " else ""
 
@@ -3386,9 +3396,19 @@ end
 
 function Chat.RemoveQueued(Index: number)
 	const Queue = table.clone(Chat.Queue() :: {Types.QueuedMessage})
+	const Entry = table.remove(Queue, Index)
 
-	table.remove(Queue, Index)
 	Chat.Queue(Queue)
+
+	if not Entry then
+		return
+	end
+
+	DestroyImages(Entry.Previews)
+
+	const Draft = Chat.Draft()
+
+	Chat.Draft(if Draft == "" then Entry.Display else `{Draft}\n{Entry.Display}`)
 end
 
 function Chat.Reply(Answers: {[string]: string}?)

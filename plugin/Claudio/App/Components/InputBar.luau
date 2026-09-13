@@ -121,13 +121,13 @@ return function()
 	Vide.cleanup(Disarm)
 
 	const function Attach(Token: string)
-		const Ok, Image = Client.GetClipboardImage()
+		const Ok, Image = Client.GetClipboardImage(Token)
 
 		if not Ok or not Image.data then
 			return
 		end
 
-		Context.AddImage("Pasted image", Image.data, Image.mediaType, Token)
+		Context.AddImage("Image", Image.data, Image.mediaType, Token)
 		Arm()
 	end
 

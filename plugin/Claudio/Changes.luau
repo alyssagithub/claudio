@@ -79,7 +79,7 @@ function Changes.For(Message: Types.Message): {Types.Change}
 	const Seen = {}
 
 	for _, Written in Edits do
-		Push(Found, Seen, {Kind = "changed", Text = Written})
+		Push(Found, Seen, if typeof(Written) == "string" then {Kind = "changed", Text = Written} else Written)
 	end
 
 	const Made: {Types.ToolCall} = Message.Calls or {}
@@ -88,8 +88,16 @@ function Changes.For(Message: Types.Message): {Types.Change}
 		if Call.status ~= "error" then
 			const Name = (Call.name:gsub("^mcp__.-__", ""))
 
-			if Name == "Write" or Name == "Edit" then
-				Push(Found, Seen, {Kind = "changed", Text = `Wrote {Format.Path(Field(Call.input, "file_path"))}`})
+			if Name == "Write" or Name == "Edit" or Name == "MultiEdit" then
+				const File = Field(Call.input, "file_path")
+
+				Push(Found, Seen, {
+					Kind = "changed",
+					Text = `Wrote {Format.Path(File)}`,
+					Path = File,
+					Added = if Call.lines then Call.lines.added else nil,
+					Removed = if Call.lines then Call.lines.removed else nil,
+				})
 			end
 		end
 	end

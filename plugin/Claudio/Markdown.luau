@@ -3,6 +3,7 @@ export type Segment = {
 	Kind: "text" | "code",
 	Text: string,
 	Order: number,
+	Language: string?,
 }
 
 const Markdown = {}
@@ -69,9 +70,9 @@ function Markdown.Split(Text: string): {Segment}
 	local Position = 1
 
 	while true do
-		const FenceStart, FenceEnd, Body = Text:find("```[%w_-]*\n?(.-)```", Position)
+		const FenceStart, FenceEnd, Language, Body = Text:find("```([%w_-]*)\n?(.-)```", Position)
 
-		if not FenceStart or not FenceEnd or type(Body) ~= "string" then
+		if not FenceStart or not FenceEnd or type(Body) ~= "string" or type(Language) ~= "string" then
 			break
 		end
 
@@ -91,6 +92,7 @@ function Markdown.Split(Text: string): {Segment}
 			Kind = "code",
 			Text = (Body:gsub("%s+$", "")),
 			Order = #Segments + 1,
+			Language = if Language ~= "" then Language else nil,
 		}
 
 		table.insert(Segments, Fenced)

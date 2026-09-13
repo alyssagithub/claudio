@@ -25,6 +25,13 @@ const Guide: {[string]: Enum.StudioStyleGuideColor} = {
 	Altered = Enum.StudioStyleGuideColor.DiffTextNoChangeBackground,
 	DiffText = Enum.StudioStyleGuideColor.DiffTextNoChange,
 	CodeText = Enum.StudioStyleGuideColor.ScriptText,
+	Keyword = Enum.StudioStyleGuideColor.ScriptKeyword,
+	String = Enum.StudioStyleGuideColor.ScriptString,
+	Number = Enum.StudioStyleGuideColor.ScriptNumber,
+	Comment = Enum.StudioStyleGuideColor.ScriptComment,
+	Operator = Enum.StudioStyleGuideColor.ScriptOperator,
+	Builtin = Enum.StudioStyleGuideColor.ScriptBuiltInFunction,
+	Call = Enum.StudioStyleGuideColor.ScriptFunctionName,
 }
 
 const Theme = {

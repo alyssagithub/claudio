@@ -134,6 +134,35 @@ return function()
 		ModelPicker.Menu(),
 		ModelPicker.EffortMenu(),
 		ModelPicker.EffortHelp(),
+		Create "ImageButton" {
+			Name = "Zoom",
+			Size = UDim2.fromScale(1, 1),
+			BackgroundColor3 = Color3.new(),
+			BackgroundTransparency = 0.25,
+			AutoButtonColor = false,
+			ZIndex = 300,
+			Visible = function()
+				return Chat.Zoomed() ~= nil
+			end,
+			Activated = function()
+				Chat.Zoomed(nil)
+			end,
+
+			Create "ImageLabel" {
+				Name = "Big",
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromScale(0.94, 0.94),
+				BackgroundTransparency = 1,
+				ScaleType = Enum.ScaleType.Fit,
+				ZIndex = 301,
+				ImageContent = function()
+					const Image = Chat.Zoomed()
+
+					return if Image then Content.fromObject(Image) else Content.none
+				end,
+			},
+		},
 		ModelPicker.ModeMenu(),
 		DeleteDialog(),
 		RewindDialog(),

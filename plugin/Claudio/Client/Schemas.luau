@@ -106,6 +106,11 @@ return {
 		status = Typed.string(),
 		text = Typed.string(),
 		thinking = Typed.optional(Typed.string()),
+		parts = Typed.optional(Typed.array(Typed.table({
+			kind = Typed.string(),
+			text = Typed.optional(Typed.string()),
+			call = Typed.optional(Typed.number()),
+		}))),
 		activity = Typed.array(Typed.string()),
 		model = Typed.optional(Typed.string()),
 		effort = Typed.optional(Typed.string()),
@@ -163,6 +168,8 @@ return {
 		title = Typed.string(),
 		source = Typed.string(),
 		messages = Typed.array(Message),
+		total = Typed.optional(Typed.number()),
+		first = Typed.optional(Typed.number()),
 	}),
 	Lint = Typed.table({
 		scripts = Typed.array(Typed.table({

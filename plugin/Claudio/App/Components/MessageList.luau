@@ -239,7 +239,18 @@ return function()
 				return true
 			end
 
-			Chat.ScrollTo = function(Index: number)
+			Chat.ScrollTo = function(Absolute: number)
+				while Absolute <= Chat.Earlier() and Chat.Earlier() > 0 do
+					const Was = Chat.Earlier()
+
+					Chat.LoadEarlier()
+
+					if Chat.Earlier() == Was then
+						break
+					end
+				end
+
+				const Index = Absolute - Chat.Earlier()
 				const Needed = #Chat.Messages() - Index + 1
 
 				if Needed > Chat.Shown() then
@@ -348,13 +359,17 @@ return function()
 			AutoButtonColor = true,
 			LayoutOrder = 0,
 			Visible = function()
-				return #Chat.Messages() > Chat.Shown()
+				return #Chat.Messages() > Chat.Shown() or Chat.Earlier() > 0
 			end,
 			Text = function()
-				return `Show earlier messages ({#Chat.Messages() - Chat.Shown()} more)`
+				return `Show earlier messages ({math.max(0, #Chat.Messages() - Chat.Shown()) + Chat.Earlier()} more)`
 			end,
 			Activated = function()
-				Chat.Shown(Chat.Shown() + 40)
+				if #Chat.Messages() > Chat.Shown() then
+					Chat.Shown(Chat.Shown() + 40)
+				else
+					task.spawn(Chat.LoadEarlier)
+				end
 			end,
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
@@ -397,6 +412,9 @@ return function()
 				end,
 				Thinking = function()
 					return Message().Thinking
+				end,
+				Parts = function()
+					return Message().Parts
 				end,
 				Attachments = function()
 					return Message().Attachments or {}
@@ -478,6 +496,7 @@ return function()
 					return {}
 				end,
 				Thinking = Chat.StreamingThinking,
+				Parts = Chat.StreamingParts,
 				Calls = Chat.Calls,
 				Images = Chat.StreamingImages,
 				Model = function()

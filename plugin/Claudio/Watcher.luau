@@ -152,7 +152,7 @@ const function IsWatched(Object: Instance): boolean
 		return false
 	end
 
-	if Object == Own or Object:IsDescendantOf(Own) then
+	if Object == Own or Object:IsDescendantOf(Own) or (Object.Name == "ClaudioExecute" and Object:IsA("ModuleScript")) then
 		return false
 	end
 

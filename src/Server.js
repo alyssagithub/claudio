@@ -9,7 +9,7 @@ import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
 import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
 import { StudioProcesses } from "./StudioPresence.js";
-import { LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { AddToTurn, LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
@@ -122,7 +122,13 @@ async function HandleConversations(Request, Response, Segments) {
       return;
     }
 
-    SendJson(Response, 200, Conversation);
+    const Query = new URL(Request.url, "http://127.0.0.1").searchParams;
+    const Total = Conversation.messages.length;
+    const Before = Number(Query.get("before")) || Total;
+    const Count = Number(Query.get("count")) || 0;
+    const First = Count > 0 ? Math.max(0, Before - Count) : 0;
+
+    SendJson(Response, 200, { ...Conversation, messages: Conversation.messages.slice(First, Before), total: Total, first: First + 1 });
     return;
   }
 
@@ -303,8 +309,18 @@ export function StartServer(Port) {
 
         const ConversationId = typeof Body.conversationId === "string" ? Body.conversationId : null;
 
-        if (ConversationId && IsConversationBusy(ConversationId)) {
-          SendJson(Response, 409, { error: "That chat is still answering. Stop it first." });
+        if ((ConversationId || typeof Body.requestId === "string") && (IsConversationBusy(ConversationId) || Body.now === true)) {
+          const Pictures = Array.isArray(Body.images)
+            ? Body.images.filter((Image) => typeof Image.data === "string" && typeof Image.mediaType === "string").slice(0, 4)
+            : [];
+          const Joined = Body.now === true ? AddToTurn(typeof Body.requestId === "string" ? Body.requestId : null, ConversationId, Body.text, Pictures) : null;
+
+          if (!Joined) {
+            SendJson(Response, 409, { error: "That chat is still answering. Stop it first." });
+            return;
+          }
+
+          SendJson(Response, 200, DescribeTurn(Joined));
           return;
         }
 

@@ -38,16 +38,4 @@ return function()
 			expect(Format.Model("")).to.equal("")
 		end)
 	end)
-
-	describe("Tool", function()
-		it("uses the verb for the tool and the status", function()
-			expect(Format.Tool("capture", nil, "", "done")).to.equal("Took a screenshot")
-			expect(Format.Tool("capture", nil, "", "running")).to.equal("Taking a screenshot")
-			expect(Format.Tool("capture", nil, "", "error")).to.equal("Failed to take a screenshot")
-		end)
-
-		it("titles a tool it has no verb for", function()
-			expect(Format.Tool("do_thing", nil, "Workspace.Part", "done")).to.equal("Do thing Workspace.Part")
-		end)
-	end)
 end

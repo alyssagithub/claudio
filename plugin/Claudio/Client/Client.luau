@@ -76,6 +76,16 @@ const function GetPlaceName(): string
 	return PlaceName :: string
 end
 
+function Client.SendNow(Text: string, ConversationId: string?, RequestId: string?, Images: {Types.ImageUpload}): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/chat`, {
+		text = Text,
+		conversationId = ConversationId,
+		requestId = RequestId,
+		images = Images,
+		now = true,
+	})
+end
+
 function Client.StartTurn(Text: string, ConversationId: string?, Images: {Types.ImageUpload}, Escalate: boolean?): (boolean, any)
 	const Effort = Settings.Get("Effort")()
 
@@ -247,8 +257,8 @@ function Client.ListConversations(): (boolean, any)
 	return Checked(Ok, Result, Schemas.Conversations)
 end
 
-function Client.GetConversation(Id: string): (boolean, any)
-	const Ok, Result = Http.Request("GET", `{BaseUrl()}/conversations/{Id}`)
+function Client.GetConversation(Id: string, Before: number?, Count: number?): (boolean, any)
+	const Ok, Result = Http.Request("GET", `{BaseUrl()}/conversations/{Id}?before={Before or ""}&count={Count or ""}`)
 
 	return Checked(Ok, Result, Schemas.Conversation)
 end

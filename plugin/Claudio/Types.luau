@@ -22,9 +22,16 @@ export type Limit = {
 	resetsAt: number?,
 }
 
+export type Piece = {
+	Kind: "thinking" | "text" | "call" | "user",
+	Text: string?,
+	Call: number?,
+}
+
 export type Message = {
 	Role: "user" | "assistant",
 	Text: string,
+	Parts: {Piece}?,
 	Activity: {string}?,
 	Thinking: string?,
 	Attachments: {string}?,
@@ -175,6 +182,7 @@ export type Turn = {
 	status: string,
 	text: string,
 	thinking: string?,
+	parts: {{kind: string, text: string?, call: number?}}?,
 	limits: {Limit}?,
 	contextWindow: number?,
 	contextModel: string?,

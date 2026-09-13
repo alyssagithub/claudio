@@ -22,6 +22,8 @@ const Chat = {
 	Draft = Vide.source(""),
 	StreamingText = Vide.source(""),
 	StreamingThinking = Vide.source(""),
+	StreamingParts = Vide.source({} :: {Types.Piece}),
+	Zoomed = Vide.source(nil :: EditableImage?),
 	StreamingPick = Vide.source(nil :: {Model: string, Effort: string?}?),
 	StreamingImages = Vide.source({} :: {EditableImage}),
 	Activity = Vide.source({} :: {string}),
@@ -68,6 +70,7 @@ const Chat = {
 	Versions = Vide.source(nil :: Types.Versions?),
 	Updating = Vide.source(false),
 	Shown = Vide.source(40),
+	Earlier = Vide.source(0),
 	ChaptersOpen = Vide.source(false),
 	Anchors = {} :: {[number]: Instance},
 	Window = nil :: DockWidgetPluginGui?,
@@ -114,6 +117,7 @@ end
 
 const function Reset()
 	Generation += 1
+	Chat.Earlier(0)
 
 	for _, Message in Chat.Messages() do
 		DestroyImages(Message.Images)
@@ -129,6 +133,7 @@ const function Reset()
 	Chat.Queue({})
 	Chat.StreamingText("")
 	Chat.StreamingThinking("")
+	Chat.StreamingParts({})
 	Chat.StreamingPick(nil)
 	Chat.StreamingImages({})
 	Chat.Activity({})
@@ -2306,6 +2311,20 @@ const function CheckEdited(Wanted: {any})
 	LintPasses = 1
 end
 
+const function ReadParts(Given: any): {Types.Piece}
+	const Parts: {Types.Piece} = {}
+
+	for _, Part in (if typeof(Given) == "table" then Given else {}) :: {any} do
+		table.insert(Parts, {
+			Kind = Part.kind,
+			Text = Part.text,
+			Call = Part.call,
+		})
+	end
+
+	return Parts
+end
+
 const function FetchImage(RequestId: string, Index: number, CurrentGeneration: number, Pending: {[number]: boolean})
 	const Ok, Image = Client.GetImage(RequestId, Index)
 
@@ -2347,6 +2366,7 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		Version = State.version
 		Chat.StreamingText(State.text or "")
 		Chat.StreamingThinking(State.thinking or "")
+		Chat.StreamingParts(ReadParts(State.parts))
 		Chat.StreamingPick(if State.auto and State.model then {Model = State.model, Effort = State.effort} else nil)
 		Chat.Limits(State.limits or Chat.Limits())
 		Chat.Tasks(State.tasks or {})
@@ -2420,6 +2440,7 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 		Text = Text,
 		Activity = if State then State.activity else nil,
 		Thinking = if State then State.thinking else nil,
+		Parts = if State then ReadParts(State.parts) else nil,
 		Calls = if State then State.calls else nil,
 		Edits = Watcher.GetTurnChanges(),
 		Tokens = if State then State.tokens else nil,
@@ -2446,6 +2467,7 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 
 	Chat.StreamingText("")
 	Chat.StreamingThinking("")
+	Chat.StreamingParts({})
 	Chat.StreamingPick(nil)
 	Chat.StreamingImages({})
 	Chat.Activity({})
@@ -2833,6 +2855,25 @@ function Chat.RequestImages(Index: number)
 	task.spawn(LoadImagesFor, Index, Generation)
 end
 
+const function Loaded(Given: {any}): {Types.Message}
+	const Messages: {Types.Message} = {}
+
+	for _, Message in Given do
+		table.insert(Messages, {
+			Role = if Message.role == "user" then "user" else "assistant",
+			Text = Message.text,
+			Activity = Message.activity,
+			ImageIds = Message.images,
+			At = Message.at,
+			Tokens = Message.tokens,
+			Cost = Message.cost,
+			Estimated = Message.estimated,
+		})
+	end
+
+	return Messages
+end
+
 function Chat.Open(Id: string)
 	if Id == Gallery.Id then
 		Chat.Stop()
@@ -2848,7 +2889,7 @@ function Chat.Open(Id: string)
 		return
 	end
 
-	const Ok, Conversation = Client.GetConversation(Id)
+	const Ok, Conversation = Client.GetConversation(Id, nil, 40)
 
 	if not Ok then
 		Chat.Say(`Could not open that chat: {Conversation}`)
@@ -2863,26 +2904,47 @@ function Chat.Open(Id: string)
 	table.clear(Requested)
 	Settings.Set("LastChat", Id)
 
-	const Messages = {}
+	const Messages = Loaded(Conversation.messages)
 
-	for _, Message in Conversation.messages do
-		table.insert(Messages, {
-			Role = if Message.role == "user" then "user" else "assistant",
-			Text = Message.text,
-			Activity = Message.activity,
-			ImageIds = Message.images,
-			At = Message.at,
-			Tokens = Message.tokens,
-			Cost = Message.cost,
-			Estimated = Message.estimated,
-		})
-	end
+	Chat.Earlier((Conversation.first or 1) - 1)
 
 	Chat.Messages(Messages)
 	Chat.ConversationId(Conversation.id)
 	Chat.Title(Conversation.title)
 	Chat.LoadChapters()
 	Chat.ListOpen(false)
+end
+
+function Chat.LoadEarlier()
+	const Id = Chat.ConversationId()
+	const Missing = Chat.Earlier()
+
+	if not Id or Missing == 0 then
+		return
+	end
+
+	const Ok, Conversation = Client.GetConversation(Id, Missing, 40)
+
+	if not Ok or Chat.ConversationId() ~= Id then
+		return
+	end
+
+	const Messages = Loaded(Conversation.messages)
+	const Anchors = table.clone(Chat.Anchors)
+
+	for _, Message in Chat.Messages() do
+		table.insert(Messages, Message)
+	end
+
+	table.clear(Chat.Anchors)
+
+	for Index, Anchor in Anchors do
+		Chat.Anchors[Index + #Conversation.messages] = Anchor
+	end
+
+	Chat.Messages(Messages)
+	Chat.Earlier((Conversation.first or 1) - 1)
+	Chat.Shown(Chat.Shown() + #Conversation.messages)
 end
 
 function Chat.Resume()
@@ -3205,7 +3267,7 @@ end
 
 function Chat.IsChapter(Index: number): boolean
 	for _, Chapter in Chat.Chapters() do
-		if Chapter.index == Index then
+		if Chapter.index == Index + Chat.Earlier() then
 			return true
 		end
 	end
@@ -3225,14 +3287,14 @@ function Chat.ToggleChapter(Index: number, Title: string)
 	const Chapters: {Types.Chapter} = {}
 
 	for _, Chapter in Chat.Chapters() do
-		if Chapter.index ~= Index then
+		if Chapter.index ~= Index + Chat.Earlier() then
 			table.insert(Chapters, Chapter)
 		end
 	end
 
 	if #Chapters == #Chat.Chapters() then
 		table.insert(Chapters, {
-			index = Index,
+			index = Index + Chat.Earlier(),
 			title = Title:gsub("%s+", " "):sub(1, 60),
 		})
 		table.sort(Chapters, function(Left: Types.Chapter, Right: Types.Chapter)
@@ -3325,7 +3387,15 @@ function Chat.InterruptWith(Index: number)
 
 	Chat.Queue(Queue)
 
-	if Chat.Sending() then
+	if Chat.Sending() and Chat.RequestId then
+		const Sent = Client.SendNow(Entry.Full, Chat.ConversationId(), Chat.RequestId, Entry.Images)
+
+		if Sent then
+			DestroyImages(Entry.Previews)
+
+			return
+		end
+
 		Chat.Stop()
 	end
 

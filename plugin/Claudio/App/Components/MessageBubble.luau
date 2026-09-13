@@ -5,6 +5,7 @@ const Config = require(script.Parent.Parent.Parent.Config)
 const Markdown = require(script.Parent.Parent.Parent.Markdown)
 const Format = require(script.Parent.Parent.Parent.Format)
 const Changes = require(script.Parent.Parent.Parent.Changes)
+const Syntax = require(script.Parent.Parent.Parent.Syntax)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Navigate = require(script.Parent.Parent.Parent.Navigate)
@@ -16,7 +17,6 @@ const IconButton = require(script.Parent.IconButton)
 const Button = require(script.Parent.Button)
 
 const TextService = game:GetService("TextService")
-const HttpService = game:GetService("HttpService")
 
 const Create = Vide.create
 
@@ -25,6 +25,7 @@ type Props = {
 	Text: () -> string,
 	Activity: () -> {string},
 	Thinking: (() -> string?)?,
+	Parts: (() -> {Types.Piece}?)?,
 	Calls: (() -> {Types.ToolCall})?,
 	Edits: (() -> {Types.Change}?)?,
 	Tokens: (() -> Types.Tokens?)?,
@@ -47,23 +48,16 @@ const function IsCommand(Name: string): boolean
 	return Name == "Bash" or Name == "PowerShell"
 end
 
-const function Details(Input: string): (string?, string)
-	const Ok, Parsed = pcall(function()
-		return HttpService:JSONDecode(Input)
-	end)
+const function Field(Input: string, Name: string): string?
+	for _, Line in string.split(Input, "\n") do
+		const Key, Value = Line:match("^([%w_]+): (.+)$")
 
-	if not Ok or typeof(Parsed) ~= "table" then
-		return nil, ""
+		if Key == Name then
+			return Value
+		end
 	end
 
-	const Action = if typeof(Parsed.action) == "string" then Parsed.action else nil
-	const Named = Parsed.path or Parsed.device or Parsed.className or Parsed.enumName or Parsed.search or Parsed.text or Parsed.label
-
-	if typeof(Named) ~= "string" or Named == "" then
-		return Action, ""
-	end
-
-	return Action, if #Named > 48 then `{Named:sub(1, 48)}...` else Named
+	return nil
 end
 
 const function Counted(Added: number, Removed: number): string
@@ -111,43 +105,8 @@ const function Describe(Entry: Types.ToolCall, Running: boolean): string
 	end
 
 	const Words = (Tool:gsub("_", " "))
-	const Titled = `{Words:sub(1, 1):upper()}{Words:sub(2)}`
 
-	if Server ~= "claudio" then
-		return `{Verb} {Server}: {Titled}`
-	end
-
-	const Action, Named = Details(Entry.input)
-
-	return Format.Tool(Tool, Action, Named, Entry.status)
-end
-
-const function Detail(Name: string, Text: () -> string, LayoutOrder: number)
-	return Create "TextLabel" {
-		Name = Name,
-		Size = UDim2.fromScale(1, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = Theme.Colors.Code,
-		TextColor3 = Theme.Colors.CodeText,
-		TextSize = Settings.SmallText,
-		FontFace = Font.fromEnum(Enum.Font.Code),
-		TextWrapped = true,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextYAlignment = Enum.TextYAlignment.Top,
-		LayoutOrder = LayoutOrder,
-		Text = Text,
-		Visible = function()
-			return Text() ~= ""
-		end,
-
-		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-		Create "UIPadding" {
-			PaddingLeft = UDim.new(0, 6),
-			PaddingRight = UDim.new(0, 6),
-			PaddingTop = UDim.new(0, 4),
-			PaddingBottom = UDim.new(0, 4),
-		},
-	}
+	return `{Verb} {Server}: {Words:sub(1, 1):upper()}{Words:sub(2)}`
 end
 
 const function Note(Name: string, LayoutOrder: any, Text: () -> string, Visible: () -> boolean)
@@ -215,13 +174,13 @@ return function(Props: Props)
 				return Font.fromEnum(if IsCode() then Enum.Font.Code else Enum.Font.BuilderSans)
 			end,
 			TextWrapped = true,
-			RichText = function()
-				return not IsCode()
-			end,
+			RichText = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextYAlignment = Enum.TextYAlignment.Top,
 			Text = function()
-				return if IsCode() then Value().Text else Markdown.Rich(Value().Text, Settings.TextSize())
+				const Body = Value().Text
+
+				return if IsCode() then Syntax.Highlight(Body, Syntax.Language(Value().Language) or Syntax.Guess(Body)) else Markdown.Rich(Body, Settings.TextSize())
 			end,
 			LayoutOrder = 1000 + Value().Order,
 
@@ -280,7 +239,6 @@ return function(Props: Props)
 			and #Written() == 0
 	end
 
-	const Listed = Vide.source(false)
 	const Expanded = Vide.source(false)
 
 	const function Trimmed(): {Types.Change}
@@ -313,8 +271,82 @@ return function(Props: Props)
 		return Pairs
 	end
 
+	const function Headline(Entry: Types.ToolCall, Running: boolean): string
+		const Label = Field(Entry.input, "label") or Field(Entry.input, "description")
+
+		if Label then
+			return Label
+		end
+
+		return Describe(Entry, Running)
+	end
+
+	const function Fields(Input: string): {{Key: string, Value: string}}
+		const Found = {}
+
+		for _, Line in string.split(Input, "\n") do
+			const Key, Value = Line:match("^([%w_]+): (.*)$")
+
+			if Key and Value then
+				table.insert(Found, {Key = Key, Value = Value})
+			elseif #Found > 0 then
+				Found[#Found].Value ..= `\n{Line}`
+			end
+		end
+
+		return Found
+	end
+
+	const function CodeBlock(Name: string, Text: () -> string, Language: () -> string?, LayoutOrder: number, Small: boolean?)
+		return Create "TextLabel" {
+			Name = Name,
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = Theme.Colors.Code,
+			TextColor3 = Theme.Colors.CodeText,
+			TextSize = if Small then Settings.SmallText else Settings.TextSize,
+			FontFace = Font.fromEnum(Enum.Font.Code),
+			TextWrapped = true,
+			RichText = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			LayoutOrder = LayoutOrder,
+			Visible = function()
+				return Text() ~= ""
+			end,
+			Text = function()
+				const Body = Text()
+
+				return Syntax.Highlight(Body, Language() or Syntax.Guess(Body))
+			end,
+
+			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
+			Create "UIPadding" {
+				PaddingLeft = UDim.new(0, 8),
+				PaddingRight = UDim.new(0, 8),
+				PaddingTop = UDim.new(0, 6),
+				PaddingBottom = UDim.new(0, 6),
+			},
+		}
+	end
+
+	const CodeFields: {[string]: boolean} = {code = true, text = true, source = true, command = true, content = true, old_string = true, new_string = true, prompt = true}
+
 	const function Call(Value: () -> Types.ToolCall, Index: number)
-		const Open = Vide.source(false)
+		const Open = Vide.source(Chat.Thinking())
+
+		const function Title(): string
+			const Name = Value().name
+			const Server, Tool = Name:match("^mcp__(.-)__(.+)$")
+
+			if not Server or not Tool then
+				return Name
+			end
+
+			const Words = (Tool:gsub("_", " "))
+
+			return `{Words:sub(1, 1):upper()}{Words:sub(2)}`
+		end
 
 		return Create "Frame" {
 			Name = "ToolCall",
@@ -322,9 +354,6 @@ return function(Props: Props)
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = Index,
-			Visible = function()
-				return #Asked(Value()) > 0 or Listed() or Chat.Thinking()
-			end,
 
 			Create "UIListLayout" {
 				SortOrder = Enum.SortOrder.LayoutOrder,
@@ -418,17 +447,6 @@ return function(Props: Props)
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					Padding = UDim.new(0, 4),
 				},
-				Icon {
-					Name = Config.Icons.Down,
-					Size = Settings.SmallText,
-					Colour = function()
-						return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.DimText()
-					end,
-					Rotation = function()
-						return if Open() then 0 else -90
-					end,
-					LayoutOrder = 1,
-				},
 				Create "TextLabel" {
 					Name = "Summary",
 					AutomaticSize = Enum.AutomaticSize.XY,
@@ -437,37 +455,138 @@ return function(Props: Props)
 						return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.DimText()
 					end,
 					TextSize = Settings.SmallText,
-					FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 					TextXAlignment = Enum.TextXAlignment.Left,
 					RichText = true,
-					LayoutOrder = 2,
+					LayoutOrder = 1,
 					Text = function()
 						const Entry = Value()
 
 						if Entry.status == "running" then
-							return Describe(Entry, true)
+							return Headline(Entry, true)
 						end
 
-						return `{Describe(Entry, false)}{if Entry.status == "error" then " · failed" else ""}`
+						return `{Headline(Entry, false)}{if Entry.status == "error" then " · failed" else ""}`
 					end,
+				},
+				Icon {
+					Name = Config.Icons.Down,
+					Size = Settings.SmallText,
+					Colour = function()
+						return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.DimText()
+					end,
+					Rotation = function()
+						return if Open() then 180 else 0
+					end,
+					LayoutOrder = 2,
 				},
 			},
 			Create "Frame" {
-				Name = "Steps",
+				Name = "Card",
 				Size = UDim2.fromScale(1, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
+				BackgroundColor3 = Theme.Colors.Background,
 				LayoutOrder = 2,
+				Visible = Open,
 
-				Create "UIPadding" {PaddingLeft = UDim.new(0, 14)},
+				Create "UICorner" {CornerRadius = UDim.new(0, 8)},
+				Create "UIStroke" {Color = Theme.Colors.Border},
+				Create "UIPadding" {
+					PaddingLeft = UDim.new(0, 12),
+					PaddingRight = UDim.new(0, 12),
+					PaddingTop = UDim.new(0, 10),
+					PaddingBottom = UDim.new(0, 10),
+				},
 				Create "UIListLayout" {
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					HorizontalFlex = Enum.UIFlexAlignment.Fill,
-					Padding = UDim.new(0, 2),
+					Padding = UDim.new(0, 6),
+				},
+				Create "TextLabel" {
+					Name = "Title",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					TextColor3 = Theme.Colors.Text,
+					TextSize = Settings.TextSize,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+					TextXAlignment = Enum.TextXAlignment.Left,
+					LayoutOrder = 1,
+					Text = Title,
 				},
 				Vide.indexes(function()
-					return Value().steps or {}
-				end, function(Step: () -> string, Index: number)
+					return if Open() then Fields(Value().input) else {}
+				end, function(Pair: () -> {Key: string, Value: string}, Order: number)
+					const function IsCode(): boolean
+						return CodeFields[Pair().Key] == true or Pair().Value:find("\n") ~= nil
+					end
+
+					return Create "Frame" {
+						Name = "Field",
+						Size = UDim2.fromScale(1, 0),
+						AutomaticSize = Enum.AutomaticSize.Y,
+						BackgroundTransparency = 1,
+						LayoutOrder = 1 + Order,
+						Visible = function()
+							return Pair().Key ~= "label" and Pair().Key ~= "description"
+						end,
+
+						Create "UIListLayout" {
+							SortOrder = Enum.SortOrder.LayoutOrder,
+							HorizontalFlex = Enum.UIFlexAlignment.Fill,
+							Padding = UDim.new(0, 2),
+						},
+						Create "TextLabel" {
+							Name = "Line",
+							Size = UDim2.fromScale(1, 0),
+							AutomaticSize = Enum.AutomaticSize.Y,
+							BackgroundTransparency = 1,
+							TextColor3 = Theme.Colors.Text,
+							TextSize = Settings.SmallText,
+							FontFace = Font.fromEnum(Enum.Font.Code),
+							TextWrapped = true,
+							RichText = true,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							LayoutOrder = 1,
+							Text = function()
+								const Value = if IsCode() then "" else ` {Pair().Value:gsub("&", "&amp;"):gsub("<", "&lt;")}`
+
+								return `<font color="#{Theme.Colors.DimText():ToHex()}">{Pair().Key}:</font>{Value}`
+							end,
+						},
+						CodeBlock("Code", function()
+							return if IsCode() then Pair().Value else ""
+						end, function()
+							return if Pair().Key == "command" then "sh" else nil
+						end, 2, true),
+					}
+				end),
+				Create "TextLabel" {
+					Name = "Output",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					TextColor3 = function()
+						return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.CodeText()
+					end,
+					TextSize = Settings.SmallText,
+					FontFace = Font.fromEnum(Enum.Font.Code),
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Top,
+					LayoutOrder = 1000,
+					Visible = function()
+						return Open() and Value().output ~= ""
+					end,
+					Text = function()
+						return if Open() then Value().output else ""
+					end,
+
+					Create "UIPadding" {PaddingTop = UDim.new(0, 4)},
+				},
+				Vide.indexes(function()
+					return if Open() then Value().steps or {} else {}
+				end, function(Step: () -> string, Order: number)
 					return Create "TextLabel" {
 						Name = "Step",
 						Size = UDim2.fromScale(1, 0),
@@ -478,23 +597,360 @@ return function(Props: Props)
 						FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 						TextWrapped = true,
 						TextXAlignment = Enum.TextXAlignment.Left,
-						LayoutOrder = Index,
+						LayoutOrder = 2000 + Order,
 						Text = function()
 							return `· {Step()}`
 						end,
 					}
 				end),
 			},
-			Detail("Input", function()
-				return if Open() then Value().input else ""
-			end, 3),
-			Detail("Output", function()
-				return if Open() then Value().output else ""
-			end, 4),
 		}
 	end
 
+	type Block = {
+		Kind: "thinking" | "text" | "calls" | "user",
+		Text: string?,
+		Calls: {number}?,
+	}
 
+	const function Blocks(): {Block}
+		const Found: {Block} = {}
+		const Parts = if Props.Parts then Props.Parts() else nil
+		const Calls: {Types.ToolCall} = if Props.Calls then Props.Calls() else {}
+
+		if not Parts or #Parts == 0 then
+			const Thinking = if Props.Thinking then Props.Thinking() or "" else ""
+
+			if Thinking:match("%S") then
+				table.insert(Found, {Kind = "thinking", Text = Thinking})
+			end
+
+			if #Calls > 0 then
+				const All = {}
+
+				for Index in Calls do
+					table.insert(All, Index)
+				end
+
+				table.insert(Found, {Kind = "calls", Calls = All})
+			end
+
+			if Props.Text() ~= "" then
+				table.insert(Found, {Kind = "text", Text = Props.Text()})
+			end
+
+			return Found
+		end
+
+		for _, Piece in Parts do
+			const Last = Found[#Found]
+
+			if Piece.Kind == "call" and Piece.Call and Calls[Piece.Call] then
+				if Last and Last.Kind == "calls" and Last.Calls then
+					table.insert(Last.Calls, Piece.Call)
+				else
+					table.insert(Found, {Kind = "calls", Calls = {Piece.Call}})
+				end
+			elseif Piece.Kind == "thinking" or Piece.Kind == "text" or Piece.Kind == "user" then
+				if Last and Last.Kind == Piece.Kind and Piece.Kind ~= "user" then
+					Last.Text = `{Last.Text or ""}{if Piece.Kind == "text" then "\n\n" else "\n"}{Piece.Text or ""}`
+				else
+					table.insert(Found, {Kind = Piece.Kind, Text = Piece.Text or ""})
+				end
+			end
+		end
+
+		return Found
+	end
+
+	const function Summarize(Chosen: {number}): string
+		const Calls: {Types.ToolCall} = if Props.Calls then Props.Calls() else {}
+		local Commands = 0
+		local Questions = 0
+		local Sent = 0
+		local Added = 0
+		local Removed = 0
+		const Files = {}
+
+		for _, Index in Chosen do
+			const Entry = Calls[Index]
+
+			if not Entry then
+				continue
+			end
+
+			if Entry.name == Config.AskTool then
+				Questions += 1
+
+				continue
+			end
+
+			if Entry.status == "running" then
+				return Headline(Entry, true)
+			end
+
+			if Entry.delegate then
+				Sent += 1
+
+				continue
+			end
+
+			if IsCommand(Entry.name) then
+				Commands += 1
+			end
+
+			const Wrote = FileWork(Entry, false)
+
+			if Wrote and Entry.status ~= "error" then
+				table.insert(Files, (Wrote:gsub(" <font.*$", "")))
+				Added += if Entry.lines then Entry.lines.added else 0
+				Removed += if Entry.lines then Entry.lines.removed else 0
+			end
+		end
+
+		const Tools = #Chosen - Commands - Questions - Sent - #Files
+		const Parts = {}
+
+		if #Files > 0 and #Files <= 2 then
+			table.insert(Parts, table.concat(Files, ", "))
+		elseif #Files > 2 then
+			table.insert(Parts, `edited {#Files} files`)
+		end
+
+		if Sent > 0 then
+			table.insert(Parts, if Sent == 1 then "delegated a read" else `delegated {Sent} reads`)
+		end
+
+		if Commands > 0 then
+			table.insert(Parts, if Commands == 1 then "ran a command" else `ran {Commands} commands`)
+		end
+
+		if Tools > 0 or #Parts == 0 then
+			table.insert(Parts, `used {Tools} tool{if Tools == 1 then "" else "s"}`)
+		end
+
+		const Line = table.concat(Parts, ", ")
+
+		return `{Line:sub(1, 1):upper()}{Line:sub(2)}{if #Files > 0 then Counted(Added, Removed) else ""}`
+	end
+
+	const Blank: Types.ToolCall = {name = "", input = "", output = "", status = "done", milliseconds = 0}
+
+	const function Group(Value: () -> Block, Index: number)
+		const Listed = Vide.source(Chat.Thinking())
+
+		const function Kind(): string
+			return Value().Kind
+		end
+
+		const function Many(): boolean
+			const Chosen = Value().Calls
+
+			return Chosen ~= nil and #Chosen > 1
+		end
+
+		return Create "Frame" {
+			Name = function()
+				return `{Kind():sub(1, 1):upper()}{Kind():sub(2)}`
+			end,
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			LayoutOrder = Index,
+			Visible = function()
+				return Kind() ~= "thinking" or Chat.Thinking()
+			end,
+
+			Create "UIListLayout" {
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				HorizontalFlex = function()
+					return if Kind() == "user" then Enum.UIFlexAlignment.None else Enum.UIFlexAlignment.Fill
+				end,
+				HorizontalAlignment = function()
+					return if Kind() == "user" then Enum.HorizontalAlignment.Right else Enum.HorizontalAlignment.Left
+				end,
+				Padding = UDim.new(0, 6),
+			},
+			Create "Frame" {
+				Name = "Thought",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				LayoutOrder = 1,
+				Visible = function()
+					return Kind() == "thinking"
+				end,
+
+				Create "UIPadding" {
+					PaddingLeft = UDim.new(0, 12),
+					PaddingTop = UDim.new(0, 2),
+					PaddingBottom = UDim.new(0, 2),
+				},
+				Create "Frame" {
+					Name = "Rule",
+					Size = UDim2.new(0, 2, 1, 0),
+					Position = UDim2.fromOffset(-12, 0),
+					BackgroundColor3 = Theme.Colors.Border,
+					BorderSizePixel = 0,
+
+					Create "UICorner" {CornerRadius = UDim.new(1, 0)},
+				},
+				Create "TextLabel" {
+					Name = "Text",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					TextColor3 = Theme.Colors.DimText,
+					TextSize = Settings.SmallText,
+					FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic),
+					TextWrapped = true,
+					LineHeight = 1.15,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Top,
+					Text = function()
+						return if Kind() == "thinking" then ((Value().Text or ""):gsub("^%s+", ""):gsub("%s+$", "")) else ""
+					end,
+				},
+			},
+			Create "Frame" {
+				Name = "Said",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				LayoutOrder = 2,
+				Visible = function()
+					return Kind() == "text"
+				end,
+
+				Create "UIListLayout" {
+					Padding = UDim.new(0, 6),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					HorizontalFlex = Enum.UIFlexAlignment.Fill,
+				},
+				Vide.indexes(Vide.derive(function()
+					const Keyed: {[string]: Markdown.Segment} = {}
+
+					if Kind() ~= "text" then
+						return Keyed
+					end
+
+					for _, Piece in Markdown.Split(Value().Text or "") do
+						Keyed[`{Piece.Order}|{Piece.Kind}`] = Piece
+					end
+
+					return Keyed
+				end), Segment),
+			},
+			Create "Frame" {
+				Name = "Asked",
+				Size = UDim2.fromOffset(0, 0),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundColor3 = Theme.Colors.Panel,
+				LayoutOrder = 3,
+				Visible = function()
+					return Kind() == "user"
+				end,
+
+				Create "UICorner" {CornerRadius = UDim.new(0, 8)},
+				Create "UIStroke" {Color = Theme.Colors.Border},
+				Create "UISizeConstraint" {
+					MaxSize = function()
+						return Vector2.new(math.max(40, math.floor(Hug() * 0.85)), math.huge)
+					end,
+				},
+				Create "UIPadding" {
+					PaddingLeft = UDim.new(0, 10),
+					PaddingRight = UDim.new(0, 10),
+					PaddingTop = UDim.new(0, 6),
+					PaddingBottom = UDim.new(0, 6),
+				},
+				Create "TextLabel" {
+					Name = "Text",
+					Size = UDim2.fromOffset(0, 0),
+					AutomaticSize = Enum.AutomaticSize.XY,
+					BackgroundTransparency = 1,
+					TextColor3 = Theme.Colors.Text,
+					TextSize = Settings.TextSize,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					Text = function()
+						return if Kind() == "user" then Value().Text or "" else ""
+					end,
+
+					Create "UISizeConstraint" {
+						MaxSize = function()
+							return Vector2.new(math.max(20, math.floor(Hug() * 0.85) - 20), math.huge)
+						end,
+					},
+				},
+			},
+			Create "TextButton" {
+				Name = "Summary",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				LayoutOrder = 4,
+				Visible = function()
+					return Kind() == "calls" and Many() and not Listed()
+				end,
+				Activated = function()
+					Listed(true)
+				end,
+
+				Create "UIListLayout" {
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 4),
+				},
+				Create "TextLabel" {
+					Name = "Label",
+					AutomaticSize = Enum.AutomaticSize.XY,
+					BackgroundTransparency = 1,
+					TextColor3 = Theme.Colors.DimText,
+					TextSize = Settings.SmallText,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+					TextXAlignment = Enum.TextXAlignment.Left,
+					RichText = true,
+					LayoutOrder = 1,
+					Text = function()
+						return if Kind() == "calls" then Summarize(Value().Calls or {}) else ""
+					end,
+				},
+				Icon {
+					Name = Config.Icons.Down,
+					Size = Settings.SmallText,
+					LayoutOrder = 2,
+				},
+			},
+			Create "Frame" {
+				Name = "Calls",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				LayoutOrder = 5,
+				Visible = function()
+					return Kind() == "calls" and (not Many() or Listed())
+				end,
+
+				Create "UIListLayout" {
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					HorizontalFlex = Enum.UIFlexAlignment.Fill,
+					Padding = UDim.new(0, 4),
+				},
+				Vide.indexes(function()
+					return if Kind() == "calls" then Value().Calls or {} else {}
+				end, function(Which: () -> number, Order: number)
+					return Call(function()
+						return (Props.Calls :: () -> {Types.ToolCall})()[Which()] or Blank
+					end, Order)
+				end),
+			},
+		}
+	end
 
 	return Create "Frame" {
 		Name = function()
@@ -553,166 +1009,7 @@ return function(Props: Props)
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				HorizontalFlex = Enum.UIFlexAlignment.Fill,
 			},
-			Create "Frame" {
-				Name = "Thought",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				LayoutOrder = -1,
-				Visible = function()
-					return Chat.Thinking() and Props.Thinking ~= nil and (Props.Thinking() or ""):match("%S") ~= nil
-				end,
-
-				Create "UIPadding" {
-					PaddingLeft = UDim.new(0, 12),
-					PaddingTop = UDim.new(0, 2),
-					PaddingBottom = UDim.new(0, 2),
-				},
-				Create "Frame" {
-					Name = "Rule",
-					Size = UDim2.new(0, 2, 1, 0),
-					Position = UDim2.fromOffset(-12, 0),
-					BackgroundColor3 = Theme.Colors.Border,
-					BorderSizePixel = 0,
-
-					Create "UICorner" {CornerRadius = UDim.new(1, 0)},
-				},
-				Create "TextLabel" {
-					Name = "Text",
-					Size = UDim2.fromScale(1, 0),
-					AutomaticSize = Enum.AutomaticSize.Y,
-					BackgroundTransparency = 1,
-					TextColor3 = Theme.Colors.DimText,
-					TextSize = Settings.SmallText,
-					FontFace = Font.new("rbxasset://fonts/families/Roboto.json", Enum.FontWeight.Regular, Enum.FontStyle.Italic),
-					TextWrapped = true,
-					LineHeight = 1.15,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextYAlignment = Enum.TextYAlignment.Top,
-					Text = function()
-						return ((if Props.Thinking then Props.Thinking() or "" else ""):gsub("^%s+", ""):gsub("%s+$", ""))
-					end,
-				},
-			},
-			Vide.indexes(function()
-				return if Props.Calls then Props.Calls() else {}
-			end, Call),
-			Create "TextButton" {
-				Name = "Summary",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				Text = "",
-				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				AutoButtonColor = false,
-				LayoutOrder = 0,
-				Visible = function()
-					if Listed() or Chat.Thinking() or not Props.Calls then
-						return false
-					end
-
-					for _, Entry in Props.Calls() do
-						if Entry.name ~= Config.AskTool then
-							return true
-						end
-					end
-
-					return false
-				end,
-				Activated = function()
-					Listed(not Listed())
-				end,
-
-				Create "UIListLayout" {
-					FillDirection = Enum.FillDirection.Horizontal,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 4),
-				},
-				Create "TextLabel" {
-					Name = "Label",
-					AutomaticSize = Enum.AutomaticSize.XY,
-					BackgroundTransparency = 1,
-					TextColor3 = Theme.Colors.DimText,
-					TextSize = Settings.SmallText,
-					FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
-					TextXAlignment = Enum.TextXAlignment.Left,
-					RichText = true,
-					LayoutOrder = 1,
-					Text = function()
-						const Calls: {Types.ToolCall} = if Props.Calls then Props.Calls() else {}
-						local Commands = 0
-						local Questions = 0
-						local Sent = 0
-						local Added = 0
-						local Removed = 0
-						const Files = {}
-
-						for _, Entry in Calls do
-							if Entry.name == Config.AskTool then
-								Questions += 1
-
-								continue
-							end
-
-							if Entry.status == "running" then
-								return Describe(Entry, true)
-							end
-
-							if Entry.delegate then
-								Sent += 1
-
-								continue
-							end
-
-							if IsCommand(Entry.name) then
-								Commands += 1
-							end
-
-							const Wrote = FileWork(Entry, false)
-
-							if Wrote and Entry.status ~= "error" then
-								table.insert(Files, (Wrote:gsub(" <font.*$", "")))
-								Added += if Entry.lines then Entry.lines.added else 0
-								Removed += if Entry.lines then Entry.lines.removed else 0
-							end
-						end
-
-						const Tools = #Calls - Commands - Questions - Sent - #Files
-						const Parts = {}
-
-						if #Files > 0 and #Files <= 2 then
-							table.insert(Parts, table.concat(Files, ", "))
-						elseif #Files > 2 then
-							table.insert(Parts, `edited {#Files} files`)
-						end
-
-						if Sent > 0 then
-							table.insert(Parts, if Sent == 1 then "delegated a read" else `delegated {Sent} reads`)
-						end
-
-						if Commands > 0 then
-							table.insert(Parts, if Commands == 1 then "ran a command" else `ran {Commands} commands`)
-						end
-
-						if Tools > 0 or #Parts == 0 then
-							table.insert(Parts, `used {Tools} tool{if Tools == 1 then "" else "s"}`)
-						end
-
-						const Line = table.concat(Parts, ", ")
-
-						return `{Line:sub(1, 1):upper()}{Line:sub(2)}{if #Files > 0 then Counted(Added, Removed) else ""}`
-					end,
-				},
-				Icon {
-					Name = Config.Icons.Down,
-					Size = Settings.SmallText,
-					Rotation = function()
-						return -90
-					end,
-					LayoutOrder = 2,
-				},
-			},
+			Vide.indexes(Blocks, Group),
 			Note("Activity", 0, function()
 				const Names = {}
 
@@ -724,15 +1021,6 @@ return function(Props: Props)
 			end, function()
 				return #Props.Activity() > 0 and (not Props.Calls or #Props.Calls() == 0)
 			end),
-			Vide.indexes(Vide.derive(function()
-				const Keyed: {[string]: Markdown.Segment} = {}
-
-				for _, Piece in Markdown.Split(Props.Text()) do
-					Keyed[`{Piece.Order}|{Piece.Kind}`] = Piece
-				end
-
-				return Keyed
-			end), Segment),
 			Vide.indexes(Vide.derive(function()
 				return if Props.Images then Props.Images() else {}
 			end), function(Image, Index: number)

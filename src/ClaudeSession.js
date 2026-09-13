@@ -461,6 +461,33 @@ function FinishTurn(Turn, Status, Error) {
   setTimeout(() => Turns.delete(Turn.Id), FinishedTurnLifetimeMilliseconds);
 }
 
+export function AddToTurn(RequestId, ConversationId, Text, Images) {
+  for (const Turn of Turns.values()) {
+    const Matches = RequestId ? Turn.Id === RequestId : Turn.ConversationId === ConversationId;
+
+    if (!Matches || Turn.Status !== "running" || !Turn.Session) {
+      continue;
+    }
+
+    Turn.Session.Send(UserMessage(Text, Images));
+    Publish(Turn, {
+      Parts: Turn.Parts.concat(
+        Turn.PendingThinking.trim() !== "" ? [{ kind: "thinking", text: Turn.PendingThinking }] : [],
+        Turn.PendingText.trim() !== "" ? [{ kind: "text", text: Turn.PendingText }] : [],
+        [{ kind: "user", text: StripContext(Text) }],
+      ),
+      CommittedThinking: JoinText(Turn.CommittedThinking, Turn.PendingThinking),
+      CommittedText: JoinText(Turn.CommittedText, Turn.PendingText),
+      PendingThinking: "",
+      PendingText: "",
+    });
+
+    return Turn;
+  }
+
+  return null;
+}
+
 export function IsConversationBusy(ConversationId) {
   for (const Turn of Turns.values()) {
     if (Turn.ConversationId === ConversationId && (Turn.Status === "running" || Turn.Status === "cancelling")) {
@@ -748,11 +775,24 @@ function RouteMessage(Session, Message) {
       Delegate: DelegateFor(Block, Turn.Delegate),
     }));
 
+    const Parts = Content.map((Block) => {
+      if (Block.type === "thinking") {
+        return { kind: "thinking", text: Block.thinking };
+      }
+
+      if (Block.type === "tool_use") {
+        return { kind: "call", id: Block.id };
+      }
+
+      return Block.type === "text" ? { kind: "text", text: Block.text } : null;
+    }).filter((Part) => Part && (Part.kind === "call" || Part.text.trim() !== ""));
+
     Publish(Turn, {
       CommittedText: JoinText(Turn.CommittedText, Committed),
       PendingText: "",
       CommittedThinking: JoinText(Turn.CommittedThinking, Thought),
       PendingThinking: "",
+      Parts: Turn.Parts.concat(Parts),
       Activity: Turn.Activity.concat(Started.map((Call) => Call.Name)),
       Calls: Turn.Calls.concat(Started),
       Usage: Message.message.usage ? CountUsage(Turn.Usage, Message.message.usage) : Turn.Usage,
@@ -1150,6 +1190,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     PendingText: "",
     CommittedThinking: "",
     PendingThinking: "",
+    Parts: [],
     Activity: [],
     Calls: [],
     Usage: { Input: 0, Output: 0, Cached: 0 },
@@ -1335,6 +1376,10 @@ export function DescribeTurn(Turn) {
     status: Turn.Status === "cancelling" ? "running" : Turn.Status,
     text: JoinText(Turn.CommittedText, Turn.PendingText),
     thinking: JoinText(Turn.CommittedThinking, Turn.PendingThinking),
+    parts: Turn.Parts.concat(
+      Turn.PendingThinking.trim() !== "" ? [{ kind: "thinking", text: Turn.PendingThinking }] : [],
+      Turn.PendingText.trim() !== "" ? [{ kind: "text", text: Turn.PendingText }] : [],
+    ).map((Part) => (Part.kind === "call" ? { kind: "call", call: Turn.Calls.findIndex((Call) => Call.Id === Part.id) + 1 } : Part)),
     activity: Turn.Activity,
     model: Turn.Model,
     effort: Turn.Effort,

@@ -2238,8 +2238,15 @@ function Chat.WatchStudioJobs()
 				break
 			end
 
-			if not Mounted and game:GetService("ServerStorage"):FindFirstChild("ClaudioTesting") then
-				continue
+			if Mounted then
+				(script.Parent.Parent :: Instance):SetAttribute("ClaudioMountSeen", os.clock())
+			else
+				const Mount = game:GetService("ServerStorage"):FindFirstChild("ClaudioTesting")
+				const Seen = if Mount then Mount:GetAttribute("ClaudioMountSeen") else nil
+
+				if typeof(Seen) == "number" and os.clock() - Seen < 5 then
+					continue
+				end
 			end
 
 			const Polled, Trouble = pcall(function()

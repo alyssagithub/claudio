@@ -31,6 +31,18 @@ export function CropToMarker(Data, Width, Height) {
 
       PNG.bitblt(Image, Out, X, Y, Wide, Tall, 0, 0);
 
+      const Under = Colour(Image, X, Math.min(Y + 8, Image.height - 1));
+
+      for (let Row = 0; Row < Math.min(8, Tall); Row += 1) {
+        for (let Column = 0; Column < Math.min(16, Wide); Column += 1) {
+          const At = (Wide * Row + Column) * 4;
+
+          Out.data[At] = Under[0];
+          Out.data[At + 1] = Under[1];
+          Out.data[At + 2] = Under[2];
+        }
+      }
+
       return { data: PNG.sync.write(Out).toString("base64"), width: Wide, height: Tall, x: X, y: Y };
     }
   }

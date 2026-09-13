@@ -2209,6 +2209,10 @@ function Chat.WatchStudioJobs()
 				break
 			end
 
+			if not Mounted and game:GetService("ServerStorage"):FindFirstChild("ClaudioTesting") then
+				continue
+			end
+
 			const Polled, Trouble = pcall(function()
 				const Ok, Result = Client.TakeStudioJob()
 

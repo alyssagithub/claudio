@@ -769,7 +769,9 @@ return function(Props: Props)
 		end
 
 		const function Many(): boolean
-			return Value().Calls ~= nil
+			const Chosen = Value().Calls
+
+			return Chosen ~= nil and #Chosen > 1
 		end
 
 		return Create "Frame" {
@@ -1232,10 +1234,10 @@ return function(Props: Props)
 						Text = "Undo",
 						LayoutOrder = 3,
 						Visible = function()
-							return not IsUser() and Props.Index ~= nil and Props.Checkpoint ~= nil and Props.Checkpoint() ~= nil
+							return not IsUser() and Props.Index ~= nil and Chat.UndoPoint(Props.Index()) ~= nil
 						end,
 						OnClick = function()
-							Chat.Rewinding(if Props.Index then Props.Index() else nil)
+							Chat.Rewinding(if Props.Index then Chat.UndoPoint(Props.Index()) else nil)
 						end,
 					},
 				},

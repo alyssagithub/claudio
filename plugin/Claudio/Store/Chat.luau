@@ -3170,6 +3170,18 @@ function Chat.Undoing(Index: number): {string}
 	return Found
 end
 
+function Chat.UndoPoint(Index: number): number?
+	const History = Chat.Messages()
+
+	for At = math.min(Index, #History), 1, -1 do
+		if History[At].Checkpoint then
+			return At
+		end
+	end
+
+	return nil
+end
+
 function Chat.Restore(Position: number)
 	const Message = Chat.Messages()[Position]
 	const Point = if Message then Message.Checkpoint else nil

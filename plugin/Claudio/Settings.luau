@@ -194,6 +194,7 @@ const Hidden: {[string]: string | boolean} = {
 	RelayToken = "",
 	Mode = "auto",
 	Bypass = false,
+	WidgetOpen = true,
 }
 
 const Settings = {

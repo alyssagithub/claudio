@@ -8,13 +8,12 @@ const Icon = require(script.Parent.Icon)
 
 const Create = Vide.create
 
-const function Row(IconName: string, Label: string, Detail: string, LayoutOrder: number, Add: () -> string?, Insert: (string) -> (), Close: () -> ())
+const function Row(IconName: string, Label: string, LayoutOrder: number, Add: () -> string?, Insert: (string) -> (), Close: () -> ())
 	const Hovered = Vide.source(false)
 
 	return Create "TextButton" {
 		Name = "Option",
-		Size = UDim2.fromScale(1, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, 30),
 		BackgroundColor3 = Theme.Colors.Button,
 		BackgroundTransparency = function()
 			return if Hovered() then 0 else 1
@@ -40,58 +39,33 @@ const function Row(IconName: string, Label: string, Detail: string, LayoutOrder:
 			Hovered(false)
 		end,
 
-		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+		Create "UICorner" {CornerRadius = UDim.new(0, 6)},
 		Create "UIPadding" {
-			PaddingLeft = UDim.new(0, 8),
-			PaddingRight = UDim.new(0, 8),
-			PaddingTop = UDim.new(0, 5),
-			PaddingBottom = UDim.new(0, 5),
+			PaddingLeft = UDim.new(0, 10),
+			PaddingRight = UDim.new(0, 10),
 		},
 		Create "UIListLayout" {
 			FillDirection = Enum.FillDirection.Horizontal,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
-			Padding = UDim.new(0, 8),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 10),
 		},
 		Icon {
 			Name = IconName,
 			Size = Settings.TextSize,
+			Colour = Theme.Colors.DimText,
+			LayoutOrder = 1,
 		},
-		Create "Frame" {
-			Name = "Labels",
-			Size = UDim2.fromScale(0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
+		Create "TextLabel" {
+			Name = "Label",
+			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
+			TextColor3 = Theme.Colors.Text,
+			TextSize = Settings.TextSize,
+			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+			TextXAlignment = Enum.TextXAlignment.Left,
 			LayoutOrder = 2,
-
-			Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
-			Create "UIListLayout" {
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				HorizontalFlex = Enum.UIFlexAlignment.Fill,
-			},
-			Create "TextLabel" {
-				Name = "Label",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				TextColor3 = Theme.Colors.Text,
-				TextSize = Settings.TextSize,
-				FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
-				TextXAlignment = Enum.TextXAlignment.Left,
-				LayoutOrder = 1,
-				Text = Label,
-			},
-			Create "TextLabel" {
-				Name = "Detail",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				TextColor3 = Theme.Colors.DimText,
-				TextSize = Settings.SmallText,
-				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				TextXAlignment = Enum.TextXAlignment.Left,
-				LayoutOrder = 2,
-				Text = Detail,
-			},
+			Text = Label,
 		},
 	}
 end
@@ -105,45 +79,33 @@ return function(Open: (boolean?) -> boolean, Insert: (string) -> ())
 		Name = "AddMenu",
 		Size = UDim2.fromScale(1, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = Theme.Colors.Background,
+		BackgroundTransparency = 1,
 		LayoutOrder = 1,
 		Visible = Open,
 
-		Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-		Create "UIStroke" {Color = Theme.Colors.Border},
-		Create "UIPadding" {
-			PaddingLeft = UDim.new(0, 4),
-			PaddingRight = UDim.new(0, 4),
-			PaddingTop = UDim.new(0, 4),
-			PaddingBottom = UDim.new(0, 4),
-		},
-		Create "UIListLayout" {
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			HorizontalFlex = Enum.UIFlexAlignment.Fill,
-			Padding = UDim.new(0, 2),
-		},
-		Create "TextLabel" {
-			Name = "DragHint",
-			Size = UDim2.fromScale(1, 0),
+		Create "Frame" {
+			Name = "Options",
+			Size = UDim2.fromOffset(220, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundTransparency = 1,
-			TextColor3 = Theme.Colors.DimText,
-			TextSize = Settings.SmallText,
-			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-			TextWrapped = true,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			LayoutOrder = 1,
-			Text = "For objects, drag them here from the Explorer.",
+			BackgroundColor3 = Theme.Colors.Panel,
 
+			Create "UICorner" {CornerRadius = UDim.new(0, 8)},
+			Create "UIStroke" {Color = Theme.Colors.Border},
 			Create "UIPadding" {
-				PaddingLeft = UDim.new(0, 8),
-				PaddingRight = UDim.new(0, 8),
+				PaddingLeft = UDim.new(0, 4),
+				PaddingRight = UDim.new(0, 4),
 				PaddingTop = UDim.new(0, 4),
-				PaddingBottom = UDim.new(0, 6),
+				PaddingBottom = UDim.new(0, 4),
 			},
+			Create "UIListLayout" {
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				HorizontalFlex = Enum.UIFlexAlignment.Fill,
+				Padding = UDim.new(0, 2),
+			},
+			Row(Config.Icons.Script, "Editor script", 1, Context.AddOpenScript, Insert, Close),
+			Row(Config.Icons.Output, "Output", 2, Context.AddOutput, Insert, Close),
+			Row(Config.Icons.Picture, "Image file", 3, Context.ImportImage, Insert, Close),
+			Row(Config.Icons.Selection, "Selected objects", 4, Context.AddSelection, Insert, Close),
 		},
-		Row(Config.Icons.Script, "Editor script", "The script you have open in the editor, with its source", 2, Context.AddOpenScript, Insert, Close),
-		Row(Config.Icons.Output, "Output", "The last 50 lines of the Output window", 3, Context.AddOutput, Insert, Close),
-		Row(Config.Icons.Picture, "Image file", "Pick a picture file from your computer", 4, Context.ImportImage, Insert, Close),
 	}
 end

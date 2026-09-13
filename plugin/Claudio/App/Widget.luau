@@ -1,10 +1,11 @@
 --!strict
 const Config = require(script.Parent.Parent.Config)
+const Settings = require(script.Parent.Parent.Settings)
 
 const Widget = {}
 
 function Widget.Create(CurrentPlugin: Plugin): DockWidgetPluginGui
-	const Made, Created = pcall(CurrentPlugin.CreateDockWidgetPluginGuiAsync, CurrentPlugin, Config.WidgetId, DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Left, true, true, 360, 520, 240, 240))
+	const Made, Created = pcall(CurrentPlugin.CreateDockWidgetPluginGuiAsync, CurrentPlugin, Config.WidgetId, DockWidgetPluginGuiInfo.new(Enum.InitialDockState.Left, Settings.Get("WidgetOpen")() == true, true, 360, 520, 240, 240))
 
 	if not Made then
 		error(`{Config.Name} could not open its window — {Created}`, 0)

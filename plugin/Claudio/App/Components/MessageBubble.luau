@@ -66,7 +66,31 @@ const function Details(Input: string): (string?, string)
 	return Action, if #Named > 48 then `{Named:sub(1, 48)}...` else Named
 end
 
+const function Counted(Added: number, Removed: number): string
+	return ` <font color="#{Theme.Colors.AddedText():ToHex()}">+{Added}</font> <font color="#{Theme.Colors.Error():ToHex()}">-{Removed}</font>`
+end
+
+const function FileWork(Entry: Types.ToolCall, Running: boolean): string?
+	if Entry.name ~= "Write" and Entry.name ~= "Edit" and Entry.name ~= "MultiEdit" then
+		return nil
+	end
+
+	const File = (Entry.input:match('"file_path"%s*:%s*"(.-)"') or ""):match("[^/\\]+$") or "a file"
+	const Lines = Entry.lines
+	const Verb = if Entry.name ~= "Write" then (if Running then "Editing" else "Edited")
+		elseif Lines and Lines.removed == 0 then (if Running then "Creating" else "Created")
+		else (if Running then "Rewriting" else "Rewrote")
+
+	return `{Verb} {File}{if Lines then Counted(Lines.added, Lines.removed) else ""}`
+end
+
 const function Describe(Entry: Types.ToolCall, Running: boolean): string
+	const Wrote = FileWork(Entry, Running)
+
+	if Wrote then
+		return Wrote
+	end
+
 	if Entry.delegate then
 		const Sent = Entry.delegate :: {name: string, model: string}
 
@@ -415,6 +439,7 @@ return function(Props: Props)
 					TextSize = Settings.SmallText,
 					FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
 					TextXAlignment = Enum.TextXAlignment.Left,
+					RichText = true,
 					LayoutOrder = 2,
 					Text = function()
 						const Entry = Value()
@@ -612,12 +637,16 @@ return function(Props: Props)
 					TextSize = Settings.SmallText,
 					FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
 					TextXAlignment = Enum.TextXAlignment.Left,
+					RichText = true,
 					LayoutOrder = 1,
 					Text = function()
 						const Calls: {Types.ToolCall} = if Props.Calls then Props.Calls() else {}
 						local Commands = 0
 						local Questions = 0
 						local Sent = 0
+						local Added = 0
+						local Removed = 0
+						const Files = {}
 
 						for _, Entry in Calls do
 							if Entry.name == Config.AskTool then
@@ -639,13 +668,27 @@ return function(Props: Props)
 							if IsCommand(Entry.name) then
 								Commands += 1
 							end
+
+							const Wrote = FileWork(Entry, false)
+
+							if Wrote and Entry.status ~= "error" then
+								table.insert(Files, (Wrote:gsub(" <font.*$", "")))
+								Added += if Entry.lines then Entry.lines.added else 0
+								Removed += if Entry.lines then Entry.lines.removed else 0
+							end
 						end
 
-						const Tools = #Calls - Commands - Questions - Sent
+						const Tools = #Calls - Commands - Questions - Sent - #Files
 						const Parts = {}
 
+						if #Files > 0 and #Files <= 2 then
+							table.insert(Parts, table.concat(Files, ", "))
+						elseif #Files > 2 then
+							table.insert(Parts, `edited {#Files} files`)
+						end
+
 						if Sent > 0 then
-							table.insert(Parts, if Sent == 1 then "Delegated a read" else `Delegated {Sent} reads`)
+							table.insert(Parts, if Sent == 1 then "delegated a read" else `delegated {Sent} reads`)
 						end
 
 						if Commands > 0 then
@@ -658,7 +701,7 @@ return function(Props: Props)
 
 						const Line = table.concat(Parts, ", ")
 
-						return `{Line:sub(1, 1):upper()}{Line:sub(2)}`
+						return `{Line:sub(1, 1):upper()}{Line:sub(2)}{if #Files > 0 then Counted(Added, Removed) else ""}`
 					end,
 				},
 				Icon {

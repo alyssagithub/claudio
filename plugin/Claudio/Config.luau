@@ -12,7 +12,7 @@ return {
 	Modes = {
 		{
 			value = "auto",
-			label = "Auto",
+			label = "Auto approve",
 			detail = "Claude handles permission decisions",
 		},
 		{

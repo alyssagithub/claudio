@@ -321,7 +321,7 @@ return function()
 			},
 			IconButton {
 				Icon = Config.Icons.Add,
-				LayoutOrder = 2,
+				LayoutOrder = 0,
 				OnClick = function()
 					Chat.PickerOpen(false)
 					Chat.EffortOpen(false)

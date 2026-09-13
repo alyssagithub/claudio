@@ -2,12 +2,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
-import { AllowedTools, AutoTiers, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DelegateModels, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, SystemPromptFor, WorkingDirectory } from "./Config.js";
+import { AllowedTools, AutoTiers, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, DelegateModels, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, SystemPromptFor, WorkingDirectory } from "./Config.js";
 import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
 import { Request as RequestStudio } from "./Studio.js";
+import { ReadPluginSetting } from "./PluginSettings.js";
 import { ChooseModel, GetModels, NextEffort, RecordTurnOutcome, RememberModels, SupportsEffort } from "./Models.js";
 
 const Turns = new Map();
@@ -639,6 +640,10 @@ function RouteMessage(Session, Message) {
   if (Message.type === "system" && Message.subtype === "init") {
     RememberCommands(Message);
     RememberServers(Message);
+
+    if (Turn && Turn.OpenedAt) {
+      console.log(`Turn ${Turn.Id}: session ready ${Date.now() - Turn.OpenedAt}ms after the turn started, ${Turn.Cold ? "cold" : "reused"}, ${(Message.mcp_servers || []).map((Server) => `${Server.name} ${Server.status}`).join(", ")}`);
+    }
   }
 
   if (Turn && Message.type === "system" && Message.subtype === "task_started") {
@@ -712,6 +717,11 @@ function RouteMessage(Session, Message) {
     const Event = Message.event;
 
     if (Event.type === "content_block_delta" && Event.delta.type === "text_delta") {
+      if (Turn.OpenedAt && !Turn.FirstTextAt) {
+        Turn.FirstTextAt = Date.now();
+        console.log(`Turn ${Turn.Id}: first reply text ${Turn.FirstTextAt - Turn.OpenedAt}ms after the turn started`);
+      }
+
       Publish(Turn, { PendingText: Turn.PendingText + Event.delta.text });
     }
 
@@ -1042,11 +1052,19 @@ export function LastUsedFolder() {
 }
 
 export function KeepSpareWarm() {
-  if (!KeepSessionsWarm || Spare || !LastFolder) {
+  if (!KeepSessionsWarm || Spare) {
     return;
   }
 
-  Spare = OpenSession(null, LastFolder, AutoTiers[0].model, AutoTiers[0].effort, true);
+  if (!LastFolder) {
+    LastFolder = UsableFolder(ReadPluginSetting("WorkingFolder"));
+  }
+
+  if (!LastFolder) {
+    return;
+  }
+
+  Spare = OpenSession(null, LastFolder, AutoTiers[0].model, AutoTiers[0].effort, true, true, false, false, false, DefaultMode, false, DelegateModels[0]);
 }
 
 function EffortRank(Effort) {
@@ -1059,7 +1077,7 @@ export function UsableFolder(Folder) {
   }
 
   try {
-    return fs.statSync(Folder).isDirectory() ? Folder : null;
+    return fs.statSync(Folder).isDirectory() ? path.resolve(Folder) : null;
   } catch {
     return null;
   }
@@ -1138,8 +1156,29 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
   const Reusable = Warm && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory && Warm.Planning === Turn.Planning && Warm.Mode === PermissionModeFor(Turn.Mode, Turn.Bypass) && Warm.Delegating === Turn.Delegating && Warm.Delegate === Turn.Delegate;
 
   if (Warm && !Reusable) {
+    const Reasons = [
+      Warm.CurrentTurn && "busy",
+      Warm.Ended && "ended",
+      EffortRank(Chosen.effort) > EffortRank(Warm.Effort) && `effort ${Warm.Effort || "none"} under ${Chosen.effort || "none"}`,
+      Warm.ExtraPrompt !== Turn.ExtraPrompt && "extra prompt",
+      Warm.FastMode !== Turn.FastMode && "fast mode",
+      Warm.WorkingDirectory !== Turn.WorkingDirectory && "folder",
+      Warm.Planning !== Turn.Planning && "planning",
+      Warm.Mode !== PermissionModeFor(Turn.Mode, Turn.Bypass) && `mode ${Warm.Mode} not ${PermissionModeFor(Turn.Mode, Turn.Bypass)}`,
+      Warm.Delegating !== Turn.Delegating && "delegating",
+      Warm.Delegate !== Turn.Delegate && "delegate",
+    ].filter(Boolean);
+
+    console.log(`Turn ${Turn.Id}: closing the ${ConversationId ? "kept" : "spare"} session, ${Reasons.join(", ")}`);
     Warm.Close();
   }
+
+  if (!ConversationId && !Warm) {
+    console.log(`Turn ${Turn.Id}: no spare session was waiting${Spare ? ` (spare is ${Spare.Model} ${Spare.Effort || "none"}, wanted ${Chosen.model} ${Chosen.effort || "none"})` : ""}`);
+  }
+
+  Turn.OpenedAt = Date.now();
+  Turn.Cold = !Reusable;
 
   if (Reusable) {
     Turn.Effort = Warm.Effort;

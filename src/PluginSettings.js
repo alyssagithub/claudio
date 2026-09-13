@@ -37,6 +37,18 @@ function ReadSettings(File) {
   }
 }
 
+export function ReadPluginSetting(Key) {
+  for (const File of SettingsFiles()) {
+    const Settings = ReadSettings(File);
+
+    if (Settings && Settings[SettingPrefix + Key] !== undefined) {
+      return Settings[SettingPrefix + Key];
+    }
+  }
+
+  return undefined;
+}
+
 export function WritePluginSetting(Key, Value) {
   const Files = SettingsFiles();
   let Written = 0;

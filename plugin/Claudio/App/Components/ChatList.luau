@@ -4,6 +4,7 @@ const Config = require(script.Parent.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
+const Gallery = require(script.Parent.Parent.Parent.Store.Gallery)
 const Theme = require(script.Parent.Parent.Theme)
 const Icon = require(script.Parent.Icon)
 
@@ -114,6 +115,10 @@ const function Ordered(): {Types.ConversationSummary}
 	const Sorted = table.clone(Chat.Conversations())
 
 	table.sort(Sorted, function(Left, Right)
+		if Left.id == Gallery.Id or Right.id == Gallery.Id then
+			return Left.id == Gallery.Id
+		end
+
 		const LeftGroup = GroupOf(Left)
 		const RightGroup = GroupOf(Right)
 

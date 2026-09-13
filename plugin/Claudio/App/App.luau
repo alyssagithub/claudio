@@ -36,7 +36,7 @@ function App.New(CurrentPlugin: Plugin)
 	const EnabledConnection = Window:GetPropertyChangedSignal("Enabled"):Connect(function()
 		Button:SetActive(Window.Enabled)
 		task.delay(0.5, function()
-			if Window.Parent then
+			if Window.Parent and not Chat.Yielding then
 				Settings.Set("WidgetOpen", Window.Enabled)
 			end
 		end)

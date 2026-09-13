@@ -71,6 +71,7 @@ const Chat = {
 	ChaptersOpen = Vide.source(false),
 	Anchors = {} :: {[number]: Instance},
 	Window = nil :: DockWidgetPluginGui?,
+	Yielding = false,
 	ScrollTo = nil :: ((Index: number) -> ())?,
 	Insert = nil :: ((string) -> ())?,
 	RequestId = nil :: string?,
@@ -2243,8 +2244,21 @@ function Chat.WatchStudioJobs()
 			else
 				const Mount = game:GetService("ServerStorage"):FindFirstChild("ClaudioTesting")
 				const Seen = if Mount then Mount:GetAttribute("ClaudioMountSeen") else nil
+				const Yield = typeof(Seen) == "number" and os.clock() - Seen < 5
 
-				if typeof(Seen) == "number" and os.clock() - Seen < 5 then
+				if Yield ~= Chat.Yielding then
+					Chat.Yielding = true
+
+					if Chat.Window then
+						Chat.Window.Enabled = if Yield then false else Settings.Get("WidgetOpen")() == true
+					end
+
+					task.delay(1, function()
+						Chat.Yielding = Yield
+					end)
+				end
+
+				if Yield then
 					continue
 				end
 			end

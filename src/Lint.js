@@ -237,7 +237,7 @@ function Build(Tree) {
   for (const Entry of Tree) {
     let At = Root;
 
-    for (const Piece of Entry.path.split(".")) {
+    for (const Piece of Array.isArray(Entry.parts) ? Entry.parts : Entry.path.split(".")) {
       if (!At.Children.has(Piece)) {
         At.Children.set(Piece, { Children: new Map(), Class: "Folder", Source: null });
       }

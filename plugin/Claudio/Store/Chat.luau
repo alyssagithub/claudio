@@ -7,7 +7,6 @@ const Gallery = require(script.Parent.Gallery)
 const Config = require(script.Parent.Parent.Config)
 const Changes = require(script.Parent.Parent.Changes)
 const Watcher = require(script.Parent.Parent.Watcher)
-const Sift = require(script.Parent.Parent.Packages.sift)
 const Settings = require(script.Parent.Parent.Settings)
 const Client = require(script.Parent.Parent.Client.Client)
 const Pictures = require(script.Parent.Parent.Pictures)
@@ -79,8 +78,29 @@ const Chat = {
 	ReplyListener = nil :: ((Text: string) -> ())?,
 }
 
+const function With(Record: any, Fields: {[string]: any}): any
+	const Changed = table.clone(Record)
+
+	for Key, Value in Fields do
+		Changed[Key] = Value
+	end
+
+	return Changed
+end
+
+const function Replaced(List: {any}, Index: number, Value: any): {any}
+	const Changed = table.clone(List)
+
+	Changed[Index] = Value
+
+	return Changed
+end
+
 const function Append(Message: Types.Message)
-	Chat.Messages(Sift.Array.push(Chat.Messages(), Sift.Dictionary.merge(Message, {At = os.time()})))
+	const Messages = table.clone(Chat.Messages())
+
+	table.insert(Messages, With(Message, {At = os.time()}))
+	Chat.Messages(Messages)
 end
 
 const function DestroyImages(Images: {EditableImage}?)
@@ -196,8 +216,17 @@ const function ScriptTree(): {any}
 				return Found
 			end
 
+			const Parts = {}
+			local Step: Instance? = Object
+
+			while Step and Step ~= game do
+				table.insert(Parts, 1, Step.Name)
+				Step = Step.Parent
+			end
+
 			table.insert(Found, {
 				path = Object:GetFullName(),
+				parts = Parts,
 				className = Object.ClassName,
 				source = if Object:IsA("LuaSourceContainer") and Object.Source ~= "" then Object.Source else nil,
 			})
@@ -2387,7 +2416,7 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 
 		for Index = #History, 1, -1 do
 			if History[Index].Role == "user" then
-				Chat.Messages(Sift.Array.set(History, Index, Sift.Dictionary.merge(History[Index], {Tokens = State.tokens})))
+				Chat.Messages(Replaced(History, Index, With(History[Index], {Tokens = State.tokens})))
 
 				break
 			end
@@ -2776,7 +2805,7 @@ const function LoadImagesFor(Index: number, CurrentGeneration: number)
 		return
 	end
 
-	Chat.Messages(Sift.Array.set(Chat.Messages(), Index, Sift.Dictionary.merge(Message, {Images = Loaded})))
+	Chat.Messages(Replaced(Chat.Messages(), Index, With(Message, {Images = Loaded})))
 end
 
 function Chat.RequestImages(Index: number)
@@ -3172,17 +3201,23 @@ function Chat.ToggleChapter(Index: number, Title: string)
 		return
 	end
 
-	const Kept = Sift.Array.filter(Chat.Chapters(), function(Chapter)
-		return Chapter.index ~= Index
-	end)
-	const Chapters = if #Kept < #Chat.Chapters()
-		then Kept
-		else Sift.Array.sort(Sift.Array.push(Kept, {
+	const Chapters: {Types.Chapter} = {}
+
+	for _, Chapter in Chat.Chapters() do
+		if Chapter.index ~= Index then
+			table.insert(Chapters, Chapter)
+		end
+	end
+
+	if #Chapters == #Chat.Chapters() then
+		table.insert(Chapters, {
 			index = Index,
 			title = Title:gsub("%s+", " "):sub(1, 60),
-		}), function(Left: Types.Chapter, Right: Types.Chapter)
+		})
+		table.sort(Chapters, function(Left: Types.Chapter, Right: Types.Chapter)
 			return Left.index < Right.index
 		end)
+	end
 
 	Chat.Chapters(Chapters)
 
@@ -3233,7 +3268,7 @@ function Chat.MoveQueued(Index: number, Delta: number)
 		return
 	end
 
-	Chat.Queue(Sift.Array.set(Sift.Array.set(Queue, Index, Queue[Target]), Target, Queue[Index]))
+	Chat.Queue(Replaced(Replaced(Queue, Index, Queue[Target]), Target, Queue[Index]))
 end
 
 function Chat.EditQueued(Index: number, Text: string)
@@ -3243,7 +3278,7 @@ function Chat.EditQueued(Index: number, Text: string)
 		return
 	end
 
-	Chat.Queue(Sift.Array.set(Chat.Queue(), Index, Sift.Dictionary.merge(Entry, {
+	Chat.Queue(Replaced(Chat.Queue(), Index, With(Entry, {
 		Display = Text,
 		Full = `{Text}{Entry.Extra or ""}`,
 	})))

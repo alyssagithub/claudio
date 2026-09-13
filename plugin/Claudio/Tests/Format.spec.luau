@@ -1,0 +1,53 @@
+--!nocheck
+--!nolint UnknownGlobal
+return function()
+	const Format = require(script.Parent.Parent.Format)
+
+	describe("Duration", function()
+		it("reads in the smallest unit that fits", function()
+			expect(Format.Duration(850)).to.equal("850ms")
+			expect(Format.Duration(1500)).to.equal("1.5s")
+			expect(Format.Duration(61000)).to.equal("1m 1s")
+			expect(Format.Duration(3600000 * 2 + 60000 * 5)).to.equal("2h 5m")
+		end)
+	end)
+
+	describe("Amount", function()
+		it("drops a trailing zero and rounds past ten thousand", function()
+			expect(Format.Amount(999)).to.equal("999")
+			expect(Format.Amount(1000)).to.equal("1k")
+			expect(Format.Amount(1550)).to.equal("1.6k")
+			expect(Format.Amount(12499)).to.equal("12k")
+			expect(Format.Amount(12500)).to.equal("13k")
+		end)
+	end)
+
+	describe("Large", function()
+		it("scales to k and M", function()
+			expect(Format.Large(950)).to.equal("950")
+			expect(Format.Large(2000)).to.equal("2k")
+			expect(Format.Large(1260000)).to.equal("1.3M")
+		end)
+	end)
+
+	describe("Model", function()
+		it("turns an SDK id into a name", function()
+			expect(Format.Model("claude-sonnet-5")).to.equal("Sonnet 5")
+			expect(Format.Model("claude-opus-4-8")).to.equal("Opus 4.8")
+			expect(Format.Model("haiku")).to.equal("Haiku")
+			expect(Format.Model("")).to.equal("")
+		end)
+	end)
+
+	describe("Tool", function()
+		it("uses the verb for the tool and the status", function()
+			expect(Format.Tool("capture", nil, "", "done")).to.equal("Took a screenshot")
+			expect(Format.Tool("capture", nil, "", "running")).to.equal("Taking a screenshot")
+			expect(Format.Tool("capture", nil, "", "error")).to.equal("Failed to take a screenshot")
+		end)
+
+		it("titles a tool it has no verb for", function()
+			expect(Format.Tool("do_thing", nil, "Workspace.Part", "done")).to.equal("Do thing Workspace.Part")
+		end)
+	end)
+end

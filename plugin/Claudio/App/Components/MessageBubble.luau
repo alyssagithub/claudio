@@ -75,7 +75,7 @@ const function FileWork(Entry: Types.ToolCall, Running: boolean): string?
 		return nil
 	end
 
-	const File = (Entry.input:match('"file_path"%s*:%s*"(.-)"') or ""):match("[^/\\]+$") or "a file"
+	const File = (Entry.input:match("file_path: ([^\n]+)") or ""):match("[^/\\]+$") or "a file"
 	const Lines = Entry.lines
 	const Verb = if Entry.name ~= "Write" then (if Running then "Editing" else "Edited")
 		elseif Lines and Lines.removed == 0 then (if Running then "Creating" else "Created")

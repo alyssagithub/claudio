@@ -86,6 +86,24 @@ function Testing.NewChat(): string
 	return "Started a chat the testing mount owns, so asking is allowed again"
 end
 
+function Testing.RunTests(): string
+	const Mounted = Beside()
+
+	if not Mounted then
+		return "Nothing is mounted, call Testing.Mount(plugin) first"
+	end
+
+	const TestEZ = Import((Mounted :: any).Packages.testez)
+	const Results = TestEZ.TestBootstrap:run({(Mounted :: any).Tests}, TestEZ.Reporters.TextReporter)
+	const Lines = {`{Results.successCount} passed, {Results.failureCount} failed, {Results.skippedCount} skipped`}
+
+	for _, Message in Results.errors do
+		table.insert(Lines, Message)
+	end
+
+	return table.concat(Lines, "\n")
+end
+
 function Testing.Refresh(): any
 	const Fresh = script:Clone()
 	const Loaded = Import(Fresh)

@@ -24,6 +24,10 @@ const function Line(Call: Types.ToolCall): Types.Change?
 		return {Kind = "changed", Text = `Rewrote {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`}
 	end
 
+	if Name == "source" and Field(Input, "action") and Field(Input, "action") ~= "get" then
+		return {Kind = "changed", Text = `Edited {Format.Path(Field(Input, "path"))}`, Path = Field(Input, "path")}
+	end
+
 	if Name == "edit_script_lines" or Name == "insert_script_lines" or Name == "delete_script_lines" then
 		return {Kind = "changed", Text = `Edited {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`}
 	end
@@ -32,7 +36,7 @@ const function Line(Call: Types.ToolCall): Types.Change?
 		return {Kind = "changed", Text = `Changed properties on {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`}
 	end
 
-	if Name == "manage_instance" then
+	if Name == "manage_instance" or Name == "modify" then
 		const Action = Field(Input, "action") or "changed"
 		const Past = {
 			create = {Kind = "added", Word = "Created"},
@@ -47,11 +51,13 @@ const function Line(Call: Types.ToolCall): Types.Change?
 
 		const Done = Past[Action] or {Kind = "changed", Word = "Changed"}
 
-		return {Kind = Done.Kind, Text = `{Done.Word} {Format.Path(Field(Input, "instancePath") or Field(Input, "parentPath") or Field(Input, "className"))}`}
+		const Path = Field(Input, "instancePath") or Field(Input, "path") or Field(Input, "parentPath") or Field(Input, "parent") or Field(Input, "className")
+
+		return {Kind = Done.Kind, Text = `{Done.Word} {Format.Path(Path)}`, Path = Path}
 	end
 
-	if Name == "import_rbxm" or Name == "insert_asset" then
-		return {Kind = "added", Text = `Inserted into {Format.Path(Field(Input, "parent_path") or Field(Input, "parentPath"))}`}
+	if Name == "import_rbxm" or Name == "insert_asset" or (Name == "rbxm" and Field(Input, "file") and not Field(Input, "paths")) then
+		return {Kind = "added", Text = `Inserted into {Format.Path(Field(Input, "parent_path") or Field(Input, "parentPath") or Field(Input, "path"))}`}
 	end
 
 	if Name == "Write" or Name == "Edit" then

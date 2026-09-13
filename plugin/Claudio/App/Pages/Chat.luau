@@ -133,6 +133,7 @@ return function()
 		ContextMenu(),
 		ModelPicker.Menu(),
 		ModelPicker.EffortMenu(),
+		ModelPicker.EffortHelp(),
 		ModelPicker.ModeMenu(),
 		DeleteDialog(),
 		RewindDialog(),

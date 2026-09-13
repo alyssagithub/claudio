@@ -66,6 +66,7 @@ end
 
 const Tip = Vide.source("")
 const Explaining = Vide.source(false)
+const MenuHeight = Vide.source(0)
 
 const function Row(Name: () -> string, Detail: () -> string, Chosen: () -> boolean, OnClick: () -> (), LayoutOrder: number, Arrow: (() -> boolean)?, Hover: ((boolean) -> ())?, Described: boolean?, Badge: (() -> boolean)?)
 	const Hovered = Vide.source(false)
@@ -701,6 +702,69 @@ function ModelPicker.EffortButton()
 	}
 end
 
+function ModelPicker.EffortHelp()
+	return Create "Frame" {
+		Name = "Bubble",
+		Size = UDim2.fromOffset(168, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = function()
+			return UDim2.new(0, 8, 1, -ModelPicker.BarHeight() - 12 - MenuHeight())
+		end,
+		BackgroundColor3 = Theme.Colors.Panel,
+		ZIndex = 200,
+		Visible = function()
+			return Explaining() and Chat.EffortOpen()
+		end,
+
+		Create "UICorner" {CornerRadius = UDim.new(0, 6)},
+		Create "UIStroke" {Color = Theme.Colors.Button},
+		Create "UIPadding" {
+			PaddingLeft = UDim.new(0, 10),
+			PaddingRight = UDim.new(0, 10),
+			PaddingTop = UDim.new(0, 8),
+			PaddingBottom = UDim.new(0, 8),
+		},
+		Create "UIListLayout" {
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 4),
+		},
+		Create "TextLabel" {
+			Name = "Title",
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			TextColor3 = Theme.Colors.Text,
+			TextSize = Settings.TextSize,
+			FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 200,
+			LayoutOrder = 1,
+			Text = "Effort",
+		},
+		Create "TextLabel" {
+			Name = "Body",
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			TextColor3 = Theme.Colors.DimText,
+			TextSize = Settings.SmallText,
+			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 200,
+			LayoutOrder = 2,
+			Text = function()
+				if Auto() then
+					return "Lower picks cheaper models and less thinking, so each message uses fewer tokens. Higher picks better models and more thinking, so answers are more accurate but use your limits faster."
+				end
+
+				return "Higher effort means more thorough responses, but takes longer and uses your limits faster."
+			end,
+		},
+	}
+end
+
 function ModelPicker.EffortMenu()
 	return Create "Frame" {
 		Name = "EffortMenu",
@@ -717,6 +781,12 @@ function ModelPicker.EffortMenu()
 			return Chat.EffortOpen() and #EffortLevels() > 0
 		end,
 
+		Vide.action(function(Menu: Frame)
+			MenuHeight(Menu.AbsoluteSize.Y)
+			Vide.cleanup(Menu:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				MenuHeight(Menu.AbsoluteSize.Y)
+			end))
+		end),
 		Create "UICorner" {CornerRadius = UDim.new(0, 6)},
 		Create "UIStroke" {Color = Theme.Colors.Button},
 		Create "UIPadding" {
@@ -791,62 +861,6 @@ function ModelPicker.EffortMenu()
 
 				Create "UICorner" {CornerRadius = UDim.new(1, 0)},
 				Create "UIStroke" {Color = Theme.Colors.DimText},
-				Create "Frame" {
-					Name = "Bubble",
-					Size = UDim2.fromOffset(196, 0),
-					AutomaticSize = Enum.AutomaticSize.Y,
-					AnchorPoint = Vector2.new(1, 1),
-					Position = UDim2.new(1, 4, 0, -8),
-					BackgroundColor3 = Theme.Colors.Panel,
-					ZIndex = 200,
-					Visible = Explaining,
-
-					Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-					Create "UIStroke" {Color = Theme.Colors.Button},
-					Create "UIPadding" {
-						PaddingLeft = UDim.new(0, 10),
-						PaddingRight = UDim.new(0, 10),
-						PaddingTop = UDim.new(0, 8),
-						PaddingBottom = UDim.new(0, 8),
-					},
-					Create "UIListLayout" {
-						SortOrder = Enum.SortOrder.LayoutOrder,
-						Padding = UDim.new(0, 4),
-					},
-					Create "TextLabel" {
-						Name = "Title",
-						Size = UDim2.fromScale(1, 0),
-						AutomaticSize = Enum.AutomaticSize.Y,
-						BackgroundTransparency = 1,
-						TextColor3 = Theme.Colors.Text,
-						TextSize = Settings.TextSize,
-						FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
-						TextXAlignment = Enum.TextXAlignment.Left,
-						ZIndex = 200,
-						LayoutOrder = 1,
-						Text = "Effort",
-					},
-					Create "TextLabel" {
-						Name = "Body",
-						Size = UDim2.fromScale(1, 0),
-						AutomaticSize = Enum.AutomaticSize.Y,
-						BackgroundTransparency = 1,
-						TextColor3 = Theme.Colors.DimText,
-						TextSize = Settings.SmallText,
-						FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-						TextWrapped = true,
-						TextXAlignment = Enum.TextXAlignment.Left,
-						ZIndex = 200,
-						LayoutOrder = 2,
-						Text = function()
-							if Auto() then
-								return "Lower picks cheaper models and less thinking, so each message uses fewer tokens. Higher picks better models and more thinking, so answers are more accurate but use your limits faster."
-							end
-
-							return "Higher effort means more thorough responses, but takes longer and uses your limits faster."
-						end,
-					},
-				},
 			},
 		},
 		Create "Frame" {

@@ -300,8 +300,19 @@ function Testing.Unmount(): string
 		require(script.ToolbarStub).Retire()
 	end)
 
+	const Source = script.Parent :: Instance
+	const Siblings: {Instance} = if Source.Parent then Source.Parent:GetChildren() else {}
+	local Stale = 0
+
+	for _, Sibling in Siblings do
+		if Sibling.Name == `{Source.Name}Testing` and Sibling ~= Folder then
+			Sibling:Destroy()
+			Stale += 1
+		end
+	end
+
 	if not Folder then
-		return "Nothing was mounted"
+		return if Stale > 0 then `Removed {Stale} mount{if Stale == 1 then "" else "s"} left by an earlier plugin` else "Nothing was mounted"
 	end
 
 	pcall(function()

@@ -220,14 +220,6 @@ function Settings.Token(): string
 	return if typeof(Given) == "string" then Given else ""
 end
 
-function Settings.Plugin(): Plugin
-	return CurrentPlugin
-end
-
-function Settings.Plugin(): Plugin
-	return CurrentPlugin
-end
-
 function Settings.TextSize(): number
 	return Sources.TextSize()
 end

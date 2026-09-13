@@ -199,7 +199,7 @@ return function()
 
 		Vide.action(function(List: ScrollingFrame)
 			const function Reveal(Index: number)
-				const Anchor = Chat.Anchors[Index] :: GuiObject?
+				const Anchor = Chat.Anchors[Index] :: any
 
 				if not Anchor or not Anchor.Parent then
 					return false

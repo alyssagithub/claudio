@@ -190,17 +190,15 @@ const function ScriptTree(): {any}
 
 	for _, Service in Places do
 		for _, Object in Service:GetDescendants() do
-			if #Found >= 2000 then
+			if #Found >= 20000 then
 				return Found
 			end
 
-			if Object:IsA("LuaSourceContainer") and Object.Source ~= "" then
-				table.insert(Found, {
-					path = Object:GetFullName(),
-					source = Object.Source,
-					className = Object.ClassName,
-				})
-			end
+			table.insert(Found, {
+				path = Object:GetFullName(),
+				className = Object.ClassName,
+				source = if Object:IsA("LuaSourceContainer") and Object.Source ~= "" then Object.Source else nil,
+			})
 		end
 	end
 
@@ -2107,13 +2105,13 @@ const function Execute(Input: any): any
 
 		Copy.Parent = Where
 
-		return require(Copy)
+		return (require :: any)(Copy)
 	end
 
 	const Holder = Instance.new("ModuleScript")
 
 	Holder.Name = "ClaudioExecute"
-	Holder.Source = `return function(plugin)\n{Code}\nend`
+	Holder.Source = `return function()\n{Code}\nend`
 	Holder.Parent = game:GetService("ServerStorage")
 
 	const function Finish(): ()
@@ -2130,7 +2128,7 @@ const function Execute(Input: any): any
 	end
 
 	const Built, Made = xpcall(function()
-		return require(Holder)
+		return (require :: any)(Holder)
 	end, Trouble)
 
 	if not Built then
@@ -2149,7 +2147,7 @@ const function Execute(Input: any): any
 		return Failed
 	end
 
-	const Ok, Result = xpcall(Made :: any, Trouble, Settings.Plugin())
+	const Ok, Result = xpcall(Made :: any, Trouble)
 
 	Finish()
 
@@ -3146,8 +3144,8 @@ function Chat.Undoing(Index: number): {string}
 		const Message = Chat.Messages()[Position]
 
 		if Message.Role == "assistant" then
-			for _, Text in Changes.For(Message) do
-				table.insert(Found, Text)
+			for _, Change in Changes.For(Message) do
+				table.insert(Found, Change.Text)
 			end
 		end
 	end

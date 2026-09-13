@@ -10,9 +10,20 @@ const Assets = {
   linux: process.arch === "arm64" ? "luau-lsp-linux-arm64.zip" : "luau-lsp-linux-x86_64.zip",
 };
 
-const Ignored = /Unknown require|Unknown type|not found in external type/;
+const Ignored = /Key 'Source' not found in external type 'LuaSourceContainer'/;
 
 let Ready = null;
+
+const SettingsChildren = /^declare extern type GlobalSettings extends GenericSettings with\r?\n(?:    \w+: \w+\r?\n)+/m;
+
+function MatchStudio(File) {
+  const Text = fs.readFileSync(File, "utf8");
+  const Trimmed = Text.replace(SettingsChildren, (Block) => `${Block.split(/\r?\n/)[0]}\n`);
+
+  if (Trimmed !== Text) {
+    fs.writeFileSync(File, Trimmed);
+  }
+}
 
 function Binary() {
   return path.join(ToolsFolder, process.platform === "win32" ? "luau-lsp.exe" : "luau-lsp");
@@ -107,6 +118,8 @@ async function Prepare() {
     fs.mkdirSync(ToolsFolder, { recursive: true });
     await Download(DefinitionsUrl, Definitions());
   }
+
+  MatchStudio(Definitions());
 
   if (Existing && fs.existsSync(Existing)) {
     return Existing;
@@ -246,7 +259,7 @@ function Build(Tree) {
     }
 
     At.Class = Entry.className || "ModuleScript";
-    At.Source = Entry.source;
+    At.Source = typeof Entry.source === "string" ? Entry.source : null;
   }
 
   const Written = [];
@@ -255,7 +268,7 @@ function Build(Tree) {
     const Children = [...Holder.Children.entries()].map(([Child, Held]) => Walk(Child, Held, `${Trail}.${Child}`));
 
     if (Holder.Source === null) {
-      return Node(Name, "Folder", Children, null);
+      return Node(Name, Holder.Class, Children, null);
     }
 
     const Leaf = Children.length > 0 ? `${FileFor(Trail)}/init.luau` : `${FileFor(Trail)}.luau`;

@@ -3,6 +3,7 @@ const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Markdown = require(script.Parent.Parent.Parent.Markdown)
 const Navigate = require(script.Parent.Parent.Parent.Navigate)
+const Types = require(script.Parent.Parent.Parent.Types)
 const Theme = require(script.Parent.Parent.Theme)
 
 const TextService = game:GetService("TextService")
@@ -301,7 +302,7 @@ return function(Text: () -> string, LayoutOrder: number, Live: boolean?)
 			const Body = Text()
 			const Links: {[string]: string} = {}
 
-			for _, Reference in if Live then {} else Navigate.FindReferences(Body) do
+			for _, Reference in (if Live then {} else Navigate.FindReferences(Body)) :: {Types.Reference} do
 				Links[(Reference.Path:gsub("^game%.", ""))] = Reference.Path
 			end
 

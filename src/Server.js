@@ -373,7 +373,7 @@ export function StartServer(Port) {
         const Body = await ReadBody(Request);
         const Usable = (Entry) => Entry && typeof Entry.path === "string" && typeof Entry.source === "string" && Entry.source !== "";
         const Wanted = (Array.isArray(Body.scripts) ? Body.scripts : []).filter(Usable);
-        const Tree = (Array.isArray(Body.tree) ? Body.tree : []).filter(Usable).slice(0, 3000);
+        const Tree = (Array.isArray(Body.tree) ? Body.tree : []).filter((Entry) => Entry && typeof Entry.path === "string" && typeof Entry.className === "string").slice(0, 20000);
 
         if (Wanted.length > MostScriptsToCheck) {
           SendJson(Response, 413, { error: `${Wanted.length} scripts is more than the analyzer will check in one run. Narrow it with paths.` });

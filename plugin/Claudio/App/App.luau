@@ -35,7 +35,11 @@ function App.New(CurrentPlugin: Plugin)
 
 	const EnabledConnection = Window:GetPropertyChangedSignal("Enabled"):Connect(function()
 		Button:SetActive(Window.Enabled)
-		Settings.Set("WidgetOpen", Window.Enabled)
+		task.delay(0.5, function()
+			if Window.Parent then
+				Settings.Set("WidgetOpen", Window.Enabled)
+			end
+		end)
 
 		if Window.Enabled and Connection.Status() ~= "Connected" then
 			task.spawn(Client.Connect)

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { AutoTiers, EffortOrder, LeanMode, ModelsCacheFile, ExtraModels } from "./Config.js";
+import { AutoTier, EffortOrder, LeanMode, ModelsCacheFile, ExtraModels } from "./Config.js";
 
 const Trouble = new Map();
 const Complaints = /^\s*(no|nope)\b|\b(wrong|incorrect|broken|failing|failed)\b|\bstill (not|no|doesn'?t|does not|broken|failing|wrong|the same)\b|\btry again\b|\b(not|isn'?t) working\b|\b(does|did)n'?t work\b|\bthat'?s not\b|\byou missed\b|\bnothing happened\b|\b(undo|revert) (that|it)\b/i;
@@ -115,7 +115,7 @@ function Weight(Text, HasContext) {
     + (Plain.includes("?") ? 0.05 : 0));
 }
 
-export function ChooseModel(ConversationId, Text, HasContext) {
+export function ChooseModel(ConversationId, Text, HasContext, Bias) {
   const Complaining = Complaints.test(Text.slice(0, 200));
   const Previous = Trouble.get(ConversationId) || 0;
   const Escalation = Complaining ? Math.min(3, Previous + 1) : Math.max(0, Previous - 1);
@@ -124,5 +124,5 @@ export function ChooseModel(ConversationId, Text, HasContext) {
     Trouble.set(ConversationId, Escalation);
   }
 
-  return AutoTiers[Math.round(Math.min(1, Weight(Text, HasContext) + Escalation * 0.17) * (AutoTiers.length - 1))];
+  return AutoTier(Weight(Text, HasContext) + Escalation * 0.17, Bias);
 }

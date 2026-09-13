@@ -175,10 +175,6 @@ export const AutoTiers = [
   { model: "sonnet", effort: "none", delegate: "haiku" },
   { model: "sonnet", effort: "low", delegate: "haiku" },
   { model: "sonnet", effort: "medium", delegate: "haiku" },
-  { model: "sonnet", effort: "high", delegate: "haiku" },
-  { model: "sonnet", effort: "xhigh", delegate: "haiku" },
-  { model: "sonnet", effort: "max", delegate: "haiku" },
-  { model: "default", effort: "none", delegate: "haiku" },
   { model: "default", effort: "low", delegate: "haiku" },
   { model: "default", effort: "medium", delegate: "haiku" },
   { model: "default", effort: "high", delegate: "haiku" },
@@ -187,3 +183,12 @@ export const AutoTiers = [
 ];
 export const CancelGraceMilliseconds = 5000;
 export const EffortOrder = ["none", "low", "medium", "high", "xhigh", "max"];
+export const AutoLevels = ["low", "medium", "high", "xhigh", "max"];
+export function AutoBias(Effort) {
+  const Index = AutoLevels.indexOf(Effort);
+
+  return (Index < 0 ? 2 : Index) / (AutoLevels.length - 1);
+}
+export function AutoTier(Score, Bias) {
+  return AutoTiers[Math.round((Math.min(1, Score) * 0.5 + Bias * 0.5) * (AutoTiers.length - 1))];
+}

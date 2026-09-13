@@ -30,7 +30,21 @@ const function CurrentModel(): Types.ModelInfo?
 	return nil
 end
 
+const function Auto(): boolean
+	return Settings.Get("Model")() == "auto"
+end
+
 const function EffortLevels(): {string}
+	if Auto() then
+		return {
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+			"max",
+		}
+	end
+
 	const Model = CurrentModel()
 
 	return if Model and Model.supportsEffort then Model.supportedEffortLevels else {}
@@ -39,7 +53,11 @@ end
 const function CurrentEffort(): string
 	const Chosen = Settings.Get("Effort")()
 
-	return if Chosen == "" then "high" else Chosen
+	if Chosen ~= "" then
+		return Chosen
+	end
+
+	return if Auto() then "medium" else "high"
 end
 
 const function EffortName(Level: string): string
@@ -302,7 +320,7 @@ function ModelPicker.Menu()
 		Row(function()
 			return "Auto"
 		end, function()
-			return "Picks the cheapest model that can do the task, and moves up when work goes wrong"
+			return "Picks a model and effort for each message from the effort slider below. Lower spends fewer tokens, higher answers more carefully"
 		end, function()
 			return Settings.Get("Model")() == "auto"
 		end, function()
@@ -495,7 +513,7 @@ function ModelPicker.Button()
 			Text = function()
 				const Model = CurrentModel()
 
-				return if Model then (Model.displayName:gsub(" %(Experimental%)", "")) else "Auto"
+				return if Model then (Titled(Model):gsub(" %(Experimental%)", "")) else "Auto"
 			end,
 		},
 		Icon {
@@ -820,7 +838,13 @@ function ModelPicker.EffortMenu()
 						TextXAlignment = Enum.TextXAlignment.Left,
 						ZIndex = 200,
 						LayoutOrder = 2,
-						Text = "Higher effort means more thorough responses, but takes longer and uses your limits faster.",
+						Text = function()
+							if Auto() then
+								return "Lower picks cheaper models and less thinking, so each message uses fewer tokens. Higher picks better models and more thinking, so answers are more accurate but use your limits faster."
+							end
+
+							return "Higher effort means more thorough responses, but takes longer and uses your limits faster."
+						end,
 					},
 				},
 			},
@@ -840,7 +864,9 @@ function ModelPicker.EffortMenu()
 				TextColor3 = Theme.Colors.DimText,
 				TextSize = Settings.SmallText,
 				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				Text = "Faster",
+				Text = function()
+					return if Auto() then "Fewer tokens" else "Faster"
+				end,
 			},
 			Create "TextLabel" {
 				Name = "Smarter",
@@ -851,7 +877,9 @@ function ModelPicker.EffortMenu()
 				TextColor3 = Theme.Colors.DimText,
 				TextSize = Settings.SmallText,
 				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				Text = "Smarter",
+				Text = function()
+					return if Auto() then "More accurate" else "Smarter"
+				end,
 			},
 		},
 		Slider {

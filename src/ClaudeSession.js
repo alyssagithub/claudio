@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
-import { AllowedTools, AutoTiers, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, DelegateModels, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, SystemPromptFor, WorkingDirectory } from "./Config.js";
+import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, DelegateModels, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, SystemPromptFor, WorkingDirectory } from "./Config.js";
 import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
@@ -1064,7 +1064,9 @@ export function KeepSpareWarm() {
     return;
   }
 
-  Spare = OpenSession(null, LastFolder, AutoTiers[0].model, AutoTiers[0].effort, true, true, false, false, false, DefaultMode, false, DelegateModels[0]);
+  const Likely = AutoTier(0, AutoBias(ReadPluginSetting("Effort")));
+
+  Spare = OpenSession(null, LastFolder, Likely.model, Likely.effort, true, true, false, false, false, DefaultMode, false, Likely.delegate);
 }
 
 function EffortRank(Effort) {
@@ -1106,7 +1108,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
   }
 
   const Chosen = Auto
-    ? ChooseModel(ConversationId, Text, Boolean(Images && Images.length) || Text.includes("<studio_context>"))
+    ? ChooseModel(ConversationId, Text, Boolean(Images && Images.length) || Text.includes("<studio_context>"), AutoBias(Effort))
     : { model: Model, effort: Escalate ? NextEffort(Model, Effort) : (SupportsEffort(Model, Effort) ? Effort : null) };
   const Turn = {
     Id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,

@@ -101,6 +101,8 @@ return function()
 	const Shown = Vide.source(false)
 	const Shift = Vide.source(0)
 	const Room = Vide.source(220)
+	const Waited = Vide.source(false)
+	local Waiting = 0
 
 	const function Follow(Object: GuiObject)
 		const Row = Object.Parent :: GuiObject
@@ -109,8 +111,27 @@ return function()
 			return
 		end
 
-		Shift(Row.AbsolutePosition.X - Object.AbsolutePosition.X)
+		Shift(Row.AbsolutePosition.X + Row.AbsoluteSize.X - Object.AbsolutePosition.X)
 		Room(math.max(160, Row.AbsoluteSize.X))
+	end
+
+	const function Wait(Over: boolean)
+		Waiting += 1
+		Hovered(Over)
+
+		if not Over then
+			Waited(false)
+
+			return
+		end
+
+		const Token = Waiting
+
+		task.delay(1, function()
+			if Waiting == Token then
+				Waited(true)
+			end
+		end)
 	end
 
 	const Expanded = Vide.source(false)
@@ -246,10 +267,10 @@ return function()
 			Shown(not Shown())
 		end,
 		MouseEnter = function()
-			Hovered(true)
+			Wait(true)
 		end,
 		MouseLeave = function()
-			Hovered(false)
+			Wait(false)
 		end,
 
 		Vide.action(function(Object: GuiObject)
@@ -278,16 +299,18 @@ return function()
 		},
 		Create "Frame" {
 			Name = "Tip",
-			AutomaticSize = Enum.AutomaticSize.XY,
-			Size = UDim2.fromOffset(0, 0),
-			AnchorPoint = Vector2.new(0, 1),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = function()
+				return UDim2.fromOffset(math.min(Room() - 16, 236), 0)
+			end,
+			AnchorPoint = Vector2.new(1, 1),
 			Position = function()
-				return UDim2.new(0, Shift(), 0, -8)
+				return UDim2.new(0, Shift(), 0, -10)
 			end,
 			BackgroundColor3 = Theme.Colors.Panel,
 			ZIndex = 20,
 			Visible = function()
-				return Hovered() and not Shown()
+				return Waited() and Hovered() and not Shown()
 			end,
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
@@ -309,7 +332,9 @@ return function()
 			},
 			Create "TextLabel" {
 				Name = "Headline",
-				AutomaticSize = Enum.AutomaticSize.XY,
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				TextWrapped = true,
 				BackgroundTransparency = 1,
 				TextColor3 = Theme.Colors.Text,
 				TextSize = Settings.SmallText,
@@ -318,15 +343,13 @@ return function()
 				ZIndex = 20,
 				LayoutOrder = 1,
 				Text = function()
-					const Limit = Window()
+					const Room = Chat.ContextWindow()
 
-					if not Limit then
-						return "5-hour limit"
+					if Room == 0 then
+						return "Context fills in after the first reply"
 					end
 
-					const Name = (Limit.label or "5-hour limit"):gsub(" %- ", " · ")
-
-					return if Limit.utilization then `{Name}: {math.round(Limit.utilization * 100)}%` else Name
+					return `Context {Format.Large(Chat.ContextUsed())} / {Format.Large(Room)} ({math.round(Chat.ContextUsed() / Room * 100)}%)`
 				end,
 			},
 			Create "TextLabel" {
@@ -345,17 +368,17 @@ return function()
 					const Limit = Window()
 					const Parts: {string} = {}
 
+					if Limit then
+						const Name = (Limit.label or "5-hour limit"):gsub(" %- ", " · ")
+
+						table.insert(Parts, if Limit.utilization then `{math.round(Limit.utilization * 100)}% of {Name:lower()}` else Name)
+					end
+
 					if Limit and Limit.resetsAt then
-						table.insert(Parts, `{Format.Until(Limit.resetsAt)}`)
+						table.insert(Parts, (Format.Until(Limit.resetsAt):gsub("^Resets", "Resets")))
 					end
 
-					const Room = Chat.ContextWindow()
-
-					if Room > 0 then
-						table.insert(Parts, `Context {Format.Large(Chat.ContextUsed())} / {Format.Large(Room)} ({math.round(Chat.ContextUsed() / Room * 100)}%)`)
-					end
-
-					return if #Parts == 0 then "Fills in after the first reply" else table.concat(Parts, " · ")
+					return if #Parts == 0 then "No limit reported yet" else table.concat(Parts, " · ")
 				end,
 			},
 		},

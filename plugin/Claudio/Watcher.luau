@@ -420,8 +420,8 @@ const function Describe(Where: Bucket): {Types.Change}
 			Path = Path,
 		}
 
-		if Item.Before and Object then
-			Change.Added, Change.Removed = CountLines(Item.Before, (Object :: any).Source)
+		if Object and Object:IsA("LuaSourceContainer") and (Item.Before or Item.Verb == "Created") then
+			Change.Added, Change.Removed = CountLines(Item.Before or "", (Object :: any).Source)
 		end
 
 		table.insert(Found, Change)

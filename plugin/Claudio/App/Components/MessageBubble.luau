@@ -281,6 +281,20 @@ return function(Props: Props)
 		return Describe(Entry, Running)
 	end
 
+	const function Shortened(Text: string): string
+		const Lines = string.split(Text, "\n")
+
+		if #Lines <= 40 then
+			return Text
+		end
+
+		const Kept = table.move(Lines, 1, 40, 1, {})
+
+		table.insert(Kept, `… {#Lines - 40} more lines`)
+
+		return table.concat(Kept, "\n")
+	end
+
 	const function Fields(Input: string): {{Key: string, Value: string}}
 		const Found = {}
 
@@ -426,92 +440,94 @@ return function(Props: Props)
 					}
 				end),
 			},
-			Create "TextButton" {
-				Name = "Header",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				Visible = function()
-					return #Asked(Value()) == 0
-				end,
-				Text = "",
-				AutoButtonColor = false,
-				LayoutOrder = 1,
-				Activated = function()
-					Open(not Open())
-				end,
-
-				Create "UIListLayout" {
-					FillDirection = Enum.FillDirection.Horizontal,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 4),
-				},
-				Create "TextLabel" {
-					Name = "Summary",
-					AutomaticSize = Enum.AutomaticSize.XY,
-					BackgroundTransparency = 1,
-					TextColor3 = function()
-						return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.DimText()
-					end,
-					TextSize = Settings.SmallText,
-					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-					TextXAlignment = Enum.TextXAlignment.Left,
-					RichText = true,
-					LayoutOrder = 1,
-					Text = function()
-						const Entry = Value()
-
-						if Entry.status == "running" then
-							return Headline(Entry, true)
-						end
-
-						return `{Headline(Entry, false)}{if Entry.status == "error" then " · failed" else ""}`
-					end,
-				},
-				Icon {
-					Name = Config.Icons.Down,
-					Size = Settings.SmallText,
-					Colour = function()
-						return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.DimText()
-					end,
-					Rotation = function()
-						return if Open() then 180 else 0
-					end,
-					LayoutOrder = 2,
-				},
-			},
 			Create "Frame" {
-				Name = "Card",
+				Name = "Box",
 				Size = UDim2.fromScale(1, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 				BackgroundColor3 = Theme.Colors.Background,
-				LayoutOrder = 2,
-				Visible = Open,
+				LayoutOrder = 1,
+				Visible = function()
+					return #Asked(Value()) == 0
+				end,
 
 				Create "UICorner" {CornerRadius = UDim.new(0, 8)},
 				Create "UIStroke" {Color = Theme.Colors.Border},
 				Create "UIPadding" {
-					PaddingLeft = UDim.new(0, 12),
-					PaddingRight = UDim.new(0, 12),
-					PaddingTop = UDim.new(0, 10),
-					PaddingBottom = UDim.new(0, 10),
+					PaddingLeft = UDim.new(0, 10),
+					PaddingRight = UDim.new(0, 10),
+					PaddingTop = UDim.new(0, 6),
+					PaddingBottom = UDim.new(0, 6),
 				},
 				Create "UIListLayout" {
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					HorizontalFlex = Enum.UIFlexAlignment.Fill,
 					Padding = UDim.new(0, 6),
 				},
+				Create "TextButton" {
+					Name = "Header",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					Text = "",
+					AutoButtonColor = false,
+					LayoutOrder = 1,
+					Activated = function()
+						Open(not Open())
+					end,
+
+					Create "UIListLayout" {
+						FillDirection = Enum.FillDirection.Horizontal,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, 4),
+					},
+					Create "TextLabel" {
+						Name = "Summary",
+						AutomaticSize = Enum.AutomaticSize.XY,
+						BackgroundTransparency = 1,
+						TextColor3 = function()
+							return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.Text()
+						end,
+						TextSize = Settings.SmallText,
+						FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+						TextXAlignment = Enum.TextXAlignment.Left,
+						RichText = true,
+						LayoutOrder = 1,
+						Text = function()
+							const Entry = Value()
+
+							if Entry.status == "running" then
+								return Headline(Entry, true)
+							end
+
+							return `{Headline(Entry, false)}{if Entry.status == "error" then " · failed" else ""}`
+						end,
+					},
+					Icon {
+						Name = Config.Icons.Down,
+						Size = Settings.SmallText,
+						Colour = function()
+							return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.DimText()
+						end,
+						Rotation = function()
+							return if Open() then 0 else -90
+						end,
+						LayoutOrder = 2,
+					},
+				},
 				Create "TextLabel" {
 					Name = "Title",
 					Size = UDim2.fromScale(1, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 					BackgroundTransparency = 1,
-					TextColor3 = Theme.Colors.Text,
-					TextSize = Settings.TextSize,
+					TextColor3 = Theme.Colors.DimText,
+					TextSize = Settings.SmallText,
 					FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
 					TextXAlignment = Enum.TextXAlignment.Left,
-					LayoutOrder = 1,
+					LayoutOrder = 2,
+					Visible = function()
+						return Open() and Title() ~= Headline(Value(), false)
+					end,
 					Text = Title,
 				},
 				Vide.indexes(function()
@@ -526,7 +542,7 @@ return function(Props: Props)
 						Size = UDim2.fromScale(1, 0),
 						AutomaticSize = Enum.AutomaticSize.Y,
 						BackgroundTransparency = 1,
-						LayoutOrder = 1 + Order,
+						LayoutOrder = 2 + Order,
 						Visible = function()
 							return Pair().Key ~= "label" and Pair().Key ~= "description"
 						end,
@@ -549,13 +565,13 @@ return function(Props: Props)
 							TextXAlignment = Enum.TextXAlignment.Left,
 							LayoutOrder = 1,
 							Text = function()
-								const Value = if IsCode() then "" else ` {Pair().Value:gsub("&", "&amp;"):gsub("<", "&lt;")}`
+								const Shown = if IsCode() then "" else ` {Pair().Value:gsub("&", "&amp;"):gsub("<", "&lt;")}`
 
-								return `<font color="#{Theme.Colors.DimText():ToHex()}">{Pair().Key}:</font>{Value}`
+								return `<font color="#{Theme.Colors.DimText():ToHex()}">{Pair().Key}:</font>{Shown}`
 							end,
 						},
 						CodeBlock("Code", function()
-							return if IsCode() then Pair().Value else ""
+							return if IsCode() then Shortened(Pair().Value) else ""
 						end, function()
 							return if Pair().Key == "command" then "sh" else nil
 						end, 2, true),
@@ -567,7 +583,7 @@ return function(Props: Props)
 					AutomaticSize = Enum.AutomaticSize.Y,
 					BackgroundTransparency = 1,
 					TextColor3 = function()
-						return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.CodeText()
+						return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.DimText()
 					end,
 					TextSize = Settings.SmallText,
 					FontFace = Font.fromEnum(Enum.Font.Code),
@@ -579,10 +595,10 @@ return function(Props: Props)
 						return Open() and Value().output ~= ""
 					end,
 					Text = function()
-						return if Open() then Value().output else ""
+						return if Open() then Shortened(Value().output) else ""
 					end,
 
-					Create "UIPadding" {PaddingTop = UDim.new(0, 4)},
+					Create "UIPadding" {PaddingTop = UDim.new(0, 2)},
 				},
 				Vide.indexes(function()
 					return if Open() then Value().steps or {} else {}
@@ -1076,20 +1092,30 @@ return function(Props: Props)
 						TextXAlignment = Enum.TextXAlignment.Left,
 						LayoutOrder = 1,
 						Text = function()
-							local Scripts = 0
+								local Scripts = 0
 							local Total = 0
+							local Made = 0
+							local Gone = 0
 
 							for _, Change in Written() do
-								if Change.Path then
-									Total += 1
+								if not Change.Path then
+									continue
 								end
+
+								Total += 1
 
 								if Change.Added or Change.Removed then
 									Scripts += 1
 								end
+
+								if Change.Kind == "added" then
+									Made += 1
+								elseif Change.Kind == "removed" then
+									Gone += 1
+								end
 							end
 
-							const Verb = if Scripts == Total then "Edited" else "Changed"
+							const Verb = if Made == Total then "Created" elseif Gone == Total then "Deleted" elseif Scripts == Total then "Edited" else "Changed"
 							const Noun = if Scripts == Total then "script" else "instance"
 
 							return `{if IsUser() then "You " else ""}{if IsUser() then Verb:lower() else Verb} {Total} {Noun}{if Total == 1 then "" else "s"}`

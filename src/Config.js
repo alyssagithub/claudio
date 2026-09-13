@@ -187,7 +187,7 @@ export const AutoLevels = ["low", "medium", "high", "xhigh", "max"];
 export function AutoBias(Effort) {
   const Index = AutoLevels.indexOf(Effort);
 
-  return (Index < 0 ? 2 : Index) / (AutoLevels.length - 1);
+  return (Index < 0 ? AutoLevels.indexOf("xhigh") : Index) / (AutoLevels.length - 1);
 }
 export function AutoTier(Score, Bias) {
   return AutoTiers[Math.round((Math.min(1, Score) * 0.5 + Bias * 0.5) * (AutoTiers.length - 1))];

@@ -57,7 +57,7 @@ const function CurrentEffort(): string
 		return Chosen
 	end
 
-	return if Auto() then "medium" else "high"
+	return if Auto() then "xhigh" else "high"
 end
 
 const function EffortName(Level: string): string

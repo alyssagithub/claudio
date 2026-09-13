@@ -195,6 +195,7 @@ const Hidden: {[string]: string | boolean} = {
 	Mode = "auto",
 	Bypass = false,
 	WidgetOpen = true,
+	AutoContinue = false,
 }
 
 const Settings = {

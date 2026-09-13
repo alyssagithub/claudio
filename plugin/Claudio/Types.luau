@@ -46,6 +46,7 @@ export type Message = {
 	Tokens: Tokens?,
 	Milliseconds: number?,
 	Failed: boolean?,
+	Error: string?,
 	Cost: number?,
 	Estimated: boolean?,
 	Prompt: string?,

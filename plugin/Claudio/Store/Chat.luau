@@ -4,6 +4,8 @@ const ChangeHistoryService = game:GetService("ChangeHistoryService")
 const Vide = require(script.Parent.Parent.Packages.vide)
 const Types = require(script.Parent.Parent.Types)
 const Gallery = require(script.Parent.Gallery)
+const Connection = require(script.Parent.Connection)
+const Format = require(script.Parent.Parent.Format)
 const Config = require(script.Parent.Parent.Config)
 const Changes = require(script.Parent.Parent.Changes)
 const Watcher = require(script.Parent.Parent.Watcher)
@@ -2235,9 +2237,19 @@ function Chat.WatchStudioJobs()
 	Watching = true
 
 	const Mounted = script:IsDescendantOf(game)
+	local Asked = 0
 
 	task.spawn(function()
 		while Watching and task.wait(1) do
+			if Connection.Status() == "Connected" and os.clock() - Asked > 60 then
+				Asked = os.clock()
+				task.spawn(Chat.RefreshUsage)
+			end
+
+			if not Mounted or script:IsDescendantOf(game) then
+				task.spawn(Chat.ResumeAfterLimit)
+			end
+
 			if Mounted and not script:IsDescendantOf(game) then
 				Watching = false
 
@@ -2419,7 +2431,7 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		end
 
 		if State.status == "error" then
-			return "error", `{State.text or ""}\n\nClaude hit an error: {State.error or "unknown"}`, State
+			return "error", State.text or "", State
 		end
 
 		if State.status == "cancelled" and State.text == "" then
@@ -2446,6 +2458,7 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 		Tokens = if State then State.tokens else nil,
 		Milliseconds = if State then State.milliseconds else nil,
 		Failed = Status == "error",
+		Error = if Status == "error" then (if State and State.error then State.error else Text) else nil,
 		Cost = if State then State.cost else nil,
 		Prompt = Chat.CurrentPrompt,
 		Images = Chat.StreamingImages(),
@@ -3325,6 +3338,26 @@ function Chat.ForkHere()
 	end
 
 	Chat.Fork(Id)
+end
+
+function Chat.ResumeAfterLimit()
+	if Chat.Sending() or Settings.Get("AutoContinue")() ~= true then
+		return
+	end
+
+	const Last = Chat.Messages()[#Chat.Messages()]
+
+	if not Last or not Last.Failed or not Last.Error or not Format.IsLimit(Last.Error) then
+		return
+	end
+
+	for _, Limit in Chat.Limits() do
+		if Limit.resetsAt and Limit.utilization and Limit.utilization >= 0.99 and Limit.resetsAt > os.time() then
+			return
+		end
+	end
+
+	Chat.Continue(Last.Prompt)
 end
 
 function Chat.Continue(Prompt: string?)

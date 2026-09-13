@@ -116,4 +116,19 @@ function Format.Amount(Tokens: number): string
 	return `{math.floor(Tokens / 1000 + 0.5)}k`
 end
 
+function Format.IsLimit(Text: string): boolean
+	const Lower = Text:lower()
+
+	return Lower:find("usage limit", 1, true) ~= nil
+		or Lower:find("session limit", 1, true) ~= nil
+		or Lower:find("rate limit", 1, true) ~= nil
+		or Lower:find("out of credits", 1, true) ~= nil
+end
+
+function Format.ResetsAt(Text: string): string?
+	const Clock = Text:match("resets%s+at%s+([%d:]+%s*[AaPp][Mm])") or Text:match("resets%s+([%d:]+%s*[ap]m)")
+
+	return if Clock then (Clock:gsub("%s+", " ")) else nil
+end
+
 return Format

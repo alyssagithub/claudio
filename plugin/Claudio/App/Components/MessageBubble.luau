@@ -15,6 +15,7 @@ const Paragraph = require(script.Parent.Paragraph)
 const Icon = require(script.Parent.Icon)
 const IconButton = require(script.Parent.IconButton)
 const Button = require(script.Parent.Button)
+const Limits = require(script.Parent.LimitCard)
 
 const TextService = game:GetService("TextService")
 
@@ -31,6 +32,7 @@ type Props = {
 	Tokens: (() -> Types.Tokens?)?,
 	Milliseconds: (() -> number?)?,
 	Failed: (() -> boolean)?,
+	Error: (() -> string?)?,
 	Cost: (() -> number?)?,
 	Estimated: (() -> boolean?)?,
 	Prompt: (() -> string?)?,
@@ -230,12 +232,19 @@ return function(Props: Props)
 		} :: any)
 	end
 
+	const Shown = Vide.source(false)
+
+	const function Broke(): string
+		return if Props.Error then Props.Error() or "" else ""
+	end
+
 	const function Empty(): boolean
 		return Props.Text() == ""
 			and (if Props.Thinking then Props.Thinking() or "" else "") == ""
 			and #(if Props.Calls then Props.Calls() else {}) == 0
 			and #(if Props.Images then Props.Images() else {}) == 0
 			and #(if Props.Attachments then Props.Attachments() else {}) == 0
+			and Broke() == ""
 			and #Written() == 0
 	end
 
@@ -1026,6 +1035,98 @@ return function(Props: Props)
 				HorizontalFlex = Enum.UIFlexAlignment.Fill,
 			},
 			Vide.indexes(Blocks, Group),
+			Create "TextButton" {
+				Name = "Trouble",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				Text = "",
+				AutoButtonColor = false,
+				LayoutOrder = 1000004,
+				Visible = function()
+					return Broke() ~= ""
+				end,
+				Activated = function()
+					Shown(not Shown())
+				end,
+
+				Create "UIListLayout" {
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					HorizontalFlex = Enum.UIFlexAlignment.Fill,
+					Padding = UDim.new(0, 4),
+				},
+				Create "Frame" {
+					Name = "Line",
+					Size = UDim2.new(1, 0, 0, 18),
+					BackgroundTransparency = 1,
+					LayoutOrder = 1,
+
+					Create "UIListLayout" {
+						FillDirection = Enum.FillDirection.Horizontal,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, 6),
+					},
+					Icon {
+						Name = Config.Icons.Limit,
+						Size = Settings.SmallText,
+						Colour = Theme.Colors.Error,
+						LayoutOrder = 1,
+					},
+					Create "TextLabel" {
+						Name = "Label",
+						AutomaticSize = Enum.AutomaticSize.XY,
+						BackgroundTransparency = 1,
+						TextColor3 = Theme.Colors.Error,
+						TextSize = Settings.SmallText,
+						FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+						TextXAlignment = Enum.TextXAlignment.Left,
+						LayoutOrder = 2,
+						Text = function()
+							return if Format.IsLimit(Broke()) then "Session limit reached" else "Claude hit an error"
+						end,
+					},
+					Icon {
+						Name = Config.Icons.Down,
+						Size = Settings.SmallText,
+						Colour = Theme.Colors.Error,
+						Rotation = function()
+							return if Shown() then 0 else -90
+						end,
+						LayoutOrder = 3,
+					},
+				},
+				Create "TextLabel" {
+					Name = "Said",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundColor3 = Theme.Colors.Code,
+					TextColor3 = Theme.Colors.CodeText,
+					TextSize = Settings.SmallText,
+					FontFace = Font.fromEnum(Enum.Font.Code),
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Top,
+					LayoutOrder = 2,
+					Visible = Shown,
+					Text = Broke,
+
+					Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+					Create "UIPadding" {
+						PaddingLeft = UDim.new(0, 6),
+						PaddingRight = UDim.new(0, 6),
+						PaddingTop = UDim.new(0, 4),
+						PaddingBottom = UDim.new(0, 4),
+					},
+				},
+			},
+			Vide.show(function()
+				return Format.IsLimit(Broke())
+			end, function()
+				return Limits.Card(Broke, function()
+					task.spawn(Chat.Continue, if Props.Prompt then Props.Prompt() else nil)
+				end, 1000005)
+			end),
 			Note("Activity", 0, function()
 				const Names = {}
 
@@ -1130,20 +1231,13 @@ return function(Props: Props)
 						Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
 					},
 					Button {
-						Text = "View changes",
+						Text = "Undo",
 						LayoutOrder = 3,
+						Visible = function()
+							return not IsUser() and Props.Index ~= nil and Props.Checkpoint ~= nil and Props.Checkpoint() ~= nil
+						end,
 						OnClick = function()
-							const Chosen = {}
-
-							for _, Change in Written() do
-								const Object = if Change.Path then Navigate.Resolve(Change.Path) else nil
-
-								if Object then
-									table.insert(Chosen, Object)
-								end
-							end
-
-							game:GetService("Selection"):Set(Chosen)
+							Chat.Rewinding(if Props.Index then Props.Index() else nil)
 						end,
 					},
 				},
@@ -1361,7 +1455,7 @@ return function(Props: Props)
 						Text = "Continue",
 						LayoutOrder = 1,
 						Visible = function()
-							return Props.Failed ~= nil and Props.Failed() and Props.Prompt ~= nil and Props.Prompt() ~= nil
+							return Props.Failed ~= nil and Props.Failed() and not Format.IsLimit(Broke()) and Props.Prompt ~= nil and Props.Prompt() ~= nil
 						end,
 						OnClick = function()
 							task.spawn(Chat.Continue, if Props.Prompt then Props.Prompt() else nil)

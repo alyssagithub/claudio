@@ -51,6 +51,7 @@ return {
 		Instance = "cube-vertexes",
 		File = "file-box",
 		Right = "chevron-small-right",
+		Limit = "speedometer",
 		Output = "rectangle-list",
 		Retry = "arrow-clockwise",
 		Send = "arrow-large-up",

@@ -440,6 +440,9 @@ return function()
 				Failed = function()
 					return Message().Failed == true
 				end,
+				Error = function()
+					return Message().Error
+				end,
 				Cost = function()
 					return Message().Cost
 				end,

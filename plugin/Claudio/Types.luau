@@ -210,6 +210,7 @@ export type ConversationSummary = {
 	id: string,
 	title: string,
 	project: string,
+	folder: string?,
 	source: "desktop" | "claudio",
 	starred: boolean?,
 	archived: boolean?,

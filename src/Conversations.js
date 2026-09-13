@@ -428,6 +428,7 @@ export function ListConversations() {
         id: Id,
         title: Title,
         project: WorkingDirectory ? path.basename(WorkingDirectory) : Project,
+        folder: WorkingDirectory || null,
         source: Desktop[Id] ? "desktop" : "claudio",
         starred: Boolean(Desktop[Id] && Desktop[Id].starred),
         archived: Boolean(Desktop[Id] && Desktop[Id].archived),

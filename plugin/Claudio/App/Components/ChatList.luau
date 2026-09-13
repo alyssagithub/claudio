@@ -5,6 +5,7 @@ const Settings = require(script.Parent.Parent.Parent.Settings)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Gallery = require(script.Parent.Parent.Parent.Store.Gallery)
+const IconButton = require(script.Parent.IconButton)
 const Theme = require(script.Parent.Parent.Theme)
 const Icon = require(script.Parent.Icon)
 
@@ -331,16 +332,10 @@ const function Row(Summary: () -> Types.ConversationSummary, Index: number)
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Padding = UDim.new(0, 4),
 		},
-		Create "TextLabel" {
+		Create "Frame" {
 			Name = "Heading",
-			Size = UDim2.fromScale(1, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.new(1, 0, 0, 22),
 			BackgroundTransparency = 1,
-			TextColor3 = Theme.Colors.DimText,
-			TextSize = Settings.SmallText,
-			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextTruncate = Enum.TextTruncate.AtEnd,
 			LayoutOrder = 1,
 			Visible = function()
 				const List = Ordered()
@@ -352,13 +347,53 @@ const function Row(Summary: () -> Types.ConversationSummary, Index: number)
 
 				return List[Index - 1] == nil or GroupOf(List[Index - 1]) ~= GroupOf(Mine)
 			end,
-			Text = function()
-				const Mine = Ordered()[Index]
-
-				return if Mine then GroupOf(Mine) else ""
-			end,
 
 			Create "UIPadding" {PaddingTop = UDim.new(0, 6)},
+			Create "UIListLayout" {
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 6),
+			},
+			Create "TextLabel" {
+				Name = "Label",
+				AutomaticSize = Enum.AutomaticSize.X,
+				Size = UDim2.fromOffset(0, 16),
+				BackgroundTransparency = 1,
+				TextColor3 = Theme.Colors.DimText,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				LayoutOrder = 1,
+				Text = function()
+					const Mine = Ordered()[Index]
+
+					return if Mine then GroupOf(Mine) else ""
+				end,
+
+				Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Shrink},
+			},
+			IconButton {
+				Icon = Config.Icons.Add,
+				LayoutOrder = 2,
+				Size = Settings.SmallText,
+				Visible = function()
+					const Mine = Ordered()[Index]
+
+					return Mine ~= nil and Mine.folder ~= nil and Mine.id ~= Gallery.Id
+				end,
+				OnClick = function()
+					const Mine = Ordered()[Index]
+
+					if not Mine or not Mine.folder then
+						return
+					end
+
+					Settings.Set("WorkingFolder", Mine.folder)
+					Chat.New()
+				end,
+			},
 		},
 		Button,
 	}

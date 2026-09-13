@@ -48,6 +48,7 @@ const Summary = Typed.table({
 	id = Typed.string(),
 	title = Typed.string(),
 	project = Typed.string(),
+	folder = Typed.optional(Typed.string()),
 	source = Typed.string(),
 	starred = Typed.optional(Typed.boolean()),
 	archived = Typed.optional(Typed.boolean()),

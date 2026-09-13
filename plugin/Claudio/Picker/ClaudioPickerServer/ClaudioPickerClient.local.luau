@@ -21,7 +21,7 @@ local Shown = 0
 local Message: TextLabel
 local Overlay: ScreenGui?
 local Marker: Instance?
-local Toolbar: ScreenGui
+local Toolbar: typeof(script.Toolbar)
 
 const function Clear()
 	if Marker then

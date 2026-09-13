@@ -1192,168 +1192,6 @@ const function Changed(Input: any): any
 	return {lines = Lines}
 end
 
-const function Rendered(Object: Instance): boolean
-	local Current: Instance? = Object
-
-	while Current do
-		if Current:IsA("PluginGui") or Current == game:GetService("CoreGui") or Current == game:GetService("StarterGui") then
-			return false
-		end
-
-		if Current:IsA("PlayerGui") or Current:IsA("SurfaceGui") or Current:IsA("BillboardGui") then
-			return true
-		end
-
-		Current = Current.Parent
-	end
-
-	return false
-end
-
-const function Unstage()
-	const Held = _G.ClaudioStage :: any
-
-	if not Held then
-		return
-	end
-
-	if Held.Part then
-		Held.Part:Destroy()
-	end
-
-	const Camera = workspace.CurrentCamera
-
-	Camera.CFrame = Held.CFrame
-	Camera.FieldOfView = Held.FieldOfView
-
-	const Lighting = game:GetService("Lighting")
-
-	for Name, Value in Held.Lighting do
-		(Lighting :: any)[Name] = Value
-	end
-
-	for _, Effect in Held.Effects do
-		if Effect.Parent then
-			Effect.Object.Parent = Effect.Parent
-		else
-			Effect.Object.Enabled = Effect.Enabled
-		end
-	end
-
-	_G.ClaudioStage = nil
-end
-
-const function Stage(Shown: GuiObject): any
-	Unstage()
-
-	const Width = Shown.AbsoluteSize.X
-	const Height = Shown.AbsoluteSize.Y
-
-	if Width < 1 or Height < 1 then
-		return {error = `{Shown.Name} is not being drawn, so there is nothing to capture.`}
-	end
-
-	const Camera = workspace.CurrentCamera
-	const Lighting = game:GetService("Lighting")
-	const Effects = {}
-
-	for _, Object in Lighting:GetDescendants() do
-		if Object:IsA("Atmosphere") then
-			table.insert(Effects, {Object = Object, Parent = Object.Parent})
-		elseif Object:IsA("PostEffect") then
-			table.insert(Effects, {Object = Object, Enabled = Object.Enabled})
-		end
-	end
-
-	_G.ClaudioStage = {
-		CFrame = Camera.CFrame,
-		FieldOfView = Camera.FieldOfView,
-		Lighting = {
-			Ambient = Lighting.Ambient,
-			OutdoorAmbient = Lighting.OutdoorAmbient,
-			Brightness = Lighting.Brightness,
-			FogEnd = Lighting.FogEnd,
-			ExposureCompensation = Lighting.ExposureCompensation,
-			GlobalShadows = Lighting.GlobalShadows,
-		},
-		Effects = Effects,
-	}
-
-	for _, Effect in Effects do
-		if Effect.Parent then
-			Effect.Object.Parent = nil
-		else
-			Effect.Object.Enabled = false
-		end
-	end
-
-	Lighting.Ambient = Color3.new()
-	Lighting.OutdoorAmbient = Color3.new()
-	Lighting.Brightness = 0
-	Lighting.FogEnd = 1e6
-	Lighting.ExposureCompensation = 0
-	Lighting.GlobalShadows = false
-
-	const Pixels = 100
-	const Screen = Instance.new("Part")
-
-	Screen.Name = "ClaudioStage"
-	Screen.Anchored = true
-	Screen.CanCollide = false
-	Screen.CanQuery = false
-	Screen.CanTouch = false
-	Screen.CastShadow = false
-	Screen.Size = Vector3.new(Width / Pixels, Height / Pixels, 0.05)
-	Screen.CFrame = CFrame.new(0, 10000, 0)
-	Screen.Color = Color3.new()
-	Screen.Parent = workspace
-
-	;(_G.ClaudioStage :: any).Part = Screen
-
-	const Surface = Instance.new("SurfaceGui")
-
-	Surface.Face = Enum.NormalId.Back
-	Surface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	Surface.PixelsPerStud = Pixels
-	Surface.LightInfluence = 0
-	Surface.Parent = Screen
-
-	const Copy = Shown:Clone()
-
-	Copy.Position = UDim2.fromOffset(0, 0)
-	Copy.Size = UDim2.fromOffset(Width, Height)
-	Copy.AnchorPoint = Vector2.zero
-	Copy.Visible = true
-	Copy.Parent = Surface
-
-	const Original = Shown:GetDescendants()
-
-	for Index, Object in Copy:GetDescendants() do
-		if Object:IsA("ScrollingFrame") and Original[Index] and Original[Index]:IsA("ScrollingFrame") then
-			Object.CanvasPosition = (Original[Index] :: ScrollingFrame).CanvasPosition
-		end
-	end
-
-	const Reach = math.tan(math.rad(Camera.FieldOfView / 2))
-	const Across = Camera.ViewportSize.X / Camera.ViewportSize.Y
-	const Fit = math.max(Screen.Size.Y / 2 / Reach, Screen.Size.X / 2 / (Reach * Across))
-	const Away = math.max(Camera.ViewportSize.Y / (2 * Pixels * Reach), Fit)
-
-	Camera.CFrame = CFrame.lookAt(Screen.Position + Vector3.new(0, 0, Away), Screen.Position)
-
-	for _ = 1, 5 do
-		game:GetService("RunService").Heartbeat:Wait()
-	end
-
-	for Index, Object in Copy:GetDescendants() do
-		if Object:IsA("ScrollingFrame") and Original[Index] and Original[Index]:IsA("ScrollingFrame") then
-			Object.CanvasPosition = (Original[Index] :: ScrollingFrame).CanvasPosition
-		end
-	end
-
-	return {staged = true, width = Width, height = Height}
-end
-
 const function ScreenBounds(Object: Instance, Viewport: Vector2): any
 	if Object:IsA("GuiObject") then
 		const Shown = Object :: GuiObject
@@ -1422,22 +1260,6 @@ const function ScreenBounds(Object: Instance, Viewport: Vector2): any
 end
 
 const function Shoot(Input: any): any
-	local Staged
-
-	if Input.around then
-		const Target = Resolve(Input.around)
-
-		if Target and Target:IsA("GuiObject") and not Rendered(Target) then
-			const Put = Stage(Target :: GuiObject)
-
-			if Put.error then
-				return {error = Put.error}
-			end
-
-			Staged = Put
-		end
-	end
-
 	const CaptureService = game:GetService("CaptureService")
 	const AssetService = game:GetService("AssetService")
 	const Base64 = require(script.Parent.Parent.Base64)
@@ -1457,10 +1279,6 @@ const function Shoot(Input: any): any
 	end
 
 	if not Captured then
-		if Staged then
-			Unstage()
-		end
-
 		return {error = "Studio did not return a screenshot."}
 	end
 
@@ -1483,18 +1301,15 @@ const function Shoot(Input: any): any
 
 		Corner = Vector2.new(Left, Top)
 		Span = Vector2.new(math.clamp(tonumber(Input.width) or 1, 1, Whole.X - Left), math.clamp(tonumber(Input.height) or 1, 1, Whole.Y - Top))
-	elseif Staged then
-		const Wide = math.min((Staged :: any).width, Whole.X)
-		const Tall = math.min((Staged :: any).height, Whole.Y)
-
-		Corner = Vector2.new(math.floor((Whole.X - Wide) / 2), math.floor((Whole.Y - Tall) / 2))
-		Span = Vector2.new(Wide, Tall)
-		Around = Input.around
 	elseif Input.around then
 		const Object = Resolve(Input.around)
 
 		if not Object then
 			return {error = `Nothing at "{tostring(Input.around)}" to crop to.`}
+		end
+
+		if Object:IsA("GuiObject") and Object:FindFirstAncestorWhichIsA("PluginGui") then
+			return {error = `{Object:GetFullName()} is inside a plugin window, which the viewport never draws. Capture with of window and widget set to that window's title instead.`}
 		end
 
 		const Edges = ScreenBounds(Object, Whole)
@@ -1528,15 +1343,70 @@ const function Shoot(Input: any): any
 		height = math.floor(Span.Y),
 		viewport = `{math.floor(Whole.X)}x{math.floor(Whole.Y)}`,
 		around = Around,
-		staged = Staged ~= nil,
 		pixels = Base64.Encode(buffer.tostring(Pixels)),
 	}
 
-	if Staged then
-		Unstage()
+	return Answer
+end
+
+const function Mark(Input: any): any
+	const Wanted = string.lower(tostring(Input.widget or ""))
+	const Titles = {}
+	local Found: PluginGui?
+
+	for _, Window in game:GetService("PluginGuiService"):GetChildren() do
+		if not Window:IsA("PluginGui") then
+			continue
+		end
+
+		table.insert(Titles, Window.Title)
+
+		if Window.Enabled and Wanted ~= "" and string.lower(Window.Title):find(Wanted, 1, true) then
+			Found = Window
+		end
 	end
 
-	return Answer
+	if not Found then
+		return {error = if Wanted == "" then "Give part of the window's title in widget." else `No open plugin window has "{Input.widget}" in its title. Open ones: {table.concat(Titles, ", ")}.`}
+	end
+
+	const Window = Found :: PluginGui
+	const Marker = Instance.new("Frame")
+
+	Marker.Name = "ClaudioMarker"
+	Marker.Size = UDim2.fromOffset(16, 8)
+	Marker.BackgroundColor3 = Color3.fromRGB(255, 0, 254)
+	Marker.BorderSizePixel = 0
+	Marker.ZIndex = 100000
+	Marker.Parent = Window
+
+	const Half = Instance.new("Frame")
+
+	Half.Name = "Half"
+	Half.Size = UDim2.fromOffset(8, 8)
+	Half.Position = UDim2.fromOffset(8, 0)
+	Half.BackgroundColor3 = Color3.fromRGB(1, 255, 254)
+	Half.BorderSizePixel = 0
+	Half.ZIndex = 100001
+	Half.Parent = Marker
+
+	task.delay(10, function()
+		Marker:Destroy()
+	end)
+
+	return {width = Window.AbsoluteSize.X, height = Window.AbsoluteSize.Y, title = Window.Title}
+end
+
+const function Unmark(): any
+	for _, Window in game:GetService("PluginGuiService"):GetChildren() do
+		const Marker = Window:FindFirstChild("ClaudioMarker")
+
+		if Marker then
+			Marker:Destroy()
+		end
+	end
+
+	return {text = "Unmarked."}
 end
 
 const function Frame(Input: any): any
@@ -2113,7 +1983,7 @@ const function Execute(Input: any): any
 	const Holder = Instance.new("ModuleScript")
 
 	Holder.Name = "ClaudioExecute"
-	Holder.Source = `return function()\n{Code}\nend`
+	Holder.Source = `return function(plugin)\n{Code}\nend`
 	Holder.Parent = game:GetService("ServerStorage")
 
 	const function Finish(): ()
@@ -2149,12 +2019,12 @@ const function Execute(Input: any): any
 		return Failed
 	end
 
-	const Ok, Result = xpcall(Made :: any, Trouble)
+	const Ok, Result = xpcall(Made :: any, Trouble, Settings.Plugin())
 
 	Finish()
 
 	if Recording then
-		ChangeHistoryService:FinishRecording(Recording, if Ok then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel)
+		ChangeHistoryService:FinishRecording(Recording, Enum.FinishRecordingOperation.Commit)
 
 		if Ok then
 			Committed += 1
@@ -2299,6 +2169,14 @@ const function RunStudioJob(Job: any)
 
 			if Job.kind == "shoot" then
 				return Shoot(Job.input)
+			end
+
+			if Job.kind == "mark" then
+				return Mark(Job.input)
+			end
+
+			if Job.kind == "unmark" then
+				return Unmark()
 			end
 
 			if Job.kind == "modify" then

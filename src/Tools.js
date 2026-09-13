@@ -106,10 +106,11 @@ export function StudioTools(Deps) {
     },
     {
       Name: "capture",
-      Description: "Take a picture of Studio. of picks what: viewport is the rendered 3D view and the default; window is the whole Studio window as the user sees it, dock widgets included, at true colours, so it is the way to look at a plugin's own interface. Give around with an instance path to crop the viewport tightly to that thing, or window to pick a floating Studio window by part of its title. Give path to point the camera at something first, or x, y, width and height to crop by hand. The camera is always put back where it was.",
+      Description: "Take a picture of Studio. of picks what: viewport is the rendered 3D view and the default; window is the whole Studio window as the user sees it, at true colours. To look at a plugin's own interface use of window with widget set to part of that panel's title, and the picture is cropped to exactly that panel wherever it is docked. Give around with an instance path to crop the viewport tightly to a part, model or on screen GuiObject, path to point the camera at something first, or x, y, width and height to crop by hand. The camera is always put back where it was.",
       Schema: {
         of: z.enum(["viewport", "window"]).optional().describe("What to capture. viewport by default."),
-        window: z.string().optional().describe("Part of a Studio window title to capture instead of the main one, such as a floating dock widget's title. Only for of window."),
+        window: z.string().optional().describe("Part of a Studio window title to capture instead of the main one, for a panel floated out of Studio. Only for of window."),
+        widget: z.string().optional().describe("Part of a plugin panel's title, such as Claudio. The window capture is cropped to that panel. Only for of window."),
         around: z.string().optional().describe("Instance to crop tightly around, such as Workspace.Model or a GuiObject path."),
         padding: z.number().optional().describe("Pixels of margin around it, 8 by default."),
         path: z.string().optional().describe("Instance to frame the camera on before shooting."),
@@ -134,14 +135,34 @@ export function StudioTools(Deps) {
         };
 
         if (Input.of === "window") {
-          const { CaptureWindow } = await import("./Window.js");
-          const Taken = await CaptureWindow(Input.window, { x: Input.x, y: Input.y, width: Input.width, height: Input.height });
+          const { CaptureWindow, CropToMarker } = await import("./Window.js");
+          const Marked = Input.widget ? await Reach("mark", { widget: Input.widget }) : null;
+
+          if (Marked && Marked.error) {
+            return { content: [{ type: "text", text: Marked.error }] };
+          }
+
+          const Taken = await CaptureWindow(Input.window, Marked ? {} : { x: Input.x, y: Input.y, width: Input.width, height: Input.height });
+
+          if (Marked) {
+            await Reach("unmark", {});
+          }
 
           if (Taken.error) {
             return { content: [{ type: "text", text: Taken.error }] };
           }
 
-          return Picture(Taken.data, `${Taken.width}x${Taken.height} of the window "${Taken.title}"${Input.width && Input.height ? `, cropped at ${Input.x || 0}, ${Input.y || 0}` : ""}`);
+          if (!Marked) {
+            return Picture(Taken.data, `${Taken.width}x${Taken.height} of the window "${Taken.title}"${Input.width && Input.height ? `, cropped at ${Input.x || 0}, ${Input.y || 0}` : ""}`);
+          }
+
+          const Cropped = CropToMarker(Taken.data, Marked.width, Marked.height);
+
+          if (Cropped.error) {
+            return { content: [{ type: "text", text: Cropped.error }] };
+          }
+
+          return Picture(Cropped.data, `${Cropped.width}x${Cropped.height} of the "${Marked.title}" panel, at ${Cropped.x}, ${Cropped.y} in the window "${Taken.title}"`);
         }
 
         const { EncodePixels } = await import("./Capture.js");

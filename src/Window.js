@@ -2,6 +2,41 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
+import { PNG } from "pngjs";
+
+function Colour(Image, X, Y) {
+  const At = (Image.width * Y + X) * 4;
+
+  return [Image.data[At], Image.data[At + 1], Image.data[At + 2]];
+}
+
+function Same(Image, X, Y, Wanted) {
+  const [R, G, B] = Colour(Image, X, Y);
+
+  return R === Wanted[0] && G === Wanted[1] && B === Wanted[2];
+}
+
+export function CropToMarker(Data, Width, Height) {
+  const Image = PNG.sync.read(Buffer.from(Data, "base64"));
+
+  for (let Y = 0; Y < Image.height - 8; Y += 1) {
+    for (let X = 0; X < Image.width - 16; X += 1) {
+      if (!Same(Image, X, Y, [255, 0, 254]) || !Same(Image, X + 8, Y, [1, 255, 254]) || !Same(Image, X + 7, Y + 7, [255, 0, 254]) || !Same(Image, X + 15, Y + 7, [1, 255, 254])) {
+        continue;
+      }
+
+      const Wide = Math.min(Width, Image.width - X);
+      const Tall = Math.min(Height, Image.height - Y);
+      const Out = new PNG({ width: Wide, height: Tall });
+
+      PNG.bitblt(Image, Out, X, Y, Wide, Tall, 0, 0);
+
+      return { data: PNG.sync.write(Out).toString("base64"), width: Wide, height: Tall, x: X, y: Y };
+    }
+  }
+
+  return { error: "The panel is open but not visible in the Studio window, so it could not be found in the capture. It may be collapsed behind another tab, or floated onto another screen; give its title as window instead." };
+}
 
 const Script = `
 Add-Type -AssemblyName System.Drawing

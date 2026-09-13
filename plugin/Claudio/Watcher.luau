@@ -118,6 +118,7 @@ end
 local Watching = false
 local Listeners: {[Instance]: RBXScriptConnection} = {}
 local Sources: {[Instance]: string} = {}
+local Paths: {[Instance]: string} = {}
 local Connections: {RBXScriptConnection} = {}
 local Turn = NewBucket()
 local Idle = NewBucket()
@@ -228,7 +229,12 @@ const function AddListener(Object: Instance)
 		Sources[Object] = (Object :: any).Source
 	end
 
+	Paths[Object] = Object:GetFullName()
 	Listeners[Object] = Object.Changed:Connect(function(Field: string)
+		if Field == "Name" or Field == "Parent" then
+			Paths[Object] = Object:GetFullName()
+		end
+
 		if Paused or Noise[Field] or StudioOwns(Object, Field) then
 			return
 		end
@@ -290,14 +296,16 @@ end
 
 const function OnDescendantRemoving(Object: Instance)
 	const Listener = Listeners[Object]
+	const Path = Paths[Object]
 
 	if Listener then
 		Listener:Disconnect()
 		Listeners[Object] = nil
 		Sources[Object] = nil
+		Paths[Object] = nil
 	end
 
-	if Paused or not IsWatched(Object) then
+	if Paused or (not Path and not IsWatched(Object)) then
 		return
 	end
 
@@ -331,7 +339,7 @@ const function OnDescendantRemoving(Object: Instance)
 		return
 	end
 
-	Record(nil, Object:GetFullName(), "Deleted", Object.ClassName)
+	Record(nil, Path or Object:GetFullName(), "Deleted", Object.ClassName)
 end
 
 const function Render(Where: Bucket): {string}

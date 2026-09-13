@@ -1248,12 +1248,22 @@ return function(Props: Props)
 						return Entry().Added ~= nil or Entry().Removed ~= nil
 					end
 
+					const function Sign(): string
+						return if Entry().Kind == "added" then "+" elseif Entry().Kind == "removed" then "-" else ""
+					end
+
 					return Create "TextButton" {
 						Name = "Change",
 						Size = UDim2.new(1, 0, 0, 24),
-						BackgroundColor3 = Theme.Colors.Button,
+						BackgroundColor3 = function()
+							return if Sign() == "+" then Theme.Colors.Added() elseif Sign() == "-" then Theme.Colors.Removed() else Theme.Colors.Button()
+						end,
 						BackgroundTransparency = function()
-							return if Hovered() then 0.5 else 1
+							if Sign() == "" then
+								return if Hovered() then 0.5 else 1
+							end
+
+							return if Hovered() then 0 else 0.35
 						end,
 						AutoButtonColor = false,
 						Text = "",
@@ -1283,6 +1293,23 @@ return function(Props: Props)
 							SortOrder = Enum.SortOrder.LayoutOrder,
 							Padding = UDim.new(0, 6),
 						},
+						Create "TextLabel" {
+							Name = "Sign",
+							AutomaticSize = Enum.AutomaticSize.X,
+							Size = UDim2.fromOffset(0, 24),
+							BackgroundTransparency = 1,
+							TextColor3 = function()
+								return if Sign() == "-" then Theme.Colors.Error() else Theme.Colors.AddedText()
+							end,
+							TextSize = Settings.TextSize,
+							FontFace = Font.fromEnum(Enum.Font.Code),
+							TextXAlignment = Enum.TextXAlignment.Left,
+							LayoutOrder = 0,
+							Visible = function()
+								return Sign() ~= ""
+							end,
+							Text = Sign,
+						},
 						Icon {
 							Name = function()
 								const Path = Entry().Path or ""
@@ -1298,7 +1325,9 @@ return function(Props: Props)
 								return if Counted() then Config.Icons.Script else Config.Icons.Instance
 							end,
 							Size = Settings.SmallText,
-							Colour = Theme.Colors.DimText,
+							Colour = function()
+								return if Sign() == "-" then Theme.Colors.Error() elseif Sign() == "+" then Theme.Colors.AddedText() else Theme.Colors.DimText()
+							end,
 							LayoutOrder = 1,
 						},
 						Create "TextLabel" {

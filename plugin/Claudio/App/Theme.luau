@@ -1,7 +1,7 @@
 --!strict
 const Vide = require(script.Parent.Parent.Packages.vide)
 
-const Studio = settings():GetService("Studio")
+const Studio = settings().Studio
 
 const Guide: {[string]: Enum.StudioStyleGuideColor} = {
 	Background = Enum.StudioStyleGuideColor.MainBackground,

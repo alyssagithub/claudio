@@ -572,16 +572,16 @@ function Testing.Paint(Name: string?): string
 	if not Name then
 		Theme.Paint(nil)
 
-		return `Painting with Studio's own theme again, which is {settings():GetService("Studio").Theme.Name}`
+		return `Painting with Studio's own theme again, which is {settings().Studio.Theme.Name}`
 	end
 
 	const Offered = {}
 
-	for _, Choice in settings():GetService("Studio"):GetAvailableThemes() do
+	for _, Choice in settings().Studio:GetAvailableThemes() do
 		if Choice.Name == Name then
 			Theme.Paint(Choice)
 
-			return `Painting the mount as {Choice.Name} while Studio stays on {settings():GetService("Studio").Theme.Name}`
+			return `Painting the mount as {Choice.Name} while Studio stays on {settings().Studio.Theme.Name}`
 		end
 
 		table.insert(Offered, Choice.Name)

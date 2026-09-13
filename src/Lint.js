@@ -14,17 +14,6 @@ const Ignored = /Key 'Source' not found in external type 'LuaSourceContainer'/;
 
 let Ready = null;
 
-const SettingsChildren = /^declare extern type GlobalSettings extends GenericSettings with\r?\n(?:    \w+: \w+\r?\n)+/m;
-
-function MatchStudio(File) {
-  const Text = fs.readFileSync(File, "utf8");
-  const Trimmed = Text.replace(SettingsChildren, (Block) => `${Block.split(/\r?\n/)[0]}\n`);
-
-  if (Trimmed !== Text) {
-    fs.writeFileSync(File, Trimmed);
-  }
-}
-
 function Binary() {
   return path.join(ToolsFolder, process.platform === "win32" ? "luau-lsp.exe" : "luau-lsp");
 }
@@ -118,8 +107,6 @@ async function Prepare() {
     fs.mkdirSync(ToolsFolder, { recursive: true });
     await Download(DefinitionsUrl, Definitions());
   }
-
-  MatchStudio(Definitions());
 
   if (Existing && fs.existsSync(Existing)) {
     return Existing;

@@ -171,7 +171,18 @@ const Definitions: {Definition} = {
 }
 
 const Sources: {[string]: any} = {}
+const Prefix = if script.Parent.Name:match("Testing$") then "ClaudioTesting_" else "Claudio_"
 local CurrentPlugin: Plugin
+
+const function Read(Key: string): any
+	const Stored = CurrentPlugin:GetSetting(`{Prefix}{Key}`)
+
+	if Stored ~= nil or Prefix == "Claudio_" then
+		return Stored
+	end
+
+	return CurrentPlugin:GetSetting(`Claudio_{Key}`)
+end
 
 const Hidden: {[string]: string | boolean} = {
 	Model = "auto",
@@ -194,13 +205,13 @@ function Settings.Load(PluginObject: Plugin)
 	CurrentPlugin = PluginObject
 
 	for _, Definition in Definitions do
-		const Stored = CurrentPlugin:GetSetting(`Claudio_{Definition.Key}`)
+		const Stored = Read(Definition.Key)
 
 		Sources[Definition.Key] = Vide.source(if Stored == nil then Definition.Default else Stored)
 	end
 
 	for Key, Default in Settings.Hidden do
-		const Stored = CurrentPlugin:GetSetting(`Claudio_{Key}`)
+		const Stored = Read(Key)
 
 		Sources[Key] = Vide.source(if Stored == nil then Default else Stored)
 	end
@@ -234,7 +245,7 @@ end
 
 function Settings.Set(Key: string, Value: any)
 	Sources[Key](Value)
-	CurrentPlugin:SetSetting(`Claudio_{Key}`, Value)
+	CurrentPlugin:SetSetting(`{Prefix}{Key}`, Value)
 end
 
 function Settings.Reset()

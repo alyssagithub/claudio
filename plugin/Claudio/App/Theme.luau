@@ -3,6 +3,10 @@ const Vide = require(script.Parent.Parent.Packages.vide)
 
 const Studio = settings().Studio
 
+const function Current(): StudioTheme
+	return (Studio :: any).Theme
+end
+
 const Guide: {[string]: Enum.StudioStyleGuideColor} = {
 	Background = Enum.StudioStyleGuideColor.MainBackground,
 	Panel = Enum.StudioStyleGuideColor.Titlebar,
@@ -60,25 +64,25 @@ function Theme.Paint(Chosen: StudioTheme?)
 	Painted = Chosen
 
 	for Name, Color in Guide do
-		Theme.Colors[Name]((Painted or Studio.Theme):GetColor(Color))
+		Theme.Colors[Name]((Painted or Current()):GetColor(Color))
 	end
 
-	Theme.Colors.DimText(Readable(Painted or Studio.Theme))
+	Theme.Colors.DimText(Readable(Painted or Current()))
 end
 
 function Theme.Init()
 	for Name, Color in Guide do
-		Theme.Colors[Name] = Vide.source(Studio.Theme:GetColor(Color))
+		Theme.Colors[Name] = Vide.source(Current():GetColor(Color))
 	end
 
-	Theme.Colors.DimText(Readable(Studio.Theme))
+	Theme.Colors.DimText(Readable(Current()))
 
-	ThemeConnection = Studio.ThemeChanged:Connect(function()
+	ThemeConnection = (Studio :: any).ThemeChanged:Connect(function()
 		for Name, Color in Guide do
-			Theme.Colors[Name]((Painted or Studio.Theme):GetColor(Color))
+			Theme.Colors[Name]((Painted or Current()):GetColor(Color))
 		end
 
-		Theme.Colors.DimText(Readable(Painted or Studio.Theme))
+		Theme.Colors.DimText(Readable(Painted or Current()))
 	end)
 end
 

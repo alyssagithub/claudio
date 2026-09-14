@@ -7,14 +7,10 @@ const Settings = require(script.Parent.Settings)
 
 const Runtime = {}
 
+local Switched = false
+
 const function Scripts(): (Instance?, Instance?)
 	return ServerScriptService:FindFirstChild("ClaudioRuntimeServer"), ReplicatedStorage:FindFirstChild("ClaudioRuntimeClient")
-end
-
-function Runtime.Installed(): boolean
-	const Server, Client = Scripts()
-
-	return Server ~= nil and Client ~= nil
 end
 
 function Runtime.Remove()
@@ -26,6 +22,11 @@ function Runtime.Remove()
 
 	if Client then
 		Client:Destroy()
+	end
+
+	if Switched then
+		Switched = false
+		HttpService.HttpEnabled = false
 	end
 end
 
@@ -39,6 +40,8 @@ function Runtime.Reachable(): (boolean, string?)
 	end)
 
 	if HttpService.HttpEnabled then
+		Switched = true
+
 		return true, nil
 	end
 

@@ -16,7 +16,7 @@ function Error.Classify(Message: string): string
 		return "HttpDenied"
 	end
 
-	if Lowered:find("timed out") or Lowered:find("timeout") then
+	if Lowered:find("timed out") or Lowered:find("timedout") or Lowered:find("timeout") then
 		return "Timeout"
 	end
 

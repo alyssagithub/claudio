@@ -70,15 +70,23 @@ function Syntax.Guess(Text: string): string
 	return "luau"
 end
 
+const Cached: {[string]: string} = {}
+local Held = 0
+
 function Syntax.Highlight(Code: string, Language: string?): string
-	const Words = Keywords[Language or "luau"] or Keywords.luau
 	const Colours = Theme.Colors
+	const Key = `{Language or ""}|{Colours.Keyword():ToHex()}|{Code}`
+
+	if Cached[Key] then
+		return Cached[Key]
+	end
+
+	const Words = Keywords[Language or "luau"] or Keywords.luau
 	const Out = {}
 	local At = 1
 
 	while At <= #Code do
-		const Rest = Code:sub(At)
-		const Comment = if Language == "luau" or Language == nil then Rest:match("^%-%-%[%[.-%]%]") or Rest:match("^%-%-[^\n]*") elseif Language == "js" then Rest:match("^/%*.-%*/") or Rest:match("^//[^\n]*") elseif Language == "sh" then Rest:match("^#[^\n]*") else nil
+		const Comment = if Language == "luau" or Language == nil then Code:match("^%-%-%[%[.-%]%]", At) or Code:match("^%-%-[^\n]*", At) elseif Language == "js" then Code:match("^/%*.-%*/", At) or Code:match("^//[^\n]*", At) elseif Language == "sh" then Code:match("^#[^\n]*", At) else nil
 
 		if Comment then
 			table.insert(Out, Paint(Comment, Colours.Comment()))
@@ -87,8 +95,8 @@ function Syntax.Highlight(Code: string, Language: string?): string
 			continue
 		end
 
-		const Long = if Language == "luau" or Language == nil then Rest:match("^%[%[.-%]%]") else nil
-		const Quoted = Long or Rest:match('^"[^"\n]*"') or Rest:match("^'[^'\n]*'") or Rest:match("^`[^`]*`")
+		const Long = if Language == "luau" or Language == nil then Code:match("^%[%[.-%]%]", At) else nil
+		const Quoted = Long or Code:match('^"[^"\n]*"', At) or Code:match("^'[^'\n]*'", At) or Code:match("^`[^`]*`", At)
 
 		if Quoted then
 			table.insert(Out, Paint(Quoted, Colours.String()))
@@ -97,7 +105,7 @@ function Syntax.Highlight(Code: string, Language: string?): string
 			continue
 		end
 
-		const Number = Rest:match("^0[xX]%x+") or Rest:match("^%d+%.?%d*[eE]?[%+%-]?%d*")
+		const Number = Code:match("^0[xX]%x+", At) or Code:match("^%d+%.?%d*[eE]?[%+%-]?%d*", At)
 
 		if Number and not Code:sub(At - 1, At - 1):match("[%w_]") then
 			table.insert(Out, Paint(Number, Colours.Number()))
@@ -106,11 +114,11 @@ function Syntax.Highlight(Code: string, Language: string?): string
 			continue
 		end
 
-		const Word = Rest:match("^[%a_][%w_]*")
+		const Word = Code:match("^[%a_][%w_]*", At)
 
 		if Word then
 			const Before = Code:sub(At - 1, At - 1)
-			const Colour = if Words[Word] then Colours.Keyword() elseif Builtins[Word] and Before ~= "." and Before ~= ":" then Colours.Builtin() elseif Rest:sub(#Word + 1):match("^%s*%(") then Colours.Call() else nil
+			const Colour = if Words[Word] then Colours.Keyword() elseif Builtins[Word] and Before ~= "." and Before ~= ":" then Colours.Builtin() elseif Code:match("^%s*%(", At + #Word) then Colours.Call() else nil
 
 			table.insert(Out, if Colour then Paint(Word, Colour) else Escape(Word))
 			At += #Word
@@ -118,7 +126,7 @@ function Syntax.Highlight(Code: string, Language: string?): string
 			continue
 		end
 
-		const Operator = Rest:match("^[%+%-%*/%%%^#=~<>:%.,;%(%)%[%]{}|&!?]+")
+		const Operator = Code:match("^[%+%-%*/%%%^#=~<>:%.,;%(%)%[%]{}|&!?]+", At)
 
 		if Operator then
 			table.insert(Out, Paint(Operator, Colours.Operator()))
@@ -127,13 +135,23 @@ function Syntax.Highlight(Code: string, Language: string?): string
 			continue
 		end
 
-		const Plain = Rest:match("^[^%w_\"'`%-/#%[%+%*%%%^=~<>:%.,;%(%)%]{}|&!?]+") or Rest:sub(1, 1)
+		const Plain = Code:match("^[^%w_\"'`%-/#%[%+%*%%%^=~<>:%.,;%(%)%]{}|&!?]+", At) or Code:sub(At, At)
 
 		table.insert(Out, Escape(Plain))
 		At += #Plain
 	end
 
-	return table.concat(Out)
+	if Held > 200 then
+		table.clear(Cached)
+		Held = 0
+	end
+
+	const Built = table.concat(Out)
+
+	Cached[Key] = Built
+	Held += 1
+
+	return Built
 end
 
 return Syntax

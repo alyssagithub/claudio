@@ -1,6 +1,5 @@
 import { exec } from "node:child_process";
 
-const Names = ["RobloxStudioBeta", "RobloxStudio"];
 
 function Run(Command) {
   return new Promise((Resolve) => {

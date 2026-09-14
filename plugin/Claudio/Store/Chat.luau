@@ -5,6 +5,7 @@ const Vide = require(script.Parent.Parent.Packages.vide)
 const Types = require(script.Parent.Parent.Types)
 const Gallery = require(script.Parent.Gallery)
 const Connection = require(script.Parent.Connection)
+const Error = require(script.Parent.Parent.Client.Error)
 const Format = require(script.Parent.Parent.Format)
 const Config = require(script.Parent.Parent.Config)
 const Changes = require(script.Parent.Parent.Changes)
@@ -707,6 +708,8 @@ const function Playtest(Input: any): any
 				Held.Ok = Ok
 				Held.Value = tostring(Result)
 			end
+
+			pcall(require(script.Parent.Parent.Runtime).Remove)
 		end)
 
 		const Deadline = os.clock() + 12
@@ -2279,12 +2282,22 @@ function Chat.WatchStudioJobs()
 				end
 			end
 
-			const Polled, Trouble = pcall(function()
+			const Polled, Trouble = pcall(function(): boolean
 				const Ok, Result = Client.TakeStudioJob()
 
-				if Ok and Result and Result.job then
+				if not Ok then
+					if Connection.Status() == "Connected" then
+						Connection.Fail(Error.Classify(tostring(Result)))
+					end
+
+					return false
+				end
+
+				if Result and Result.job then
 					RunStudioJob(Result.job)
 				end
+
+				return true
 			end)
 
 			if not Polled then
@@ -2408,7 +2421,7 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		Chat.Permission(State.permission)
 		Chat.Question(State.question)
 
-		if State.conversationId then
+		if State.conversationId and Chat.ConversationId() ~= State.conversationId then
 			Chat.ConversationId(State.conversationId)
 			Settings.Set("LastChat", State.conversationId)
 		end
@@ -2507,8 +2520,16 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 	end
 
 	if Status == "cancelled" then
+		for _, Entry in Chat.Queue() do
+			DestroyImages(Entry.Previews)
+		end
+
 		Chat.Queue({})
 
+		return
+	end
+
+	if Status == "error" then
 		return
 	end
 

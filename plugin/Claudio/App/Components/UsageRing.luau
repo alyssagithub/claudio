@@ -326,7 +326,7 @@ return function()
 			end,
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-			Create "UIStroke" {Color = Theme.Colors.Button, Thickness = 1.5},
+			Create "UIStroke" {Color = Theme.Colors.DimText, Transparency = 0.6},
 			Create "UISizeConstraint" {
 				MaxSize = function()
 					return Vector2.new(math.min(Room(), 240), math.huge)

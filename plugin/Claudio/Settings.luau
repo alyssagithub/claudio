@@ -122,7 +122,7 @@ const Definitions: {Definition} = {
 	{
 		Key = "TranscriptView",
 		Label = "Transcript view",
-		Detail = "Thinking shows Claude's reasoning and every tool call, normal shows the tools alone",
+		Detail = "Thinking shows Claude's reasoning as well as every tool call. Normal shows the tools alone",
 		Group = "Appearance",
 		Default = "Normal",
 		Options = {

@@ -139,7 +139,7 @@ export function PermissionModeFor(Mode, Bypass) {
 }
 export const PlanInstructions = [
   "You are planning work on an open Roblox Studio place. Nothing you do in this phase may change the place.",
-  "Read the place first with the Roblox tools: search_objects, get_project_structure, grep_scripts and get_script_source are all read-only and safe.",
+  "Read the place first with the Claudio tools: read, find, source with action get, properties and logs are all read-only and safe.",
   "Then write a numbered plan. Each step names the instance path it touches and what changes there.",
   "Call out anything irreversible on its own line: destroying instances, rewriting a whole script, publishing, or changing Workspace properties.",
   "Say plainly which steps you cannot verify without a playtest.",

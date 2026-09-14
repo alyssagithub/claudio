@@ -2,9 +2,9 @@
 
 Claude in Roblox Studio.
 
-A chat panel that can see and edit the place you have open. It runs on the Claude Code login you already have so there's no API key anywhere in this. Each reply is one undo point, so ctrl+Z takes a whole reply back.
+A chat panel that can see and edit the place you have open. It runs on the Claude Code login you already have so there's no API key anywhere in this. Each reply is one undo point, so Ctrl+Z takes a whole reply back.
 
-Windows only. On Mac the plugin itself loads, the startup helper and the notifications don't.
+Windows only. On Mac the plugin itself loads. The startup helper and the notifications don't.
 
 ## Install
 

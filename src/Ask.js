@@ -3,7 +3,7 @@ import { z } from "zod/v3";
 import { StudioTools } from "./Tools.js";
 
 export const AskServerName = "claudio";
-export const AskToolName = "mcp__claudio__ask";
+const AskToolName = "mcp__claudio__ask";
 
 const Option = z.object({
   label: z.string().describe("The display text for this option. Concise, one to five words."),

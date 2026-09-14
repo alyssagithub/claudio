@@ -517,7 +517,7 @@ return function()
 					end
 
 					if Found.bridge and Found.bridge ~= Running then
-						return `The plugin is on {Running} and the bridge is on {Found.bridge}. They update separately, so run the installer again to bring the bridge along.`
+						return `The plugin is on {Running} and the bridge is on {Found.bridge}. Pick a version below to bring them level.`
 					end
 
 					return `You are on {Running}. Pick another and switch to install it. Studio has to restart for it to take effect.`

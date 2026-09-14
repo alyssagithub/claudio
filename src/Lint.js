@@ -214,7 +214,7 @@ function SourceMap() {
 }
 
 function FileFor(Where) {
-  return Where.split(".").join("/");
+  return Where.split(".").map((Part) => Part.replace(/[\\/:*?"<>|]/g, "_").replace(/^\.+$/, "_")).join("/");
 }
 
 function Node(Name, Class, Children, Where) {

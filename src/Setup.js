@@ -94,5 +94,5 @@ export async function RunSetup(LocalPath) {
     console.log(`  ${Index + 1}. ${Step}`);
   }
 
-  console.log("\nThe bridge is up. From here Studio is the only thing you need to open.");
+  console.log(process.platform === "win32" && !Manual.some((Step) => Step.startsWith("Start the bridge")) ? "\nThe bridge is up. From here Studio is the only thing you need to open." : "");
 }

@@ -778,11 +778,11 @@ function RouteMessage(Session, Message) {
         console.log(`Turn ${Turn.Id}: first reply text ${Turn.FirstTextAt - Turn.OpenedAt}ms after the turn started`);
       }
 
-      Publish(Turn, { PendingText: Turn.PendingText + Event.delta.text });
+      Publish(Turn, { PendingText: Turn.PendingText + Event.delta.text, Streamed: Turn.Streamed + Event.delta.text.length });
     }
 
     if (Event.type === "content_block_delta" && Event.delta.type === "thinking_delta") {
-      Publish(Turn, { PendingThinking: Turn.PendingThinking + Event.delta.thinking });
+      Publish(Turn, { PendingThinking: Turn.PendingThinking + Event.delta.thinking, Streamed: Turn.Streamed + Event.delta.thinking.length });
     }
 
     if (Event.type === "content_block_start" && Event.content_block && Event.content_block.type === "tool_use") {
@@ -817,7 +817,7 @@ function RouteMessage(Session, Message) {
       const Last = Turn.Calls[Turn.Calls.length - 1];
 
       if (Last && Last.Status === "preparing") {
-        Publish(Turn, { Calls: Turn.Calls.slice(0, -1).concat([{ ...Last, Input: (Last.Input + Event.delta.partial_json).slice(0, 4000) }]) });
+        Publish(Turn, { Calls: Turn.Calls.slice(0, -1).concat([{ ...Last, Input: (Last.Input + Event.delta.partial_json).slice(0, 4000) }]), Streamed: Turn.Streamed + Event.delta.partial_json.length });
       }
     }
 
@@ -867,6 +867,7 @@ function RouteMessage(Session, Message) {
       Activity: Turn.Activity.concat(Started.map((Call) => Call.Name)),
       Calls: Readied.concat(Started),
       Usage: Message.message.usage ? CountUsage(Turn.Usage, Message.message.usage) : Turn.Usage,
+      Streamed: 0,
     });
     return;
   }
@@ -1279,6 +1280,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     PendingThinking: "",
     Parts: [],
     Flushed: false,
+    Streamed: 0,
     Activity: [],
     Calls: [],
     Usage: { Input: 0, Output: 0, Cached: 0 },
@@ -1457,6 +1459,8 @@ function Settle(Turn) {
 }
 
 export function DescribeTurn(Turn) {
+  Turn.OutputShown = Math.max(Turn.OutputShown || 0, Turn.Usage.Output + Math.ceil(Turn.Streamed / 4));
+
   return {
     requestId: Turn.Id,
     conversationId: Turn.ConversationId,
@@ -1499,7 +1503,7 @@ export function DescribeTurn(Turn) {
     })),
     planning: Turn.Planning === true,
     milliseconds: Turn.Milliseconds || (Turn.Status === "running" ? Date.now() - Turn.StartedAt : 0),
-    tokens: { input: Turn.Usage.Input, output: Turn.Usage.Output, cached: Turn.Usage.Cached },
+    tokens: { input: Turn.Usage.Input, output: Turn.OutputShown, cached: Turn.Usage.Cached },
     limits: GetLimits(),
     context: (Turn.Session && Turn.Session.Breakdown) || null,
     contextWindow: Turn.ContextWindow || 0,

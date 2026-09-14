@@ -70,30 +70,6 @@ Port 47225 being in use is usually another copy of the bridge. `claudio start --
 
 Claude replying but saying it can't see the place means the plugin isn't connected to the bridge. Open the panel and check the top of it says Connected, and that Studio allowed the plugin's HTTP requests.
 
-## What it does
-
-Tool calls show up in the reply and expand so you can see what it actually ran.
-
-Underneath that it lists what changed in the place. It gets that by watching the data model while the turn runs. Anything you edit yourself while it's working stays credited to you.
-
-Ctrl+Z undoes a whole turn. Hovering your own message also gives you a Rewind button, which goes back further.
-
-The + button attaches things to your message: your selection, the open script, the Output window, an image. Each one becomes a tag that you write around, so you end up sending things like "the object [Baseplate] is handled by [Chat.luau], see [Output]". Ctrl+V pastes screenshots. During a playtest there's a crosshair for clicking something and sending it over.
-
-Instance paths in a reply select the object. Script paths open the script at that line.
-
-Usage limits and running cost are in the panel too. You can queue messages while it's still replying, mark chapters, fork a chat. Subagent activity shows under whatever spawned it. The model picker starts on Default, Claude Code's own default model. Auto picks a model and effort per message from the effort slider.
-
-## Known issues
-
-Studio only loads plugins when it starts, so setup usually means restarting it twice.
-
-Opening a very long chat is slow, a few seconds for a transcript in the hundreds of megabytes, because the whole thing gets parsed to rebuild the messages.
-
-Claude Code doesn't store what a turn cost anywhere, so for chats from before you installed this the cost is worked out from the token counts in the transcript. Prices are checked against real turns but hardcoded, so they'll drift if Anthropic changes them. Anything sent after installing records the real number instead.
-
-The npm name `claudio` belongs to someone else, hence installing from git.
-
 ## Licence
 
 MIT. Issues and suggestions at [github.com/alyssagithub/claudio/issues](https://github.com/alyssagithub/claudio/issues).

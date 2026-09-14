@@ -82,7 +82,7 @@ The + button attaches things to your message: your selection, the open script, t
 
 Instance paths in a reply select the object. Script paths open the script at that line.
 
-Usage limits and running cost are in the panel too. You can queue messages while it's still replying, mark chapters, fork a chat. Subagent activity shows under whatever spawned it. The model picker defaults to auto, which starts on Haiku and moves up if the task needs it.
+Usage limits and running cost are in the panel too. You can queue messages while it's still replying, mark chapters, fork a chat. Subagent activity shows under whatever spawned it. The model picker starts on Default, Claude Code's own default model. Auto picks a model and effort per message from the effort slider.
 
 ## Known issues
 

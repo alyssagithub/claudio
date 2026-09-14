@@ -185,7 +185,7 @@ const function Read(Key: string): any
 end
 
 const Hidden: {[string]: string | boolean} = {
-	Model = "auto",
+	Model = "default",
 	Effort = "",
 	FastMode = false,
 	DeclinedVersion = "",

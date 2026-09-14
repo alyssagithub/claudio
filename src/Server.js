@@ -332,7 +332,7 @@ export function StartServer(Port) {
           Text: Body.text,
           ConversationId,
           Images,
-          Model: typeof Body.model === "string" ? Body.model : "auto",
+          Model: typeof Body.model === "string" ? Body.model : "default",
           Effort: typeof Body.effort === "string" ? Body.effort : null,
           AskForTools: Body.askForTools !== false,
           GuardTools: Body.guardTools === true,

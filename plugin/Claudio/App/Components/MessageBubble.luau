@@ -660,6 +660,10 @@ return function(Props: Props)
 		end
 
 		for _, Piece in Parts do
+			if Piece.Kind == "thinking" and not Chat.Thinking() then
+				continue
+			end
+
 			const Last = Found[#Found]
 
 			if Piece.Kind == "call" and Piece.Call and Calls[Piece.Call] then

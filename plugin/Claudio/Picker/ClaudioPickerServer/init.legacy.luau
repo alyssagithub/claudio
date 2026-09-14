@@ -10,13 +10,25 @@ Link.Parent = ReplicatedStorage
 
 const function Send(Name: string, Description: string): (boolean, string)
 	const Ok, Result = pcall(function()
-		HttpService:PostAsync(`http://127.0.0.1:{script:GetAttribute("Port") or 47225}/picker`, HttpService:JSONEncode({
-			name = Name:sub(1, 120),
-			description = Description:sub(1, 8000),
-		}), Enum.HttpContentType.ApplicationJson)
+		return HttpService:RequestAsync({
+			Url = `http://127.0.0.1:{script:GetAttribute("Port") or 47225}/picker`,
+			Method = "POST",
+			Headers = {
+				["Content-Type"] = "application/json",
+				["X-Claudio-Token"] = script:GetAttribute("Token") or "",
+			},
+			Body = HttpService:JSONEncode({
+				name = Name:sub(1, 120),
+				description = Description:sub(1, 8000),
+			}),
+		})
 	end)
 
-	return Ok, if Ok then "" else tostring(Result)
+	if not Ok then
+		return false, tostring(Result)
+	end
+
+	return Result.Success, if Result.Success then "" else `{Result.StatusCode} {Result.Body}`
 end
 
 const function Dress(Player: Player)

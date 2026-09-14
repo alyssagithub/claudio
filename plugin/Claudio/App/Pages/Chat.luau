@@ -30,17 +30,9 @@ return function()
 	task.spawn(Chat.RefreshUsage)
 	task.spawn(Chat.CheckVersions)
 
-	Vide.effect(function()
-		if RunService:IsRunning() then
-			return
-		end
-
-		if Settings.Get("PlaytestPicker")() then
-			Picker.Install()
-		elseif Picker.Installed() then
-			Picker.Remove()
-		end
-	end)
+	if not RunService:IsRunning() and Picker.Installed() then
+		Picker.Remove()
+	end
 
 	Picker.Watch(function(Label: string, Description: string)
 		const Token = Context.AddRuntime(Label, Description)

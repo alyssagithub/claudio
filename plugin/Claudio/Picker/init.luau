@@ -11,6 +11,7 @@ const Picker = {
 }
 
 local Watching = 0
+local Switched = false
 
 function Picker.Installed(): boolean
 	return ServerScriptService:FindFirstChild("ClaudioPickerServer") ~= nil
@@ -26,12 +27,15 @@ function Picker.Install()
 	const Copy = script.ClaudioPickerServer:Clone()
 
 	Copy:SetAttribute("Port", Settings.Get("Port")())
+	Copy:SetAttribute("Token", Settings.Token())
 	Copy.Disabled = false
 	Copy.Parent = ServerScriptService
 
-	pcall(function()
-		HttpService.HttpEnabled = true
-	end)
+	if not HttpService.HttpEnabled then
+		Switched = pcall(function()
+			HttpService.HttpEnabled = true
+		end) and HttpService.HttpEnabled
+	end
 end
 
 function Picker.Remove()
@@ -39,6 +43,11 @@ function Picker.Remove()
 
 	if Existing then
 		Existing:Destroy()
+	end
+
+	if Switched then
+		Switched = false
+		HttpService.HttpEnabled = false
 	end
 end
 

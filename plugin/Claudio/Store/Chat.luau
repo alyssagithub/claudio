@@ -681,6 +681,10 @@ const function Playtest(Input: any): any
 
 			Runtime.Install()
 
+			if Settings.Get("PlaytestPicker")() then
+				require(script.Parent.Parent.Picker).Install()
+			end
+
 			if not Reachable then
 				Warning = Why
 			end
@@ -710,6 +714,7 @@ const function Playtest(Input: any): any
 			end
 
 			pcall(require(script.Parent.Parent.Runtime).Remove)
+			pcall(require(script.Parent.Parent.Picker).Remove)
 		end)
 
 		const Deadline = os.clock() + 12

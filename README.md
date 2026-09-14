@@ -56,8 +56,6 @@ irm https://raw.githubusercontent.com/alyssagithub/claudio/main/uninstall.ps1 | 
 
 Or `claudio uninstall` then `npm uninstall -g claudio`.
 
-The Roblox MCP server stays unless you add `-Mcp` to the script or `--mcp` to the command, since other Claude apps are probably using it.
-
 ## Troubleshooting
 
 Panel says it can't reach the bridge: `claudio restart`.
@@ -70,7 +68,7 @@ A new version breaking something can be rolled back from Settings, Connection, P
 
 Port 47225 being in use is usually another copy of the bridge. `claudio start --port 47300` and set the same number in Claudio's settings.
 
-Claude replying but saying it can't see the place means the Roblox MCP server isn't set up, or isn't one Claudio recognises. Setup installs [robloxstudio-mcp](https://github.com/Chrrxs/robloxstudio-mcp) if you have none. It only picks up servers named `robloxstudio-mcp`, `Roblox_Studio` or `roblox-docs`, so rename yours or add one of those if you already have a different one.
+Claude replying but saying it can't see the place means the plugin isn't connected to the bridge. Open the panel and check the top of it says Connected, and that Studio allowed the plugin's HTTP requests.
 
 ## What it does
 

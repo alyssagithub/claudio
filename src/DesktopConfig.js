@@ -2,13 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { DesktopConfigPath } from "./Config.js";
 
-export const RobloxServer = {
-  command: process.platform === "win32" ? "cmd" : "npx",
-  args: process.platform === "win32"
-    ? ["/c", "npx", "-y", "@chrrxs/robloxstudio-mcp@latest", "--auto-install-plugin"]
-    : ["-y", "@chrrxs/robloxstudio-mcp@latest", "--auto-install-plugin"],
-};
-
 export function ReadConfig() {
   let Text;
 

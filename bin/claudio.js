@@ -42,7 +42,7 @@ function Fail(Error) {
 if (Command === "setup") {
   RunSetup(ReadFlag("--local")).catch(Fail);
 } else if (Command === "uninstall") {
-  RunUninstall(Arguments.includes("--mcp")).catch(Fail);
+  RunUninstall().catch(Fail);
 } else if (Command === "install") {
   InstallPlugin(ReadFlag("--local")).catch(Fail);
 } else if (Command === "install-startup") {
@@ -58,6 +58,6 @@ if (Command === "setup") {
 } else if (Command === undefined || Command === "start") {
   StartServer(ChosenPort());
 } else {
-  console.error("Usage: claudio setup | claudio uninstall [--mcp] | claudio [start] [--port N] | claudio install [--local path/to/Claudio.rbxm] | claudio install-startup | claudio uninstall-startup | claudio restart | claudio stop | claudio version");
+  console.error("Usage: claudio setup | claudio uninstall | claudio [start] [--port N] | claudio install [--local path/to/Claudio.rbxm] | claudio install-startup | claudio uninstall-startup | claudio restart | claudio stop | claudio version");
   process.exit(1);
 }

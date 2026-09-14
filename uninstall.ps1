@@ -2,13 +2,8 @@
 <#
     irm https://raw.githubusercontent.com/alyssagithub/claudio/main/uninstall.ps1 | iex
 
-    Hands off to `claudio uninstall`, then removes the npm package. Add -Mcp to
-    drop the Roblox MCP server as well.
+    Hands off to `claudio uninstall`, then removes the npm package.
 #>
-
-param(
-    [switch]$Mcp
-)
 
 $ErrorActionPreference = "Stop"
 
@@ -19,11 +14,7 @@ function Has($Name) {
 Write-Host ""
 
 if (Has "claudio") {
-    if ($Mcp) {
-        & claudio uninstall --mcp
-    } else {
-        & claudio uninstall
-    }
+    & claudio uninstall
 } else {
     Write-Host "No claudio command, so clearing its files directly."
 

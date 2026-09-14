@@ -1,11 +1,7 @@
-import fs from "node:fs";
-import path from "node:path";
 import { exec, spawn } from "node:child_process";
-import { AllowedTools, DesktopConfigPath } from "./Config.js";
 import { InstallPlugin } from "./PluginInstaller.js";
 import { GetPluginsFolder } from "./StudioPaths.js";
 import { InstallStartup } from "./Startup.js";
-import { ReadConfig, RobloxServer, WriteConfig } from "./DesktopConfig.js";
 
 function Run(Line) {
   return new Promise((Resolve) => {
@@ -13,14 +9,6 @@ function Run(Line) {
       Resolve({ Ok: !Error, Output: `${Stdout || ""}${Stderr || ""}`.trim() });
     });
   });
-}
-
-const Usable = AllowedTools
-  .filter((Name) => Name.startsWith("mcp__"))
-  .map((Name) => Name.split("__")[1]);
-
-function HasRobloxServer(Config) {
-  return Object.keys((Config && Config.mcpServers) || {}).some((Name) => Usable.includes(Name));
 }
 
 async function EnsureClaude(Manual) {
@@ -70,36 +58,6 @@ function SignIn() {
   });
 }
 
-function EnsureRobloxServer(Manual) {
-  const Read = ReadConfig();
-
-  if (Read.Unreadable) {
-    console.log(`Left the Claude desktop config alone, it could not be read: ${Read.Unreadable}`);
-    Manual.push(`Add robloxstudio-mcp to ${DesktopConfigPath} yourself. Claudio did not touch it because it could not read it, and overwriting would have lost whatever is in there.`);
-    return;
-  }
-
-  if (HasRobloxServer(Read.Config)) {
-    console.log("Roblox MCP server already configured.");
-    return;
-  }
-
-  const Fresh = Read.Config || {};
-
-  if (Read.Missing) {
-    fs.mkdirSync(path.dirname(DesktopConfigPath), { recursive: true });
-  } else {
-    fs.copyFileSync(DesktopConfigPath, `${DesktopConfigPath}.claudio-backup`);
-  }
-
-  Fresh.mcpServers = Fresh.mcpServers || {};
-  Fresh.mcpServers["robloxstudio-mcp"] = RobloxServer;
-  WriteConfig(Fresh);
-
-  console.log(Read.Missing ? `Created ${DesktopConfigPath} with robloxstudio-mcp.` : "Added robloxstudio-mcp to the Claude desktop config (previous file kept as .claudio-backup).");
-  Manual.push("Fully close and reopen Roblox Studio so the Roblox MCP plugin loads, then check it shows Connected.");
-}
-
 export async function RunSetup(LocalPath) {
   const Manual = [];
 
@@ -113,8 +71,6 @@ export async function RunSetup(LocalPath) {
     Manual.push(`Install the plugin yourself: download Claudio.rbxm from the releases page and drop it in ${GetPluginsFolder()}`);
     console.log(`Could not install the plugin automatically: ${Error.message}`);
   }
-
-  EnsureRobloxServer(Manual);
 
   if (process.platform === "win32") {
     try {

@@ -1,32 +1,28 @@
 ## Changelogs
 
-- A tool call now appears the moment Claude starts writing one, its arguments filling in as they arrive. Before, a long build script meant a minute of blank panel
+### Additions
 
-- Each call gets its own box. A run of them collapses into one row you can unfold, and the arrow turns when it does
+- Tool calls appear while Claude is still writing them
+- A box per call, and a run of them folds into one row
+- Pictures stay in the call that took them
+- Line counts and deletions in the change list, kept when you reopen the chat
+- Undo on the change list, which takes back the whole turn
+- Chats with no working folder
+- Readme section on using Claudio's tools from other Claude apps
+- Unread on queued messages, Send now on the front one
 
-- A picture stays in the call that produced it, instead of being dumped at the bottom of the reply
+### Changes
 
-- What a turn changed reads as a diff now, with line counts, deletions included, and it is still there when you reopen the chat
+- Calls are named the way the desktop app names them
+- The token count ticks up as the reply arrives
+- New chats start on Default instead of Auto
+- A call that is still running can be folded
+- The playtest crosshair installs for the playtest and goes when it ends
+- Setup leaves the Claude desktop config alone
 
-- Undo sits on that list. It takes the whole turn back, files a script Claude ran wrote included
+### Removals
 
-- You can start a chat without picking a working folder, and clear the folder later from Settings
-
-- The readme says how to point Claude Code or the desktop app at Claudio's tools. They work whether or not the panel is open
-
-- Queued messages are marked Unread, with Send now on the front one
-
-- The token count ticks up while the reply arrives instead of landing all at once at the end
-
-- New chats start on Default, not Auto
-
-- Calls are named the way the desktop app names them. A shell command shows its description; a tool search reads Loaded tools; a failure reads Failed to run, in red. A background command gets its own row when it finishes
-
-- You can fold a call that is still running, which you could not before
-
-- The playtest crosshair comes and goes with the playtest. Saving a place with that setting on used to leave a Claudio script sitting in it
-
-- Setup no longer writes to the Claude desktop config. `--mcp` on uninstall did nothing but clean that up, so it is gone
+- The `--mcp` flag on uninstall
 
 ## Installation
 

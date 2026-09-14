@@ -1,4 +1,5 @@
 --!strict
+const RunService = game:GetService("RunService")
 const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Config = require(script.Parent.Parent.Parent.Config)
@@ -13,6 +14,7 @@ const Theme = require(script.Parent.Parent.Theme)
 const ImageView = require(script.Parent.ImageView)
 const Paragraph = require(script.Parent.Paragraph)
 const Icon = require(script.Parent.Icon)
+const Chevron = require(script.Parent.Chevron)
 const IconButton = require(script.Parent.IconButton)
 const Button = require(script.Parent.Button)
 const Limits = require(script.Parent.LimitCard)
@@ -84,7 +86,11 @@ const function Describe(Entry: Types.ToolCall, Running: boolean): string
 	const Name = Entry.name
 
 	if IsCommand(Name) then
-		return if Running then "Running a command" else "Ran a command"
+		return Changes.Field(Entry.input, "description") or (if Running then "Running a command" else "Ran a command")
+	end
+
+	if Name == "ToolSearch" then
+		return if Running then "Loading tools" else "Loaded tools"
 	end
 
 	const Server, Tool = Name:match("^mcp__(.-)__(.+)$")
@@ -94,9 +100,11 @@ const function Describe(Entry: Types.ToolCall, Running: boolean): string
 		return `{Verb} {Name}`
 	end
 
-	const Words = (Tool:gsub("_", " "))
+	return `{Verb} {Server}: {Tool:gsub("_", " "):gsub("%f[%a]%l", string.upper)}`
+end
 
-	return `{Verb} {Server}: {Words:sub(1, 1):upper()}{Words:sub(2)}`
+const function Busy(Entry: Types.ToolCall): boolean
+	return Entry.status == "preparing" or Entry.status == "running"
 end
 
 const function Note(Name: string, LayoutOrder: any, Text: () -> string, Visible: () -> boolean)
@@ -338,7 +346,13 @@ return function(Props: Props)
 	const CodeFields: {[string]: boolean} = {code = true, text = true, source = true, command = true, content = true, old_string = true, new_string = true, prompt = true}
 
 	const function Call(Value: () -> Types.ToolCall, Index: number)
-		const Open = Vide.source(false)
+		const Open = Vide.source(Busy(Value()))
+		const Shimmer = Vide.source(0)
+		const Turned = Vide.source(if Busy(Value()) then 1 else 0)
+
+		Vide.effect(function()
+			Open(Busy(Value()))
+		end)
 
 		const function Title(): string
 			const Name = Value().name
@@ -359,6 +373,21 @@ return function(Props: Props)
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = Index,
+
+			Vide.action(function()
+				Vide.cleanup(RunService.Heartbeat:Connect(function(Step: number)
+					if Busy(Vide.untrack(Value)) then
+						Shimmer((os.clock() * 0.6) % 1.6 - 0.8)
+					end
+
+					const Wanted = if Vide.untrack(Open) then 1 else 0
+					const Current = Vide.untrack(Turned)
+
+					if Current ~= Wanted then
+						Turned(if math.abs(Wanted - Current) < 0.02 then Wanted else Current + (Wanted - Current) * math.min(1, Step * 14))
+					end
+				end))
+			end),
 
 			Create "UIListLayout" {
 				SortOrder = Enum.SortOrder.LayoutOrder,
@@ -487,16 +516,30 @@ return function(Props: Props)
 						Text = function()
 							const Entry = Value()
 
-							if Entry.status == "running" then
+							if Busy(Entry) then
 								return Headline(Entry, true)
 							end
 
 							return `{Headline(Entry, false)}{if Entry.status == "error" then " · failed" else ""}`
 						end,
+
+						Create "UIGradient" {
+							Color = ColorSequence.new({
+								ColorSequenceKeypoint.new(0, Color3.new(0.55, 0.55, 0.55)),
+								ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)),
+								ColorSequenceKeypoint.new(1, Color3.new(0.55, 0.55, 0.55)),
+							}),
+							Offset = function()
+								return Vector2.new(Shimmer(), 0)
+							end,
+							Enabled = function()
+								return Busy(Value())
+							end,
+						},
 					},
-					Icon {
-						Name = function()
-							return if Open() then Config.Icons.Down else Config.Icons.Right
+					Chevron {
+						Angle = function()
+							return Turned() * 90 - 90
 						end,
 						Size = Settings.SmallText,
 						Colour = function()
@@ -521,7 +564,7 @@ return function(Props: Props)
 					Text = Title,
 				},
 				Vide.indexes(function()
-					return if Open() then Fields(Value().input) else {}
+					return if Open() and Value().status ~= "preparing" then Fields(Value().input) else {}
 				end, function(Pair: () -> {Key: string, Value: string}, Order: number)
 					const function IsCode(): boolean
 						return CodeFields[Pair().Key] == true or Pair().Value:find("\n") ~= nil
@@ -706,7 +749,7 @@ return function(Props: Props)
 				continue
 			end
 
-			if Entry.status == "running" then
+			if Busy(Entry) then
 				return Headline(Entry, true)
 			end
 
@@ -759,6 +802,8 @@ return function(Props: Props)
 
 	const function Group(Value: () -> Block, Index: number)
 		const Listed = Vide.source(false)
+		const Shimmer = Vide.source(0)
+		const Turned = Vide.source(0)
 
 		const function Kind(): string
 			return Value().Kind
@@ -769,6 +814,25 @@ return function(Props: Props)
 
 			return Chosen ~= nil and #Chosen > 1
 		end
+
+		const function Working(): boolean
+			const Calls: {Types.ToolCall} = if Props.Calls then Props.Calls() else {}
+			const Chosen: {number} = Value().Calls or {}
+
+			for _, Index in Chosen do
+				if Calls[Index] and Busy(Calls[Index]) then
+					return true
+				end
+			end
+
+			return false
+		end
+
+		Vide.effect(function()
+			if Working() then
+				Listed(true)
+			end
+		end)
 
 		return Create "Frame" {
 			Name = function()
@@ -782,6 +846,20 @@ return function(Props: Props)
 				return Kind() ~= "thinking" or Chat.Thinking()
 			end,
 
+			Vide.action(function()
+				Vide.cleanup(RunService.Heartbeat:Connect(function(Step: number)
+					if Vide.untrack(Working) then
+						Shimmer((os.clock() * 0.6) % 1.6 - 0.8)
+					end
+
+					const Wanted = if Vide.untrack(Listed) then 1 else 0
+					const Current = Vide.untrack(Turned)
+
+					if Current ~= Wanted then
+						Turned(if math.abs(Wanted - Current) < 0.02 then Wanted else Current + (Wanted - Current) * math.min(1, Step * 14))
+					end
+				end))
+			end),
 			Create "UIListLayout" {
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				HorizontalFlex = function()
@@ -940,10 +1018,22 @@ return function(Props: Props)
 					Text = function()
 						return if Kind() == "calls" then Summarize(Value().Calls or {}) else ""
 					end,
+
+					Create "UIGradient" {
+						Color = ColorSequence.new({
+							ColorSequenceKeypoint.new(0, Color3.new(0.55, 0.55, 0.55)),
+							ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)),
+							ColorSequenceKeypoint.new(1, Color3.new(0.55, 0.55, 0.55)),
+						}),
+						Offset = function()
+							return Vector2.new(Shimmer(), 0)
+						end,
+						Enabled = Working,
+					},
 				},
-				Icon {
-					Name = function()
-						return if Listed() then Config.Icons.Down else Config.Icons.Right
+				Chevron {
+					Angle = function()
+						return Turned() * 90 - 90
 					end,
 					Size = Settings.SmallText,
 					LayoutOrder = 2,

@@ -10,20 +10,9 @@ const Format = require(script.Parent.Parent.Parent.Format)
 
 const Create = Vide.create
 
-const Words = {
-	"Still thinking",
-	"Still working",
-	"Still puzzling",
-	"Still digging",
-	"Still pondering",
-	"Still noodling",
-	"Still untangling",
-	"Still considering",
-}
-
 const function Running(): boolean
 	for _, Call in Chat.Calls() do
-		if Call.status == "running" then
+		if Call.status == "preparing" or Call.status == "running" then
 			return true
 		end
 	end
@@ -32,30 +21,15 @@ const function Running(): boolean
 end
 
 return function()
-	const Word = Vide.source(Words[1])
 	const Dots = Vide.source(1)
 	const Seconds = Vide.source(0)
 
 	const function Phase(): string
-		if Chat.Elapsed() == 0 and Chat.StreamingText() == "" then
-			return "Sending"
-		end
-
 		if Running() then
 			return "Running tools"
 		end
 
-		if Chat.StreamingText() ~= "" then
-			return "Almost done thinking"
-		end
-
-		const Tokens = Chat.Tokens()
-
-		if #Chat.Activity() == 0 and (not Tokens or Tokens.output == 0) then
-			return "Waiting for Claude"
-		end
-
-		return Word()
+		return if Chat.StreamingText() ~= "" then "Writing" else "Thinking"
 	end
 
 	return Create "TextButton" {
@@ -71,8 +45,6 @@ return function()
 		end,
 
 		Vide.action(function()
-			local Chosen = 1
-
 			Vide.cleanup(RunService.Heartbeat:Connect(function()
 				const Started = Chat.Began()
 
@@ -81,15 +53,9 @@ return function()
 				end
 
 				const Elapsed = os.clock() - Started
-				const Next = math.floor(Elapsed / 3) % #Words + 1
 
 				Dots(math.floor(Elapsed * 2.5) % 3 + 1)
 				Seconds(math.floor(Elapsed))
-
-				if Next ~= Chosen then
-					Chosen = Next
-					Word(Words[Next])
-				end
 			end))
 		end),
 		Create "UIListLayout" {

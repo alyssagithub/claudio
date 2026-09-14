@@ -4,7 +4,7 @@ const Format = require(script.Parent.Format)
 
 const Changes = {}
 
-const function Field(Input: string, Name: string): string?
+function Changes.Field(Input: string, Name: string): string?
 	for _, Line in string.split(Input, "\n") do
 		const Key, Value = Line:match("^([%w_]+): (.+)$")
 
@@ -15,6 +15,8 @@ const function Field(Input: string, Name: string): string?
 
 	return nil
 end
+
+const Field = Changes.Field
 
 const function Line(Call: Types.ToolCall): Types.Change?
 	const Name = (Call.name:gsub("^mcp__.-__", ""))

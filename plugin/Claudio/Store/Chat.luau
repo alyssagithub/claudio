@@ -381,7 +381,7 @@ const function Source(Input: any): any
 	end
 
 	const ChangeHistoryService = game:GetService("ChangeHistoryService")
-	const Recording = ChangeHistoryService:TryBeginRecording("ClaudioSource", Input.label or `Claudio edited {Script.Name}`)
+	const Recording = ChangeHistoryService:TryBeginRecording("ClaudioSource", Input.description or `Claudio edited {Script.Name}`)
 
 	const Ok, Trouble = pcall(function(): string
 		if Action == "set" then
@@ -1151,7 +1151,7 @@ const function Rbxm(Input: any): any
 		end
 
 		const ChangeHistoryService = game:GetService("ChangeHistoryService")
-		const Recording = ChangeHistoryService:TryBeginRecording("ClaudioRbxm", Input.label or "Claudio loaded an rbxm")
+		const Recording = ChangeHistoryService:TryBeginRecording("ClaudioRbxm", Input.description or "Claudio loaded an rbxm")
 		const Names = {}
 
 		for _, Object in Made do
@@ -1857,7 +1857,7 @@ end
 
 const function Modify(Input: any): any
 	const ChangeHistoryService = game:GetService("ChangeHistoryService")
-	const Recording = ChangeHistoryService:TryBeginRecording("ClaudioModify", Input.label or "Claudio changed the place")
+	const Recording = ChangeHistoryService:TryBeginRecording("ClaudioModify", Input.description or "Claudio changed the place")
 
 	const Ok, Result = pcall(function(): any
 		const Action = Input.action
@@ -2003,7 +2003,7 @@ const function Execute(Input: any): any
 	local Recording: string? = nil
 
 	if Input.readOnly ~= true then
-		Recording = ChangeHistoryService:TryBeginRecording("ClaudioExecute", Input.label or "Claudio ran a script")
+		Recording = ChangeHistoryService:TryBeginRecording("ClaudioExecute", Input.description or "Claudio ran a script")
 	end
 
 	_G.ClaudioFresh = function(Module: ModuleScript): any

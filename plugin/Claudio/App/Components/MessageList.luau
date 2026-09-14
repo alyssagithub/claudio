@@ -127,6 +127,17 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, 10),
 			},
+			Create "TextLabel" {
+				Name = "Unread",
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				TextColor3 = Theme.Colors.DimText,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+				LayoutOrder = 0,
+				Visible = Hovered,
+				Text = "Unread",
+			},
 			IconButton {
 				Icon = Config.Icons.Copy,
 				LayoutOrder = 1,
@@ -179,6 +190,9 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 				AutoButtonColor = false,
 				LayoutOrder = 5,
 				Text = "Send now",
+				Visible = function()
+					return Hovered() or Index == 1
+				end,
 				Activated = function()
 					Chat.InterruptWith(Index)
 				end,

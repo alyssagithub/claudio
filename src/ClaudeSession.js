@@ -757,6 +757,42 @@ function RouteMessage(Session, Message) {
       Publish(Turn, { PendingThinking: Turn.PendingThinking + Event.delta.thinking });
     }
 
+    if (Event.type === "content_block_start" && Event.content_block && Event.content_block.type === "tool_use") {
+      const Block = Event.content_block;
+
+      Publish(Turn, {
+        Parts: Turn.Parts.concat(
+          Turn.PendingThinking.trim() !== "" ? [{ kind: "thinking", text: Turn.PendingThinking }] : [],
+          Turn.PendingText.trim() !== "" ? [{ kind: "text", text: Turn.PendingText }] : [],
+          [{ kind: "call", id: Block.id }],
+        ),
+        CommittedThinking: JoinText(Turn.CommittedThinking, Turn.PendingThinking),
+        CommittedText: JoinText(Turn.CommittedText, Turn.PendingText),
+        PendingThinking: "",
+        PendingText: "",
+        Flushed: true,
+        Activity: Turn.Activity.concat([Block.name]),
+        Calls: Turn.Calls.concat([{
+          Id: Block.id,
+          Name: Block.name,
+          Input: "",
+          Output: "",
+          Status: "preparing",
+          StartedAt: Date.now(),
+          Milliseconds: 0,
+          Delegate: DelegateFor(Block, Turn.Delegate),
+        }]),
+      });
+    }
+
+    if (Event.type === "content_block_delta" && Event.delta.type === "input_json_delta") {
+      const Last = Turn.Calls[Turn.Calls.length - 1];
+
+      if (Last && Last.Status === "preparing") {
+        Publish(Turn, { Calls: Turn.Calls.slice(0, -1).concat([{ ...Last, Input: (Last.Input + Event.delta.partial_json).slice(0, 4000) }]) });
+      }
+    }
+
     return;
   }
 
@@ -764,7 +800,8 @@ function RouteMessage(Session, Message) {
     const Content = Blocks(Message);
     const Committed = Content.filter((Block) => Block.type === "text").map((Block) => Block.text).join("");
     const Thought = Content.filter((Block) => Block.type === "thinking").map((Block) => Block.thinking).join(NewLine);
-    const Started = Content.filter((Block) => Block.type === "tool_use").map((Block) => ({
+    const Known = new Set(Turn.Calls.map((Call) => Call.Id));
+    const Started = Content.filter((Block) => Block.type === "tool_use" && !Known.has(Block.id)).map((Block) => ({
       Id: Block.id,
       Name: Block.name,
       Input: DescribeInput(Block.input),
@@ -774,8 +811,13 @@ function RouteMessage(Session, Message) {
       Milliseconds: 0,
       Delegate: DelegateFor(Block, Turn.Delegate),
     }));
+    const Readied = Turn.Calls.map((Call) => {
+      const Block = Content.find((Candidate) => Candidate.type === "tool_use" && Candidate.id === Call.Id);
 
-    const Parts = Content.map((Block) => {
+      return Block && Call.Status === "preparing" ? { ...Call, Input: DescribeInput(Block.input), Status: "running", StartedAt: Date.now() } : Call;
+    });
+
+    const Parts = Turn.Flushed ? [] : Content.map((Block) => {
       if (Block.type === "thinking") {
         return { kind: "thinking", text: Block.thinking };
       }
@@ -788,13 +830,14 @@ function RouteMessage(Session, Message) {
     }).filter((Part) => Part && (Part.kind === "call" || Part.text.trim() !== ""));
 
     Publish(Turn, {
-      CommittedText: JoinText(Turn.CommittedText, Committed),
+      CommittedText: Turn.Flushed ? Turn.CommittedText : JoinText(Turn.CommittedText, Committed),
       PendingText: "",
-      CommittedThinking: JoinText(Turn.CommittedThinking, Thought),
+      CommittedThinking: Turn.Flushed ? Turn.CommittedThinking : JoinText(Turn.CommittedThinking, Thought),
       PendingThinking: "",
+      Flushed: false,
       Parts: Turn.Parts.concat(Parts),
       Activity: Turn.Activity.concat(Started.map((Call) => Call.Name)),
-      Calls: Turn.Calls.concat(Started),
+      Calls: Readied.concat(Started),
       Usage: Message.message.usage ? CountUsage(Turn.Usage, Message.message.usage) : Turn.Usage,
     });
     return;
@@ -1200,6 +1243,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     CommittedThinking: "",
     PendingThinking: "",
     Parts: [],
+    Flushed: false,
     Activity: [],
     Calls: [],
     Usage: { Input: 0, Output: 0, Cached: 0 },

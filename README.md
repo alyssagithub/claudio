@@ -23,6 +23,31 @@ claudio setup
 
 If you don't have Claude Code yet it'll open a window for you to log in. Then restart Studio and click **Claudio** in the Plugins tab, allowing HTTP requests when it asks. It'll ask you to pick a folder for Claude to work in before anything else, and you can change that later under settings.
 
+## Using the Claudio tools from other Claude apps
+
+The tools the panel gives Claude are also a normal MCP server, so Claude Code, the desktop app, or anything else that speaks MCP can drive your open place the same way. It needs the bridge running (the installer sets it to start with Windows, or run `claudio`) and Studio open with the plugin installed. The panel does not have to be open.
+
+Claude Code:
+
+```powershell
+claude mcp add claudio -- node "$(npm root -g)\claudio\bin\mcp.js"
+```
+
+Claude desktop app, in `%APPDATA%\Claude\claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "claudio": {
+      "command": "node",
+      "args": ["C:\\Users\\you\\AppData\\Roaming\\npm\\node_modules\\claudio\\bin\\mcp.js"]
+    }
+  }
+}
+```
+
+`npm root -g` prints the folder the path above starts from. Restart the app after editing the file.
+
 ## Uninstall
 
 ```powershell

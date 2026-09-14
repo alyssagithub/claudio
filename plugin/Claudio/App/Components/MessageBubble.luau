@@ -57,11 +57,16 @@ const function Counted(Added: number, Removed: number): string
 end
 
 const function FileWork(Entry: Types.ToolCall, Running: boolean): string?
-	if Entry.name ~= "Write" and Entry.name ~= "Edit" and Entry.name ~= "MultiEdit" then
+	if Entry.name ~= "Write" and Entry.name ~= "Edit" and Entry.name ~= "MultiEdit" and Entry.name ~= "Read" then
 		return nil
 	end
 
 	const File = (Entry.input:match("file_path: ([^\n]+)") or ""):match("[^/\\]+$") or "a file"
+
+	if Entry.name == "Read" then
+		return `{if Running then "Reading" else "Read"} <b>{File}</b>`
+	end
+
 	const Lines = Entry.lines
 	const Verb = if Entry.name ~= "Write" then (if Running then "Editing" else "Edited")
 		elseif Lines and Lines.removed == 0 then (if Running then "Creating" else "Created")
@@ -91,6 +96,12 @@ const function Describe(Entry: Types.ToolCall, Running: boolean): string
 
 	if Name == "ToolSearch" then
 		return if Running then "Loading tools" else "Loaded tools"
+	end
+
+	if Name == "TaskNotification" then
+		const Summary = (Changes.Field(Entry.input, "summary") or ""):gsub('^Background command "(.-)".*$', "%1")
+
+		return `Background command {Changes.Field(Entry.input, "status") or "finished"} · {Summary}`
 	end
 
 	const Server, Tool = Name:match("^mcp__(.-)__(.+)$")
@@ -506,7 +517,7 @@ return function(Props: Props)
 						AutomaticSize = Enum.AutomaticSize.XY,
 						BackgroundTransparency = 1,
 						TextColor3 = function()
-							return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.Text()
+							return if Value().status == "error" and not IsCommand(Value().name) and Value().name ~= "TaskNotification" then Theme.Colors.Error() else Theme.Colors.Text()
 						end,
 						TextSize = Settings.SmallText,
 						FontFace = Font.fromEnum(Enum.Font.BuilderSans),
@@ -520,7 +531,18 @@ return function(Props: Props)
 								return Headline(Entry, true)
 							end
 
-							return `{Headline(Entry, false)}{if Entry.status == "error" then " · failed" else ""}`
+							if Entry.status == "error" and IsCommand(Entry.name) then
+								return `<font color="#{Theme.Colors.Error():ToHex()}">Failed to run</font> {Headline(Entry, false)}`
+							end
+
+							if Entry.name == "TaskNotification" then
+								const Line = Headline(Entry, false)
+								const Cut = Line:find(" · ", 1, true) or #Line + 1
+
+								return `<font color="#{(if Entry.status == "error" then Theme.Colors.Error() else Theme.Colors.Text()):ToHex()}">{Line:sub(1, Cut - 1)}</font>{Line:sub(Cut)}`
+							end
+
+							return Headline(Entry, false)
 						end,
 
 						Create "UIGradient" {
@@ -735,6 +757,7 @@ return function(Props: Props)
 		local Added = 0
 		local Removed = 0
 		const Files = {}
+		const Reads = {}
 
 		for _, Index in Chosen do
 			const Entry = Calls[Index]
@@ -766,19 +789,29 @@ return function(Props: Props)
 			const Wrote = FileWork(Entry, false)
 
 			if Wrote and Entry.status ~= "error" then
-				table.insert(Files, (Wrote:gsub(" <font.*$", "")))
-				Added += if Entry.lines then Entry.lines.added else 0
-				Removed += if Entry.lines then Entry.lines.removed else 0
+				if Entry.name == "Read" then
+					table.insert(Reads, (Wrote:gsub("^Read ", "")))
+				else
+					table.insert(Files, (Wrote:gsub(" <font.*$", "")))
+					Added += if Entry.lines then Entry.lines.added else 0
+					Removed += if Entry.lines then Entry.lines.removed else 0
+				end
 			end
 		end
 
-		const Tools = #Chosen - Commands - Questions - Sent - #Files
+		const Tools = #Chosen - Commands - Questions - Sent - #Files - #Reads
 		const Parts = {}
 
 		if #Files > 0 and #Files <= 2 then
 			table.insert(Parts, table.concat(Files, ", "))
 		elseif #Files > 2 then
 			table.insert(Parts, `edited {#Files} files`)
+		end
+
+		if #Reads > 0 and #Reads <= 2 then
+			table.insert(Parts, `read {table.concat(Reads, ", ")}`)
+		elseif #Reads > 2 then
+			table.insert(Parts, `read {#Reads} files`)
 		end
 
 		if Sent > 0 then

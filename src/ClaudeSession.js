@@ -357,6 +357,34 @@ export async function DiscoverCommands() {
 
 const NewLine = "\n";
 
+function TextOf(Content) {
+  if (typeof Content === "string") {
+    return Content;
+  }
+
+  return (Content || []).filter((Block) => Block.type === "text").map((Block) => Block.text).join("");
+}
+
+function TaskNotice(Text) {
+  const Status = Text.match(/<status>(\w+)<\/status>/);
+  const Summary = Text.match(/<summary>([\s\S]*?)<\/summary>/);
+
+  if (!Text.includes("<task-notification>") || !Status || !Summary) {
+    return null;
+  }
+
+  return {
+    Id: `task-${Date.now()}-${Turns.size}`,
+    Name: "TaskNotification",
+    Input: `status: ${Status[1]}\nsummary: ${Summary[1].trim()}`,
+    Output: "",
+    Status: Status[1] === "failed" ? "error" : "done",
+    StartedAt: Date.now(),
+    Milliseconds: 0,
+    Delegate: null,
+  };
+}
+
 function Describe(Value) {
   if (typeof Value === "string") {
     return Value.slice(0, 4000);
@@ -883,6 +911,13 @@ function RouteMessage(Session, Message) {
           Image: Slots.get(Call.Id) || null,
         };
       });
+    }
+
+    const Notice = TaskNotice(TextOf(Message.message && Message.message.content));
+
+    if (Notice) {
+      Changes.Calls = (Changes.Calls || Turn.Calls).concat([Notice]);
+      Changes.Parts = Turn.Parts.concat([{ kind: "call", id: Notice.Id }]);
     }
 
     if (Object.keys(Changes).length > 0) {

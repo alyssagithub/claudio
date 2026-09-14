@@ -136,12 +136,21 @@ function App.New(CurrentPlugin: Plugin)
 		end)(Pages)
 	end, Window)
 
-	if Window.Enabled then
-		task.spawn(Client.Connect)
-	end
+	local Retrying = true
+
+	task.spawn(function()
+		Client.Connect()
+
+		while Retrying and task.wait(15) do
+			if Connection.Status() ~= "Connected" and Connection.Status() ~= "Connecting" then
+				Client.Connect()
+			end
+		end
+	end)
 
 	return {
 		Destroy = function()
+			Retrying = false
 			Chat.ReplyListener = nil
 			Chat.Window = nil
 			Chat.Unload()

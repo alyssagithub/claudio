@@ -450,16 +450,42 @@ return function()
 				TextXAlignment = Enum.TextXAlignment.Left,
 				LayoutOrder = 7931,
 				Text = function()
-					return `Claude runs in {Settings.Get("WorkingFolder")()}`
+					const Folder = Settings.Get("WorkingFolder")()
+
+					return if Folder == "" then "Claude runs without a folder, so it only reaches your place through the Roblox tools" else `Claude runs in {Folder}`
 				end,
 			},
-			Button {
-				Text = "Change folder",
+			Create "Frame" {
+				Name = "FolderActions",
+				Size = UDim2.new(1, 0, 0, 24),
+				BackgroundTransparency = 1,
 				LayoutOrder = 7932,
-				OnClick = function()
-					Chat.SettingsOpen(false)
-					Settings.Set("WorkingFolder", "")
-				end,
+
+				Create "UIListLayout" {
+					FillDirection = Enum.FillDirection.Horizontal,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 6),
+				},
+				Button {
+					Text = function()
+						return if Settings.Get("WorkingFolder")() == "" then "Pick a folder" else "Change folder"
+					end,
+					LayoutOrder = 1,
+					OnClick = function()
+						Chat.SettingsOpen(false)
+						Settings.Set("FolderAsked", false)
+					end,
+				},
+				Button {
+					Text = "Clear folder",
+					LayoutOrder = 2,
+					Visible = function()
+						return Settings.Get("WorkingFolder")() ~= ""
+					end,
+					OnClick = function()
+						Settings.Set("WorkingFolder", "")
+					end,
+				},
 			},
 			Heading("Plugin version", 7950),
 			Create "TextLabel" {

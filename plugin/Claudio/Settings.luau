@@ -190,6 +190,7 @@ const Hidden: {[string]: string | boolean} = {
 	FastMode = false,
 	DeclinedVersion = "",
 	WorkingFolder = "",
+	FolderAsked = false,
 	LastChat = "",
 	RelayToken = "",
 	Mode = "auto",
@@ -220,6 +221,10 @@ function Settings.Load(PluginObject: Plugin)
 
 	if Sources.Mode() == "standard" then
 		Sources.Mode("auto")
+	end
+
+	if Sources.WorkingFolder() ~= "" then
+		Sources.FolderAsked(true)
 	end
 end
 

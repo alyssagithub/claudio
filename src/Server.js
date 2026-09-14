@@ -9,7 +9,7 @@ import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
 import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
 import { StudioProcesses } from "./StudioPresence.js";
-import { AddToTurn, LastUsedFolder, UsableFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { AddToTurn, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
@@ -321,11 +321,6 @@ export function StartServer(Port) {
           }
 
           SendJson(Response, 200, DescribeTurn(Joined));
-          return;
-        }
-
-        if (!UsableFolder(Body.workingDirectory) && !ConversationId) {
-          SendJson(Response, 400, { error: "Pick a folder for Claude to work in first. Settings, then Working folder." });
           return;
         }
 

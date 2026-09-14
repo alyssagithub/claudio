@@ -128,7 +128,7 @@ function App.New(CurrentPlugin: Plugin)
 		return Vide.switch(function()
 			const Status = Connection.Status()
 
-			if Status == "Connected" and Settings.Get("WorkingFolder")() == "" then
+			if Status == "Connected" and not Settings.Get("FolderAsked")() then
 				return "Folder"
 			end
 

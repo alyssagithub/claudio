@@ -1127,11 +1127,7 @@ export function KeepSpareWarm() {
   }
 
   if (!LastFolder) {
-    LastFolder = UsableFolder(ReadPluginSetting("WorkingFolder"));
-  }
-
-  if (!LastFolder) {
-    return;
+    LastFolder = UsableFolder(ReadPluginSetting("WorkingFolder")) || WorkingDirectory;
   }
 
   const Likely = AutoTier(0, AutoBias(ReadPluginSetting("Effort")));
@@ -1196,7 +1192,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     GuardTools: GuardTools === true,
     ExtraPrompt: ExtraPrompt !== false,
     FastMode: FastMode === true,
-    WorkingDirectory: (Existing && UsableFolder(Existing.workingDirectory)) || UsableFolder(Folder),
+    WorkingDirectory: (Existing && UsableFolder(Existing.workingDirectory)) || UsableFolder(Folder) || WorkingDirectory,
     SessionId: ConversationId,
     Status: "running",
     CommittedText: "",

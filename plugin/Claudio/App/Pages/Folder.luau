@@ -9,7 +9,7 @@ const Button = require(script.Parent.Parent.Components.Button)
 const Create = Vide.create
 
 return function()
-	const Typing = Vide.source("")
+	const Typing = Vide.source(Settings.Get("WorkingFolder")() :: string)
 	const Problem = Vide.source("")
 	const Checking = Vide.source(false)
 
@@ -55,6 +55,7 @@ return function()
 
 		Typing(Path)
 		Settings.Set("WorkingFolder", Path)
+		Settings.Set("FolderAsked", true)
 		task.spawn(Chat.Refresh)
 	end
 
@@ -85,6 +86,7 @@ return function()
 
 		Problem("")
 		Settings.Set("WorkingFolder", Wanted)
+		Settings.Set("FolderAsked", true)
 		task.spawn(Chat.Refresh)
 	end
 
@@ -126,7 +128,7 @@ return function()
 			TextWrapped = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			LayoutOrder = 2,
-			Text = "Claude runs in this folder, so a CLAUDE.md there applies and it can read files next to it. Your Studio place is reached through the Roblox tools either way. You can change this later in settings.",
+			Text = "Claude runs in this folder, so a CLAUDE.md there applies and it can read files next to it. Your Studio place is reached through the Roblox tools either way, so you can also go without one. You can change this later in settings.",
 		},
 		Create "TextBox" {
 			Name = "Path",
@@ -179,6 +181,15 @@ return function()
 				HorizontalAlignment = Enum.HorizontalAlignment.Right,
 				Padding = UDim.new(0, 6),
 				SortOrder = Enum.SortOrder.LayoutOrder,
+			},
+			Button {
+				Text = "No folder",
+				LayoutOrder = 0,
+				OnClick = function()
+					Settings.Set("WorkingFolder", "")
+					Settings.Set("FolderAsked", true)
+					task.spawn(Chat.Refresh)
+				end,
 			},
 			Button {
 				Text = "Use this path",

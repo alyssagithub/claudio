@@ -100,7 +100,7 @@ export function StudioTools(Deps) {
         className: z.string().optional().describe("Class to create."),
         name: z.string().optional().describe("Name to give it, for create and rename."),
         properties: z.record(z.any()).optional().describe("Property names and values, for set and create."),
-        description: z.string().optional().describe("A few words on what this does, shown as the step in the chat and as its undo name."),
+        description: z.string().optional().describe("What the undo step should be called."),
       },
       Run: async (Input) => ({ content: [{ type: "text", text: Said(await Reach("modify", Input), "Studio did not say what happened.") }] }),
     },
@@ -203,7 +203,7 @@ export function StudioTools(Deps) {
         code: z.string().describe("The Luau to run. Return a value to get it back."),
         target: z.enum(["edit", "server", "client"]).optional().describe("Where to run it. edit is the editor itself and the default; server and client are the running play session and need one to be open."),
         readOnly: z.boolean().optional().describe("Set when the script only reads, so no undo step is recorded. Only meaningful in edit."),
-        description: z.string().optional().describe("A few words on what this does, such as \"Rename the doors\", shown as the step in the chat and as its undo name."),
+        description: z.string().optional().describe("What the undo step should be called, such as \"Rename the doors\"."),
         timeout: z.number().optional().describe("How long to wait, in seconds, when the code is expected to take a while. Five minutes by default, thirty at most."),
       },
       Run: async (Input) => {
@@ -356,7 +356,7 @@ export function StudioTools(Deps) {
         from: z.number().optional().describe("First line, counting from one."),
         to: z.number().optional().describe("Last line, for get, replace and delete."),
         text: z.string().optional().describe("The new source, for set, insert and replace."),
-        description: z.string().optional().describe("A few words on what this does, shown as the step in the chat and as its undo name."),
+        description: z.string().optional().describe("What the undo step should be called."),
       },
       Run: async (Input) => ({ content: [{ type: "text", text: SourceReport(await Reach("source", Input)) }] }),
     },
@@ -382,7 +382,7 @@ export function StudioTools(Deps) {
         file: z.string().describe("Where the file lives on disk."),
         paths: z.array(z.string()).optional().describe("Instances to save. Give these to save, leave them out to load."),
         path: z.string().optional().describe("Where to put what is loaded, such as Workspace."),
-        description: z.string().optional().describe("A few words on what this does, when loading, shown as the step in the chat and as its undo name."),
+        description: z.string().optional().describe("What the undo step should be called, when loading."),
       },
       Run: async (Input) => {
         if (Input.paths && Input.paths.length > 0) {

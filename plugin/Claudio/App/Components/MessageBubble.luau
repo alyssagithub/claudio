@@ -361,22 +361,16 @@ return function(Props: Props)
 		const Shimmer = Vide.source(0)
 		const Turned = Vide.source(if Busy(Value()) then 1 else 0)
 
+		local WasBusy = Busy(Value())
+
 		Vide.effect(function()
-			Open(Busy(Value()))
-		end)
+			const Now = Busy(Value())
 
-		const function Title(): string
-			const Name = Value().name
-			const Server, Tool = Name:match("^mcp__(.-)__(.+)$")
-
-			if not Server or not Tool then
-				return Name
+			if Now ~= WasBusy then
+				WasBusy = Now
+				Open(Now)
 			end
-
-			const Words = (Tool:gsub("_", " "))
-
-			return `{Words:sub(1, 1):upper()}{Words:sub(2)}`
-		end
+		end)
 
 		return Create "Frame" {
 			Name = "ToolCall",
@@ -569,21 +563,6 @@ return function(Props: Props)
 						end,
 						LayoutOrder = 2,
 					},
-				},
-				Create "TextLabel" {
-					Name = "Title",
-					Size = UDim2.fromScale(1, 0),
-					AutomaticSize = Enum.AutomaticSize.Y,
-					BackgroundTransparency = 1,
-					TextColor3 = Theme.Colors.DimText,
-					TextSize = Settings.SmallText,
-					FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
-					TextXAlignment = Enum.TextXAlignment.Left,
-					LayoutOrder = 2,
-					Visible = function()
-						return Open() and Title() ~= Headline(Value(), false)
-					end,
-					Text = Title,
 				},
 				Vide.indexes(function()
 					return if Open() and Value().status ~= "preparing" then Fields(Value().input) else {}
@@ -861,10 +840,16 @@ return function(Props: Props)
 			return false
 		end
 
+		local WasWorking = false
+
 		Vide.effect(function()
-			if Working() then
+			const Now = Working()
+
+			if Now and not WasWorking then
 				Listed(true)
 			end
+
+			WasWorking = Now
 		end)
 
 		return Create "Frame" {

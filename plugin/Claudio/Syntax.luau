@@ -63,7 +63,7 @@ function Syntax.Guess(Text: string): string
 		return "luau"
 	end
 
-	if Text:match("^%s*%$ ") or Text:match("^%s*[%w%./-]+ %-%-?%w") then
+	if Text:match("^%s*%$ ") or Text:match("^%s*[%w%./-]+ [^\n]* %-%-?%a") then
 		return "sh"
 	end
 

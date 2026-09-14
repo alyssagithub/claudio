@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { DefaultPort, LogFile } from "./Config.js";
 import { EnsureToken } from "./Token.js";
@@ -11,11 +11,11 @@ const LauncherPath = path.join(
   "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "Claudio Bridge.vbs",
 );
 
-function VisualBasicString(Value) {
+function VisualBasicString(Value: string): string {
   return `"${Value.replace(/"/g, '""')}"`;
 }
 
-export async function InstallStartup(Port) {
+export async function InstallStartup(Port?: number | null): Promise<void> {
   if (process.platform !== "win32") {
     throw new Error("Startup install is only written for Windows so far.");
   }
@@ -42,7 +42,7 @@ export function LaunchHidden() {
     throw new Error("Run `claudio install-startup` first.");
   }
 
-  const Launched = execFile("wscript.exe", [LauncherPath], { detached: true });
+  const Launched = execFile("wscript.exe", [LauncherPath], { detached: true } as ExecFileOptionsWithStringEncoding);
 
   Launched.on("error", (Error) => {
     console.error("Could not start the bridge launcher: " + Error.message);
@@ -50,7 +50,7 @@ export function LaunchHidden() {
   Launched.unref();
 }
 
-async function PortIsBusy(Port) {
+async function PortIsBusy(Port?: number | null): Promise<boolean> {
   try {
     await fetch(`http://127.0.0.1:${Port || DefaultPort}/health`, {
       headers: { "X-Claudio-Token": EnsureToken() },
@@ -62,7 +62,7 @@ async function PortIsBusy(Port) {
   }
 }
 
-export async function StopBridge(Port) {
+export async function StopBridge(Port?: number | null): Promise<boolean> {
   try {
     const Answer = await fetch(`http://127.0.0.1:${Port || DefaultPort}/quit`, {
       method: "POST",
@@ -82,7 +82,7 @@ export async function StopBridge(Port) {
   }
 }
 
-export async function RestartBridge(Port) {
+export async function RestartBridge(Port?: number | null): Promise<void> {
   if (!fs.existsSync(LauncherPath)) {
     throw new Error("Run `claudio install-startup` first.");
   }

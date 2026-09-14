@@ -1,6 +1,11 @@
 import { PNG } from "pngjs";
 
-export function EncodePixels(Width, Height, Base64Pixels) {
+type EncodedImage = {
+  error?: string;
+  data?: string;
+};
+
+export function EncodePixels(Width: number, Height: number, Base64Pixels: string): EncodedImage {
   const Bytes = Buffer.from(Base64Pixels, "base64");
   const Wanted = Width * Height * 4;
 

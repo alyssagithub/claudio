@@ -3,8 +3,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { AnalyzerVersion, DefinitionsUrl, ToolsFolder } from "./Config.js";
+import type { ScriptEntry, TreeEntry } from "./Types.js";
 
-const Assets = {
+type Outcome = { Failed: boolean; Stopped: boolean; Text: string };
+
+type TreeItem = TreeEntry & { parts?: string[]; source?: string };
+
+type TreeNode = { name: string; className: string; filePaths: string[]; children?: TreeNode[] };
+
+type Holder = { Children: Map<string, Holder>; Class: string; Source: string | null };
+
+const Assets: Record<string, string> = {
   win32: "luau-lsp-win64.zip",
   darwin: "luau-lsp-macos.zip",
   linux: process.arch === "arm64" ? "luau-lsp-linux-arm64.zip" : "luau-lsp-linux-x86_64.zip",
@@ -12,22 +21,22 @@ const Assets = {
 
 const Ignored = /Key 'Source' not found in external type 'LuaSourceContainer'/;
 
-let Ready = null;
+let Ready: Promise<string | null> | null = null;
 
-function Binary() {
+function Binary(): string {
   return path.join(ToolsFolder, process.platform === "win32" ? "luau-lsp.exe" : "luau-lsp");
 }
 
-function Definitions() {
+function Definitions(): string {
   return path.join(ToolsFolder, "globalTypes.d.luau");
 }
 
-function Overrides() {
+function Overrides(): string {
   return path.join(ToolsFolder, "overrides.d.luau");
 }
 
-function Run(Command, Args, Options) {
-  return new Promise((Resolve) => {
+function Run(Command: string, Args: string[], Options?: { cwd?: string }): Promise<Outcome> {
+  return new Promise<Outcome>((Resolve) => {
     execFile(Command, Args, { timeout: 30000, maxBuffer: 8 * 1024 * 1024, ...Options }, (Error, Output, Errors) => {
       const Stopped = Error && (Error.killed || Error.signal || Error.code === "ENOBUFS");
 
@@ -40,7 +49,7 @@ function Run(Command, Args, Options) {
   });
 }
 
-async function Download(Url, Into) {
+async function Download(Url: string, Into: string): Promise<void> {
   const Answer = await fetch(Url);
 
   if (!Answer.ok) {
@@ -50,14 +59,14 @@ async function Download(Url, Into) {
   fs.writeFileSync(Into, Buffer.from(await Answer.arrayBuffer()));
 }
 
-async function OnPath() {
+async function OnPath(): Promise<string | null> {
   const Name = process.platform === "win32" ? "luau-lsp.exe" : "luau-lsp";
   const Found = await Run(Name, ["--version"]);
 
   return !Found.Failed && /\d+\.\d+\.\d+/.test(Found.Text) && !/failed to find|not found|manifest/i.test(Found.Text) ? Name : null;
 }
 
-async function Extract(Asset) {
+async function Extract(Asset: string): Promise<string> {
   if (process.platform === "win32") {
     const Shell = await Run("powershell", ["-NoProfile", "-NonInteractive", "-Command", `Expand-Archive -LiteralPath '${Asset}' -DestinationPath '.' -Force`], { cwd: ToolsFolder });
 
@@ -75,7 +84,7 @@ async function Extract(Asset) {
   return Tarred.Text;
 }
 
-async function Install() {
+async function Install(): Promise<void> {
   const Asset = Assets[process.platform];
 
   if (!Asset) {
@@ -100,7 +109,7 @@ async function Install() {
   }
 }
 
-async function Prepare() {
+async function Prepare(): Promise<string> {
   const Existing = process.env.CLAUDIO_LUAU_LSP;
 
   if (!fs.existsSync(Definitions())) {
@@ -128,13 +137,13 @@ async function Prepare() {
 const StudioSettings = "https://clientsettingscdn.roblox.com/v2/settings/application/PCStudioApp";
 const Prefixes = ["FFlag", "DFFlag", "FInt", "DFInt", "SFFlag", "FString", "DFString"];
 
-let Tuned = null;
+let Tuned: string[] | null = null;
 
-function Published() {
+function Published(): string {
   return path.join(ToolsFolder, "studioflags.json");
 }
 
-async function Registry(Analyzer) {
+async function Registry(Analyzer: string): Promise<string[]> {
   const Shown = await Run(Analyzer, ["--show-flags"]);
 
   return Shown.Text
@@ -143,12 +152,12 @@ async function Registry(Analyzer) {
     .filter((Name) => Name !== "");
 }
 
-async function Settings() {
+async function Settings(): Promise<Record<string, unknown> | null> {
   const Age = fs.existsSync(Published()) ? Date.now() - fs.statSync(Published()).mtimeMs : Infinity;
 
   if (Age < 24 * 60 * 60 * 1000) {
     try {
-      return JSON.parse(fs.readFileSync(Published(), "utf8"));
+      return JSON.parse(fs.readFileSync(Published(), "utf8")) as Record<string, unknown>;
     } catch {
       return null;
     }
@@ -160,7 +169,7 @@ async function Settings() {
     return null;
   }
 
-  const Body = await Answer.json();
+  const Body = await Answer.json() as Record<string, unknown> & { applicationSettings?: Record<string, unknown> };
   const Values = Body.applicationSettings || Body;
 
   fs.mkdirSync(ToolsFolder, { recursive: true });
@@ -169,7 +178,7 @@ async function Settings() {
   return Values;
 }
 
-async function Flags(Analyzer) {
+async function Flags(Analyzer: string): Promise<string[]> {
   if (Tuned) {
     return Tuned;
   }
@@ -196,7 +205,7 @@ async function Flags(Analyzer) {
       }
     }
   } catch (Error) {
-    console.error(`Could not sync Studio flags: ${Error.message}`);
+    console.error(`Could not sync Studio flags: ${(Error as NodeJS.ErrnoException).message}`);
   }
 
   return Tuned;
@@ -205,20 +214,20 @@ async function Flags(Analyzer) {
 const Canary = "__ClaudioCanary";
 const Vendored = /(^|[\/])Packages[\/]/;
 
-function Workspace() {
+function Workspace(): string {
   return path.join(ToolsFolder, "workspace");
 }
 
-function SourceMap() {
+function SourceMap(): string {
   return path.join(Workspace(), "sourcemap.json");
 }
 
-function FileFor(Where) {
+function FileFor(Where: string): string {
   return Where.split(".").map((Part) => Part.replace(/[\\/:*?"<>|]/g, "_").replace(/^\.+$/, "_")).join("/");
 }
 
-function Node(Name, Class, Children, Where) {
-  const Made = { name: Name, className: Class, filePaths: [] };
+function Node(Name: string, Class: string, Children: TreeNode[], Where: string | null): TreeNode {
+  const Made: TreeNode = { name: Name, className: Class, filePaths: [] };
 
   if (Where) {
     Made.filePaths.push(Where);
@@ -231,8 +240,8 @@ function Node(Name, Class, Children, Where) {
   return Made;
 }
 
-function Build(Tree) {
-  const Root = { Children: new Map(), Class: "Folder", Source: null };
+function Build(Tree: TreeItem[]) {
+  const Root: Holder = { Children: new Map(), Class: "Folder", Source: null };
 
   for (const Entry of Tree) {
     let At = Root;
@@ -242,16 +251,16 @@ function Build(Tree) {
         At.Children.set(Piece, { Children: new Map(), Class: "Folder", Source: null });
       }
 
-      At = At.Children.get(Piece);
+      At = At.Children.get(Piece)!;
     }
 
     At.Class = Entry.className || "ModuleScript";
     At.Source = typeof Entry.source === "string" ? Entry.source : null;
   }
 
-  const Written = [];
+  const Written: { File: string; Source: string }[] = [];
 
-  function Walk(Name, Holder, Trail) {
+  function Walk(Name: string, Holder: Holder, Trail: string): TreeNode {
     const Children = [...Holder.Children.entries()].map(([Child, Held]) => Walk(Child, Held, `${Trail}.${Child}`));
 
     if (Holder.Source === null) {
@@ -273,7 +282,7 @@ function Build(Tree) {
   return { Map: Node("Root", "DataModel", Top, null), Files: Written };
 }
 
-function Lay(Tree) {
+function Lay(Tree: TreeItem[]) {
   const { Map: Shaped, Files } = Build(Tree);
 
   fs.rmSync(Workspace(), { recursive: true, force: true });
@@ -289,10 +298,10 @@ function Lay(Tree) {
   fs.writeFileSync(SourceMap(), JSON.stringify(Shaped, null, 1));
 }
 
-function Parse(Text) {
-  const Found = new Map();
+function Parse(Text: string): Map<string, Set<string>> {
+  const Found = new Map<string, { Where: string; Parts: string[] }[]>();
 
-  let Open = null;
+  let Open: { Where: string; Parts: string[] } | null = null;
 
   for (const Line of Text.split(/\r?\n/)) {
     const Match = Line.match(/^(.+?\.luau)(?:\s+\[[^\]]*\])?\((\d+),\d+\):\s*(.+)$/);
@@ -315,10 +324,10 @@ function Parse(Text) {
 
     Open = { Where, Parts: [`line ${Match[2]}: ${Match[3]}`] };
 
-    Found.get(Where).push(Open);
+    Found.get(Where)!.push(Open);
   }
 
-  const Joined = new Map();
+  const Joined = new Map<string, Set<string>>();
 
   for (const [Where, Entries] of Found) {
     Joined.set(Where, new Set(Entries.map((Entry) => Entry.Parts.join(" "))));
@@ -327,7 +336,7 @@ function Parse(Text) {
   return Joined;
 }
 
-export async function Analyze(Entries, Raw, Tree) {
+export async function Analyze(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]) {
   if (!Ready) {
     Ready = Prepare().catch((Error) => {
       console.error(`Could not prepare the Luau analyzer: ${Error.message}`);
@@ -395,14 +404,14 @@ export async function Analyze(Entries, Raw, Tree) {
 
   Found.delete(`${Canary}.luau`);
 
-  const Report = [];
+  const Report: { path: string; lines: string[] }[] = [];
 
   for (const [Where, Lines] of Found) {
     if (Vendored.test(Where)) {
       continue;
     }
 
-    const Unique = [...Lines].sort((Left, Right) => Number(Left.match(/\d+/)[0]) - Number(Right.match(/\d+/)[0]));
+    const Unique = [...Lines].sort((Left, Right) => Number(Left.match(/\d+/)![0]) - Number(Right.match(/\d+/)![0]));
     const Kept = Raw === true ? Unique : Unique.filter((Line) => !Ignored.test(Line));
 
     if (Kept.length > 0) {
@@ -413,7 +422,7 @@ export async function Analyze(Entries, Raw, Tree) {
   return Report;
 }
 
-export async function Warm() {
+export async function Warm(): Promise<void> {
   if (!Ready) {
     Ready = Prepare().catch(() => null);
   }

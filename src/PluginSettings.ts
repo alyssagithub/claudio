@@ -6,9 +6,9 @@ const SettingPrefix = "Claudio_";
 
 function SettingsFiles() {
   const Root = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "Roblox");
-  const Found = [];
+  const Found: string[] = [];
 
-  let Accounts = [];
+  let Accounts: string[] = [];
 
   try {
     Accounts = fs.readdirSync(Root);
@@ -27,17 +27,17 @@ function SettingsFiles() {
   return Found;
 }
 
-function ReadSettings(File) {
+function ReadSettings(File: string): Record<string, unknown> | null {
   try {
-    const Parsed = JSON.parse(fs.readFileSync(File, "utf8").replace(/^﻿/, ""));
+    const Parsed: unknown = JSON.parse(fs.readFileSync(File, "utf8").replace(/^﻿/, ""));
 
-    return Parsed && typeof Parsed === "object" && !Array.isArray(Parsed) ? Parsed : null;
+    return Parsed && typeof Parsed === "object" && !Array.isArray(Parsed) ? Parsed as Record<string, unknown> : null;
   } catch {
     return null;
   }
 }
 
-export function ReadPluginSetting(Key) {
+export function ReadPluginSetting(Key: string): unknown {
   for (const File of SettingsFiles()) {
     const Settings = ReadSettings(File);
 
@@ -49,7 +49,7 @@ export function ReadPluginSetting(Key) {
   return undefined;
 }
 
-export function WritePluginSetting(Key, Value) {
+export function WritePluginSetting(Key: string, Value: unknown): number {
   const Files = SettingsFiles();
   let Written = 0;
 
@@ -75,14 +75,14 @@ export function WritePluginSetting(Key, Value) {
       Written += 1;
     } catch (Error) {
       fs.rmSync(Temporary, { force: true });
-      console.error(`Could not write the plugin setting ${Key}: ${Error.message}`);
+      console.error(`Could not write the plugin setting ${Key}: ${(Error as NodeJS.ErrnoException).message}`);
     }
   }
 
   return Written;
 }
 
-export function ForgetPluginSetting(Key) {
+export function ForgetPluginSetting(Key: string): void {
   for (const File of SettingsFiles()) {
     const Settings = ReadSettings(File);
 
@@ -99,7 +99,7 @@ export function ForgetPluginSetting(Key) {
       fs.renameSync(Temporary, File);
     } catch (Error) {
       fs.rmSync(Temporary, { force: true });
-      console.error(`Could not clear the plugin setting ${Key}: ${Error.message}`);
+      console.error(`Could not clear the plugin setting ${Key}: ${(Error as NodeJS.ErrnoException).message}`);
     }
   }
 }

@@ -2,19 +2,22 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
+import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, DelegateModels, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, SystemPromptFor, WorkingDirectory } from "./Config.js";
 import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
+import type { Reacher, ReacherIn } from "./Tools.js";
 import { Request as RequestStudio } from "./Studio.js";
 import { ReadPluginSetting } from "./PluginSettings.js";
 import { CountLines, EditedFile, ReadFileText } from "./Lines.js";
 import { ChooseModel, GetModels, NextEffort, RecordTurnOutcome, RememberModels, SupportsEffort } from "./Models.js";
+import type { Asked, Breakdown, Call, CallStatus, ContentBlock, Content, JobAnswer, LineCount, Part, Permission, Picture, Question, Query, SdkMessage, SentImage, Session, Task, Turn, TurnRequest, Usage } from "./Types.js";
 
-const Turns = new Map();
-const Sessions = new Map();
-const SessionAllowances = new Map();
+const Turns = new Map<string, Turn>();
+const Sessions = new Map<string, Session>();
+const SessionAllowances = new Map<string, Set<string>>();
 const AllowedServers = AllowedTools
   .filter((Name) => Name.startsWith("mcp__"))
   .map((Name) => Name.split("__")[1]);
@@ -29,19 +32,19 @@ function ReadCommandsCache() {
 
 let Commands = ReadCommandsCache();
 let AskedForModels = false;
-let Limits = new Map();
+let Limits = new Map<string, unknown>();
 
 export function GetLimits() {
   return [...Limits.values()];
 }
 
-function Blocks(Message) {
+function Blocks(Message: SdkMessage): ContentBlock[] {
   const Content = Message.message && Message.message.content;
 
   return Array.isArray(Content) ? Content : [];
 }
 
-function StoreWindow(Into, Kind, Label, Entry) {
+function StoreWindow(Into: Map<string, unknown>, Kind: string, Label: string, Entry: {utilization?: number, resets_at?: string} | undefined) {
   if (!Entry) {
     return;
   }
@@ -55,13 +58,13 @@ function StoreWindow(Into, Kind, Label, Entry) {
   });
 }
 
-export function GetBreakdown(ConversationId) {
+export function GetBreakdown(ConversationId: string | null): Breakdown | null {
   const Session = ConversationId ? Sessions.get(ConversationId) : null;
 
   return (Session && Session.Breakdown) || null;
 }
 
-function Rank(Entry) {
+function Rank(Entry: {deferred: boolean, name: string}) {
   if (Entry.deferred) {
     return 3;
   }
@@ -69,7 +72,7 @@ function Rank(Entry) {
   return /free space/i.test(Entry.name) ? 2 : 1;
 }
 
-export async function RefreshContext(Session) {
+export async function RefreshContext(Session: Session) {
   if (!Session.Query || !Session.Query.getContextUsage) {
     return;
   }
@@ -87,20 +90,20 @@ export async function RefreshContext(Session) {
       percentage: Usage.percentage || 0,
       model: Usage.model || null,
       categories: Usage.categories
-        .map((Entry) => ({
+        .map((Entry: any) => ({
           name: Entry.name,
           tokens: Entry.tokens || 0,
           colour: String(Entry.color || ""),
           deferred: Entry.isDeferred === true,
         }))
-        .sort((Left, Right) => Rank(Left) - Rank(Right) || Right.tokens - Left.tokens),
+        .sort((Left: {deferred: boolean, name: string, tokens: number}, Right: {deferred: boolean, name: string, tokens: number}) => Rank(Left) - Rank(Right) || Right.tokens - Left.tokens),
     };
   } catch (Error) {
-    console.error("Could not read context usage: " + Error.message);
+    console.error("Could not read context usage: " + (Error as Error).message);
   }
 }
 
-export async function PollUsage(ConversationId) {
+export async function PollUsage(ConversationId: string | null) {
   const Ready = [...Sessions.values()].find((Entry) => Entry.Query);
 
   if (!Ready) {
@@ -118,7 +121,7 @@ export async function PollUsage(ConversationId) {
   return true;
 }
 
-export async function RefreshUsage(Session) {
+export async function RefreshUsage(Session: Session) {
   const Ask = Session.Query && Session.Query.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET;
 
   if (!Ask) {
@@ -127,7 +130,7 @@ export async function RefreshUsage(Session) {
 
   try {
     const Usage = await Ask.call(Session.Query);
-    const Windows = Usage && Usage.rate_limits;
+    const Windows = (Usage && Usage.rate_limits) as Record<string, any> | undefined;
 
     if (!Windows) {
       return;
@@ -146,16 +149,16 @@ export async function RefreshUsage(Session) {
 
     Limits = Fresh;
   } catch (Error) {
-    console.error("Could not read usage: " + Error.message);
+    console.error("Could not read usage: " + (Error as Error).message);
   }
 }
 
 export function ReadMcpServers() {
   try {
-    const Desktop = JSON.parse(fs.readFileSync(DesktopConfigPath, "utf8"));
-    const Servers = {};
+    const Desktop = JSON.parse(fs.readFileSync(DesktopConfigPath, "utf8")) as {mcpServers?: unknown};
+    const Servers: Record<string, {command: string, args: string[], env?: Record<string, string>}> = {};
 
-    for (const [Name, Definition] of Object.entries(Desktop.mcpServers || {})) {
+    for (const [Name, Definition] of Object.entries((Desktop.mcpServers || {}) as Record<string, {command?: string, args?: string[], env?: Record<string, string>}>)) {
       if (!Definition.command || !AllowedServers.includes(Name)) {
         continue;
       }
@@ -165,14 +168,14 @@ export function ReadMcpServers() {
 
     return Servers;
   } catch (Error) {
-    console.error(`Could not read MCP servers from ${DesktopConfigPath}: ${Error.message}`);
+    console.error(`Could not read MCP servers from ${DesktopConfigPath}: ${(Error as Error).message}`);
     return {};
   }
 }
 
 const Destructive = /destroy|:remove\(|clearallchildren/i;
 
-function IsRisky(ToolName, Input) {
+function IsRisky(ToolName: string, Input: unknown) {
   const Name = ToolName.replace(/^mcp__.*?__/, "");
   const Body = JSON.stringify(Input || {});
 
@@ -187,11 +190,11 @@ function IsRisky(ToolName, Input) {
   return (Name === "execute_luau" || Name === "run_as_job" || Name === "Bash" || Name === "PowerShell") && Destructive.test(Body);
 }
 
-function IsAllowedTool(ToolName) {
+function IsAllowedTool(ToolName: string) {
   return AllowedTools.some((Pattern) => Pattern.endsWith("*") ? ToolName.startsWith(Pattern.slice(0, -1)) : ToolName === Pattern);
 }
 
-let ServerStatuses = {};
+let ServerStatuses: Record<string, string> = {};
 
 export function GetMcpServers() {
   const Configured = ReadMcpServers();
@@ -204,13 +207,13 @@ export function GetMcpServers() {
   }));
 }
 
-function RememberServers(Init) {
+function RememberServers(Init: {mcp_servers?: {name: string, status: string}[]}) {
   for (const Server of Init.mcp_servers || []) {
     ServerStatuses[Server.name] = Server.status;
   }
 }
 
-function ReadDescription(File) {
+function ReadDescription(File: string): string {
   try {
     const Lines = fs.readFileSync(File, "utf8").slice(0, 4000).split(NewLine);
 
@@ -234,7 +237,7 @@ function ReadDescription(File) {
   }
 }
 
-function ReadFolder(Folder) {
+function ReadFolder(Folder: string): string[] {
   try {
     return fs.readdirSync(Folder);
   } catch {
@@ -259,8 +262,8 @@ function PluginFolders() {
   return Folders;
 }
 
-function ReadDescriptions() {
-  const Found = {};
+function ReadDescriptions(): Record<string, string | undefined> {
+  const Found: Record<string, string | undefined> = {};
   const SkillsRoot = path.join(os.homedir(), ".claude", "skills");
   const CommandsRoot = path.join(os.homedir(), ".claude", "commands");
 
@@ -297,7 +300,7 @@ function ReadDescriptions() {
   return Found;
 }
 
-function RememberCommands(Init) {
+function RememberCommands(Init: {slash_commands?: string[], skills?: string[]}) {
   Commands = {
     slashCommands: Init.slash_commands || [],
     skills: Init.skills || [],
@@ -312,7 +315,7 @@ function RememberCommands(Init) {
   }
 }
 
-let Described = null;
+let Described: Record<string, string | undefined> | null = null;
 let DescribedAt = 0;
 
 export function GetCommands() {
@@ -323,7 +326,7 @@ export function GetCommands() {
 
   return {
     ...Commands,
-    commands: Commands.slashCommands.map((Name) => ({ name: Name, description: Described[Name] || "" })),
+    commands: Commands.slashCommands.map((Name: string) => ({ name: Name, description: (Described || {})[Name] || "" })),
   };
 }
 
@@ -351,21 +354,21 @@ export async function DiscoverCommands() {
       }
     }
   } catch (Error) {
-    console.error(`Could not discover commands: ${Error.message}`);
+    console.error(`Could not discover commands: ${(Error as Error).message}`);
   }
 }
 
 const NewLine = "\n";
 
-function TextOf(Content) {
+function TextOf(Content: Content | undefined): string {
   if (typeof Content === "string") {
     return Content;
   }
 
-  return (Content || []).filter((Block) => Block.type === "text").map((Block) => Block.text).join("");
+  return ((Content || []) as ContentBlock[]).filter((Block) => Block.type === "text").map((Block) => Block.text).join("");
 }
 
-function TaskNotice(Text) {
+function TaskNotice(Text: string): Call | null {
   const Status = Text.match(/<status>(\w+)<\/status>/);
   const Summary = Text.match(/<summary>([\s\S]*?)<\/summary>/);
 
@@ -385,7 +388,7 @@ function TaskNotice(Text) {
   };
 }
 
-function Describe(Value) {
+function Describe(Value: unknown): string {
   if (typeof Value === "string") {
     return Value.slice(0, 4000);
   }
@@ -401,8 +404,8 @@ function Describe(Value) {
   }
 }
 
-function AgentsOn(Model) {
-  const Named = {};
+function AgentsOn(Model: string) {
+  const Named: Record<string, unknown> = {};
 
   for (const [Name, Agent] of Object.entries(Delegates)) {
     Named[Name] = { ...Agent, model: Model };
@@ -411,19 +414,21 @@ function AgentsOn(Model) {
   return Named;
 }
 
-function DelegateFor(Block, Model) {
+function DelegateFor(Block: ContentBlock, Model: string) {
   if (Block.name !== "Agent" && Block.name !== "Task") {
     return null;
   }
 
-  if (!Block.input || !Delegates[Block.input.subagent_type]) {
+  const Asked = (Block.input || {}) as {subagent_type?: string, description?: string, prompt?: string};
+
+  if (!Asked.subagent_type || !Delegates[Asked.subagent_type as keyof typeof Delegates]) {
     return null;
   }
 
-  return { name: Block.input.subagent_type, model: Model };
+  return { name: Asked.subagent_type, model: Model };
 }
 
-function DescribeInput(Input) {
+function DescribeInput(Input: unknown): string {
   if (!Input || typeof Input !== "object" || Array.isArray(Input)) {
     return Describe(Input);
   }
@@ -434,7 +439,7 @@ function DescribeInput(Input) {
     .slice(0, 4000);
 }
 
-function CountUsage(Existing, Usage) {
+function CountUsage(Existing: Usage, Usage: {input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number}): Usage {
   return {
     Input: Existing.Input + (Usage.input_tokens || 0),
     Output: Existing.Output + (Usage.output_tokens || 0),
@@ -442,7 +447,7 @@ function CountUsage(Existing, Usage) {
   };
 }
 
-function Publish(Turn, Changes) {
+function Publish(Turn: Turn, Changes: Partial<Turn>) {
   Object.assign(Turn, Changes);
   Turn.Version += 1;
 
@@ -451,7 +456,7 @@ function Publish(Turn, Changes) {
   }
 }
 
-function JoinText(Existing, Added) {
+function JoinText(Existing: string, Added: string): string {
   if (Existing === "" || Added === "") {
     return Existing + Added;
   }
@@ -459,7 +464,7 @@ function JoinText(Existing, Added) {
   return `${Existing}\n\n${Added}`;
 }
 
-function FinishTurn(Turn, Status, Error) {
+function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
   if (Turn.Status !== "running" && Turn.Status !== "cancelling") {
     return;
   }
@@ -469,7 +474,7 @@ function FinishTurn(Turn, Status, Error) {
   if (Turn.ConversationId) {
     UpdateDesktopSession(Turn.ConversationId, (Session) => {
       Session.lastActivityAt = Date.now();
-      Session.completedTurns = (Session.completedTurns || 0) + 1;
+      Session.completedTurns = ((Session.completedTurns as number) || 0) + 1;
     });
   }
 
@@ -477,9 +482,9 @@ function FinishTurn(Turn, Status, Error) {
     Permission.Resolve({ behavior: "deny", message: "The turn ended before the user answered." });
   }
 
-  RecordTurnOutcome(Turn.ConversationId, {
+  RecordTurnOutcome(Turn.ConversationId || "", {
     Failed: Status === "error",
-    Denied: Turn.Activity.some((Name) => Name.startsWith("denied ")),
+    Denied: Turn.Activity.some((Name: string) => Name.startsWith("denied ")),
   });
   if (Turn.Session && Turn.Session.CurrentTurn === Turn) {
     Turn.Session.CurrentTurn = null;
@@ -489,7 +494,7 @@ function FinishTurn(Turn, Status, Error) {
   setTimeout(() => Turns.delete(Turn.Id), FinishedTurnLifetimeMilliseconds);
 }
 
-export function AddToTurn(RequestId, ConversationId, Text, Images) {
+export function AddToTurn(RequestId: string | null, ConversationId: string | null, Text: string, Images: Picture[]): Turn | null {
   for (const Turn of Turns.values()) {
     const Matches = RequestId ? Turn.Id === RequestId : Turn.ConversationId === ConversationId;
 
@@ -516,7 +521,7 @@ export function AddToTurn(RequestId, ConversationId, Text, Images) {
   return null;
 }
 
-export function IsConversationBusy(ConversationId) {
+export function IsConversationBusy(ConversationId: string | null) {
   for (const Turn of Turns.values()) {
     if (Turn.ConversationId === ConversationId && (Turn.Status === "running" || Turn.Status === "cancelling")) {
       return true;
@@ -526,11 +531,11 @@ export function IsConversationBusy(ConversationId) {
   return false;
 }
 
-function AllowanceKey(Turn) {
+function AllowanceKey(Turn: Turn) {
   return Turn.Session && Turn.Session.ConversationId ? Turn.Session.Key : Turn.Id;
 }
 
-function AskPermission(Turn, ToolName, Input, Options) {
+function AskPermission(Turn: Turn, ToolName: string, Input: unknown, Options: {suggestions?: unknown, signal?: AbortSignal}) {
   const Allowed = SessionAllowances.get(AllowanceKey(Turn));
 
   if (Allowed && Allowed.has(ToolName)) {
@@ -563,7 +568,7 @@ function AskPermission(Turn, ToolName, Input, Options) {
   });
 }
 
-function AskQuestion(Session, Questions) {
+function AskQuestion(Session: Session, Questions: Question[]) {
   return new Promise((Resolve) => {
     const Turn = Session.CurrentTurn;
 
@@ -582,7 +587,7 @@ function AskQuestion(Session, Questions) {
   });
 }
 
-export function AnswerQuestion(Turn, QuestionId, Answers) {
+export function AnswerQuestion(Turn: Turn, QuestionId: string, Answers: unknown) {
   const Asked = Turn.Question;
 
   if (!Asked || Asked.Id !== QuestionId) {
@@ -596,7 +601,7 @@ export function AnswerQuestion(Turn, QuestionId, Answers) {
   return true;
 }
 
-export function AnswerPermission(Turn, PermissionId, Allow, Always) {
+export function AnswerPermission(Turn: Turn, PermissionId: string, Allow: boolean, Always: boolean) {
   const Index = Turn.Permissions.findIndex((Entry) => Entry.Id === PermissionId);
 
   if (Index === -1) {
@@ -612,7 +617,7 @@ export function AnswerPermission(Turn, PermissionId, Allow, Always) {
       SessionAllowances.set(Key, new Set());
     }
 
-    SessionAllowances.get(Key).add(Permission.ToolName);
+    (SessionAllowances.get(Key) as Set<string>).add(Permission.ToolName);
   }
 
   Publish(Turn, {});
@@ -622,15 +627,15 @@ export function AnswerPermission(Turn, PermissionId, Allow, Always) {
   return true;
 }
 
-function UserMessage(Text, Images) {
-  const Pictures = (Images || []).map((Image) => ({
+function UserMessage(Text: string, Images: Picture[]) {
+  const Pictures = (Images || []).map((Image: Picture) => ({
     type: "image",
     source: { type: "base64", media_type: Image.mediaType, data: Image.data },
   }));
 
   return {
     type: "user",
-    message: { role: "user", content: Pictures.concat([{ type: "text", text: Text }]) },
+    message: { role: "user", content: (Pictures as unknown[]).concat([{ type: "text", text: Text }]) },
     parent_tool_use_id: null,
   };
 }
@@ -651,7 +656,7 @@ function CloseIdleSessions() {
   }
 }
 
-function CleanOutput(Name, Text) {
+function CleanOutput(Name: string, Text: string): string {
   if (Name !== "Agent" && Name !== "Task") {
     return Text;
   }
@@ -663,7 +668,7 @@ function CleanOutput(Name, Text) {
   return "Ran in the background. Its steps are listed above and its report is in the reply.";
 }
 
-function RecordStep(Turn, Message) {
+function RecordStep(Turn: Turn, Message: SdkMessage & {parent_tool_use_id?: string | null, task_id?: string}) {
   const Call = Turn.Calls.find((Entry) => Entry.Id === Message.parent_tool_use_id);
 
   if (!Call || Message.type !== "assistant") {
@@ -677,8 +682,8 @@ function RecordStep(Turn, Message) {
       Lines.push(`Used ${Block.name}`);
     }
 
-    if (Block.type === "text" && Block.text.trim() !== "") {
-      Lines.push(Block.text.trim().replace(/\s+/g, " ").slice(0, 200));
+    if (Block.type === "text" && (Block.text || "").trim() !== "") {
+      Lines.push((Block.text || "").trim().replace(/\s+/g, " ").slice(0, 200));
     }
   }
 
@@ -690,7 +695,7 @@ function RecordStep(Turn, Message) {
   Publish(Turn, { Calls: Turn.Calls.slice() });
 }
 
-function RouteMessage(Session, Message) {
+function RouteMessage(Session: Session, Message: any) {
   const Turn = Session.CurrentTurn;
 
   if (Message.type === "system" && Message.subtype === "init") {
@@ -698,7 +703,7 @@ function RouteMessage(Session, Message) {
     RememberServers(Message);
 
     if (Turn && Turn.OpenedAt) {
-      console.log(`Turn ${Turn.Id}: session ready ${Date.now() - Turn.OpenedAt}ms after the turn started, ${Turn.Cold ? "cold" : "reused"}, ${(Message.mcp_servers || []).map((Server) => `${Server.name} ${Server.status}`).join(", ")}`);
+      console.log(`Turn ${Turn.Id}: session ready ${Date.now() - Turn.OpenedAt}ms after the turn started, ${Turn.Cold ? "cold" : "reused"}, ${(Message.mcp_servers || []).map((Server: {name: string, status: string}) => `${Server.name} ${Server.status}`).join(", ")}`);
     }
   }
 
@@ -745,7 +750,7 @@ function RouteMessage(Session, Message) {
   if (Message.type === "system" && Message.subtype === "init") {
     if (!AskedForModels) {
       AskedForModels = true;
-      Session.Query.supportedModels().then(RememberModels).catch(() => {});
+      (Session.Query as Query).supportedModels().then(RememberModels).catch(() => {});
     }
 
     if (!Session.ConversationId) {
@@ -771,6 +776,10 @@ function RouteMessage(Session, Message) {
 
   if (Message.type === "stream_event") {
     const Event = Message.event;
+
+    if (!Event || !Event.delta) {
+      return;
+    }
 
     if (Event.type === "content_block_delta" && Event.delta.type === "text_delta") {
       if (Turn.OpenedAt && !Turn.FirstTextAt) {
@@ -829,12 +838,12 @@ function RouteMessage(Session, Message) {
     const Committed = Content.filter((Block) => Block.type === "text").map((Block) => Block.text).join("");
     const Thought = Content.filter((Block) => Block.type === "thinking").map((Block) => Block.thinking).join(NewLine);
     const Known = new Set(Turn.Calls.map((Call) => Call.Id));
-    const Started = Content.filter((Block) => Block.type === "tool_use" && !Known.has(Block.id)).map((Block) => ({
-      Id: Block.id,
-      Name: Block.name,
+    const Started = Content.filter((Block) => Block.type === "tool_use" && !Known.has(Block.id as string)).map((Block) => ({
+      Id: Block.id as string,
+      Name: Block.name as string,
       Input: DescribeInput(Block.input),
       Output: "",
-      Status: "running",
+      Status: "running" as CallStatus,
       StartedAt: Date.now(),
       Milliseconds: 0,
       Delegate: DelegateFor(Block, Turn.Delegate),
@@ -842,7 +851,7 @@ function RouteMessage(Session, Message) {
     const Readied = Turn.Calls.map((Call) => {
       const Block = Content.find((Candidate) => Candidate.type === "tool_use" && Candidate.id === Call.Id);
 
-      return Block && Call.Status === "preparing" ? { ...Call, Input: DescribeInput(Block.input), Status: "running", StartedAt: Date.now() } : Call;
+      return Block && Call.Status === "preparing" ? { ...Call, Input: DescribeInput(Block.input), Status: "running" as CallStatus, StartedAt: Date.now() } : Call;
     });
 
     const Parts = Turn.Flushed ? [] : Content.map((Block) => {
@@ -854,8 +863,8 @@ function RouteMessage(Session, Message) {
         return { kind: "call", id: Block.id };
       }
 
-      return Block.type === "text" ? { kind: "text", text: Block.text } : null;
-    }).filter((Part) => Part && (Part.kind === "call" || Part.text.trim() !== ""));
+      return Block.type === "text" ? { kind: "text", text: Block.text || "" } : null;
+    }).filter((Part) => Part && (Part.kind === "call" || (Part.text || "").trim() !== "")) as Part[];
 
     Publish(Turn, {
       CommittedText: Turn.Flushed ? Turn.CommittedText : JoinText(Turn.CommittedText, Committed),
@@ -865,7 +874,7 @@ function RouteMessage(Session, Message) {
       Flushed: false,
       Parts: Turn.Parts.concat(Parts),
       Activity: Turn.Activity.concat(Started.map((Call) => Call.Name)),
-      Calls: Readied.concat(Started),
+      Calls: Readied.concat(Started as Call[]),
       Usage: Message.message.usage ? CountUsage(Turn.Usage, Message.message.usage) : Turn.Usage,
       Streamed: 0,
     });
@@ -877,10 +886,10 @@ function RouteMessage(Session, Message) {
       .map((Image) => DecodeImage(Image.mediaType, Image.data))
       .filter(Boolean);
     const Results = Blocks(Message).filter((Block) => Block.type === "tool_result");
-    const Changes = {};
+    const Changes: Partial<Turn> = {};
 
     if (Decoded.length > 0) {
-      Changes.Images = Turn.Images.concat(Decoded);
+      Changes.Images = Turn.Images.concat(Decoded as SentImage[]);
     }
 
     if (Results.length > 0) {
@@ -932,7 +941,7 @@ function RouteMessage(Session, Message) {
     return;
   }
 
-  Turn.Activity = Turn.Activity.concat((Message.permission_denials || []).map((Denial) => `denied ${Denial.tool_name}`));
+  Turn.Activity = Turn.Activity.concat((Message.permission_denials || []).map((Denial: {tool_name: string}) => `denied ${Denial.tool_name}`));
   Turn.Milliseconds = Message.duration_ms || (Date.now() - Turn.StartedAt);
   const Spent = Message.total_cost_usd || 0;
 
@@ -949,7 +958,7 @@ function RouteMessage(Session, Message) {
 
   let Busiest = 0;
 
-  for (const [Name, Usage] of Object.entries(Message.modelUsage || {})) {
+  for (const [Name, Usage] of Object.entries((Message.modelUsage || {}) as Record<string, {inputTokens?: number, cacheReadInputTokens?: number, contextWindow?: number}>)) {
     const Weight = (Usage.inputTokens || 0) + (Usage.cacheReadInputTokens || 0);
     const Matches = Turn.Model && Name.includes(Turn.Model.replace(/\[.*\]$/, ""));
 
@@ -980,12 +989,12 @@ function RouteMessage(Session, Message) {
   CloseIdleSessions();
 }
 
-function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskForTools, ExtraPrompt, FastMode, Planning, Delegating, Mode, Bypass, Delegate) {
-  const Pending = [];
-  let Wake = null;
+function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string, Model: string, Effort: string | null, AskForTools: boolean, ExtraPrompt: boolean, FastMode: boolean, Planning: boolean, Delegating: boolean, Mode: string, Bypass: boolean, Delegate: string): Session {
+  const Pending: unknown[] = [];
+  let Wake: ((Value?: unknown) => void) | null = null;
   let Ended = false;
 
-  const Session = {
+  const Session: Session = {
     Key: ConversationId || `pending-${Math.random().toString(36).slice(2, 10)}`,
     ConversationId,
     Model,
@@ -1004,7 +1013,7 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
     CurrentTurn: null,
     LastUsedAt: Date.now(),
     Query: null,
-    Send(Message) {
+    Send(Message: unknown) {
       Pending.push(Message);
 
       if (Wake) {
@@ -1054,7 +1063,7 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
         continue;
       }
 
-      yield Pending.shift();
+      yield Pending.shift() as SDKUserMessage;
     }
   }
 
@@ -1067,25 +1076,26 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
         options: {
           resume: ConversationId || undefined,
           model: Model,
-          effort: Effort || undefined,
+          effort: (Effort || undefined) as EffortLevel | undefined,
           cwd: TurnWorkingDirectory,
           includePartialMessages: true,
           settings: { fastMode: FastMode === true, todoFeatureEnabled: true },
           thinking: { type: "adaptive", display: "summarized" },
-          permissionMode: Session.Mode,
+          permissionMode: Session.Mode as PermissionMode,
           planModeInstructions: PlanInstructions,
-          agents: Session.Delegating ? AgentsOn(Session.Delegate) : undefined,
+          agents: Session.Delegating ? AgentsOn(Session.Delegate) as Record<string, AgentDefinition> : undefined,
           skills: Session.Delegating ? [] : undefined,
           hooks: {
             PreToolUse: [{
               hooks: [async (HookInput, ToolUseId, Options) => {
-                const Edited = EditedFile(HookInput.tool_name, HookInput.tool_input);
+                const Asked = HookInput as {tool_name: string, tool_input: unknown};
+                const Edited = EditedFile(Asked.tool_name, Asked.tool_input);
 
                 if (Edited && ToolUseId) {
                   Session.FilesBefore.set(ToolUseId, ReadFileText(Edited));
                 }
 
-                if ((IsAllowedTool(HookInput.tool_name) || !Session.AskForTools) && !(Session.GuardTools && IsRisky(HookInput.tool_name, HookInput.tool_input))) {
+                if ((IsAllowedTool(Asked.tool_name) || !Session.AskForTools) && !(Session.GuardTools && IsRisky(Asked.tool_name, Asked.tool_input))) {
                   return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
                 }
 
@@ -1099,20 +1109,22 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
                   };
                 }
 
-                const Result = await AskPermission(Session.CurrentTurn, HookInput.tool_name, HookInput.tool_input, Options);
+                const Result = await AskPermission(Session.CurrentTurn, Asked.tool_name, Asked.tool_input, Options);
 
                 return {
                   hookSpecificOutput: {
                     hookEventName: "PreToolUse",
-                    permissionDecision: Result.behavior === "allow" ? "allow" : "deny",
-                    permissionDecisionReason: Result.message || "Answered in Claudio",
+                    permissionDecision: (Result as {behavior?: string}).behavior === "allow" ? "allow" : "deny",
+                    permissionDecisionReason: (Result as {message?: string}).message || "Answered in Claudio",
                   },
                 };
               }],
             }],
             UserPromptSubmit: [{
               hooks: [async (HookInput) => {
-                if (HookInput && HookInput.source && HookInput.source !== "user") {
+                const Sent = HookInput as {source?: string};
+
+                if (Sent && Sent.source && Sent.source !== "user") {
                   return {};
                 }
 
@@ -1131,10 +1143,11 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
             }],
             PostToolUse: [{
               hooks: [async (HookInput, ToolUseId) => {
-                const Edited = EditedFile(HookInput.tool_name, HookInput.tool_input);
+                const Asked = HookInput as {tool_name: string, tool_input: unknown};
+                const Edited = EditedFile(Asked.tool_name, Asked.tool_input);
 
                 if (Edited && ToolUseId && Session.FilesBefore.has(ToolUseId)) {
-                  Session.LineCounts.set(ToolUseId, CountLines(Session.FilesBefore.get(ToolUseId), ReadFileText(Edited)));
+                  Session.LineCounts.set(ToolUseId, CountLines(Session.FilesBefore.get(ToolUseId) as string, ReadFileText(Edited)));
                   Session.FilesBefore.delete(ToolUseId);
                 }
 
@@ -1142,7 +1155,8 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
                   return {};
                 }
 
-                const Capped = CapToolOutput(HookInput.tool_name, HookInput.tool_response);
+                const Finished = HookInput as {tool_name: string, tool_response: unknown};
+                const Capped = CapToolOutput(Finished.tool_name, Finished.tool_response as any);
 
                 if (!Capped) {
                   return {};
@@ -1152,7 +1166,7 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
               }],
             }],
           },
-          mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions), (Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined)), (Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined), Role)) },
+          mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions) as Promise<JobAnswer | null>, ((Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined))) as Reacher, ((Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined), Role)) as ReacherIn) },
           systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.Delegating) },
         },
       });
@@ -1166,10 +1180,10 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
       }
     } catch (Error) {
       if (Session.CurrentTurn) {
-        FinishTurn(Session.CurrentTurn, Session.CurrentTurn.Status === "cancelling" ? "cancelled" : "error", Error.message);
+        FinishTurn(Session.CurrentTurn, Session.CurrentTurn.Status === "cancelling" ? "cancelled" : "error", (Error as Error).message);
       }
 
-      console.error(`Session ${Session.Key} ended: ${Error.message}`);
+      console.error(`Session ${Session.Key} ended: ${(Error as Error).message}`);
     }
 
     Session.CurrentTurn = null;
@@ -1181,9 +1195,9 @@ function OpenSession(ConversationId, TurnWorkingDirectory, Model, Effort, AskFor
   return Session;
 }
 
-let Spare = null;
+let Spare: Session | null = null;
 
-function TakeSpare(Model, Effort) {
+function TakeSpare(Model: string, Effort: string | null) {
   const Ready = Spare;
 
   if (!Ready || Ready.Ended || Ready.CurrentTurn || Ready.Model !== Model || (Ready.Effort || null) !== (Effort || null)) {
@@ -1194,7 +1208,7 @@ function TakeSpare(Model, Effort) {
   return Ready;
 }
 
-let LastFolder = null;
+let LastFolder: string | null = null;
 
 export function LastUsedFolder() {
   return LastFolder;
@@ -1209,16 +1223,16 @@ export function KeepSpareWarm() {
     LastFolder = UsableFolder(ReadPluginSetting("WorkingFolder")) || WorkingDirectory;
   }
 
-  const Likely = AutoTier(0, AutoBias(ReadPluginSetting("Effort")));
+  const Likely = AutoTier(0, AutoBias(ReadPluginSetting("Effort") as string | null));
 
   Spare = OpenSession(null, LastFolder, Likely.model, Likely.effort, true, true, false, false, false, DefaultMode, false, Likely.delegate);
 }
 
-function EffortRank(Effort) {
+function EffortRank(Effort: string | null) {
   return EffortOrder.indexOf(Effort || "none");
 }
 
-export function UsableFolder(Folder) {
+export function UsableFolder(Folder: unknown): string | null {
   if (typeof Folder !== "string" || Folder.trim() === "") {
     return null;
   }
@@ -1230,7 +1244,7 @@ export function UsableFolder(Folder) {
   }
 }
 
-function DescribePlace(Place) {
+function DescribePlace(Place: {name?: string, placeId?: number, universeId?: number} | null | undefined): string | null {
   if (!Place || typeof Place.name !== "string" || Place.name === "") {
     return null;
   }
@@ -1242,20 +1256,20 @@ function DescribePlace(Place) {
   return `<studio_place>\n${Said}\n</studio_place>`;
 }
 
-export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForTools, GuardTools, Escalate, ExtraPrompt, FastMode, Mode, Place, Folder }) {
+export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForTools, GuardTools, Escalate, ExtraPrompt, FastMode, Mode, Bypass, Place, Folder }: TurnRequest) {
   const Existing = ConversationId ? GetConversation(ConversationId) : null;
   const Lean = Model === LeanMode.value;
   const Auto = Lean || !Model || Model === "auto";
   const Planning = Mode === "plan";
 
   if (Escalate && Auto) {
-    RecordTurnOutcome(ConversationId, { Failed: true, Denied: false });
+    RecordTurnOutcome(ConversationId || "", { Failed: true, Denied: false });
   }
 
   const Chosen = Auto
-    ? ChooseModel(ConversationId, Text, Boolean(Images && Images.length) || Text.includes("<studio_context>"), AutoBias(Effort))
-    : { model: Model, effort: Escalate ? NextEffort(Model, Effort) : (SupportsEffort(Model, Effort) ? Effort : null) };
-  const Turn = {
+    ? ChooseModel(ConversationId || "", Text, Boolean(Images && Images.length) || Text.includes("<studio_context>"), AutoBias(Effort))
+    : { model: Model, effort: Escalate ? NextEffort(Model, Effort) : (SupportsEffort(Model, Effort) ? Effort : null), delegate: "" };
+  const Turn: Turn = {
     Id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
     ConversationId,
     Prompt: Text,
@@ -1271,6 +1285,8 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     GuardTools: GuardTools === true,
     ExtraPrompt: ExtraPrompt !== false,
     FastMode: FastMode === true,
+    Bypass: Bypass === true,
+    Mode,
     WorkingDirectory: (Existing && UsableFolder(Existing.workingDirectory)) || UsableFolder(Folder) || WorkingDirectory,
     SessionId: ConversationId,
     Status: "running",
@@ -1376,11 +1392,11 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
   return Turn;
 }
 
-export function GetTurn(Id) {
+export function GetTurn(Id: string) {
   return Turns.get(Id);
 }
 
-export function CancelTurn(Turn) {
+export function CancelTurn(Turn: Turn) {
   if (Turn.Status !== "running") {
     return;
   }
@@ -1413,7 +1429,7 @@ export function AbortAllTurns() {
   }
 }
 
-export function ReleaseImage(Turn, Index) {
+export function ReleaseImage(Turn: Turn, Index: number) {
   Turn.Delivered[Index] = true;
 
   if (Turn.Status === "running" || Turn.Images.length === 0) {
@@ -1429,7 +1445,7 @@ export function ReleaseImage(Turn, Index) {
   Turn.Images = [];
 }
 
-export function WaitForChange(Turn, KnownVersion, Milliseconds) {
+export function WaitForChange(Turn: Turn, KnownVersion: number, Milliseconds: number) {
   if (Turn.Version > KnownVersion) {
     return Settle(Turn);
   }
@@ -1441,14 +1457,14 @@ export function WaitForChange(Turn, KnownVersion, Milliseconds) {
     };
     const Timer = setTimeout(() => {
       Turn.Waiters.splice(Turn.Waiters.indexOf(Waiter), 1);
-      Resolve();
+      Resolve(undefined);
     }, Milliseconds);
 
     Turn.Waiters.push(Waiter);
   });
 }
 
-function Settle(Turn) {
+function Settle(Turn: Turn) {
   if (Turn.Status !== "running") {
     return Promise.resolve();
   }
@@ -1458,7 +1474,7 @@ function Settle(Turn) {
   });
 }
 
-export function DescribeTurn(Turn) {
+export function DescribeTurn(Turn: Turn) {
   Turn.OutputShown = Math.max(Turn.OutputShown || 0, Turn.Usage.Output + Math.ceil(Turn.Streamed / 4));
 
   return {
@@ -1513,8 +1529,8 @@ export function DescribeTurn(Turn) {
   };
 }
 
-export async function ForkConversation(ConversationId) {
-  const Result = await forkSession(ConversationId);
+export async function ForkConversation(ConversationId: string) {
+  const Result = await forkSession(ConversationId) as {sessionId?: string};
 
   return Result.sessionId;
 }

@@ -5,15 +5,30 @@ import { GitHubRepo, Version } from "./Config.js";
 
 const InstalledFile = path.join(os.homedir(), ".claudio", "installed.json");
 
-function Installed() {
+type InstalledRecord = {
+  commit: string;
+  at: number;
+};
+
+type CommitRecord = {
+  sha: string;
+  commit: {
+    message: string;
+    committer: {
+      date: string;
+    };
+  };
+};
+
+function Installed(): InstalledRecord | null {
   try {
-    return JSON.parse(fs.readFileSync(InstalledFile, "utf8").replace(/^\uFEFF/, ""));
+    return JSON.parse(fs.readFileSync(InstalledFile, "utf8").replace(/^\uFEFF/, "")) as InstalledRecord;
   } catch {
     return null;
   }
 }
 
-async function LatestCommit() {
+async function LatestCommit(): Promise<CommitRecord> {
   const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/commits/main`, {
     headers: { "User-Agent": "claudio", "Cache-Control": "no-cache" },
   });
@@ -22,7 +37,7 @@ async function LatestCommit() {
     throw new Error(`GitHub answered ${Response.status}`);
   }
 
-  return await Response.json();
+  return await Response.json() as CommitRecord;
 }
 
 export async function ReportVersion() {
@@ -36,12 +51,12 @@ export async function ReportVersion() {
     console.log("Installed by hand rather than by the installer, so there is no commit recorded.");
   }
 
-  let Newest;
+  let Newest: CommitRecord;
 
   try {
     Newest = await LatestCommit();
   } catch (Error) {
-    console.log(`Could not check for a newer version: ${Error.message}`);
+    console.log(`Could not check for a newer version: ${(Error as NodeJS.ErrnoException).message}`);
     return;
   }
 

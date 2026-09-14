@@ -4,14 +4,35 @@ import { exec } from "node:child_process";
 import { GitHubRepo, InstalledPluginFile, PluginFileName } from "./Config.js";
 import { GetPluginsFolder } from "./StudioPaths.js";
 
-let Releases = { At: 0, List: [] };
+type ReleaseEntry = {
+  version: string;
+  name: string;
+  prerelease: boolean;
+  notes: string;
+};
 
-export function LooksLikeVersion(Text) {
+type GitHubAsset = {
+  name: string;
+  browser_download_url: string;
+};
+
+type GitHubRelease = {
+  tag_name: string;
+  name?: string;
+  draft?: boolean;
+  prerelease?: boolean;
+  body?: string;
+  assets?: GitHubAsset[];
+};
+
+let Releases: { At: number; List: ReleaseEntry[] } = { At: 0, List: [] };
+
+export function LooksLikeVersion(Text: unknown): Text is string {
   return typeof Text === "string" && /^v?\d+(\.\d+)*$/.test(Text.trim());
 }
 
-function Compare(Left, Right) {
-  const Parts = (Text) => String(Text).trim().replace(/^v/, "").split(".").map((Piece) => Number(Piece) || 0);
+function Compare(Left: string, Right: string): number {
+  const Parts = (Text: string) => String(Text).trim().replace(/^v/, "").split(".").map((Piece) => Number(Piece) || 0);
   const First = Parts(Left);
   const Second = Parts(Right);
 
@@ -24,7 +45,7 @@ function Compare(Left, Right) {
   return 0;
 }
 
-export function IsNewer(Candidate, Current) {
+export function IsNewer(Candidate: unknown, Current: unknown): boolean {
   if (!LooksLikeVersion(Candidate) || !LooksLikeVersion(Current)) {
     return false;
   }
@@ -32,8 +53,8 @@ export function IsNewer(Candidate, Current) {
   return Compare(Candidate, Current) > 0;
 }
 
-export function NewestRelease(Releases) {
-  let Best = null;
+export function NewestRelease(Releases: ReleaseEntry[]): ReleaseEntry | null {
+  let Best: ReleaseEntry | null = null;
 
   for (const Entry of Releases) {
     if (Entry.prerelease || !LooksLikeVersion(Entry.version)) {
@@ -48,7 +69,7 @@ export function NewestRelease(Releases) {
   return Best;
 }
 
-export async function ListReleases() {
+export async function ListReleases(): Promise<ReleaseEntry[]> {
   if (Date.now() - Releases.At < 600000 && Releases.List.length > 0) {
     return Releases.List;
   }
@@ -62,7 +83,7 @@ export async function ListReleases() {
       return Releases.List;
     }
 
-    const Found = (await Response.json())
+    const Found = (await Response.json() as GitHubRelease[])
       .filter((Entry) => !Entry.draft && (Entry.assets || []).some((Asset) => Asset.name === PluginFileName))
       .map((Entry) => ({
         version: String(Entry.tag_name).replace(/^v/, ""),
@@ -73,13 +94,13 @@ export async function ListReleases() {
 
     Releases = { At: Date.now(), List: Found };
   } catch (Error) {
-    console.error("Could not list releases: " + Error.message);
+    console.error("Could not list releases: " + (Error as NodeJS.ErrnoException).message);
   }
 
   return Releases.List;
 }
 
-function FromGitHub(Url) {
+function FromGitHub(Url: string): boolean {
   try {
     const Parsed = new URL(Url);
 
@@ -89,7 +110,7 @@ function FromGitHub(Url) {
   }
 }
 
-async function CommitFor(Version) {
+async function CommitFor(Version: string): Promise<string> {
   const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/commits/v${Version}`, {
     headers: { "User-Agent": "claudio-installer" },
   });
@@ -98,7 +119,7 @@ async function CommitFor(Version) {
     throw new Error(`Could not find the commit for v${Version}`);
   }
 
-  const Found = (await Response.json()).sha;
+  const Found = (await Response.json() as { sha?: unknown }).sha;
 
   if (typeof Found !== "string" || !/^[0-9a-f]{40}$/.test(Found)) {
     throw new Error(`GitHub gave an unusable commit for v${Version}`);
@@ -107,12 +128,12 @@ async function CommitFor(Version) {
   return Found;
 }
 
-export async function InstallBridge(Version) {
+export async function InstallBridge(Version: string): Promise<string> {
   const Commit = await CommitFor(Version);
 
-  await new Promise((Resolve, Reject) => {
-    exec(`npm install -g https://github.com/${GitHubRepo}/archive/${Commit}.tar.gz`, { timeout: 300000 }, (Error, Stdout, Stderr) => {
-      if (Error) {
+  await new Promise<void>((Resolve, Reject) => {
+    exec(`npm install -g https://github.com/${GitHubRepo}/archive/${Commit}.tar.gz`, { timeout: 300000 }, (Trouble, Stdout, Stderr) => {
+      if (Trouble) {
         const Said = `${Stderr || ""}${Stdout || ""}`.trim().split(/\r?\n/).slice(-3).join(" ");
 
         Reject(new Error(`npm could not install the bridge for v${Version}: ${Said}`));
@@ -127,7 +148,7 @@ export async function InstallBridge(Version) {
   return Commit;
 }
 
-export async function InstallVersion(Version) {
+export async function InstallVersion(Version: string): Promise<string> {
   if (!LooksLikeVersion(Version)) {
     throw new Error("A version looks like 1.0.0");
   }
@@ -140,7 +161,7 @@ export async function InstallVersion(Version) {
     throw new Error(`No release tagged v${Version}`);
   }
 
-  const Release = await Response.json();
+  const Release = await Response.json() as GitHubRelease;
   const Asset = (Release.assets || []).find((Entry) => Entry.name === PluginFileName);
 
   if (!Asset) {
@@ -166,9 +187,9 @@ export async function InstallVersion(Version) {
   return Release.tag_name;
 }
 
-export function InstalledPluginVersion() {
+export function InstalledPluginVersion(): string | null {
   try {
-    const Recorded = JSON.parse(fs.readFileSync(InstalledPluginFile, "utf8").replace(/^﻿/, "")).version;
+    const Recorded = (JSON.parse(fs.readFileSync(InstalledPluginFile, "utf8").replace(/^﻿/, "")) as { version?: unknown }).version;
 
     return LooksLikeVersion(Recorded) ? Recorded.replace(/^v/, "") : null;
   } catch {
@@ -176,16 +197,16 @@ export function InstalledPluginVersion() {
   }
 }
 
-function RememberInstalled(Installed) {
+function RememberInstalled(Installed: string | null): void {
   try {
     fs.mkdirSync(path.dirname(InstalledPluginFile), { recursive: true });
     fs.writeFileSync(InstalledPluginFile, JSON.stringify({ version: Installed }, null, 2));
   } catch (Error) {
-    console.error("Could not record the installed plugin version: " + Error.message);
+    console.error("Could not record the installed plugin version: " + (Error as NodeJS.ErrnoException).message);
   }
 }
 
-function WritePlugin(Target, Body) {
+function WritePlugin(Target: string, Body: Buffer): void {
   if (Body.length < 1024 || !Body.subarray(0, 8).toString("binary").startsWith("<roblox")) {
     throw new Error("That download is not a Roblox model file");
   }
@@ -202,7 +223,7 @@ function WritePlugin(Target, Body) {
   }
 }
 
-export async function InstallPlugin(LocalPath) {
+export async function InstallPlugin(LocalPath?: string | null): Promise<void> {
   const PluginsFolder = GetPluginsFolder();
   const Target = path.join(PluginsFolder, PluginFileName);
 
@@ -224,7 +245,7 @@ export async function InstallPlugin(LocalPath) {
     throw new Error(`Could not read the latest release of ${GitHubRepo} (${ReleaseResponse.status})`);
   }
 
-  const Release = await ReleaseResponse.json();
+  const Release = await ReleaseResponse.json() as GitHubRelease;
   const Asset = (Release.assets || []).find((Entry) => Entry.name === PluginFileName);
 
   if (!Asset) {

@@ -1,8 +1,9 @@
 import { PNG } from "pngjs";
 import jpeg from "jpeg-js";
 import { MaxImageWidth } from "./Config.js";
+import type { Content, ContentBlock, DecodedImage, Picture, SentImage } from "./Types.js";
 
-function DecodeBytes(MediaType, Bytes) {
+function DecodeBytes(MediaType: string, Bytes: Buffer): DecodedImage | null {
   try {
     if (MediaType === "image/png") {
       const Decoded = PNG.sync.read(Bytes);
@@ -19,7 +20,7 @@ function DecodeBytes(MediaType, Bytes) {
   return null;
 }
 
-export function DecodeImage(MediaType, Base64) {
+export function DecodeImage(MediaType: string, Base64: string): SentImage | null {
   const Decoded = DecodeBytes(MediaType, Buffer.from(Base64, "base64"));
 
   if (!Decoded) {
@@ -45,10 +46,10 @@ export function DecodeImage(MediaType, Base64) {
   return { width: Width, height: Height, pixels: Pixels.toString("base64") };
 }
 
-export function ImagesInContent(Content) {
-  const Images = [];
+export function ImagesInContent(Content: Content | undefined): Picture[] {
+  const Images: Picture[] = [];
 
-  for (const Block of Array.isArray(Content) ? Content : []) {
+  for (const Block of (Array.isArray(Content) ? Content : []) as ContentBlock[]) {
     if (Block.type === "tool_result") {
       Images.push(...ImagesInContent(Block.content));
     } else if (Block.type === "image" && Block.source && Block.source.type === "base64") {

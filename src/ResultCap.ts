@@ -1,12 +1,15 @@
 import { CappedTools, ResultCapCharacters } from "./Config.js";
+import type { ContentBlock } from "./Types.js";
+
+type Response = string | ContentBlock[] | {content?: ContentBlock[], structuredContent?: unknown};
 
 const CapThreshold = ResultCapCharacters + 1000;
 
-function TextOf(Block) {
+function TextOf(Block: ContentBlock): string {
   return Block && typeof Block.text === "string" ? Block.text : "";
 }
 
-function CapText(Name, Text) {
+function CapText(Name: string, Text: string): string {
   const Structured = /^\s*[{[]/.test(Text);
   const Head = Structured ? ResultCapCharacters : Math.floor(ResultCapCharacters * 0.75);
   const Shape = Structured
@@ -23,7 +26,7 @@ function CapText(Name, Text) {
   return Text.slice(0, Head) + Note + "\n\n" + Text.slice(Text.length - (ResultCapCharacters - Head));
 }
 
-export function CapToolOutput(Name, Response) {
+export function CapToolOutput(Name: string, Response: Response): Response | null {
   if (ResultCapCharacters <= 0 || typeof Name !== "string" || !(Name.startsWith("mcp__") || CappedTools.includes(Name))) {
     return null;
   }
@@ -32,7 +35,7 @@ export function CapToolOutput(Name, Response) {
     return Response.length > CapThreshold ? CapText(Name, Response) : null;
   }
 
-  if (!Response || typeof Response !== "object" || Response.structuredContent) {
+  if (!Response || typeof Response !== "object" || (!Array.isArray(Response) && Response.structuredContent)) {
     return null;
   }
 
@@ -48,7 +51,7 @@ export function CapToolOutput(Name, Response) {
     return null;
   }
 
-  const Content = [];
+  const Content: ContentBlock[] = [];
   let Placed = false;
 
   for (const Block of Blocks) {

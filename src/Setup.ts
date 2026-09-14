@@ -3,15 +3,20 @@ import { InstallPlugin } from "./PluginInstaller.js";
 import { GetPluginsFolder } from "./StudioPaths.js";
 import { InstallStartup } from "./Startup.js";
 
-function Run(Line) {
-  return new Promise((Resolve) => {
+type RunResult = {
+  Ok: boolean;
+  Output: string;
+};
+
+function Run(Line: string): Promise<RunResult> {
+  return new Promise<RunResult>((Resolve) => {
     exec(Line, { timeout: 300000 }, (Error, Stdout, Stderr) => {
       Resolve({ Ok: !Error, Output: `${Stdout || ""}${Stderr || ""}`.trim() });
     });
   });
 }
 
-async function EnsureClaude(Manual) {
+async function EnsureClaude(Manual: string[]): Promise<boolean> {
   const Found = await Run("claude --version");
 
   if (Found.Ok) {
@@ -39,8 +44,8 @@ async function EnsureClaude(Manual) {
   return true;
 }
 
-function SignIn() {
-  return new Promise((Resolve) => {
+function SignIn(): Promise<boolean> {
+  return new Promise<boolean>((Resolve) => {
     if (!process.stdin.isTTY) {
       Resolve(false);
       return;
@@ -58,8 +63,8 @@ function SignIn() {
   });
 }
 
-export async function RunSetup(LocalPath) {
-  const Manual = [];
+export async function RunSetup(LocalPath?: string | null): Promise<void> {
+  const Manual: string[] = [];
 
   console.log("Setting up.\n");
 
@@ -69,14 +74,14 @@ export async function RunSetup(LocalPath) {
     await InstallPlugin(LocalPath);
   } catch (Error) {
     Manual.push(`Install the plugin yourself: download Claudio.rbxm from the releases page and drop it in ${GetPluginsFolder()}`);
-    console.log(`Could not install the plugin automatically: ${Error.message}`);
+    console.log(`Could not install the plugin automatically: ${(Error as NodeJS.ErrnoException).message}`);
   }
 
   if (process.platform === "win32") {
     try {
       await InstallStartup();
     } catch (Error) {
-      Manual.push("Start the bridge by running `claudio` and leaving that window open (" + Error.message + ")");
+      Manual.push("Start the bridge by running `claudio` and leaving that window open (" + (Error as NodeJS.ErrnoException).message + ")");
     }
   } else {
     Manual.push("Start the bridge by running `claudio` and leaving that window open. Starting it automatically is Windows-only so far.");

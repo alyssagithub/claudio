@@ -1,12 +1,19 @@
-const Pending = [];
-const Waiting = new Map();
+type Job = {
+  Id: string;
+  Kind: string;
+  Input: unknown;
+  Role: string;
+};
+
+const Pending: Job[] = [];
+const Waiting = new Map<string, (Result: unknown) => void>();
 
 let Counter = 0;
 
-export function Request(Kind, Input, Timeout, Role) {
-  return new Promise((Resolve) => {
+export function Request(Kind: string, Input: unknown, Timeout?: number | null, Role?: string | null): Promise<unknown> {
+  return new Promise<unknown>((Resolve) => {
     const Id = `job-${Counter += 1}-${Math.random().toString(36).slice(2, 8)}`;
-    const Give = (Result) => {
+    const Give = (Result: unknown) => {
       if (!Waiting.has(Id)) {
         return;
       }
@@ -33,20 +40,20 @@ export function Request(Kind, Input, Timeout, Role) {
 const Heard = new Map();
 const StartedAt = Date.now();
 
-let CanRun = null;
-let Clients = null;
-let PluginVersion = null;
-let BridgeVersion = null;
-let BridgeRoot = null;
-let ToolCount = null;
+let CanRun: boolean | null = null;
+let Clients: number | null = null;
+let PluginVersion: string | null = null;
+let BridgeVersion: string | null = null;
+let BridgeRoot: string | null = null;
+let ToolCount: number | null = null;
 
-export function Serving(Version, Root, Tools) {
+export function Serving(Version: string, Root: string, Tools: number): void {
   BridgeVersion = Version;
   BridgeRoot = Root;
   ToolCount = Tools;
 }
 
-export function Seen(Role, Able, Attached, Plugin) {
+export function Seen(Role?: string | null, Able?: boolean, Attached?: number, Plugin?: string): void {
   Heard.set(Role || "edit", Date.now());
 
   if (Able !== undefined) {
@@ -62,7 +69,7 @@ export function Seen(Role, Able, Attached, Plugin) {
   }
 }
 
-export function Take(Role, Able, Attached, Plugin) {
+export function Take(Role?: string | null, Able?: boolean, Attached?: number, Plugin?: string) {
   const Wanted = Role || "edit";
 
   Seen(Wanted, Able, Attached, Plugin);
@@ -73,7 +80,7 @@ export function Take(Role, Able, Attached, Plugin) {
     return null;
   }
 
-  const [Job] = Pending.splice(At, 1);
+  const [Job] = Pending.splice(At, 1) as [Job];
 
   return { id: Job.Id, kind: Job.Kind, input: Job.Input };
 }
@@ -101,7 +108,7 @@ export function RuntimeLive() {
   return Date.now() - Last < 6000;
 }
 
-export function Deliver(Id, Result) {
+export function Deliver(Id: string, Result: unknown): boolean {
   const Give = Waiting.get(Id);
 
   if (!Give) {

@@ -10,7 +10,7 @@ import { InstallStartup, RestartBridge, StopBridge, UninstallStartup } from "../
 const Arguments = process.argv.slice(2);
 const Command = Arguments[0];
 
-function ReadFlag(Name) {
+function ReadFlag(Name: string) {
   const Index = Arguments.indexOf(Name);
   const Value = Index === -1 ? null : Arguments[Index + 1];
 
@@ -34,7 +34,7 @@ function ChosenPort() {
   return Number_;
 }
 
-function Fail(Error) {
+function Fail(Error: { message: string }) {
   console.error(Error.message);
   process.exit(1);
 }

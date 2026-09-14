@@ -3,8 +3,19 @@ import fs from "node:fs";
 import path from "node:path";
 import { ChaptersFile, CostsFile, DesktopSessionsRoot, OwnSessionsFile, PriceFor, SessionsRoot } from "./Config.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
+import type { Chapter, Content, ContentBlock, StoredCall, StoredMessage, Tokens, TranscriptLine } from "./Types.js";
 
-function FindFile(Id) {
+type TranscriptEntry = TranscriptLine & { customTitle?: string; aiTitle?: string; summary?: string };
+
+type DesktopSession = { title: string | undefined; workingDirectory: string | undefined; starred: boolean; archived: boolean };
+
+type DesktopRecord = Record<string, unknown> & { cliSessionId?: string; title?: string; cwd?: string; isStarred?: boolean; isArchived?: boolean };
+
+type CostStore = Record<string, number[] | Record<string, number>>;
+
+type Listing = { id: string; title: string; project: string; folder: string | null; source: string; starred: boolean; archived: boolean; createdAt: number; updatedAt: number };
+
+function FindFile(Id: string): string | null {
   if (!fs.existsSync(SessionsRoot)) {
     return null;
   }
@@ -20,16 +31,16 @@ function FindFile(Id) {
   return null;
 }
 
-function ReadJson(File) {
+function ReadJson<Value>(File: string): Value | null {
   try {
-    return JSON.parse(fs.readFileSync(File, "utf8"));
+    return JSON.parse(fs.readFileSync(File, "utf8")) as Value;
   } catch {
     return null;
   }
 }
 
-function ReadDesktopSessions() {
-  const Sessions = {};
+function ReadDesktopSessions(): Record<string, DesktopSession> {
+  const Sessions: Record<string, DesktopSession> = {};
 
   if (!fs.existsSync(DesktopSessionsRoot)) {
     return Sessions;
@@ -54,7 +65,7 @@ function ReadDesktopSessions() {
           continue;
         }
 
-        const Session = ReadJson(path.join(Folder, Name));
+        const Session = ReadJson<DesktopRecord>(path.join(Folder, Name));
 
         if (!Session || !Session.cliSessionId) {
           continue;
@@ -68,12 +79,12 @@ function ReadDesktopSessions() {
   return Sessions;
 }
 
-function DesktopSessionsFolder() {
+function DesktopSessionsFolder(): string | null {
   if (!fs.existsSync(DesktopSessionsRoot)) {
     return null;
   }
 
-  let Newest = null;
+  let Newest: { Folder: string; mtimeMs: number } | null = null;
 
   for (const Account of fs.readdirSync(DesktopSessionsRoot)) {
     const AccountFolder = path.join(DesktopSessionsRoot, Account);
@@ -95,7 +106,7 @@ function DesktopSessionsFolder() {
   return Newest ? Newest.Folder : null;
 }
 
-export function AddDesktopSession(Id, WorkingDirectory, Title) {
+export function AddDesktopSession(Id: string, WorkingDirectory: string, Title: string) {
   const Folder = DesktopSessionsFolder();
 
   if (!Folder || ReadDesktopSessions()[Id]) {
@@ -130,8 +141,8 @@ export function AddDesktopSession(Id, WorkingDirectory, Title) {
   fs.writeFileSync(path.join(Folder, `${Session.sessionId}.json`), JSON.stringify(Session, null, 2));
 }
 
-function DesktopSessionFiles() {
-  const Files = [];
+function DesktopSessionFiles(): string[] {
+  const Files: string[] = [];
 
   if (!fs.existsSync(DesktopSessionsRoot)) {
     return Files;
@@ -162,9 +173,9 @@ function DesktopSessionFiles() {
   return Files;
 }
 
-export function UpdateDesktopSession(Id, Change) {
+export function UpdateDesktopSession(Id: string, Change: (Session: DesktopRecord) => void) {
   for (const File of DesktopSessionFiles()) {
-    const Session = ReadJson(File);
+    const Session = ReadJson<DesktopRecord>(File);
 
     if (!Session || Session.cliSessionId !== Id) {
       continue;
@@ -176,22 +187,22 @@ export function UpdateDesktopSession(Id, Change) {
   }
 }
 
-function ReadOwnSessions() {
-  const Stored = ReadJson(OwnSessionsFile) || [];
+function ReadOwnSessions(): Map<string, boolean> {
+  const Stored = ReadJson<string[] | Record<string, boolean>>(OwnSessionsFile) || [];
 
   if (Array.isArray(Stored)) {
-    return new Map(Stored.map((Id) => [Id, false]));
+    return new Map(Stored.map((Id) => [Id, false] as [string, boolean]));
   }
 
   return new Map(Object.entries(Stored));
 }
 
-function WriteOwnSessions(Own) {
+function WriteOwnSessions(Own: Map<string, boolean>) {
   fs.mkdirSync(path.dirname(OwnSessionsFile), { recursive: true });
   fs.writeFileSync(OwnSessionsFile, JSON.stringify(Object.fromEntries(Own), null, 2));
 }
 
-export function RememberOwnSession(Id) {
+export function RememberOwnSession(Id: string) {
   const Own = ReadOwnSessions();
 
   if (Own.has(Id)) {
@@ -202,7 +213,7 @@ export function RememberOwnSession(Id) {
   WriteOwnSessions(Own);
 }
 
-function InputOf(Input) {
+function InputOf(Input: unknown): string {
   if (!Input || typeof Input !== "object" || Array.isArray(Input)) {
     return String(Input === undefined ? "" : Input);
   }
@@ -213,7 +224,7 @@ function InputOf(Input) {
     .slice(0, 4000);
 }
 
-function TextOf(Content) {
+function TextOf(Content: Content | undefined): string {
   if (typeof Content === "string") {
     return Content;
   }
@@ -223,11 +234,11 @@ function TextOf(Content) {
 
 const ContextPattern = /<studio_context>[\s\S]*?<\/studio_context>|<studio_place>[\s\S]*?<\/studio_place>|<studio_edits>[\s\S]*?<\/studio_edits>|<studio_lint>[\s\S]*?<\/studio_lint>|I changed these in Studio myself since my last message:(?:\n- [^\n]*)+/g;
 
-export function ExtractContext(Text) {
+export function ExtractContext(Text: string): string {
   return (Text.match(ContextPattern) || []).join("\n\n");
 }
 
-export function StripContext(Text) {
+export function StripContext(Text: string): string {
   return Text
     .replace(/\n*<studio_context>[\s\S]*?<\/studio_context>\n*/g, "")
     .replace(/\n*<studio_place>[\s\S]*?<\/studio_place>\n*/g, "")
@@ -237,7 +248,7 @@ export function StripContext(Text) {
     .trim();
 }
 
-function IsPromptLine(Line) {
+function IsPromptLine(Line: TranscriptEntry) {
   return Line.type === "user"
     && !Line.isMeta
     && !Line.isSidechain
@@ -246,9 +257,9 @@ function IsPromptLine(Line) {
     && !StripContext(TextOf(Line.message.content)).startsWith("<");
 }
 
-const Parsed = new Map();
+const Parsed = new Map<string, { Stamp: string; Lines: TranscriptEntry[] }>();
 
-function EndsCleanly(File) {
+function EndsCleanly(File: string): boolean {
   try {
     const Size = fs.statSync(File).size;
 
@@ -268,7 +279,7 @@ function EndsCleanly(File) {
   }
 }
 
-function ReadTail(File) {
+function ReadTail(File: string): TranscriptEntry[] {
   try {
     const Size = fs.statSync(File).size;
 
@@ -285,17 +296,17 @@ function ReadTail(File) {
 
     return Buffer.toString("utf8").split("\n").map((Line) => {
       try {
-        return JSON.parse(Line);
+        return JSON.parse(Line) as TranscriptEntry;
       } catch {
         return null;
       }
-    }).filter((Line) => Line && Line.type === "custom-title");
+    }).filter((Line) => Line && Line.type === "custom-title") as TranscriptEntry[];
   } catch {
     return [];
   }
 }
 
-function ReadLines(File, MaxBytes) {
+function ReadLines(File: string, MaxBytes?: number): TranscriptEntry[] | null {
   const Key = `${File}:${MaxBytes || 0}`;
   const Stamp = (() => {
     try {
@@ -316,7 +327,7 @@ function ReadLines(File, MaxBytes) {
 
   if (Lines && Stamp) {
     if (Parsed.size >= 4) {
-      Parsed.delete(Parsed.keys().next().value);
+      Parsed.delete(Parsed.keys().next().value as string);
     }
 
     Parsed.set(Key, { Stamp, Lines });
@@ -325,7 +336,7 @@ function ReadLines(File, MaxBytes) {
   return Lines;
 }
 
-function ParseLines(File, MaxBytes) {
+function ParseLines(File: string, MaxBytes?: number): TranscriptEntry[] | null {
   try {
     const Descriptor = fs.openSync(File, "r");
     const Size = fs.fstatSync(Descriptor).size;
@@ -336,17 +347,17 @@ function ParseLines(File, MaxBytes) {
 
     return new TextDecoder().decode(Buffer).split("\n").map((Raw) => {
       try {
-        return JSON.parse(Raw);
+        return JSON.parse(Raw) as TranscriptEntry;
       } catch {
         return null;
       }
-    }).filter(Boolean);
+    }).filter(Boolean) as TranscriptEntry[];
   } catch {
     return null;
   }
 }
 
-function TitleOf(Lines, Desktop, IsOwn) {
+function TitleOf(Lines: TranscriptEntry[], Desktop: DesktopSession | undefined, IsOwn: boolean): string {
   const Named = Lines.find((Line) => Line.type === "custom-title" && Line.customTitle)
     || Lines.find((Line) => Line.type === "ai-title" && Line.aiTitle)
     || Lines.find((Line) => Line.type === "summary" && Line.summary);
@@ -356,19 +367,19 @@ function TitleOf(Lines, Desktop, IsOwn) {
   }
 
   if (Named) {
-    return Named.customTitle || Named.aiTitle || Named.summary;
+    return (Named.customTitle || Named.aiTitle || Named.summary) as string;
   }
 
   const Prompt = Lines.find(IsPromptLine);
 
-  return Prompt ? StripContext(TextOf(Prompt.message.content)).replace(/\s+/g, " ").trim().slice(0, 60) : "New chat";
+  return Prompt ? StripContext(TextOf(Prompt.message!.content)).replace(/\s+/g, " ").trim().slice(0, 60) : "New chat";
 }
 
-function StampOf(Entry) {
+function StampOf(Entry: TranscriptEntry | undefined): number {
   return Entry && typeof Entry.timestamp === "string" ? Date.parse(Entry.timestamp) : NaN;
 }
 
-function StartedAt(Lines, File) {
+function StartedAt(Lines: TranscriptEntry[], File: string): number {
   for (const Entry of Lines) {
     if (Number.isFinite(StampOf(Entry))) {
       return StampOf(Entry);
@@ -378,7 +389,7 @@ function StartedAt(Lines, File) {
   return fs.statSync(File).birthtimeMs;
 }
 
-function EndedAt(Lines, File) {
+function EndedAt(Lines: TranscriptEntry[], File: string): number {
   for (let Index = Lines.length - 1; Index >= 0; Index -= 1) {
     if (Number.isFinite(StampOf(Lines[Index]))) {
       return StampOf(Lines[Index]);
@@ -388,13 +399,13 @@ function EndedAt(Lines, File) {
   return fs.statSync(File).mtimeMs;
 }
 
-function WorkingDirectoryOf(Lines) {
+function WorkingDirectoryOf(Lines: TranscriptEntry[]): string | null {
   const Line = Lines.find((Entry) => typeof Entry.cwd === "string" && Entry.cwd !== "");
 
-  return Line ? Line.cwd : null;
+  return Line ? Line.cwd as string : null;
 }
 
-export function ListConversations() {
+export function ListConversations(): Listing[] {
   if (!fs.existsSync(SessionsRoot)) {
     return [];
   }
@@ -402,7 +413,7 @@ export function ListConversations() {
   const Desktop = ReadDesktopSessions();
   const Own = ReadOwnSessions();
   const Deletable = DesktopSessionsFolder() !== null && Object.keys(Desktop).length > 0;
-  const Summaries = [];
+  const Summaries: Listing[] = [];
 
   for (const Project of fs.readdirSync(SessionsRoot)) {
     const Folder = path.join(SessionsRoot, Project);
@@ -419,7 +430,7 @@ export function ListConversations() {
       }
 
       const File = path.join(Folder, Name);
-      const Lines = ReadLines(File).concat(ReadTail(File));
+      const Lines = ReadLines(File)!.concat(ReadTail(File));
 
       if (!Lines || !Lines.some(IsPromptLine)) {
         continue;
@@ -452,7 +463,7 @@ export function ListConversations() {
   return Summaries.sort((Left, Right) => (Number(Right.starred) - Number(Left.starred)) || (Right.updatedAt - Left.updatedAt));
 }
 
-export function GetConversationImage(Id, Wanted) {
+export function GetConversationImage(Id: string, Wanted: number) {
   const File = FindFile(Id);
   const Lines = File ? ReadLines(File) : null;
   let Index = 0;
@@ -462,7 +473,7 @@ export function GetConversationImage(Id, Wanted) {
       continue;
     }
 
-    for (const Image of ImagesInContent(Line.message.content)) {
+    for (const Image of ImagesInContent(Line.message!.content)) {
       Index += 1;
 
       if (Index === Wanted) {
@@ -474,11 +485,11 @@ export function GetConversationImage(Id, Wanted) {
   return null;
 }
 
-function ReadCosts() {
-  return ReadJson(CostsFile) || {};
+function ReadCosts(): CostStore {
+  return ReadJson<CostStore>(CostsFile) || {};
 }
 
-export function ForgetCosts(Id) {
+export function ForgetCosts(Id: string) {
   const Costs = ReadCosts();
 
   if (!Costs[Id]) {
@@ -489,15 +500,15 @@ export function ForgetCosts(Id) {
   fs.writeFileSync(CostsFile, JSON.stringify(Costs, null, 2));
 }
 
-function CostList(Stored) {
+function CostList(Stored: number[] | Record<string, number> | undefined): number[] {
   if (Array.isArray(Stored)) {
     return Stored;
   }
 
-  return Object.keys(Stored || {}).sort((Left, Right) => Number(Left) - Number(Right)).map((Key) => Stored[Key]);
+  return Object.keys(Stored || {}).sort((Left, Right) => Number(Left) - Number(Right)).map((Key) => (Stored as Record<string, number>)[Key]);
 }
 
-export function RecordCost(Id, Cost) {
+export function RecordCost(Id: string, Cost: number) {
   if (!Id || !Cost) {
     return;
   }
@@ -509,7 +520,7 @@ export function RecordCost(Id, Cost) {
   fs.writeFileSync(CostsFile, JSON.stringify(Costs, null, 2));
 }
 
-function EstimateCost(Line) {
+function EstimateCost(Line: TranscriptEntry): number | null {
   const Usage = Line.message && Line.message.usage;
   const Price = PriceFor((Line.message && Line.message.model) || "");
 
@@ -525,7 +536,7 @@ function EstimateCost(Line) {
   ) / 1000000;
 }
 
-function UsageOf(Line) {
+function UsageOf(Line: TranscriptEntry): Tokens | null {
   const Usage = Line.message && Line.message.usage;
 
   if (!Usage) {
@@ -539,17 +550,17 @@ function UsageOf(Line) {
   };
 }
 
-function TimeOf(Line) {
+function TimeOf(Line: TranscriptEntry): number | null {
   const Stamp = Date.parse(Line.timestamp || "");
 
   return Number.isNaN(Stamp) ? null : Math.floor(Stamp / 1000);
 }
 
-export function ConversationExists(Id) {
+export function ConversationExists(Id: string): boolean {
   return FindFile(Id) !== null;
 }
 
-export function GetConversation(Id) {
+export function GetConversation(Id: string) {
   const File = FindFile(Id);
   const Lines = File ? ReadLines(File) : null;
 
@@ -557,13 +568,13 @@ export function GetConversation(Id) {
     return null;
   }
 
-  const Messages = [];
-  let PendingTools = [];
-  let PendingCalls = [];
-  const Results = new Map();
-  let PendingImages = [];
+  const Messages: StoredMessage[] = [];
+  let PendingTools: string[] = [];
+  let PendingCalls: { Id: string; name: string; input: string }[] = [];
+  const Results = new Map<string, { Output: string; Failed: boolean; Image: number | null }>();
+  let PendingImages: number[] = [];
   let ImageIndex = 0;
-  const Priced = new Set();
+  const Priced = new Set<string | undefined>();
   let PendingCost = 0;
 
   for (const Line of Lines) {
@@ -572,7 +583,7 @@ export function GetConversation(Id) {
     }
 
     if (IsPromptLine(Line)) {
-      const Attached = [];
+      const Attached: number[] = [];
 
       for (const Image of ImagesInContent(Line.message.content)) {
         ImageIndex += 1;
@@ -584,11 +595,11 @@ export function GetConversation(Id) {
       PendingCalls = [];
       PendingImages = [];
     } else if (Line.type === "user") {
-      for (const Block of Line.message.content || []) {
+      for (const Block of (Line.message.content || []) as ContentBlock[]) {
         const Pictures = ImagesInContent([Block]).length;
 
         if (Block.type === "tool_result") {
-          Results.set(Block.tool_use_id, { Output: TextOf(Block.content).slice(0, 2000), Failed: Block.is_error === true, Image: Pictures > 0 ? PendingImages.length + 1 : null });
+          Results.set(Block.tool_use_id as string, { Output: TextOf(Block.content).slice(0, 2000), Failed: Block.is_error === true, Image: Pictures > 0 ? PendingImages.length + 1 : null });
         }
 
         for (let Count = 0; Count < Pictures; Count += 1) {
@@ -597,7 +608,7 @@ export function GetConversation(Id) {
         }
       }
     } else if (Line.type === "assistant") {
-      const Content = Line.message.content || [];
+      const Content = (Line.message.content || []) as ContentBlock[];
       const Text = TextOf(Content);
       const Response = Line.requestId || (Line.message && Line.message.id);
 
@@ -606,8 +617,8 @@ export function GetConversation(Id) {
         PendingCost += EstimateCost(Line) || 0;
       }
 
-      PendingTools = PendingTools.concat(Content.filter((Block) => Block.type === "tool_use").map((Block) => Block.name));
-      PendingCalls = PendingCalls.concat(Content.filter((Block) => Block.type === "tool_use").map((Block) => ({ Id: Block.id, name: Block.name, input: InputOf(Block.input) })));
+      PendingTools = PendingTools.concat(Content.filter((Block) => Block.type === "tool_use").map((Block) => Block.name as string));
+      PendingCalls = PendingCalls.concat(Content.filter((Block) => Block.type === "tool_use").map((Block) => ({ Id: Block.id as string, name: Block.name as string, input: InputOf(Block.input) })));
 
       if (Text === "") {
         continue;
@@ -627,7 +638,7 @@ export function GetConversation(Id) {
       }
 
       const Before = Last && Last.role === "assistant" ? Last.images.length : 0;
-      const Calls = PendingCalls.map((Call) => {
+      const Calls: StoredCall[] = PendingCalls.map((Call) => {
         const Result = Results.get(Call.Id);
 
         return { name: Call.name, input: Call.input, output: Result ? Result.Output : "", status: Result && Result.Failed ? "error" : "done", milliseconds: 0, image: Result && Result.Image ? Result.Image + Before : null };
@@ -635,8 +646,8 @@ export function GetConversation(Id) {
 
       if (Last && Last.role === "assistant") {
         Last.text = `${Last.text}\n\n${Text}`;
-        Last.activity = Last.activity.concat(PendingTools);
-        Last.calls = Last.calls.concat(Calls);
+        Last.activity = Last.activity!.concat(PendingTools);
+        Last.calls = Last.calls!.concat(Calls);
         Last.images = Last.images.concat(PendingImages);
         Last.tokens = Used || Last.tokens;
         Last.cost = (Last.cost || 0) + (Spent || 0);
@@ -685,15 +696,15 @@ export function GetConversation(Id) {
   };
 }
 
-function ReadChapters() {
-  return ReadJson(ChaptersFile) || {};
+function ReadChapters(): Record<string, Chapter[]> {
+  return ReadJson<Record<string, Chapter[]>>(ChaptersFile) || {};
 }
 
-export function GetChapters(Id) {
+export function GetChapters(Id: string): Chapter[] {
   return ReadChapters()[Id] || [];
 }
 
-export function SetChapters(Id, Chapters) {
+export function SetChapters(Id: string, Chapters: Chapter[]): Chapter[] {
   const All = ReadChapters();
 
   if (Chapters.length === 0) {
@@ -707,7 +718,7 @@ export function SetChapters(Id, Chapters) {
   return Chapters;
 }
 
-export function RenameConversation(Id, Title) {
+export function RenameConversation(Id: string, Title: string): boolean {
   const File = FindFile(Id);
 
   if (!File) {
@@ -723,7 +734,7 @@ export function RenameConversation(Id, Title) {
   return true;
 }
 
-export function SetConversationFlag(Id, Field, Value) {
+export function SetConversationFlag(Id: string, Field: string, Value: unknown): boolean {
   let Changed = false;
 
   UpdateDesktopSession(Id, (Session) => {
@@ -734,7 +745,7 @@ export function SetConversationFlag(Id, Field, Value) {
   return Changed;
 }
 
-function RemoveDesktopSession(Id) {
+function RemoveDesktopSession(Id: string) {
   const Folder = DesktopSessionsFolder();
 
   if (!Folder) {
@@ -747,7 +758,7 @@ function RemoveDesktopSession(Id) {
     }
 
     const File = path.join(Folder, Name);
-    const Session = ReadJson(File);
+    const Session = ReadJson<DesktopRecord>(File);
 
     if (Session && Session.cliSessionId === Id) {
       fs.rmSync(File, { force: true });
@@ -756,7 +767,7 @@ function RemoveDesktopSession(Id) {
   }
 }
 
-function ForgetOwnSession(Id) {
+function ForgetOwnSession(Id: string) {
   const Own = ReadOwnSessions();
 
   if (!Own.delete(Id)) {
@@ -766,7 +777,7 @@ function ForgetOwnSession(Id) {
   WriteOwnSessions(Own);
 }
 
-export function DeleteConversation(Id) {
+export function DeleteConversation(Id: string): boolean {
   const File = FindFile(Id);
 
   if (!File) {

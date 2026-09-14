@@ -1,8 +1,8 @@
 import { exec } from "node:child_process";
 
 
-function Run(Command) {
-  return new Promise((Resolve) => {
+function Run(Command: string): Promise<string> {
+  return new Promise<string>((Resolve) => {
     exec(Command, { timeout: 8000, windowsHide: true }, (Error, Output) => Resolve(Output || ""));
   });
 }
@@ -23,7 +23,22 @@ export async function StudioProcesses() {
   return [];
 }
 
-function Health(Presence) {
+type PresenceInfo = {
+  bridge?: string | null;
+  plugin?: string | null;
+  from?: string | null;
+  tools?: number | null;
+  upSince?: number | null;
+  lastSeen?: number | null;
+  runtimeSeen?: number | null;
+  canRun?: boolean | null;
+  clients?: number | null;
+  queued: number;
+  waiting: number;
+  processes?: number[];
+};
+
+function Health(Presence: PresenceInfo): string {
   if (!Presence.bridge) {
     return "";
   }
@@ -53,14 +68,14 @@ function Health(Presence) {
   return Line;
 }
 
-export function Describe(Presence) {
+export function Describe(Presence: PresenceInfo): string {
   const Running = (Presence.processes || []).length;
   const Since = Presence.lastSeen ? Date.now() - Presence.lastSeen : null;
   const Fresh = Since !== null && Since < 8000;
 
   if (Fresh) {
     const Live = Presence.runtimeSeen && Date.now() - Presence.runtimeSeen < 6000;
-    const Busy = [];
+    const Busy: string[] = [];
 
     if (Live) {
       const Attached = Presence.clients;

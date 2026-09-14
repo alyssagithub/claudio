@@ -1,6 +1,8 @@
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod/v3";
 import { StudioTools } from "./Tools.js";
+import type { JobAnswer, Question as AskedQuestion } from "./Types.js";
+import type { Reacher, ReacherIn } from "./Tools.js";
 
 export const AskServerName = "claudio";
 const AskToolName = "mcp__claudio__ask";
@@ -27,8 +29,8 @@ const Description = [
   "An Other choice with a free text box is added to every question automatically, so never write one yourself.",
 ].join(" ");
 
-function Describe(Questions, Answers) {
-  const Parts = Questions.map((Entry) => {
+function Describe(Questions: AskedQuestion[], Answers: JobAnswer) {
+  const Parts = Questions.map((Entry: AskedQuestion) => {
     const Given = Answers[Entry.question];
 
     if (Given === undefined || Given === "") {
@@ -44,7 +46,9 @@ function Describe(Questions, Answers) {
   ].join(" ");
 }
 
-export function ReadReport(Found) {
+export type ReadAnswer = { error?: string; tree?: string[]; sources?: { path: string; source: string }[]; truncated?: boolean } | null;
+
+export function ReadReport(Found: ReadAnswer) {
   if (!Found) {
     return "Studio did not answer.";
   }
@@ -66,7 +70,9 @@ export function ReadReport(Found) {
   return Parts.join("\n");
 }
 
-export function PropertyReport(Found) {
+export type PropertyAnswer = { error?: string; path?: string; className?: string; values?: string[]; unreadable?: string[] } | null;
+
+export function PropertyReport(Found: PropertyAnswer) {
   if (!Found) {
     return "Studio did not answer.";
   }
@@ -84,7 +90,9 @@ export function PropertyReport(Found) {
   return Parts.join("\n");
 }
 
-export function LogReport(Found) {
+export type LogAnswer = { error?: string; lines?: string[]; scanned?: number; skipped: number } | null;
+
+export function LogReport(Found: LogAnswer) {
   if (!Found) {
     return "Studio did not answer.";
   }
@@ -104,7 +112,9 @@ export function LogReport(Found) {
   return `${Lines.join("\n")}${Tail}`;
 }
 
-export function FindReport(Found) {
+export type FindAnswer = { error?: string; hits?: string[]; scanned?: number; more: number } | null;
+
+export function FindReport(Found: FindAnswer) {
   if (!Found) {
     return "Studio did not answer.";
   }
@@ -122,7 +132,9 @@ export function FindReport(Found) {
   return `${Hits.join("\n")}${Found.more > 0 ? `\n${Found.more} more matches not shown; raise limit to see them.` : ""}`;
 }
 
-export function SourceReport(Found) {
+export type SourceAnswer = { error?: string; path?: string; total?: number; lines?: string[]; text?: string } | null;
+
+export function SourceReport(Found: SourceAnswer) {
   if (!Found) {
     return "Studio did not answer.";
   }
@@ -138,7 +150,9 @@ export function SourceReport(Found) {
   return Found.text || "Done.";
 }
 
-export function SelectReport(Found) {
+export type SelectAnswer = { error?: string; paths?: string[]; text?: string } | null;
+
+export function SelectReport(Found: SelectAnswer) {
   if (!Found) {
     return "Studio did not answer.";
   }
@@ -154,7 +168,9 @@ export function SelectReport(Found) {
   return Found.text || "Done.";
 }
 
-export function ApiReport(Found) {
+export type ApiAnswer = { error?: string; classes?: string[]; items?: string[]; enumName?: string; hits?: string[]; search?: string; className?: string; inherits?: string[]; creatable?: boolean; member?: string; properties: string[]; methods: string[]; events: string[]; subclasses?: string[]; shared: number } | null;
+
+export function ApiReport(Found: ApiAnswer) {
   if (!Found) {
     return "Studio did not answer.";
   }
@@ -192,10 +208,10 @@ export function ApiReport(Found) {
     return `${Found.className} has no member called "${Found.member}".`;
   }
 
-  for (const [Label, Lines] of [["properties", Found.properties], ["methods", Found.methods], ["events", Found.events]]) {
+  for (const [Label, Lines] of [["properties", Found.properties], ["methods", Found.methods], ["events", Found.events]] as [string, string[]][]) {
     if (Lines && Lines.length > 0) {
       Parts.push(`${Label}:`);
-      Parts.push(Lines.map((Line) => `  ${Line}`).join("\n"));
+      Parts.push(Lines.map((Line: string) => `  ${Line}`).join("\n"));
     }
   }
 
@@ -210,7 +226,9 @@ export function ApiReport(Found) {
   return Parts.join("\n");
 }
 
-export function ExecuteReport(Found) {
+export type ExecuteAnswer = { error?: string; line?: string; trace?: string; result?: unknown; output?: string[]; undo?: boolean } | null;
+
+export function ExecuteReport(Found: ExecuteAnswer) {
   if (!Found) {
     return "Studio did not answer.";
   }
@@ -242,7 +260,9 @@ export function ExecuteReport(Found) {
   return Parts.join("\n");
 }
 
-export function LintReport(Found) {
+export type LintAnswer = { error?: string; scripts?: { path: string; lines?: string[] }[]; skipped?: string[] } | null;
+
+export function LintReport(Found: LintAnswer) {
   if (!Found) {
     return "Studio did not answer.";
   }
@@ -252,7 +272,7 @@ export function LintReport(Found) {
   }
 
   const Scripts = Found.scripts || [];
-  const Lines = Scripts.map((Entry) => [Entry.path].concat((Entry.lines || []).map((Warning) => `  ${Warning}`)).join("\n"));
+  const Lines = Scripts.map((Entry: { path: string; lines?: string[] }) => [Entry.path].concat((Entry.lines || []).map((Warning: string) => `  ${Warning}`)).join("\n"));
 
   if (Found.skipped && Found.skipped.length > 0) {
     Lines.push(`Could not check: ${Found.skipped.join(", ")}`);
@@ -267,10 +287,10 @@ export function LintReport(Found) {
 
 
 
-export function AskServerFor(Pose, Reach, ReachIn) {
+export function AskServerFor(Pose: (Questions: AskedQuestion[]) => Promise<JobAnswer | null>, Reach: Reacher, ReachIn: ReacherIn) {
   const Shared = StudioTools({
     Reach,
-    ReachIn: (Role, Kind, Input, Timeout) => ReachIn(Role, Kind, Input, Timeout),
+    ReachIn: <Found,>(Role: string, Kind: string, Input?: unknown, Timeout?: number): Promise<Found> => ReachIn<Found>(Role, Kind, Input, Timeout),
     Presence: async () => {
       const { Describe: Say } = await import("./StudioPresence.js");
       const { Presence } = await import("./Studio.js");
@@ -290,7 +310,7 @@ export function AskServerFor(Pose, Reach, ReachIn) {
     version: "1.0.0",
     tools: [
       ...Shared.map((Entry) => tool(Entry.Name, Entry.Description, Entry.Schema, Entry.Run)),
-      tool("ask", Description, { questions: z.array(Question).min(1).max(4) }, async (Input) => {
+      tool("ask", Description, { questions: z.array(Question).min(1).max(4) }, async (Input: { questions: AskedQuestion[] }) => {
         const Answers = await Pose(Input.questions);
 
         if (!Answers) {

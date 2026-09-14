@@ -4,18 +4,32 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import notifier from "node-notifier";
 
-const ScriptPath = path.resolve(fileURLToPath(import.meta.url), "..", "Notify.ps1");
-const IconFile = path.resolve(fileURLToPath(import.meta.url), "..", "Icon.png");
-const ClipboardPath = path.resolve(fileURLToPath(import.meta.url), "..", "Clipboard.ps1");
+const ScriptPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "Notify.ps1");
+const IconFile = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "Icon.png");
+const ClipboardPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "Clipboard.ps1");
 
+
+type ToastOptions = {
+  Flash?: boolean;
+  Toast?: boolean;
+  Banner?: boolean;
+  Sound?: boolean;
+  Anywhere?: boolean;
+};
+
+type ClipboardPicture = {
+  data: string;
+  mediaType: string;
+  id: string;
+};
 
 let LastShownAt = 0;
 
-function Clean(Value, Limit) {
+function Clean(Value: unknown, Limit: number): string {
   return String(Value).replace(/\s+/g, " ").trim().slice(0, Limit);
 }
 
-export function ShowToast(Title, Body, Options) {
+export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions | null): boolean {
   const Wanted = Options || {};
 
   if (process.platform !== "win32" || Date.now() - LastShownAt < 2000) {
@@ -63,7 +77,7 @@ export function ShowToast(Title, Body, Options) {
       icon: IconFile,
       sound: false,
       wait: false,
-    }, (Failure) => {
+    }, (Failure: Error | null) => {
       if (Failure) {
         console.error(`Toast failed: ${String(Failure).slice(0, 200)}`);
       }
@@ -73,8 +87,8 @@ export function ShowToast(Title, Body, Options) {
   return true;
 }
 
-export function WriteClipboard(Text) {
-  return new Promise((Resolve) => {
+export function WriteClipboard(Text: string): Promise<boolean> {
+  return new Promise<boolean>((Resolve) => {
     if (process.platform !== "win32") {
       Resolve(false);
       return;
@@ -89,8 +103,8 @@ export function WriteClipboard(Text) {
   });
 }
 
-function RunClipboard(Mode, Marker) {
-  return new Promise((Resolve) => {
+function RunClipboard(Mode: string, Marker?: string | null): Promise<string> {
+  return new Promise<string>((Resolve) => {
     if (process.platform !== "win32") {
       Resolve("");
       return;
@@ -106,9 +120,9 @@ function RunClipboard(Mode, Marker) {
   });
 }
 
-let Armed = null;
+let Armed: { Marker: string; Image: ClipboardPicture } | null = null;
 
-function Picture(Data) {
+function Picture(Data: string): ClipboardPicture {
   return {
     data: Data,
     mediaType: "image/png",
@@ -116,7 +130,7 @@ function Picture(Data) {
   };
 }
 
-export async function ArmClipboard(Marker) {
+export async function ArmClipboard(Marker: string): Promise<string> {
   const [Outcome, Data] = (await RunClipboard("arm", Marker)).split(/\r?\n/);
 
   if (Outcome === "armed" && Data && Data.length >= 64) {
@@ -126,12 +140,12 @@ export async function ArmClipboard(Marker) {
   return Outcome;
 }
 
-export async function DisarmClipboard(Marker) {
+export async function DisarmClipboard(Marker: string): Promise<string> {
   return await RunClipboard("disarm", Marker);
 }
 
-export function ReadClipboardImage(Marker) {
-  return new Promise((Resolve) => {
+export function ReadClipboardImage(Marker?: string | null): Promise<ClipboardPicture | null> {
+  return new Promise<ClipboardPicture | null>((Resolve) => {
     if (Marker && Armed && Armed.Marker === Marker) {
       Resolve(Armed.Image);
       return;

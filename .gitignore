@@ -3,3 +3,4 @@ node_modules/
 *.claudio-backup
 Claudio.rbxm
 place/
+dist/

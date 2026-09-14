@@ -16,17 +16,17 @@ function Key() {
   }
 }
 
-async function Get(Where) {
+async function Get<Found>(Where: string): Promise<Found | null> {
   try {
     const Answer = await fetch(`http://127.0.0.1:${Port}${Where}`, { headers: { "x-claudio-token": Key() } });
 
-    return Answer.ok ? await Answer.json() : null;
+    return Answer.ok ? await Answer.json() as Found : null;
   } catch {
     return null;
   }
 }
 
-async function Send(Role, Kind, Input, Timeout) {
+async function Send<Found>(Role: string | undefined, Kind: string, Input: unknown, Timeout: number | undefined): Promise<Found> {
   try {
     const Answer = await fetch(`http://127.0.0.1:${Port}/studio/enqueue`, {
       method: "POST",
@@ -35,27 +35,27 @@ async function Send(Role, Kind, Input, Timeout) {
     });
 
     if (!Answer.ok) {
-      return { error: `The Claudio bridge answered ${Answer.status}. Is it running?` };
+      return { error: `The Claudio bridge answered ${Answer.status}. Is it running?` } as Found;
     }
 
-    return await Answer.json();
+    return await Answer.json() as Found;
   } catch (Trouble) {
-    return { error: `Could not reach the Claudio bridge on port ${Port}: ${Trouble.message}. Start it with "claudio" and open a place in Studio.` };
+    return { error: `Could not reach the Claudio bridge on port ${Port}: ${(Trouble as Error).message}. Start it with "claudio" and open a place in Studio.` } as Found;
   }
 }
 
 const Server = new McpServer({ name: "claudio", version: "1.0.0" });
 
 for (const Entry of StudioTools({
-  Reach: (Kind, Input, Timeout) => Send(undefined, Kind, Input, Timeout),
-  ReachIn: (Role, Kind, Input, Timeout) => Send(Role, Kind, Input, Timeout),
+  Reach: <Found,>(Kind: string, Input?: unknown, Timeout?: number): Promise<Found> => Send<Found>(undefined, Kind, Input, Timeout),
+  ReachIn: <Found,>(Role: string, Kind: string, Input?: unknown, Timeout?: number): Promise<Found> => Send<Found>(Role, Kind, Input, Timeout),
   Presence: async () => {
-    const Found = await Get("/studio/presence");
+    const Found = await Get<Parameters<typeof DescribePresence>[0]>("/studio/presence");
 
     return Found ? DescribePresence(Found) : "The Claudio bridge is not running, so nothing can be reached. Start it with \"claudio\".";
   },
   RuntimeLive: async () => {
-    const Found = await Get("/studio/presence");
+    const Found = await Get<{ runtimeSeen?: number }>("/studio/presence");
 
     return Boolean(Found && Found.runtimeSeen && Date.now() - Found.runtimeSeen < 6000);
   },

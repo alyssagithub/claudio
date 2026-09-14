@@ -38,7 +38,7 @@ export const AllowedTools = [
   "WebFetch",
 ];
 export const CappedTools = ["Read", "Glob", "Grep"];
-export function SystemPromptFor(ServerNames, Delegating) {
+export function SystemPromptFor(ServerNames: string[], Delegating: boolean) {
   const Lines = ["You are Claudio, a chat assistant in a plugin widget docked in Roblox Studio."];
 
   if (ServerNames.length === 0) {
@@ -82,10 +82,10 @@ export const ModelPrices = {
   sonnet: { input: 2, output: 10 },
   haiku: { input: 1, output: 5 },
 };
-export function PriceFor(Model) {
+export function PriceFor(Model: string) {
   const Family = Object.keys(ModelPrices).find((Name) => String(Model).includes(Name));
 
-  return Family ? ModelPrices[Family] : null;
+  return Family ? ModelPrices[Family as keyof typeof ModelPrices] : null;
 }
 export const ExtraModels = [
   { value: "claude-fable-5", displayName: "Fable 5", contextWindow: 1000000, description: "Earlier Fable release · 1M context" },
@@ -130,12 +130,12 @@ export const Modes = [
   },
 ];
 export const DefaultMode = "auto";
-export function PermissionModeFor(Mode, Bypass) {
+export function PermissionModeFor(Mode: string | undefined, Bypass: boolean | undefined): string {
   if (Bypass === true) {
     return "bypassPermissions";
   }
 
-  return Modes.some((Entry) => Entry.value === Mode) ? Mode : DefaultMode;
+  return Modes.some((Entry) => Entry.value === Mode) ? Mode as string : DefaultMode;
 }
 export const PlanInstructions = [
   "You are planning work on an open Roblox Studio place. Nothing you do in this phase may change the place.",
@@ -184,11 +184,11 @@ export const AutoTiers = [
 export const CancelGraceMilliseconds = 5000;
 export const EffortOrder = ["none", "low", "medium", "high", "xhigh", "max"];
 export const AutoLevels = ["low", "medium", "high", "xhigh", "max"];
-export function AutoBias(Effort) {
-  const Index = AutoLevels.indexOf(Effort);
+export function AutoBias(Effort: string | null | undefined) {
+  const Index = AutoLevels.indexOf(Effort as string);
 
   return (Index < 0 ? AutoLevels.indexOf("xhigh") : Index) / (AutoLevels.length - 1);
 }
-export function AutoTier(Score, Bias) {
+export function AutoTier(Score: number, Bias: number) {
   return AutoTiers[Math.round((Math.min(1, Score) * 0.5 + Bias * 0.5) * (AutoTiers.length - 1))];
 }

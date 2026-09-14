@@ -4,3 +4,9 @@ node_modules/
 Claudio.rbxm
 install.ps1
 uninstall.ps1
+dist/*.tsbuildinfo
+tsconfig.json
+src/*.ts
+bin/*.ts
+test/
+dist/test/

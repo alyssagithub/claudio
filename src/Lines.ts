@@ -1,8 +1,9 @@
 import fs from "node:fs";
+import type { LineCount } from "./Types.js";
 
 const EditingTools = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
 
-export function CountLines(Before, After) {
+export function CountLines(Before: string, After: string): LineCount {
   const Old = Before === "" ? [] : Before.split(/\r?\n/);
   const New = After === "" ? [] : After.split(/\r?\n/);
 
@@ -46,15 +47,17 @@ export function CountLines(Before, After) {
   return { added: Added - Common, removed: Removed - Common };
 }
 
-export function EditedFile(ToolName, Input) {
-  if (!EditingTools.has(ToolName) || !Input || typeof Input.file_path !== "string") {
+export function EditedFile(ToolName: string, Input: unknown): string | null {
+  const Named = Input as {file_path?: unknown};
+
+  if (!EditingTools.has(ToolName) || !Named || typeof Named.file_path !== "string") {
     return null;
   }
 
-  return Input.file_path;
+  return Named.file_path;
 }
 
-export function ReadFileText(File) {
+export function ReadFileText(File: string): string {
   try {
     return fs.readFileSync(File, "utf8");
   } catch {

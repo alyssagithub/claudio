@@ -4,9 +4,17 @@ const Lookup = "https://discord-lookup-api-one.vercel.app/v1/user/";
 const Cdn = "https://cdn.discordapp.com";
 const HoldMilliseconds = 10 * 60 * 1000;
 
-let Held = null;
+type Avatar = {
+  Id: string;
+  At: number;
+  Hash: string | null;
+  Animated: boolean;
+  Name: string;
+};
 
-async function HashFor(Id) {
+let Held: Avatar | null = null;
+
+async function HashFor(Id: string): Promise<Avatar> {
   if (Held && Held.Id === Id && Date.now() - Held.At < HoldMilliseconds) {
     return Held;
   }
@@ -17,7 +25,7 @@ async function HashFor(Id) {
     throw new Error(`the lookup answered ${Answer.status}`);
   }
 
-  const Body = await Answer.json();
+  const Body = await Answer.json() as { avatar?: { id?: unknown; is_animated?: unknown } | null; username?: unknown };
   const Avatar = Body && Body.avatar;
 
   Held = {
@@ -31,11 +39,11 @@ async function HashFor(Id) {
   return Held;
 }
 
-function DefaultFor(Id) {
+function DefaultFor(Id: string): string {
   return `${Cdn}/embed/avatars/${Number((BigInt(Id) >> 22n) % 6n)}.png`;
 }
 
-export async function AvatarFor(Id) {
+export async function AvatarFor(Id: string) {
   const Found = await HashFor(Id);
   const Address = Found.Hash ? `${Cdn}/avatars/${Id}/${Found.Hash}.png?size=256` : DefaultFor(Id);
   const Picture = await fetch(Address);

@@ -30,7 +30,7 @@ The tools the panel gives Claude are also a normal MCP server, so Claude Code, t
 Claude Code:
 
 ```powershell
-claude mcp add claudio -- node "$(npm root -g)\claudio\bin\mcp.js"
+claude mcp add claudio -- node "$(npm root -g)\claudio\dist\bin\mcp.js"
 ```
 
 Claude desktop app, in `%APPDATA%\Claude\claude_desktop_config.json`:
@@ -40,7 +40,7 @@ Claude desktop app, in `%APPDATA%\Claude\claude_desktop_config.json`:
   "mcpServers": {
     "claudio": {
       "command": "node",
-      "args": ["C:\\Users\\you\\AppData\\Roaming\\npm\\node_modules\\claudio\\bin\\mcp.js"]
+      "args": ["C:\\Users\\you\\AppData\\Roaming\\npm\\node_modules\\claudio\\dist\\bin\\mcp.js"]
     }
   }
 }

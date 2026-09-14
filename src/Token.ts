@@ -4,25 +4,25 @@ import path from "node:path";
 import { TokenFile } from "./Config.js";
 import { WritePluginSetting } from "./PluginSettings.js";
 
-let Current = null;
+let Current: string | null = null;
 
-function Remember(Value) {
+function Remember(Value: string): boolean {
   try {
     fs.mkdirSync(path.dirname(TokenFile), { recursive: true });
     fs.writeFileSync(TokenFile, JSON.stringify({ token: Value }, null, 2), { mode: 0o600 });
 
     return true;
   } catch (Error) {
-    console.error(`Could not save the bridge key to ${TokenFile}: ${Error.message}`);
+    console.error(`Could not save the bridge key to ${TokenFile}: ${(Error as NodeJS.ErrnoException).message}`);
     console.error("A new key will be made every time the bridge starts, and Studio will have to be told each time.");
 
     return false;
   }
 }
 
-function Stored() {
+function Stored(): string | null {
   try {
-    const Saved = JSON.parse(fs.readFileSync(TokenFile, "utf8").replace(/^﻿/, "")).token;
+    const Saved = (JSON.parse(fs.readFileSync(TokenFile, "utf8").replace(/^﻿/, "")) as { token?: unknown }).token;
 
     return typeof Saved === "string" && Saved.length >= 32 ? Saved : null;
   } catch {
@@ -49,7 +49,7 @@ export function HandToken() {
   return WritePluginSetting("BridgeToken", EnsureToken());
 }
 
-export function TokenMatches(Given) {
+export function TokenMatches(Given: unknown): boolean {
   const Wanted = EnsureToken();
 
   if (typeof Given !== "string") {

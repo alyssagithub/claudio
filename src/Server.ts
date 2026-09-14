@@ -1,4 +1,5 @@
 import http from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +9,7 @@ import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
 import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
+import type { Reacher, ReacherIn } from "./Tools.js";
 import { StudioProcesses } from "./StudioPresence.js";
 import { AddToTurn, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
@@ -20,7 +22,9 @@ import { ForgetConversation, GetModels } from "./Models.js";
 import { Analyze, Warm } from "./Lint.js";
 import { RestartBridge } from "./Startup.js";
 
-let LastLogin = { CheckedAt: 0, Result: null };
+type LoginState = {loggedIn: boolean, detail: string | null};
+
+let LastLogin: {CheckedAt: number, Result: Promise<LoginState> | null} = { CheckedAt: 0, Result: null };
 
 function CheckLogin() {
   if (Date.now() - LastLogin.CheckedAt < 30000) {
@@ -29,7 +33,7 @@ function CheckLogin() {
 
   LastLogin = {
     CheckedAt: Date.now(),
-    Result: new Promise((Resolve) => {
+    Result: new Promise<LoginState>((Resolve) => {
       exec("claude auth status", { timeout: 15000 }, (Error, Stdout) => {
         if (Error) {
           Resolve({ loggedIn: false, detail: Error.message });
@@ -37,7 +41,7 @@ function CheckLogin() {
         }
 
         try {
-          const Status = JSON.parse(Stdout);
+          const Status = JSON.parse(Stdout) as {loggedIn?: unknown, authMethod?: string};
           Resolve({ loggedIn: Boolean(Status.loggedIn), detail: Status.authMethod || null });
         } catch {
           Resolve({ loggedIn: /logged in/i.test(Stdout), detail: Stdout.trim() });
@@ -49,14 +53,14 @@ function CheckLogin() {
   return LastLogin.Result;
 }
 
-function SendJson(Response, StatusCode, Body) {
+function SendJson(Response: ServerResponse, StatusCode: number, Body: unknown) {
   Response.writeHead(StatusCode, { "Content-Type": "application/json" });
   Response.end(JSON.stringify(Body));
 }
 
-function ReadBody(Request) {
+function ReadBody(Request: IncomingMessage): Promise<Record<string, any>> {
   return new Promise((Resolve, Reject) => {
-    const Chunks = [];
+    const Chunks: Buffer[] = [];
     let Size = 0;
 
     Request.on("data", (Chunk) => {
@@ -84,7 +88,7 @@ function ReadBody(Request) {
   });
 }
 
-async function HandleConversations(Request, Response, Segments) {
+async function HandleConversations(Request: IncomingMessage, Response: ServerResponse, Segments: string[]) {
   const Id = Segments[1];
 
   if (Request.method === "GET" && !Id) {
@@ -122,7 +126,7 @@ async function HandleConversations(Request, Response, Segments) {
       return;
     }
 
-    const Query = new URL(Request.url, "http://127.0.0.1").searchParams;
+    const Query = new URL(Request.url as string, "http://127.0.0.1").searchParams;
     const Total = Conversation.messages.length;
     const Before = Number(Query.get("before")) || Total;
     const Count = Number(Query.get("count")) || 0;
@@ -176,7 +180,7 @@ async function HandleConversations(Request, Response, Segments) {
     try {
       SendJson(Response, 200, { id: await ForkConversation(Id) });
     } catch (Error) {
-      SendJson(Response, 500, { error: `Could not fork this chat: ${Error.message}` });
+      SendJson(Response, 500, { error: `Could not fork this chat: ${(Error as Error).message}` });
     }
 
     return;
@@ -197,16 +201,16 @@ async function HandleConversations(Request, Response, Segments) {
 }
 
 let Armed = false;
-let Picks = [];
+let Picks: {name: string, description: string, at: number}[] = [];
 
-let Picking = { Busy: false, Path: null };
+let Picking: {Busy: boolean, Path: string | null} = { Busy: false, Path: null };
 
 function BrowseForFolder() {
   if (Picking.Busy || process.platform !== "win32") {
     return Picking.Busy;
   }
 
-  const Script = path.join(path.dirname(fileURLToPath(import.meta.url)), "PickFolder.ps1");
+  const Script = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "PickFolder.ps1");
 
   Picking = { Busy: true, Path: null };
   execFile("powershell.exe", ["-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File", Script], { timeout: 600000 }, (Error, Stdout) => {
@@ -222,7 +226,7 @@ function WarmUsage() {
   const Attempt = async () => {
     Tries += 1;
 
-    if (await PollUsage() || Tries >= 10) {
+    if (await PollUsage(null) || Tries >= 10) {
       return;
     }
 
@@ -232,16 +236,18 @@ function WarmUsage() {
   setTimeout(Attempt, 1500);
 }
 
-export function StartServer(Port) {
+export function StartServer(Port: number) {
   process.on("uncaughtException", (Error) => {
     console.error("Unexpected error, the bridge is staying up: " + (Error && Error.stack ? Error.stack : Error));
   });
   process.on("unhandledRejection", (Reason) => {
-    console.error("Unhandled rejection, the bridge is staying up: " + (Reason && Reason.stack ? Reason.stack : Reason));
+    const Thrown = Reason as Error;
+
+    console.error("Unhandled rejection, the bridge is staying up: " + (Thrown && Thrown.stack ? Thrown.stack : Thrown));
   });
 
   const Server = http.createServer(async (Request, Response) => {
-    const Url = new URL(Request.url, "http://127.0.0.1");
+    const Url = new URL(Request.url as string, "http://127.0.0.1");
     const Segments = Url.pathname.split("/").filter(Boolean);
 
     try {
@@ -262,10 +268,10 @@ export function StartServer(Port) {
           name: "claudio",
           version: Version,
           protocolVersion: ProtocolVersion,
-          loggedIn: Login.loggedIn,
-          loginDetail: Login.detail,
+          loggedIn: Login && Login.loggedIn,
+          loginDetail: Login && Login.detail,
           mcpServers: Object.keys(ReadMcpServers()),
-          systemPrompt: SystemPromptFor(Object.keys(ReadMcpServers())),
+          systemPrompt: SystemPromptFor(Object.keys(ReadMcpServers()), false),
           limits: GetLimits(),
           workingDirectory: LastUsedFolder() || null,
         });
@@ -382,9 +388,9 @@ export function StartServer(Port) {
 
       if (Request.method === "POST" && Url.pathname === "/lint") {
         const Body = await ReadBody(Request);
-        const Usable = (Entry) => Entry && typeof Entry.path === "string" && typeof Entry.source === "string" && Entry.source !== "";
+        const Usable = (Entry: {path?: unknown, source?: unknown}) => Entry && typeof Entry.path === "string" && typeof Entry.source === "string" && Entry.source !== "";
         const Wanted = (Array.isArray(Body.scripts) ? Body.scripts : []).filter(Usable);
-        const Tree = (Array.isArray(Body.tree) ? Body.tree : []).filter((Entry) => Entry && typeof Entry.path === "string" && typeof Entry.className === "string").slice(0, 20000);
+        const Tree = (Array.isArray(Body.tree) ? Body.tree : []).filter((Entry: {path?: unknown, className?: unknown}) => Entry && typeof Entry.path === "string" && typeof Entry.className === "string").slice(0, 20000);
 
         if (Wanted.length > MostScriptsToCheck) {
           SendJson(Response, 413, { error: `${Wanted.length} scripts is more than the analyzer will check in one run. Narrow it with paths.` });
@@ -406,7 +412,7 @@ export function StartServer(Port) {
         try {
           SendJson(Response, 200, await AvatarFor(AunId));
         } catch (Failure) {
-          SendJson(Response, 502, { error: Failure.message });
+          SendJson(Response, 502, { error: (Failure as Error).message });
         }
 
         return;
@@ -546,7 +552,7 @@ export function StartServer(Port) {
             RestartBridge(Port).catch((Error) => console.error("Could not restart onto the new version: " + Error.message));
           }, 500);
         } catch (Error) {
-          SendJson(Response, 502, { error: Error.message });
+          SendJson(Response, 502, { error: (Error as Error).message });
         }
 
         return;
@@ -614,12 +620,12 @@ export function StartServer(Port) {
 
       SendJson(Response, 404, { error: "Not found" });
     } catch (Error) {
-      SendJson(Response, 500, { error: Error.message });
+      SendJson(Response, 500, { error: (Error as Error).message });
     }
   });
 
   Server.on("error", (Error) => {
-    if (Error.code === "EADDRINUSE") {
+    if ((Error as NodeJS.ErrnoException).code === "EADDRINUSE") {
       console.error(`Port ${Port} is already in use. Is another Claudio bridge running? Use --port to pick another.`);
       process.exit(1);
     }
@@ -630,8 +636,8 @@ export function StartServer(Port) {
   Server.listen(Port, "127.0.0.1", () => {
     const Reached = HandToken();
 
-    const Root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-    const Tools = StudioTools({ Reach: async () => ({}), ReachIn: async () => ({}), Presence: async () => "", RuntimeLive: async () => false }).length + 1;
+    const Root = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
+    const Tools = StudioTools({ Reach: (async () => ({})) as Reacher, ReachIn: (async () => ({})) as ReacherIn, Presence: async () => "", RuntimeLive: async () => false }).length + 1;
 
     Serving(Version, Root, Tools);
 

@@ -7,7 +7,7 @@ import { StopBridge, UninstallStartup } from "./Startup.js";
 import { EnsureToken } from "./Token.js";
 import { ForgetPluginSetting } from "./PluginSettings.js";
 
-async function Remove(Target, Label, Removed, Kept) {
+async function Remove(Target: string, Label: string, Removed: string[], Kept: string[]): Promise<void> {
   if (!fs.existsSync(Target)) {
     Kept.push(`${Label} was not there`);
     return;
@@ -20,7 +20,7 @@ async function Remove(Target, Label, Removed, Kept) {
       return;
     } catch (Error) {
       if (Attempt === 12) {
-        Kept.push(`${Label} could not be removed: ${Error.message}`);
+        Kept.push(`${Label} could not be removed: ${(Error as NodeJS.ErrnoException).message}`);
         return;
       }
 
@@ -30,8 +30,8 @@ async function Remove(Target, Label, Removed, Kept) {
 }
 
 export async function RunUninstall() {
-  const Removed = [];
-  const Kept = [];
+  const Removed: string[] = [];
+  const Kept: string[] = [];
 
   const Port = Number(process.env.CLAUDIO_PORT || DefaultPort);
 
@@ -54,7 +54,7 @@ export async function RunUninstall() {
   try {
     UninstallStartup();
   } catch (Error) {
-    Kept.push(`the startup launcher could not be removed: ${Error.message}`);
+    Kept.push(`the startup launcher could not be removed: ${(Error as NodeJS.ErrnoException).message}`);
   }
 
   await Remove(path.join(GetPluginsFolder(), PluginFileName), "the Studio plugin", Removed, Kept);

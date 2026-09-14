@@ -4,19 +4,43 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { PNG } from "pngjs";
 
-function Colour(Image, X, Y) {
+type CropResult = {
+  error?: string;
+  data?: string;
+  width?: number;
+  height?: number;
+  x?: number;
+  y?: number;
+};
+
+type WindowShot = {
+  error?: string;
+  data?: string;
+  width?: number;
+  height?: number;
+  title?: string;
+};
+
+type CropBox = {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+};
+
+function Colour(Image: PNG, X: number, Y: number): number[] {
   const At = (Image.width * Y + X) * 4;
 
   return [Image.data[At], Image.data[At + 1], Image.data[At + 2]];
 }
 
-function Same(Image, X, Y, Wanted) {
+function Same(Image: PNG, X: number, Y: number, Wanted: number[]): boolean {
   const [R, G, B] = Colour(Image, X, Y);
 
   return R === Wanted[0] && G === Wanted[1] && B === Wanted[2];
 }
 
-export function CropToMarker(Data, Width, Height) {
+export function CropToMarker(Data: string, Width: number, Height: number): CropResult {
   const Image = PNG.sync.read(Buffer.from(Data, "base64"));
 
   for (let Y = 0; Y < Image.height - 8; Y += 1) {
@@ -116,14 +140,14 @@ Write-Output ('OK|' + $Bitmap.Width + '|' + $Bitmap.Height + '|' + $Text.ToStrin
 $Bitmap.Dispose()
 `;
 
-export function CaptureWindow(Title, Crop) {
+export function CaptureWindow(Title: string | null | undefined, Crop: CropBox): Promise<WindowShot> {
   if (process.platform !== "win32") {
     return Promise.resolve({ error: "Capturing the Studio window only works on Windows, because it reads the window through Win32. Use the viewport capture instead." });
   }
 
   const File = path.join(os.tmpdir(), `claudio-window-${process.pid}-${Date.now()}.png`);
 
-  return new Promise((Resolve) => {
+  return new Promise<WindowShot>((Resolve) => {
     execFile("powershell", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", Script], {
       timeout: 20000,
       windowsHide: true,
@@ -154,13 +178,13 @@ export function CaptureWindow(Title, Crop) {
 
       const [, Width, Height, Named] = Line.split("|");
 
-      let Data;
+      let Data: string;
 
       try {
         Data = fs.readFileSync(File).toString("base64");
         fs.unlinkSync(File);
       } catch (Error) {
-        Resolve({ error: `The window capture was taken but could not be read back: ${Error.message}` });
+        Resolve({ error: `The window capture was taken but could not be read back: ${(Error as NodeJS.ErrnoException).message}` });
         return;
       }
 

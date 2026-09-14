@@ -22,6 +22,7 @@ const Call = Typed.table({
 		added = Typed.number(),
 		removed = Typed.number(),
 	})),
+	image = Typed.optional(Typed.number()),
 })
 
 const Asked = Typed.table({
@@ -87,6 +88,7 @@ const Message = Typed.table({
 		output = Typed.string(),
 		status = Typed.string(),
 		milliseconds = Typed.number(),
+		image = Typed.optional(Typed.number()),
 	}))),
 	images = Typed.optional(Typed.array(Typed.number())),
 	at = Typed.optional(Typed.number()),

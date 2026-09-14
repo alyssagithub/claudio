@@ -2021,7 +2021,6 @@ const function Execute(Input: any): any
 
 	Holder.Name = "ClaudioExecute"
 	Holder.Source = `return function(plugin)\n{Code}\nend`
-	Holder.Parent = game:GetService("ServerStorage")
 
 	const function Finish(): ()
 		task.wait(0.15)
@@ -3194,7 +3193,7 @@ function Chat.Restore(Position: number)
 	Chat.Restoring(true)
 	Watcher.Pause(true)
 
-	const Target = `Claudio {Point} done`
+	const Target = `Claudio {Point} open`
 	local Steps = 0
 	local Reached = false
 
@@ -3202,18 +3201,18 @@ function Chat.Restore(Position: number)
 		while Steps < 500 do
 			const CanUndo, Name = ChangeHistoryService:GetCanUndo()
 
-			if not CanUndo or not Name or not Name:match("^Claudio %d") then
+			if not CanUndo or not Name then
 				break
 			end
-
-			ChangeHistoryService:Undo()
-			Steps += 1
 
 			if Name == Target then
 				Reached = true
 
 				break
 			end
+
+			ChangeHistoryService:Undo()
+			Steps += 1
 		end
 	end)
 

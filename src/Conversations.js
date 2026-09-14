@@ -585,14 +585,16 @@ export function GetConversation(Id) {
       PendingImages = [];
     } else if (Line.type === "user") {
       for (const Block of Line.message.content || []) {
-        if (Block.type === "tool_result") {
-          Results.set(Block.tool_use_id, { Output: TextOf(Block.content).slice(0, 2000), Failed: Block.is_error === true });
-        }
-      }
+        const Pictures = ImagesInContent([Block]).length;
 
-      for (const Image of ImagesInContent(Line.message.content)) {
-        ImageIndex += 1;
-        PendingImages.push(ImageIndex);
+        if (Block.type === "tool_result") {
+          Results.set(Block.tool_use_id, { Output: TextOf(Block.content).slice(0, 2000), Failed: Block.is_error === true, Image: Pictures > 0 ? PendingImages.length + 1 : null });
+        }
+
+        for (let Count = 0; Count < Pictures; Count += 1) {
+          ImageIndex += 1;
+          PendingImages.push(ImageIndex);
+        }
       }
     } else if (Line.type === "assistant") {
       const Content = Line.message.content || [];
@@ -624,10 +626,11 @@ export function GetConversation(Id) {
         }
       }
 
+      const Before = Last && Last.role === "assistant" ? Last.images.length : 0;
       const Calls = PendingCalls.map((Call) => {
         const Result = Results.get(Call.Id);
 
-        return { name: Call.name, input: Call.input, output: Result ? Result.Output : "", status: Result && Result.Failed ? "error" : "done", milliseconds: 0 };
+        return { name: Call.name, input: Call.input, output: Result ? Result.Output : "", status: Result && Result.Failed ? "error" : "done", milliseconds: 0, image: Result && Result.Image ? Result.Image + Before : null };
       });
 
       if (Last && Last.role === "assistant") {

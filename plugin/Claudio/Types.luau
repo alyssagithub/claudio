@@ -132,6 +132,7 @@ export type ToolCall = {
 	steps: {string}?,
 	delegate: {name: string, model: string}?,
 	lines: {added: number, removed: number}?,
+	image: number?,
 }
 
 export type Release = {

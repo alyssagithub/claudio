@@ -363,7 +363,7 @@ function Describe(Value) {
   }
 
   if (Array.isArray(Value)) {
-    return Value.map((Block) => (Block && Block.type === "text" ? Block.text : JSON.stringify(Block))).join(NewLine).slice(0, 4000);
+    return Value.filter((Block) => !(Block && Block.type === "image")).map((Block) => (Block && Block.type === "text" ? Block.text : JSON.stringify(Block))).join(NewLine).slice(0, 4000);
   }
 
   try {
@@ -812,6 +812,18 @@ function RouteMessage(Session, Message) {
     }
 
     if (Results.length > 0) {
+      const Slots = new Map();
+      let Slot = Turn.Images.length;
+
+      for (const Result of Results) {
+        const Pictures = ImagesInContent([Result]).length;
+
+        if (Pictures > 0) {
+          Slots.set(Result.tool_use_id, Slot + 1);
+          Slot += Pictures;
+        }
+      }
+
       Changes.Calls = Turn.Calls.map((Call) => {
         const Result = Results.find((Block) => Block.tool_use_id === Call.Id);
 
@@ -825,6 +837,7 @@ function RouteMessage(Session, Message) {
           Status: Result.is_error ? "error" : "done",
           Milliseconds: Date.now() - Call.StartedAt,
           Lines: Session.LineCounts.get(Call.Id) || null,
+          Image: Slots.get(Call.Id) || null,
         };
       });
     }
@@ -1399,6 +1412,7 @@ export function DescribeTurn(Turn) {
       milliseconds: Call.Milliseconds,
       delegate: Call.Delegate || null,
       lines: Call.Lines || null,
+      image: Call.Image || null,
     })),
     tasks: Turn.Tasks.map((Task) => ({
       id: Task.Id,

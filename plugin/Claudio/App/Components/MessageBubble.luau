@@ -50,18 +50,6 @@ const function IsCommand(Name: string): boolean
 	return Name == "Bash" or Name == "PowerShell"
 end
 
-const function Field(Input: string, Name: string): string?
-	for _, Line in string.split(Input, "\n") do
-		const Key, Value = Line:match("^([%w_]+): (.+)$")
-
-		if Key == Name then
-			return Value
-		end
-	end
-
-	return nil
-end
-
 const function Counted(Added: number, Removed: number): string
 	return ` <font color="#{Theme.Colors.AddedText():ToHex()}">+{Added}</font> <font color="#{Theme.Colors.Error():ToHex()}">-{Removed}</font>`
 end
@@ -281,12 +269,6 @@ return function(Props: Props)
 	end
 
 	const function Headline(Entry: Types.ToolCall, Running: boolean): string
-		const Label = Field(Entry.input, "label") or Field(Entry.input, "description")
-
-		if Label then
-			return Label
-		end
-
 		return Describe(Entry, Running)
 	end
 
@@ -513,13 +495,12 @@ return function(Props: Props)
 						end,
 					},
 					Icon {
-						Name = Config.Icons.Down,
+						Name = function()
+							return if Open() then Config.Icons.Down else Config.Icons.Right
+						end,
 						Size = Settings.SmallText,
 						Colour = function()
 							return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.DimText()
-						end,
-						Rotation = function()
-							return if Open() then 0 else -90
 						end,
 						LayoutOrder = 2,
 					},
@@ -609,6 +590,17 @@ return function(Props: Props)
 
 					Create "UIPadding" {PaddingTop = UDim.new(0, 2)},
 				},
+				Vide.show(function()
+					const Slot = Value().image
+
+					return Open() and Slot ~= nil and Props.Images ~= nil and (Props.Images() :: {EditableImage?})[Slot] ~= nil
+				end, function()
+					const Picture = (Props.Images :: () -> {EditableImage})()[Value().image :: number]
+
+					return ImageView(function()
+						return Picture
+					end, 1001)
+				end),
 				Vide.indexes(function()
 					return if Open() then Value().steps or {} else {}
 				end, function(Step: () -> string, Order: number)
@@ -919,10 +911,10 @@ return function(Props: Props)
 				AutoButtonColor = false,
 				LayoutOrder = 4,
 				Visible = function()
-					return Kind() == "calls" and Many() and not Listed()
+					return Kind() == "calls" and Many()
 				end,
 				Activated = function()
-					Listed(true)
+					Listed(not Listed())
 				end,
 
 				Create "UIListLayout" {
@@ -946,7 +938,9 @@ return function(Props: Props)
 					end,
 				},
 				Icon {
-					Name = Config.Icons.Down,
+					Name = function()
+						return if Listed() then Config.Icons.Down else Config.Icons.Right
+					end,
 					Size = Settings.SmallText,
 					LayoutOrder = 2,
 				},
@@ -1139,7 +1133,25 @@ return function(Props: Props)
 				return #Props.Activity() > 0 and (not Props.Calls or #Props.Calls() == 0)
 			end),
 			Vide.indexes(Vide.derive(function()
-				return if Props.Images then Props.Images() else {}
+				const Claimed = {}
+				const Made: {Types.ToolCall} = if Props.Calls then Props.Calls() else {}
+				const All: {EditableImage} = if Props.Images then Props.Images() else {}
+
+				for _, Call in Made do
+					if Call.image then
+						Claimed[Call.image] = true
+					end
+				end
+
+				const Loose = {}
+
+				for Index, Image in All do
+					if not Claimed[Index] then
+						Loose[Index] = Image
+					end
+				end
+
+				return Loose
 			end), function(Image, Index: number)
 				return ImageView(Image, 900000 + Index)
 			end),

@@ -3,6 +3,12 @@
   "version": "1.4.0",
   "description": "Local bridge between Roblox Studio and the Claude Code login on this machine",
   "type": "module",
+  "files": [
+    "dist/bin",
+    "dist/src",
+    "src/*.ps1",
+    "src/Icon.png"
+  ],
   "bin": {
     "claudio": "dist/bin/claudio.js",
     "claudio-mcp": "dist/bin/mcp.js"

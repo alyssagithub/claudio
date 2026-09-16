@@ -128,11 +128,30 @@ async function CommitFor(Version: string): Promise<string> {
   return Found;
 }
 
+async function PackageFor(Version: string): Promise<string> {
+  const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/releases/tags/v${Version}`, {
+    headers: { "User-Agent": "claudio-installer" },
+  });
+
+  if (!Response.ok) {
+    return `https://github.com/${GitHubRepo}/archive/${await CommitFor(Version)}.tar.gz`;
+  }
+
+  const Packed = ((await Response.json() as GitHubRelease).assets || []).find((Entry) => Entry.name.endsWith(".tgz"));
+
+  if (!Packed || !FromGitHub(Packed.browser_download_url)) {
+    return `https://github.com/${GitHubRepo}/archive/${await CommitFor(Version)}.tar.gz`;
+  }
+
+  return Packed.browser_download_url;
+}
+
 export async function InstallBridge(Version: string): Promise<string> {
+  const Package = await PackageFor(Version);
   const Commit = await CommitFor(Version);
 
   await new Promise<void>((Resolve, Reject) => {
-    exec(`npm install -g https://github.com/${GitHubRepo}/archive/${Commit}.tar.gz`, { timeout: 300000 }, (Trouble, Stdout, Stderr) => {
+    exec(`npm install -g ${Package}`, { timeout: 300000 }, (Trouble, Stdout, Stderr) => {
       if (Trouble) {
         const Said = `${Stderr || ""}${Stdout || ""}`.trim().split(/\r?\n/).slice(-3).join(" ");
 

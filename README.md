@@ -17,7 +17,7 @@ irm https://raw.githubusercontent.com/alyssagithub/claudio/main/install.ps1 | ie
 Or without the script:
 
 ```bash
-npm install -g https://github.com/alyssagithub/claudio/archive/refs/heads/main.tar.gz
+npm install -g <the .tgz attached to the newest release at github.com/alyssagithub/claudio/releases>
 claudio setup
 ```
 

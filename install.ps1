@@ -35,7 +35,7 @@ function Native([scriptblock]$Command) {
 }
 
 if ($IsMacOS -or $IsLinux) {
-    Fail "This one's Windows only. Elsewhere install Node.js yourself, then: npm install -g https://github.com/alyssagithub/claudio/archive/refs/heads/main.tar.gz && claudio setup"
+    Fail "This one's Windows only. Elsewhere install Node.js yourself, then npm install -g the .tgz attached to the newest release at https://github.com/alyssagithub/claudio/releases, and run claudio setup"
 }
 
 Write-Host ""
@@ -67,26 +67,28 @@ if (Has "node") {
     }
 }
 
-# A branch archive sits behind a CDN for a few minutes, so someone reinstalling
-# to pick up a fix can quietly get the version they already had. A commit
-# archive is immutable and never cached wrong, so ask GitHub what main points at
-# and install that exact commit.
-$Latest = "main"
-
 try {
-    $Head = Invoke-RestMethod "https://api.github.com/repos/alyssagithub/claudio/commits/main" -Headers @{
+    $Release = Invoke-RestMethod "https://api.github.com/repos/alyssagithub/claudio/releases/latest" -Headers @{
         "User-Agent"    = "claudio-installer"
         "Cache-Control" = "no-cache"
     }
-
-    if ($Head.sha) {
-        $Latest = $Head.sha
-    }
 } catch {
-    Write-Host "Couldn't reach GitHub to check the newest version, carrying on with main." -ForegroundColor DarkYellow
+    Fail "Couldn't reach GitHub to find the newest release. Check your connection and run this again."
 }
 
-$Package = "https://github.com/alyssagithub/claudio/archive/$Latest.tar.gz"
+$Packed = $Release.assets | Where-Object { $_.name -like "*.tgz" } | Select-Object -First 1
+
+if (-not $Packed) {
+    Fail "The newest release ($($Release.tag_name)) has no package attached. Try again later, or tell the author."
+}
+
+$Package = $Packed.browser_download_url
+$Latest = ""
+
+try {
+    $Latest = (Invoke-RestMethod "https://api.github.com/repos/alyssagithub/claudio/commits/$($Release.tag_name)" -Headers @{ "User-Agent" = "claudio-installer" }).sha
+} catch {
+}
 
 Write-Host "Installing Claudio."
 Native { & npm install -g $Package }
@@ -95,11 +97,7 @@ if ($LASTEXITCODE -ne 0) {
     Fail "npm couldn't install it. Try a new terminal, or do it yourself: npm install -g $Package"
 }
 
-if ($Latest -eq "main") {
-    Remove-Item -Force -ErrorAction SilentlyContinue "$env:USERPROFILE\.claudio\installed.json"
-}
-
-if ($Latest -ne "main") {
+if ($Latest) {
     New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claudio" | Out-Null
     $Record = [ordered]@{ commit = $Latest; at = (Get-Date).ToString("o") } | ConvertTo-Json
 

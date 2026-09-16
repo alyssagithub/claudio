@@ -137,7 +137,7 @@ async function PackageFor(Version: string): Promise<string> {
     return `https://github.com/${GitHubRepo}/archive/${await CommitFor(Version)}.tar.gz`;
   }
 
-  const Packed = ((await Response.json() as GitHubRelease).assets || []).find((Entry) => Entry.name.endsWith(".tgz"));
+  const Packed = ((await Response.json() as GitHubRelease).assets || []).find((Entry) => Entry.name === "claudio.tgz");
 
   if (!Packed || !FromGitHub(Packed.browser_download_url)) {
     return `https://github.com/${GitHubRepo}/archive/${await CommitFor(Version)}.tar.gz`;

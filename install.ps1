@@ -35,7 +35,7 @@ function Native([scriptblock]$Command) {
 }
 
 if ($IsMacOS -or $IsLinux) {
-    Fail "This one's Windows only. Elsewhere install Node.js yourself, then npm install -g the .tgz attached to the newest release at https://github.com/alyssagithub/claudio/releases, and run claudio setup"
+    Fail "This one's Windows only. Elsewhere install Node.js yourself, then: npm install -g https://github.com/alyssagithub/claudio/releases/latest/download/claudio.tgz && claudio setup"
 }
 
 Write-Host ""
@@ -76,7 +76,7 @@ try {
     Fail "Couldn't reach GitHub to find the newest release. Check your connection and run this again."
 }
 
-$Packed = $Release.assets | Where-Object { $_.name -like "*.tgz" } | Select-Object -First 1
+$Packed = $Release.assets | Where-Object { $_.name -eq "claudio.tgz" } | Select-Object -First 1
 
 if (-not $Packed) {
     Fail "The newest release ($($Release.tag_name)) has no package attached. Try again later, or tell the author."

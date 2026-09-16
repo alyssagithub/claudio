@@ -38,7 +38,12 @@ type Props = {
 
 return function(Props: Props)
 	const Allowed, Output = pcall(function()
-		return AssetService:CreateEditableImage({Size = Vector2.new(Edge, Edge)})
+		const Made = AssetService:CreateEditableImage({Size = Vector2.new(Edge, Edge)})
+
+		Made:DrawImageTransformed(Vector2.new(Edge / 2, Edge / 2), Vector2.one, 0, Drawn(), {PivotPoint = Vector2.new(Edge / 2, Edge / 2)})
+		Content.fromObject(Made)
+
+		return Made
 	end)
 
 	if not Allowed then

@@ -11,7 +11,7 @@ import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStud
 import { StudioTools } from "./Tools.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
 import { StudioProcesses } from "./StudioPresence.js";
-import { AddToTurn, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { ActiveTurnFor, AddToTurn, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
@@ -565,6 +565,13 @@ export function StartServer(Port: number) {
 
       if (Request.method === "GET" && Url.pathname === "/commands") {
         SendJson(Response, 200, GetCommands());
+        return;
+      }
+
+      if (Request.method === "GET" && Url.pathname === "/chat/active") {
+        const Turn = ActiveTurnFor(Url.searchParams.get("conversation") || "");
+
+        SendJson(Response, 200, { turn: Turn ? DescribeTurn(Turn) : null });
         return;
       }
 

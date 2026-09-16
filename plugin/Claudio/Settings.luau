@@ -174,10 +174,10 @@ const Sources: {[string]: any} = {}
 const Prefix = if script.Parent.Name:match("Testing$") then "ClaudioTesting_" else "Claudio_"
 local CurrentPlugin: Plugin
 
-const function Read(Key: string): any
+const function Read(Key: string, OwnOnly: boolean?): any
 	const Stored = CurrentPlugin:GetSetting(`{Prefix}{Key}`)
 
-	if Stored ~= nil or Prefix == "Claudio_" then
+	if Stored ~= nil or Prefix == "Claudio_" or OwnOnly then
 		return Stored
 	end
 
@@ -208,9 +208,10 @@ function Settings.Load(PluginObject: Plugin)
 	CurrentPlugin = PluginObject
 
 	for _, Definition in Definitions do
-		const Stored = Read(Definition.Key)
+		const Quiet = Prefix ~= "Claudio_" and Definition.Group == "Notifications"
+		const Stored = Read(Definition.Key, Quiet)
 
-		Sources[Definition.Key] = Vide.source(if Stored == nil then Definition.Default else Stored)
+		Sources[Definition.Key] = Vide.source(if Stored ~= nil then Stored elseif Quiet then false else Definition.Default)
 	end
 
 	for Key, Default in Settings.Hidden do

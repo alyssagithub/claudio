@@ -369,7 +369,7 @@ export async function Analyze(Entries: ScriptEntry[], Raw: boolean, Tree: TreeIt
     Arguments.push(`--definitions=${Overrides()}`);
   }
 
-  Arguments.push(`${Canary}.luau`);
+  const Leaves: string[] = [];
 
   for (const Entry of Entries) {
     if (FileFor(Entry.path).includes(Canary)) {
@@ -385,17 +385,34 @@ export async function Analyze(Entries: ScriptEntry[], Raw: boolean, Tree: TreeIt
       fs.writeFileSync(Full, Entry.source);
     }
 
-    Arguments.push(Leaf);
+    Leaves.push(Leaf);
   }
 
-  const Outcome = await Run(Analyzer, Arguments, { cwd: Workspace() });
+  const Batches: string[][] = [[]];
 
-  if (Outcome.Stopped) {
-    console.error(Outcome.Text);
-    return null;
+  for (const Leaf of Leaves) {
+    if (Batches[Batches.length - 1].join(" ").length + Leaf.length > 20000) {
+      Batches.push([]);
+    }
+
+    Batches[Batches.length - 1].push(Leaf);
   }
 
-  const Found = Parse(Outcome.Text);
+  let Text = "";
+
+  for (const Batch of Batches) {
+    const Outcome = await Run(Analyzer, Arguments.concat([`${Canary}.luau`], Batch), { cwd: Workspace() });
+
+    if (Outcome.Stopped) {
+      console.error(Outcome.Text);
+      return null;
+    }
+
+    Text += `${Outcome.Text}
+`;
+  }
+
+  const Found = Parse(Text);
 
   if (!Found.has(`${Canary}.luau`)) {
     console.error("The Luau analyzer reported nothing for its canary, so its output cannot be trusted");

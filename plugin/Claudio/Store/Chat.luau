@@ -2462,6 +2462,7 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 end
 
 local Start: (Types.QueuedMessage) -> ()
+local Attach: (string) -> ()
 
 const function Finish(Status: string, Text: string, State: Types.Turn?)
 	Append({
@@ -2547,6 +2548,45 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 
 	Chat.Queue(Queue)
 	assert(Start)(Next)
+end
+
+Attach = function(ConversationId: string)
+	const Found, Result = Client.ActiveTurn(ConversationId)
+
+	if not Found or typeof(Result) ~= "table" or typeof(Result.turn) ~= "table" or Result.turn.requestId == Chat.RequestId then
+		return
+	end
+
+	Generation += 1
+
+	const CurrentGeneration = Generation
+	const Turn = Result.turn :: Types.Turn
+
+	Chat.Began(os.clock() - (Turn.milliseconds or 0) / 1000)
+	Chat.Sending(true)
+	Chat.RequestId = Turn.requestId
+
+	for Index = #Chat.Messages(), 1, -1 do
+		if Chat.Messages()[Index].Role == "user" then
+			Chat.CurrentPrompt = Chat.Messages()[Index].Text
+
+			break
+		end
+	end
+
+	task.spawn(function()
+		const Ok, Status, Reply, State = pcall(Poll, Turn, CurrentGeneration)
+
+		if CurrentGeneration ~= Generation then
+			return
+		end
+
+		if Ok then
+			Finish(Status, Reply, State)
+		else
+			Finish("error", `The plugin hit an error: {Status}`, nil)
+		end
+	end)
 end
 
 Start = function(Entry: Types.QueuedMessage)
@@ -2952,6 +2992,7 @@ function Chat.Open(Id: string)
 	Chat.Title(Conversation.title)
 	Chat.LoadChapters()
 	Chat.ListOpen(false)
+	Attach(Conversation.id)
 end
 
 function Chat.LoadEarlier()

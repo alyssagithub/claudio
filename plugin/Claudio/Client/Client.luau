@@ -117,6 +117,10 @@ function Client.PollTurn(RequestId: string, Version: number): (boolean, any)
 	return Checked(Ok, Result, Schemas.Turn)
 end
 
+function Client.ActiveTurn(ConversationId: string): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/chat/active?conversation={HttpService:UrlEncode(ConversationId)}`)
+end
+
 function Client.CancelTurn(RequestId: string): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/turn/{RequestId}/cancel`)
 end

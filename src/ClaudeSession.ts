@@ -521,6 +521,16 @@ export function AddToTurn(RequestId: string | null, ConversationId: string | nul
   return null;
 }
 
+export function ActiveTurnFor(ConversationId: string): Turn | null {
+  for (const Turn of Turns.values()) {
+    if (Turn.ConversationId === ConversationId && (Turn.Status === "running" || Turn.Status === "cancelling")) {
+      return Turn;
+    }
+  }
+
+  return null;
+}
+
 export function IsConversationBusy(ConversationId: string | null) {
   for (const Turn of Turns.values()) {
     if (Turn.ConversationId === ConversationId && (Turn.Status === "running" || Turn.Status === "cancelling")) {

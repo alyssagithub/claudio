@@ -13,7 +13,7 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "sourceMap": true,
+    "sourceMap": false,
     "declaration": false,
     "resolveJsonModule": true,
     "allowJs": false,

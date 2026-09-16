@@ -5,7 +5,7 @@ import { DefaultPort, PluginFileName } from "./Config.js";
 import { GetPluginsFolder } from "./StudioPaths.js";
 import { StopBridge, UninstallStartup } from "./Startup.js";
 import { EnsureToken } from "./Token.js";
-import { ForgetPluginSetting } from "./PluginSettings.js";
+import { ForgetPluginSettings } from "./PluginSettings.js";
 
 async function Remove(Target: string, Label: string, Removed: string[], Kept: string[]): Promise<void> {
   if (!fs.existsSync(Target)) {
@@ -49,7 +49,11 @@ export async function RunUninstall() {
     }
   }
 
-  ForgetPluginSetting("BridgeToken");
+  const Cleared = ForgetPluginSettings();
+
+  if (Cleared > 0) {
+    Removed.push(`${Cleared} Claudio settings from Studio's plugin settings, the bridge token among them`);
+  }
 
   try {
     UninstallStartup();
@@ -75,9 +79,10 @@ export async function RunUninstall() {
     }
   }
 
-  console.log("\nLeft alone, because they belong to Claude Code rather than Claudio:");
-  console.log("  - your chats and their transcripts in ~/.claude");
+  console.log("\nLeft alone, because they are yours rather than Claudio's:");
+  console.log("  - your chats and their transcripts in ~/.claude, and their entries in the desktop app's chat list");
   console.log("  - your Claude Code login");
+  console.log("  - any claudio entry you added to Claude Code or the desktop app's MCP config, since Claudio never wrote one");
 
   console.log("\nLast step, which has to be separate because it deletes this command:");
   console.log("  npm uninstall -g claudio");

@@ -82,24 +82,32 @@ export function WritePluginSetting(Key: string, Value: unknown): number {
   return Written;
 }
 
-export function ForgetPluginSetting(Key: string): void {
+export function ForgetPluginSettings(): number {
+  let Cleared = 0;
+
   for (const File of SettingsFiles()) {
     const Settings = ReadSettings(File);
+    const Keys = Object.keys(Settings || {}).filter((Key) => Key.startsWith("Claudio"));
 
-    if (!Settings || Settings[SettingPrefix + Key] === undefined) {
+    if (!Settings || Keys.length === 0) {
       continue;
     }
 
-    delete Settings[SettingPrefix + Key];
+    for (const Key of Keys) {
+      delete Settings[Key];
+    }
 
     const Temporary = `${File}.claudio-writing`;
 
     try {
       fs.writeFileSync(Temporary, JSON.stringify(Settings, null, 2));
       fs.renameSync(Temporary, File);
+      Cleared += Keys.length;
     } catch (Error) {
       fs.rmSync(Temporary, { force: true });
-      console.error(`Could not clear the plugin setting ${Key}: ${(Error as NodeJS.ErrnoException).message}`);
+      console.error(`Could not clear the plugin's settings in ${File}: ${(Error as NodeJS.ErrnoException).message}`);
     }
   }
+
+  return Cleared;
 }

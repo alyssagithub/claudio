@@ -1,0 +1,63 @@
+#!/usr/bin/env node
+import { DefaultPort } from "../src/Config.js";
+import { InstallPlugin } from "../src/PluginInstaller.js";
+import { StartServer } from "../src/Server.js";
+import { RunSetup } from "../src/Setup.js";
+import { RunUninstall } from "../src/Uninstall.js";
+import { ReportVersion } from "../src/Version.js";
+import { InstallStartup, RestartBridge, StopBridge, UninstallStartup } from "../src/Startup.js";
+const Arguments = process.argv.slice(2);
+const Command = Arguments[0];
+function ReadFlag(Name) {
+    const Index = Arguments.indexOf(Name);
+    const Value = Index === -1 ? null : Arguments[Index + 1];
+    return Value && Value.startsWith("--") ? null : Value;
+}
+function ChosenPort() {
+    const Given = ReadFlag("--port") || process.env.CLAUDIO_PORT;
+    if (Given === null || Given === undefined || Given === "") {
+        return DefaultPort;
+    }
+    const Number_ = Number(Given);
+    if (!Number.isInteger(Number_) || Number_ < 1 || Number_ > 65535) {
+        console.error(`${Given} is not a port number.`);
+        process.exit(1);
+    }
+    return Number_;
+}
+function Fail(Error) {
+    console.error(Error.message);
+    process.exit(1);
+}
+if (Command === "setup") {
+    RunSetup(ReadFlag("--local")).catch(Fail);
+}
+else if (Command === "uninstall") {
+    RunUninstall().catch(Fail);
+}
+else if (Command === "install") {
+    InstallPlugin(ReadFlag("--local")).catch(Fail);
+}
+else if (Command === "install-startup") {
+    InstallStartup(ChosenPort()).catch(Fail);
+}
+else if (Command === "version" || Arguments.includes("--version")) {
+    ReportVersion().catch(Fail);
+}
+else if (Command === "uninstall-startup") {
+    UninstallStartup();
+}
+else if (Command === "restart") {
+    RestartBridge(ChosenPort()).catch(Fail);
+}
+else if (Command === "stop") {
+    StopBridge(ChosenPort());
+}
+else if (Command === undefined || Command === "start") {
+    StartServer(ChosenPort());
+}
+else {
+    console.error("Usage: claudio setup | claudio uninstall | claudio [start] [--port N] | claudio install [--local path/to/Claudio.rbxm] | claudio install-startup | claudio uninstall-startup | claudio restart | claudio stop | claudio version");
+    process.exit(1);
+}
+//# sourceMappingURL=claudio.js.map

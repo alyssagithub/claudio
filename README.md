@@ -27,10 +27,12 @@ If you don't have Claude Code yet it'll open a window for you to log in. Then re
 
 The tools the panel gives Claude are also a normal MCP server, so Claude Code, the desktop app, or anything else that speaks MCP can drive your open place the same way. It needs the bridge running (the installer sets it to start with Windows, or run `claudio`) and Studio open with the plugin installed. The panel does not have to be open.
 
+Installing Claudio puts a `claudio-mcp` command on your PATH, so nothing needs a file path.
+
 Claude Code:
 
 ```powershell
-claude mcp add claudio -- node "$(npm root -g)\claudio\dist\bin\mcp.js"
+claude mcp add claudio -- cmd /c claudio-mcp
 ```
 
 Claude desktop app, in `%APPDATA%\Claude\claude_desktop_config.json`:
@@ -39,14 +41,14 @@ Claude desktop app, in `%APPDATA%\Claude\claude_desktop_config.json`:
 {
   "mcpServers": {
     "claudio": {
-      "command": "node",
-      "args": ["C:\\Users\\you\\AppData\\Roaming\\npm\\node_modules\\claudio\\dist\\bin\\mcp.js"]
+      "command": "cmd",
+      "args": ["/c", "claudio-mcp"]
     }
   }
 }
 ```
 
-`npm root -g` prints the folder the path above starts from. Restart the app after editing the file.
+It goes through `cmd` because the command npm installs is a `.cmd` file, and apps that start MCP servers do not resolve those on their own. Restart the app after editing the file.
 
 ## Uninstall
 

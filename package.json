@@ -4,7 +4,8 @@
   "description": "Local bridge between Roblox Studio and the Claude Code login on this machine",
   "type": "module",
   "bin": {
-    "claudio": "dist/bin/claudio.js"
+    "claudio": "dist/bin/claudio.js",
+    "claudio-mcp": "dist/bin/mcp.js"
   },
   "scripts": {
     "start": "node dist/bin/claudio.js",

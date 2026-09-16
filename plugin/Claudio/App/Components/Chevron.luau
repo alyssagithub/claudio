@@ -3,7 +3,9 @@ const AssetService = game:GetService("AssetService")
 
 const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
+const Config = require(script.Parent.Parent.Parent.Config)
 const Theme = require(script.Parent.Parent.Theme)
+const Icon = require(script.Parent.Icon)
 
 const Create = Vide.create
 
@@ -35,7 +37,20 @@ type Props = {
 }
 
 return function(Props: Props)
-	const Output = AssetService:CreateEditableImage({Size = Vector2.new(Edge, Edge)})
+	const Allowed, Output = pcall(function()
+		return AssetService:CreateEditableImage({Size = Vector2.new(Edge, Edge)})
+	end)
+
+	if not Allowed then
+		return Icon {
+			Name = function()
+				return if Props.Angle() > -45 then Config.Icons.Down else Config.Icons.Right
+			end,
+			Colour = Props.Colour,
+			Size = Props.Size,
+			LayoutOrder = Props.LayoutOrder,
+		}
+	end
 
 	Vide.cleanup(function()
 		Output:Destroy()

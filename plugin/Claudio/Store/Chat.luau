@@ -1,5 +1,6 @@
 --!strict
 const ChangeHistoryService = game:GetService("ChangeHistoryService")
+const RunService = game:GetService("RunService")
 
 const Vide = require(script.Parent.Parent.Packages.vide)
 const Types = require(script.Parent.Parent.Types)
@@ -648,7 +649,6 @@ end
 
 const function Playtest(Input: any): any
 	const StudioTestService = game:GetService("StudioTestService")
-	const RunService = game:GetService("RunService")
 	const Action = Input.action
 
 	const function Live(): boolean
@@ -2285,6 +2285,10 @@ function Chat.WatchStudioJobs()
 				if Yield then
 					continue
 				end
+			end
+
+			if RunService:IsRunning() then
+				continue
 			end
 
 			const Polled, Trouble = pcall(function(): boolean

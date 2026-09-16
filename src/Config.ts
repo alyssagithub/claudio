@@ -1,7 +1,8 @@
 import os from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
 
-export const Version = "1.3.0";
+export const Version = (createRequire(import.meta.url)("../../package.json") as {version: string}).version;
 export const ProtocolVersion = 1;
 export const DefaultPort = 47225;
 export const MostScriptsToCheck = 1200;

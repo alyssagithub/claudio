@@ -57,6 +57,18 @@ const function Counted(Added: number, Removed: number): string
 end
 
 const function FileWork(Entry: Types.ToolCall, Running: boolean): string?
+	if Entry.name:match("__source$") then
+		const Doing = Changes.Field(Entry.input, "action")
+
+		if not Doing or Doing == "get" then
+			return nil
+		end
+
+		const Named = (Changes.Field(Entry.input, "path") or ""):match("[^%.]+$") or "a script"
+
+		return `{if Running then "Editing" else "Edited"} <b>{Named}</b>{if Entry.lines then Counted(Entry.lines.added, Entry.lines.removed) else ""}`
+	end
+
 	if Entry.name ~= "Write" and Entry.name ~= "Edit" and Entry.name ~= "MultiEdit" and Entry.name ~= "Read" then
 		return nil
 	end

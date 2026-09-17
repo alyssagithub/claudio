@@ -351,6 +351,26 @@ const function Remember(Script: LuaSourceContainer)
 	Seen[Script:GetFullName()] = Fingerprint(Script)
 end
 
+const function Measured(Before: string, After: string): (number, number)
+	const Old = if Before == "" then {} else string.split(Before, "\n")
+	const New = if After == "" then {} else string.split(After, "\n")
+	local Start = 0
+
+	while Start < #Old and Start < #New and Old[Start + 1] == New[Start + 1] do
+		Start += 1
+	end
+
+	local OldEnd = #Old
+	local NewEnd = #New
+
+	while OldEnd > Start and NewEnd > Start and Old[OldEnd] == New[NewEnd] do
+		OldEnd -= 1
+		NewEnd -= 1
+	end
+
+	return NewEnd - Start, OldEnd - Start
+end
+
 const function Source(Input: any): any
 	const Object = Resolve(Input.path)
 
@@ -359,6 +379,7 @@ const function Source(Input: any): any
 	end
 
 	const Script = Object :: LuaSourceContainer
+	const Before = Script.Source
 	const Lines = string.split(Script.Source, "\n")
 	const Action = Input.action or "get"
 	const Path = Script:GetFullName()
@@ -440,7 +461,14 @@ const function Source(Input: any): any
 		Committed += 1
 	end
 
-	return {text = `{Path} is now {#string.split(Script.Source, "\n")} lines.`, undo = Recording ~= nil}
+	const Added, Removed = Measured(Before, Script.Source)
+
+	return {
+		text = `{Path} is now {#string.split(Script.Source, "\n")} lines. +{Added} -{Removed}`,
+		added = Added,
+		removed = Removed,
+		undo = Recording ~= nil,
+	}
 end
 
 const function Selected(Input: any): any

@@ -1161,6 +1161,15 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
                   Session.FilesBefore.delete(ToolUseId);
                 }
 
+                if (ToolUseId && /__source$/.test(Asked.tool_name)) {
+                  const Said = JSON.stringify((HookInput as {tool_response?: unknown}).tool_response || "");
+                  const Shown = Said.match(/ \+(\d+) -(\d+)/);
+
+                  if (Shown) {
+                    Session.LineCounts.set(ToolUseId, { added: Number(Shown[1]), removed: Number(Shown[2]) });
+                  }
+                }
+
                 if (!Session.CapResults) {
                   return {};
                 }

@@ -27,7 +27,13 @@ const function Line(Call: Types.ToolCall): Types.Change?
 	end
 
 	if Name == "source" and Field(Input, "action") and Field(Input, "action") ~= "get" then
-		return {Kind = "changed", Text = `Edited {Format.Path(Field(Input, "path"))}`, Path = Field(Input, "path")}
+		return {
+			Kind = "changed",
+			Text = `Edited {Format.Path(Field(Input, "path"))}`,
+			Path = Field(Input, "path"),
+			Added = if Call.lines then Call.lines.added else nil,
+			Removed = if Call.lines then Call.lines.removed else nil,
+		}
 	end
 
 	if Name == "edit_script_lines" or Name == "insert_script_lines" or Name == "delete_script_lines" then

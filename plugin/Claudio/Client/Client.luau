@@ -193,12 +193,37 @@ function Client.GetCommands(): (boolean, any)
 end
 
 function Client.Lint(Scripts: {any}, Tree: {any}): (boolean, any)
-	const Ok, Result = Http.Request("POST", `{BaseUrl()}/lint`, {
+	const Sent, Started = Http.Request("POST", `{BaseUrl()}/lint`, {
 		scripts = Scripts,
 		tree = Tree,
 	})
 
-	return Checked(Ok, Result, Schemas.Lint)
+	if not Sent then
+		return false, Started
+	end
+
+	if typeof(Started) ~= "table" or typeof(Started.ticket) ~= "string" then
+		return Checked(Sent, Started, Schemas.Lint)
+	end
+
+	const Ticket = Started.ticket
+	local Waited = 0
+
+	while Waited < 300 do
+		Waited += task.wait(0.5)
+
+		const Asked, Answer = Http.Request("GET", `{BaseUrl()}/lint/{Ticket}`)
+
+		if not Asked then
+			return false, Answer
+		end
+
+		if typeof(Answer) ~= "table" or not Answer.running then
+			return Checked(Asked, Answer, Schemas.Lint)
+		end
+	end
+
+	return false, "The analyzer took longer than five minutes."
 end
 
 function Client.GetModels(): (boolean, any)

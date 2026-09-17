@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import http from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import fs from "node:fs";
@@ -51,6 +52,55 @@ function CheckLogin() {
   };
 
   return LastLogin.Result;
+}
+
+type LintRun = { Done: boolean; Scripts: {path: string, lines: string[]}[] | null; Failed: string | null; At: number };
+
+const LintRuns = new Map<string, LintRun>();
+const LintSeen = new Map<string, {path: string, lines: string[]}[]>();
+
+function StartLint(Wanted: {path: string, source: string}[], Raw: boolean, Tree: {path: string, className: string}[]): string {
+  const Ticket = crypto.randomUUID();
+  const Run: LintRun = { Done: false, Scripts: null, Failed: null, At: Date.now() };
+  const Fingerprint = crypto.createHash("sha1").update(JSON.stringify([Raw, Wanted])).digest("hex");
+  const Remembered = LintSeen.get(Fingerprint);
+
+  LintRuns.set(Ticket, Run);
+
+  if (Remembered) {
+    Run.Scripts = Remembered;
+    Run.Done = true;
+
+    return Ticket;
+  }
+
+  for (const [Key, Held] of LintRuns) {
+    if (Held.Done && Date.now() - Held.At > 300000) {
+      LintRuns.delete(Key);
+    }
+  }
+
+  Analyze(Wanted, Raw, Tree).then((Checked) => {
+    Run.Scripts = Checked;
+    Run.Done = true;
+    Run.At = Date.now();
+
+    if (Checked === null) {
+      return;
+    }
+
+    if (LintSeen.size >= 24) {
+      LintSeen.delete(LintSeen.keys().next().value as string);
+    }
+
+    LintSeen.set(Fingerprint, Checked);
+  }).catch((Trouble) => {
+    Run.Failed = `The analyzer stopped: ${(Trouble as Error).message}`;
+    Run.Done = true;
+    Run.At = Date.now();
+  });
+
+  return Ticket;
 }
 
 function SendJson(Response: ServerResponse, StatusCode: number, Body: unknown) {
@@ -411,14 +461,33 @@ export function StartServer(Port: number) {
           return;
         }
 
-        const Checked = await Analyze(Wanted, Body.raw === true, Tree);
+        const Ticket = StartLint(Wanted, Body.raw === true, Tree);
 
-        if (Checked === null) {
-          SendJson(Response, 500, { error: "The analyzer did not produce trustworthy output, so nothing was checked." });
+        SendJson(Response, 200, { ticket: Ticket });
+        return;
+      }
+
+      if (Request.method === "GET" && Segments[0] === "lint" && Segments[1]) {
+        const Run = LintRuns.get(Segments[1]);
+
+        if (!Run) {
+          SendJson(Response, 404, { error: "No such lint" });
           return;
         }
 
-        SendJson(Response, 200, { scripts: Checked });
+        if (!Run.Done) {
+          SendJson(Response, 200, { running: true });
+          return;
+        }
+
+        LintRuns.delete(Segments[1]);
+
+        if (Run.Failed || Run.Scripts === null) {
+          SendJson(Response, 500, { error: Run.Failed || "The analyzer did not produce trustworthy output, so nothing was checked." });
+          return;
+        }
+
+        SendJson(Response, 200, { scripts: Run.Scripts });
         return;
       }
 

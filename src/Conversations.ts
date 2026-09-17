@@ -13,6 +13,8 @@ type DesktopRecord = Record<string, unknown> & { cliSessionId?: string; title?: 
 
 type CostStore = Record<string, number[] | Record<string, number>>;
 
+type BuiltConversation = { id: string; title: string; project: string | null; source: string; workingDirectory: string | null; messages: StoredMessage[] };
+
 type Listing = { id: string; title: string; project: string; folder: string | null; source: string; starred: boolean; archived: boolean; hidden: boolean; createdAt: number; updatedAt: number };
 
 function FindFile(Id: string): string | null {
@@ -257,7 +259,18 @@ function IsPromptLine(Line: TranscriptEntry) {
     && !StripContext(TextOf(Line.message.content)).startsWith("<");
 }
 
-const Parsed = new Map<string, { Stamp: string; Lines: TranscriptEntry[] }>();
+const Parsed = new Map<string, { Stamp: string; Lines: TranscriptEntry[]; Read: number }>();
+const Built = new Map<string, { Stamp: string; Result: BuiltConversation }>();
+
+function StampFor(File: string): string | null {
+  try {
+    const Stat = fs.statSync(File);
+
+    return `${Stat.mtimeMs}:${Stat.size}`;
+  } catch {
+    return null;
+  }
+}
 
 function EndsCleanly(File: string): boolean {
   try {
@@ -279,7 +292,7 @@ function EndsCleanly(File: string): boolean {
   }
 }
 
-function ReadTail(File: string): TranscriptEntry[] {
+function ReadTail(File: string, Everything?: boolean): TranscriptEntry[] {
   try {
     const Size = fs.statSync(File).size;
 
@@ -300,7 +313,7 @@ function ReadTail(File: string): TranscriptEntry[] {
       } catch {
         return null;
       }
-    }).filter((Line) => Line && Line.type === "custom-title") as TranscriptEntry[];
+    }).filter((Line) => Line && (Everything || Line.type === "custom-title")) as TranscriptEntry[];
   } catch {
     return [];
   }
@@ -308,50 +321,76 @@ function ReadTail(File: string): TranscriptEntry[] {
 
 function ReadLines(File: string, MaxBytes?: number): TranscriptEntry[] | null {
   const Key = `${File}:${MaxBytes || 0}`;
-  const Stamp = (() => {
+  const Measured = (() => {
     try {
       const Stat = fs.statSync(File);
 
-      return `${Stat.mtimeMs}:${Stat.size}`;
+      return { Stamp: `${Stat.mtimeMs}:${Stat.size}`, Size: Stat.size };
     } catch {
       return null;
     }
   })();
   const Remembered = Parsed.get(Key);
 
-  if (Remembered && Stamp && Remembered.Stamp === Stamp) {
+  if (Remembered && Measured && Remembered.Stamp === Measured.Stamp) {
     return Remembered.Lines;
   }
 
-  const Lines = ParseLines(File, MaxBytes);
+  if (Remembered && Measured && !MaxBytes && Measured.Size > Remembered.Read) {
+    const Added = ParseLines(File, undefined, Remembered.Read);
 
-  if (Lines && Stamp) {
+    if (Added) {
+      const Grown = Remembered.Lines.concat(Added.Lines);
+
+      Parsed.set(Key, { Stamp: Measured.Stamp, Lines: Grown, Read: Added.Read });
+
+      return Grown;
+    }
+  }
+
+  const Whole = ParseLines(File, MaxBytes);
+
+  if (Whole && Measured) {
     if (Parsed.size >= 4) {
       Parsed.delete(Parsed.keys().next().value as string);
     }
 
-    Parsed.set(Key, { Stamp, Lines });
+    Parsed.set(Key, { Stamp: Measured.Stamp, Lines: Whole.Lines, Read: Whole.Read });
   }
 
-  return Lines;
+  return Whole ? Whole.Lines : null;
 }
 
-function ParseLines(File: string, MaxBytes?: number): TranscriptEntry[] | null {
+function ParseLines(File: string, MaxBytes?: number, From?: number): { Lines: TranscriptEntry[]; Read: number } | null {
   try {
     const Descriptor = fs.openSync(File, "r");
     const Size = fs.fstatSync(Descriptor).size;
-    const Buffer = new Uint8Array(Math.min(Size, MaxBytes || Size));
+    const Start = From || 0;
+    const Length = Math.min(Size - Start, MaxBytes || Size);
 
-    fs.readSync(Descriptor, Buffer, 0, Buffer.length, 0);
+    if (Length <= 0) {
+      fs.closeSync(Descriptor);
+
+      return { Lines: [], Read: Size };
+    }
+
+    const Buffer = new Uint8Array(Length);
+
+    fs.readSync(Descriptor, Buffer, 0, Length, Start);
     fs.closeSync(Descriptor);
 
-    return new TextDecoder().decode(Buffer).split("\n").map((Raw) => {
+    const Text = new TextDecoder().decode(Buffer);
+    const Ended = Text.lastIndexOf("\n");
+    const Whole = Ended < 0 ? Text : Text.slice(0, Ended);
+    const Lines = Whole.split("\n").map((Raw) => {
       try {
         return JSON.parse(Raw) as TranscriptEntry;
       } catch {
         return null;
       }
     }).filter(Boolean) as TranscriptEntry[];
+
+    return { Lines, Read: Ended < 0 ? Start : Start + global.Buffer.byteLength(Whole, "utf8") + 1 };
   } catch {
     return null;
   }
@@ -452,7 +491,7 @@ export function ListConversations(): Listing[] {
       }
 
       const File = path.join(Folder, Name);
-      const Lines = ReadLines(File)!.concat(ReadTail(File));
+      const Lines = (ReadLines(File, 256 * 1024) || []).concat(ReadTail(File, true));
 
       if (!Lines || !Lines.some(IsPromptLine)) {
         continue;
@@ -595,8 +634,15 @@ export function ConversationExists(Id: string): boolean {
   return FindFile(Id) !== null;
 }
 
-export function GetConversation(Id: string) {
+export function GetConversation(Id: string): BuiltConversation | null {
   const File = FindFile(Id);
+  const Stamp = File ? StampFor(File) : null;
+  const Remembered = Built.get(Id);
+
+  if (Remembered && Stamp && Remembered.Stamp === Stamp) {
+    return Remembered.Result;
+  }
+
   const Lines = File ? ReadLines(File) : null;
 
   if (!Lines) {
@@ -752,7 +798,7 @@ export function GetConversation(Id: string) {
   const Desktop = ReadDesktopSessions()[Id];
   const WorkingDirectory = WorkingDirectoryOf(Lines);
 
-  return {
+  const Result: BuiltConversation = {
     id: Id,
     title: TitleOf(Lines, Desktop, ReadOwnSessions().has(Id)),
     project: WorkingDirectory ? path.basename(WorkingDirectory) : null,
@@ -760,6 +806,16 @@ export function GetConversation(Id: string) {
     workingDirectory: WorkingDirectory,
     messages: Messages,
   };
+
+  if (Stamp) {
+    if (Built.size >= 4) {
+      Built.delete(Built.keys().next().value as string);
+    }
+
+    Built.set(Id, { Stamp, Result });
+  }
+
+  return Result;
 }
 
 function ReadChapters(): Record<string, Chapter[]> {

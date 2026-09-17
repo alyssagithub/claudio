@@ -78,6 +78,7 @@ const Chat = {
 	Updating = Vide.source(false),
 	Shown = Vide.source(40),
 	Earlier = Vide.source(0),
+	Partial = Vide.source(false),
 	ChaptersOpen = Vide.source(false),
 	Anchors = {} :: {[number]: Instance},
 	Window = nil :: DockWidgetPluginGui?,
@@ -3046,7 +3047,7 @@ function Chat.Open(Id: string)
 		return
 	end
 
-	const Ok, Conversation = Client.GetConversation(Id, nil, 12)
+	const Ok, Conversation = Client.GetConversation(Id, nil, 14)
 
 	if not Ok then
 		Chat.Say(`Could not open that chat: {Conversation}`)
@@ -3063,6 +3064,7 @@ function Chat.Open(Id: string)
 
 	const Messages = Loaded(Conversation.messages)
 
+	Chat.Partial(Conversation.partial == true)
 	Chat.Earlier((Conversation.first or 1) - 1)
 
 	Chat.Shown(Chat.Fits(Messages, #Messages))
@@ -3078,7 +3080,26 @@ function Chat.LoadEarlier()
 	const Id = Chat.ConversationId()
 	const Missing = Chat.Earlier()
 
-	if not Id or Missing == 0 then
+	if not Id or (Missing == 0 and not Chat.Partial()) then
+		return
+	end
+
+	if Chat.Partial() then
+		const Whole, Everything = Client.GetConversation(Id, nil, nil)
+
+		if not Whole or Chat.ConversationId() ~= Id then
+			return
+		end
+
+		const All = Loaded(Everything.messages)
+		const Kept = #Chat.Messages()
+
+		Chat.Partial(false)
+		Chat.Earlier((Everything.first or 1) - 1)
+		Chat.Shown(Chat.Shown() + Chat.Fits(All, math.max(0, #All - Kept)))
+		Chat.Messages(All)
+		table.clear(Chat.Anchors)
+
 		return
 	end
 
@@ -3102,6 +3123,7 @@ function Chat.LoadEarlier()
 	end
 
 	Chat.Messages(Messages)
+	Chat.Partial(Conversation.partial == true)
 	Chat.Earlier((Conversation.first or 1) - 1)
 	Chat.Shown(Chat.Shown() + #Conversation.messages)
 end

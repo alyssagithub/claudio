@@ -180,6 +180,7 @@ return {
 		messages = Typed.array(Message),
 		total = Typed.optional(Typed.number()),
 		first = Typed.optional(Typed.number()),
+		partial = Typed.optional(Typed.boolean()),
 	}),
 	Lint = Typed.table({
 		scripts = Typed.array(Typed.table({

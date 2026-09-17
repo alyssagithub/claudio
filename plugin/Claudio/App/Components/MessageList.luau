@@ -226,8 +226,37 @@ return function()
 
 	local NearBottom = true
 
+	const Ready = Vide.source(1)
+	local Filling = 0
+
+	Vide.effect(function()
+		const Wanted = Chat.Shown()
+
+		Chat.ConversationId()
+
+		if Vide.untrack(Ready) >= Wanted then
+			return
+		end
+
+		Filling += 1
+
+		const Mine = Filling
+
+		task.spawn(function()
+			while Vide.untrack(Ready) < Wanted and Filling == Mine do
+				task.wait()
+				Ready(math.min(Wanted, Vide.untrack(Ready) + 2))
+			end
+		end)
+	end)
+
+	Vide.effect(function()
+		Chat.ConversationId()
+		Ready(1)
+	end)
+
 	const First = Vide.derive(function()
-		return math.max(1, #Chat.Messages() - Chat.Shown() + 1)
+		return math.max(1, #Chat.Messages() - math.min(Chat.Shown(), Ready()) + 1)
 	end)
 
 	const Windowed = Vide.derive(function()
@@ -386,9 +415,13 @@ return function()
 			AutoButtonColor = true,
 			LayoutOrder = 0,
 			Visible = function()
-				return #Chat.Messages() > Chat.Shown() or Chat.Earlier() > 0
+				return #Chat.Messages() > Chat.Shown() or Chat.Earlier() > 0 or Chat.Partial()
 			end,
 			Text = function()
+				if Chat.Partial() then
+					return "Show earlier messages"
+				end
+
 				return `Show earlier messages ({math.max(0, #Chat.Messages() - Chat.Shown()) + Chat.Earlier()} more)`
 			end,
 			Activated = function()

@@ -183,18 +183,19 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
   }
 
   if (Request.method === "GET" && Id) {
-    const Conversation = GetConversation(Id);
+    const Query = new URL(Request.url as string, "http://127.0.0.1").searchParams;
+    const Asked = Number(Query.get("count")) || 0;
+    const Paging = (Query.get("before") || "") !== "";
+    const Conversation = GetConversation(Id, Paging || Asked === 0 ? undefined : Asked);
 
     if (!Conversation) {
       SendJson(Response, 404, { error: "No such conversation" });
       return;
     }
 
-    const Query = new URL(Request.url as string, "http://127.0.0.1").searchParams;
     const Total = Conversation.messages.length;
     const Before = Number(Query.get("before")) || Total;
-    const Count = Number(Query.get("count")) || 0;
-    const First = Count > 0 ? Math.max(0, Before - Count) : 0;
+    const First = Asked > 0 ? Math.max(0, Before - Asked) : 0;
 
     SendJson(Response, 200, { ...Conversation, messages: Conversation.messages.slice(First, Before), total: Total, first: First + 1 });
     return;

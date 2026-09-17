@@ -13,7 +13,7 @@ type DesktopRecord = Record<string, unknown> & { cliSessionId?: string; title?: 
 
 type CostStore = Record<string, number[] | Record<string, number>>;
 
-type BuiltConversation = { id: string; title: string; project: string | null; source: string; workingDirectory: string | null; messages: StoredMessage[] };
+type BuiltConversation = { id: string; title: string; project: string | null; source: string; workingDirectory: string | null; messages: StoredMessage[]; partial: boolean };
 
 type Listing = { id: string; title: string; project: string; folder: string | null; source: string; starred: boolean; archived: boolean; hidden: boolean; createdAt: number; updatedAt: number };
 
@@ -261,6 +261,33 @@ function IsPromptLine(Line: TranscriptEntry) {
 
 const Parsed = new Map<string, { Stamp: string; Lines: TranscriptEntry[]; Read: number }>();
 const Built = new Map<string, { Stamp: string; Result: BuiltConversation }>();
+
+const Windows = [4 * 1024 * 1024, 16 * 1024 * 1024, 64 * 1024 * 1024];
+
+function ReadWindow(File: string, Bytes: number): TranscriptEntry[] | null {
+  try {
+    const Descriptor = fs.openSync(File, "r");
+    const Size = fs.fstatSync(Descriptor).size;
+    const Length = Math.min(Bytes, Size);
+    const Buffer = new Uint8Array(Length);
+
+    fs.readSync(Descriptor, Buffer, 0, Length, Size - Length);
+    fs.closeSync(Descriptor);
+
+    const Text = new TextDecoder().decode(Buffer);
+    const Start = Length < Size ? Text.indexOf("\n") + 1 : 0;
+
+    return Text.slice(Start).split("\n").map((Raw) => {
+      try {
+        return JSON.parse(Raw) as TranscriptEntry;
+      } catch {
+        return null;
+      }
+    }).filter(Boolean) as TranscriptEntry[];
+  } catch {
+    return null;
+  }
+}
 
 function StampFor(File: string): string | null {
   try {
@@ -634,13 +661,37 @@ export function ConversationExists(Id: string): boolean {
   return FindFile(Id) !== null;
 }
 
-export function GetConversation(Id: string): BuiltConversation | null {
+export function GetConversation(Id: string, Least?: number): BuiltConversation | null {
   const File = FindFile(Id);
   const Stamp = File ? StampFor(File) : null;
-  const Remembered = Built.get(Id);
+  const Key = Least ? `${Id}:${Least}` : Id;
+  const Remembered = Built.get(Key);
 
   if (Remembered && Stamp && Remembered.Stamp === Stamp) {
     return Remembered.Result;
+  }
+
+  if (File && Least && fs.statSync(File).size > Windows[0]) {
+    for (const Bytes of Windows) {
+      if (Bytes >= fs.statSync(File).size) {
+        break;
+      }
+
+      const Window = ReadWindow(File, Bytes);
+      const Tried = Window ? Assemble(Window, Id, File, true) : null;
+
+      if (Tried && Tried.messages.length >= Least + 2) {
+        if (Stamp) {
+          if (Built.size >= 6) {
+            Built.delete(Built.keys().next().value as string);
+          }
+
+          Built.set(Key, { Stamp, Result: Tried });
+        }
+
+        return Tried;
+      }
+    }
   }
 
   const Lines = File ? ReadLines(File) : null;
@@ -648,6 +699,21 @@ export function GetConversation(Id: string): BuiltConversation | null {
   if (!Lines) {
     return null;
   }
+
+  const Whole = Assemble(Lines, Id, File as string, false);
+
+  if (Whole && Stamp) {
+    if (Built.size >= 6) {
+      Built.delete(Built.keys().next().value as string);
+    }
+
+    Built.set(Key, { Stamp, Result: Whole });
+  }
+
+  return Whole;
+}
+
+function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: boolean): BuiltConversation | null {
 
   const Messages: StoredMessage[] = [];
   let PendingTools: string[] = [];
@@ -798,24 +864,15 @@ export function GetConversation(Id: string): BuiltConversation | null {
   const Desktop = ReadDesktopSessions()[Id];
   const WorkingDirectory = WorkingDirectoryOf(Lines);
 
-  const Result: BuiltConversation = {
+  return {
     id: Id,
     title: TitleOf(Lines, Desktop, ReadOwnSessions().has(Id)),
     project: WorkingDirectory ? path.basename(WorkingDirectory) : null,
     source: Desktop ? "desktop" : "claudio",
     workingDirectory: WorkingDirectory,
     messages: Messages,
+    partial: Partial,
   };
-
-  if (Stamp) {
-    if (Built.size >= 4) {
-      Built.delete(Built.keys().next().value as string);
-    }
-
-    Built.set(Id, { Stamp, Result });
-  }
-
-  return Result;
 }
 
 function ReadChapters(): Record<string, Chapter[]> {

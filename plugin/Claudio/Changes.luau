@@ -61,7 +61,15 @@ const function Line(Call: Types.ToolCall): Types.Change?
 	end
 
 	if Name == "import_rbxm" or Name == "insert_asset" or (Name == "rbxm" and Field(Input, "file") and not Field(Input, "paths")) then
-		return {Kind = "added", Text = `Inserted into {Format.Path(Field(Input, "parent_path") or Field(Input, "parentPath") or Field(Input, "path"))}`}
+		const Into = Field(Input, "parent_path") or Field(Input, "parentPath") or Field(Input, "path")
+		const From = Field(Input, "file") or Field(Input, "assetId") or Field(Input, "asset_id")
+		const Named = Field(Input, "name") or (if From then (From:match("([^/\]+)%.%w+$") or From:match("[^/\]+$")) else nil)
+
+		return {
+			Kind = "added",
+			Text = if Named then `Inserted {Named} into {Format.Path(Into)}` else `Inserted into {Format.Path(Into)}`,
+			Path = if Named and Into then `{Into}.{Named}` else Into,
+		}
 	end
 
 	if Name == "Write" or Name == "Edit" then

@@ -2,6 +2,7 @@
 const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Config = require(script.Parent.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Parent.Settings)
+const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Theme = require(script.Parent.Parent.Theme)
 
 const Create = Vide.create
@@ -28,9 +29,42 @@ end
 
 return function(Props: Props)
 	const Hovered = Vide.source(false)
-	const Below = Vide.source(true)
-	const Side = Vide.source(0.5)
 	local Anchor: TextButton
+
+	const function Wording(): string
+		if Props.Disabled and Props.Disabled() then
+			return Props.DisabledTooltip or Read(Props.Tooltip)
+		end
+
+		return Read(Props.Tooltip)
+	end
+
+	const function Show()
+		const Window = Chat.Window
+
+		if not Anchor or not Window or (Props.Tooltip == nil and Props.DisabledTooltip == nil) then
+			return
+		end
+
+		const Room = Window.AbsoluteSize
+		const Corner = Anchor.AbsolutePosition - Window.AbsolutePosition
+		const Middle = Corner.X + Anchor.AbsoluteSize.X / 2
+		const Under = Room.Y - (Corner.Y + Anchor.AbsoluteSize.Y) > 30
+		const Side = if Room.X - Middle < 90 then 1 elseif Middle < 90 then 0 else 0.5
+
+		Chat.Tip({
+			Text = Wording(),
+			Where = Vector2.new(Middle, if Under then Corner.Y + Anchor.AbsoluteSize.Y + 4 else Corner.Y - 4),
+			Side = Side,
+			Below = Under,
+		})
+	end
+
+	Vide.cleanup(function()
+		if Chat.Tip() then
+			Chat.Tip(nil)
+		end
+	end)
 
 	const function Room(): number
 		return if Props.Size then Props.Size() else Settings.TextSize()
@@ -71,67 +105,16 @@ return function(Props: Props)
 		end,
 		MouseEnter = function()
 			Hovered(true)
-
-			if Anchor then
-				const Screen = Anchor:FindFirstAncestorWhichIsA("LayerCollector")
-				const Bottom = if Screen then Screen.AbsolutePosition.Y + Screen.AbsoluteSize.Y else math.huge
-				const Right = if Screen then Screen.AbsolutePosition.X + Screen.AbsoluteSize.X else math.huge
-				const Left = if Screen then Screen.AbsolutePosition.X else -math.huge
-				const Middle = Anchor.AbsolutePosition.X + Anchor.AbsoluteSize.X / 2
-
-				Below(Bottom - (Anchor.AbsolutePosition.Y + Anchor.AbsoluteSize.Y) > 30)
-
-				if Right - Middle < 90 then
-					Side(1)
-				elseif Middle - Left < 90 then
-					Side(0)
-				else
-					Side(0.5)
-				end
-			end
+			Show()
 		end,
 		MouseLeave = function()
 			Hovered(false)
+			Chat.Tip(nil)
 		end,
 
 		Vide.action(function(Object: TextButton)
 			Anchor = Object
 		end),
-
-		Create "TextLabel" {
-			Name = "Tooltip",
-			AnchorPoint = function()
-				return Vector2.new(Side(), if Below() then 0 else 1)
-			end,
-			Position = function()
-				return UDim2.new(Side(), 0, if Below() then 1 else 0, if Below() then 4 else -4)
-			end,
-			AutomaticSize = Enum.AutomaticSize.XY,
-			BackgroundColor3 = Theme.Colors.Background,
-			TextColor3 = Theme.Colors.Text,
-			TextSize = Settings.SmallText,
-			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-			ZIndex = 60,
-			Visible = function()
-				return Hovered() and (Props.Tooltip ~= nil or Props.DisabledTooltip ~= nil)
-			end,
-			Text = function()
-				if Props.Disabled and Props.Disabled() then
-					return Props.DisabledTooltip or Read(Props.Tooltip)
-				end
-
-				return Read(Props.Tooltip)
-			end,
-
-			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-			Create "UIStroke" {Color = Theme.Colors.Border},
-			Create "UIPadding" {
-				PaddingLeft = UDim.new(0, 6),
-				PaddingRight = UDim.new(0, 6),
-				PaddingTop = UDim.new(0, 2),
-				PaddingBottom = UDim.new(0, 2),
-			},
-		},
 		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
 	}
 end

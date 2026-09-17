@@ -16,6 +16,7 @@ const QuestionCard = require(script.Parent.Parent.Components.QuestionCard)
 const GalleryBar = require(script.Parent.Parent.Components.GalleryBar)
 const SettingsPage = require(script.Parent.Parent.Components.SettingsPage)
 const ContextMenu = require(script.Parent.Parent.Components.ContextMenu)
+const Tooltip = require(script.Parent.Parent.Components.Tooltip)
 const ModelPicker = require(script.Parent.Parent.Components.ModelPicker)
 const ChapterList = require(script.Parent.Parent.Components.ChapterList)
 const Picker = require(script.Parent.Parent.Parent.Picker)
@@ -133,6 +134,7 @@ return function()
 			},
 		},
 		ChapterList(),
+		Tooltip(),
 		ContextMenu(),
 		ModelPicker.Menu(),
 		ModelPicker.EffortMenu(),

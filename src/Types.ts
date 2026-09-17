@@ -129,6 +129,7 @@ export type StoredMessage = {
   role: string;
   text: string;
   activity?: string[];
+  parts?: Part[];
   calls?: StoredCall[];
   images: number[];
   at: number | null;

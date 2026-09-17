@@ -33,7 +33,11 @@ function Format.Clock(Seconds: number): string
 		return `{Seconds}s`
 	end
 
-	return `{Seconds // 60}m {Seconds % 60}s`
+	if Seconds < 3600 then
+		return `{Seconds // 60}m {Seconds % 60}s`
+	end
+
+	return `{Seconds // 3600}h {(Seconds % 3600) // 60}m {Seconds % 60}s`
 end
 
 function Format.Model(Name: string): string

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ChaptersFile, CostsFile, DesktopSessionsRoot, HiddenFoldersFile, OwnSessionsFile, PriceFor, SessionsRoot } from "./Config.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
-import type { Chapter, Content, ContentBlock, StoredCall, StoredMessage, Tokens, TranscriptLine } from "./Types.js";
+import type { Chapter, Content, ContentBlock, Part, StoredCall, StoredMessage, Tokens, TranscriptLine } from "./Types.js";
 
 type TranscriptEntry = TranscriptLine & { customTitle?: string; aiTitle?: string; summary?: string };
 
@@ -559,6 +559,18 @@ function EstimateCost(Line: TranscriptEntry): number | null {
   ) / 1000000;
 }
 
+function Plus(Left: Tokens | null, Right: Tokens | null): Tokens | null {
+  if (!Left) {
+    return Right ? { ...Right } : null;
+  }
+
+  if (!Right) {
+    return Left;
+  }
+
+  return { input: Left.input + Right.input, output: Left.output + Right.output, cached: Left.cached + Right.cached };
+}
+
 function UsageOf(Line: TranscriptEntry): Tokens | null {
   const Usage = Line.message && Line.message.usage;
 
@@ -594,6 +606,9 @@ export function GetConversation(Id: string) {
   const Messages: StoredMessage[] = [];
   let PendingTools: string[] = [];
   let PendingCalls: { Id: string; name: string; input: string }[] = [];
+  let PendingParts: Part[] = [];
+  let PendingTokens: Tokens | null = null;
+  let FirstTokens: Tokens | null = null;
   const Results = new Map<string, { Output: string; Failed: boolean; Image: number | null }>();
   let PendingImages: number[] = [];
   let ImageIndex = 0;
@@ -616,6 +631,7 @@ export function GetConversation(Id: string) {
       Messages.push({ role: "user", text: StripContext(TextOf(Line.message.content)), images: Attached, at: TimeOf(Line) });
       PendingTools = [];
       PendingCalls = [];
+      PendingParts = [];
       PendingImages = [];
     } else if (Line.type === "user") {
       for (const Block of (Line.message.content || []) as ContentBlock[]) {
@@ -640,6 +656,26 @@ export function GetConversation(Id: string) {
         PendingCost += EstimateCost(Line) || 0;
       }
 
+      const Counted = UsageOf(Line);
+
+      if (Counted) {
+        PendingTokens = Plus(PendingTokens, Counted);
+        FirstTokens = FirstTokens || { ...Counted };
+      }
+
+      let Seat = PendingCalls.length;
+
+      for (const Block of Content) {
+        if (Block.type === "tool_use") {
+          Seat += 1;
+          PendingParts.push({ kind: "call", call: Seat });
+        } else if (Block.type === "thinking" && typeof Block.thinking === "string" && Block.thinking.trim() !== "") {
+          PendingParts.push({ kind: "thinking", text: Block.thinking as string });
+        } else if (Block.type === "text" && typeof Block.text === "string" && Block.text.trim() !== "") {
+          PendingParts.push({ kind: "text", text: Block.text as string });
+        }
+      }
+
       PendingTools = PendingTools.concat(Content.filter((Block) => Block.type === "tool_use").map((Block) => Block.name as string));
       PendingCalls = PendingCalls.concat(Content.filter((Block) => Block.type === "tool_use").map((Block) => ({ Id: Block.id as string, name: Block.name as string, input: InputOf(Block.input) })));
 
@@ -648,19 +684,24 @@ export function GetConversation(Id: string) {
       }
 
       const Last = Messages[Messages.length - 1];
-      const Used = UsageOf(Line);
+      const Used = PendingTokens;
+      const Opened = FirstTokens;
       const Spent = PendingCost;
 
       PendingCost = 0;
+      PendingTokens = null;
+      FirstTokens = null;
 
-      for (let At = Messages.length - 1; At >= 0 && Used; At -= 1) {
+      for (let At = Messages.length - 1; At >= 0 && Opened; At -= 1) {
         if (Messages[At].role === "user") {
-          Messages[At].tokens = Used;
+          Messages[At].tokens = Opened;
           break;
         }
       }
 
       const Before = Last && Last.role === "assistant" ? Last.images.length : 0;
+      const Already = Last && Last.role === "assistant" ? (Last.calls || []).length : 0;
+      const Ordered = PendingParts.map((Part) => (Part.kind === "call" && Part.call ? { ...Part, call: Part.call + Already } : Part));
       const Calls: StoredCall[] = PendingCalls.map((Call) => {
         const Result = Results.get(Call.Id);
 
@@ -671,15 +712,17 @@ export function GetConversation(Id: string) {
         Last.text = `${Last.text}\n\n${Text}`;
         Last.activity = Last.activity!.concat(PendingTools);
         Last.calls = Last.calls!.concat(Calls);
+        Last.parts = (Last.parts || []).concat(Ordered);
         Last.images = Last.images.concat(PendingImages);
-        Last.tokens = Used || Last.tokens;
+        Last.tokens = Plus(Last.tokens || null, Used) || Last.tokens;
         Last.cost = (Last.cost || 0) + (Spent || 0);
       } else {
-        Messages.push({ role: "assistant", text: Text, activity: PendingTools, calls: Calls, images: PendingImages, at: TimeOf(Line), tokens: Used, cost: Spent, estimated: true });
+        Messages.push({ role: "assistant", text: Text, activity: PendingTools, parts: Ordered, calls: Calls, images: PendingImages, at: TimeOf(Line), tokens: Used, cost: Spent, estimated: true });
       }
 
       PendingTools = [];
       PendingCalls = [];
+      PendingParts = [];
       PendingImages = [];
     }
   }

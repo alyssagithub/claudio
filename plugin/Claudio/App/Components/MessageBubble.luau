@@ -735,6 +735,7 @@ return function(Props: Props)
 		local Sent = 0
 		local Added = 0
 		local Removed = 0
+		local Measured = false
 		const Files = {}
 		const Reads = {}
 
@@ -772,8 +773,11 @@ return function(Props: Props)
 					table.insert(Reads, (Wrote:gsub("^Read ", "")))
 				else
 					table.insert(Files, (Wrote:gsub(" <font.*$", "")))
-					Added += if Entry.lines then Entry.lines.added else 0
-					Removed += if Entry.lines then Entry.lines.removed else 0
+					if Entry.lines then
+						Added += Entry.lines.added
+						Removed += Entry.lines.removed
+						Measured = true
+					end
 				end
 			end
 		end
@@ -807,7 +811,7 @@ return function(Props: Props)
 
 		const Line = table.concat(Parts, ", ")
 
-		return `{Line:sub(1, 1):upper()}{Line:sub(2)}{if #Files > 0 then Counted(Added, Removed) else ""}`
+		return `{Line:sub(1, 1):upper()}{Line:sub(2)}{if #Files > 0 and Measured then Counted(Added, Removed) else ""}`
 	end
 
 	const Blank: Types.ToolCall = {name = "", input = "", output = "", status = "done", milliseconds = 0}
@@ -1318,16 +1322,12 @@ return function(Props: Props)
 					TextXAlignment = Enum.TextXAlignment.Left,
 					LayoutOrder = 1,
 					Text = function()
-							local Scripts = 0
+						local Scripts = 0
 						local Total = 0
 						local Made = 0
 						local Gone = 0
 
 						for _, Change in Written() do
-							if not Change.Path then
-								continue
-							end
-
 							Total += 1
 
 							if Change.Added or Change.Removed then
@@ -1341,8 +1341,12 @@ return function(Props: Props)
 							end
 						end
 
+						if Total == 0 then
+							return if IsUser() then "You changed nothing" else "Changed nothing"
+						end
+
 						const Verb = if Made == Total then "Created" elseif Gone == Total then "Deleted" elseif Scripts == Total then "Edited" else "Changed"
-						const Noun = if Scripts == Total then "script" else "instance"
+						const Noun = if Scripts == Total then "script" else "object"
 
 						return `{if IsUser() then "You " else ""}{if IsUser() then Verb:lower() else Verb} {Total} {Noun}{if Total == 1 then "" else "s"}`
 					end,

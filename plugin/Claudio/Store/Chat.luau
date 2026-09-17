@@ -2573,6 +2573,7 @@ Attach = function(ConversationId: string)
 	for Index = #Chat.Messages(), 1, -1 do
 		if Chat.Messages()[Index].Role == "user" then
 			Chat.CurrentPrompt = Chat.Messages()[Index].Text
+			Chat.Messages(table.move(Chat.Messages(), 1, Index, 1, {}))
 
 			break
 		end

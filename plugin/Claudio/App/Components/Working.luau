@@ -25,6 +25,10 @@ return function()
 	const Seconds = Vide.source(0)
 
 	const function Phase(): string
+		if Chat.Compacting() then
+			return "Compacting session"
+		end
+
 		if Running() then
 			return "Running tools"
 		end

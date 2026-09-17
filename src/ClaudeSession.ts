@@ -717,6 +717,18 @@ function RouteMessage(Session: Session, Message: any) {
     }
   }
 
+  if (Turn && Message.type === "system" && Message.subtype === "status") {
+    Turn.Compacting = Message.status === "compacting";
+
+    if (Message.compact_error) {
+      console.error(`Turn ${Turn.Id}: compacting failed, ${Message.compact_error}`);
+    }
+
+    Publish(Turn, {});
+
+    return;
+  }
+
   if (Turn && Message.type === "system" && Message.subtype === "task_started") {
     Publish(Turn, {
       Tasks: Turn.Tasks.concat([{
@@ -1316,6 +1328,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Parts: [],
     Flushed: false,
     Streamed: 0,
+    Compacting: false,
     Activity: [],
     Calls: [],
     Usage: { Input: 0, Output: 0, Cached: 0 },
@@ -1537,6 +1550,7 @@ export function DescribeTurn(Turn: Turn) {
       depth: Task.Depth,
     })),
     planning: Turn.Planning === true,
+    compacting: Turn.Compacting === true,
     milliseconds: Turn.Milliseconds || (Turn.Status === "running" ? Date.now() - Turn.StartedAt : 0),
     tokens: { input: Turn.Usage.Input, output: Turn.OutputShown, cached: Turn.Usage.Cached },
     limits: GetLimits(),

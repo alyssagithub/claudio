@@ -140,6 +140,7 @@ return {
 			depth = Typed.number(),
 		}))),
 		planning = Typed.optional(Typed.boolean()),
+		compacting = Typed.optional(Typed.boolean()),
 		milliseconds = Typed.number(),
 		tokens = Tokens,
 		cost = Typed.number(),

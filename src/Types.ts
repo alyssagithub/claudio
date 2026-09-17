@@ -336,6 +336,7 @@ export type Turn = {
   Auto: boolean;
   CapResults: boolean;
   Planning: boolean;
+  Compacting: boolean;
   Delegating: boolean;
   Tasks: Task[];
   Model: string;

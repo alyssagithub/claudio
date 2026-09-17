@@ -53,6 +53,7 @@ const Chat = {
 	Calls = Vide.source({} :: {Types.ToolCall}),
 	Tasks = Vide.source({} :: {Types.Task}),
 	Planning = Vide.source(false),
+	Compacting = Vide.source(false),
 	Tokens = Vide.source(nil :: Types.Tokens?),
 	Elapsed = Vide.source(0),
 	Began = Vide.source(0),
@@ -2436,6 +2437,7 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		Chat.Limits(State.limits or Chat.Limits())
 		Chat.Tasks(State.tasks or {})
 		Chat.Planning(State.planning == true)
+		Chat.Compacting(State.compacting == true)
 
 		if State.tokens then
 			Chat.ContextUsed(State.tokens.input + State.tokens.cached)

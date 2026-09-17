@@ -3594,8 +3594,9 @@ end
 
 function Chat.Unload()
 	Watching = false
+	Chat.RequestId = nil
 
-	Chat.Stop()
+	Chat.Sending(false)
 	Watcher.Stop()
 	Reset()
 end

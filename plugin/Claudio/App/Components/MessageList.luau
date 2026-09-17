@@ -119,9 +119,7 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 			Create "UIListLayout" {
 				FillDirection = Enum.FillDirection.Horizontal,
 				VerticalAlignment = Enum.VerticalAlignment.Center,
-				HorizontalAlignment = function()
-					return if Hovered() then Enum.HorizontalAlignment.Right else Enum.HorizontalAlignment.Center
-				end,
+				HorizontalAlignment = Enum.HorizontalAlignment.Right,
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, 10),
 			},

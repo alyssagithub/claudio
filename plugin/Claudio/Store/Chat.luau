@@ -2586,6 +2586,48 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 	assert(Start)(Next)
 end
 
+local Flushing = false
+
+function Chat.Flush()
+	if Flushing then
+		return
+	end
+
+	Flushing = true
+
+	while Chat.Sending() do
+		const Waiting = Chat.Queue() :: {Types.QueuedMessage}
+		const Entry = Waiting[1]
+
+		if not Entry then
+			break
+		end
+
+		if not Chat.RequestId then
+			task.wait(0.05)
+
+			continue
+		end
+
+		const Sent = Client.SendNow(Entry.Full, Chat.ConversationId(), Chat.RequestId, Entry.Images)
+
+		if not Sent then
+			break
+		end
+
+		const Rest = table.clone(Chat.Queue() :: {Types.QueuedMessage})
+
+		if Rest[1] == Entry then
+			table.remove(Rest, 1)
+			Chat.Queue(Rest)
+		end
+
+		DestroyImages(Entry.Previews)
+	end
+
+	Flushing = false
+end
+
 Attach = function(ConversationId: string)
 	const Found, Result = Client.ActiveTurn(ConversationId)
 
@@ -2601,6 +2643,8 @@ Attach = function(ConversationId: string)
 	Chat.Began(os.clock() - (Turn.milliseconds or 0) / 1000)
 	Chat.Sending(true)
 	Chat.RequestId = Turn.requestId
+
+	task.spawn(Chat.Flush)
 
 	for Index = #Chat.Messages(), 1, -1 do
 		if Chat.Messages()[Index].Role == "user" then
@@ -2663,6 +2707,8 @@ Start = function(Entry: Types.QueuedMessage)
 			end
 
 			Chat.RequestId = Turn.requestId
+
+			task.spawn(Chat.Flush)
 
 			if Stopping == CurrentGeneration then
 				task.spawn(Client.CancelTurn, Turn.requestId)
@@ -3334,6 +3380,7 @@ function Chat.Send(Text: string, Quiet: string?)
 
 	table.insert(Queue, Entry)
 	Chat.Queue(Queue)
+	task.spawn(Chat.Flush)
 end
 
 function Chat.Undoing(Index: number): {string}

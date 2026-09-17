@@ -65,6 +65,32 @@ const function Delete()
 	Chat.Confirming(Summary.id)
 end
 
+const function FolderHidden(): boolean
+	const Folder = Chat.MenuFolder()
+
+	if not Folder then
+		return false
+	end
+
+	for _, Summary in Chat.Conversations() do
+		if Summary.folder == Folder then
+			return Summary.hidden == true
+		end
+	end
+
+	return false
+end
+
+const function ToggleFolder()
+	const Folder = Chat.MenuFolder()
+
+	if not Folder then
+		return
+	end
+
+	task.spawn(Chat.SetFolderHidden, Folder, not FolderHidden())
+end
+
 const function Item(Label: () -> string, LayoutOrder: number, Danger: boolean, OnClick: () -> ())
 	const Hovered = Vide.source(false)
 
@@ -117,7 +143,7 @@ return function()
 		BackgroundTransparency = 1,
 		ZIndex = 100,
 		Visible = function()
-			return Chosen() ~= nil
+			return Chosen() ~= nil or Chat.MenuFolder() ~= nil
 		end,
 
 		Create "TextButton" {
@@ -129,13 +155,44 @@ return function()
 			ZIndex = 100,
 			Activated = function()
 				Chat.MenuFor(nil)
+				Chat.MenuFolder(nil)
 			end,
 
 			Vide.action(function(Object: TextButton)
 				Vide.cleanup(Object.MouseButton2Click:Connect(function()
 					Chat.MenuFor(nil)
+					Chat.MenuFolder(nil)
 				end))
 			end),
+		},
+		Create "Frame" {
+			Name = "FolderMenu",
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.fromOffset(160, 0),
+			BackgroundColor3 = Theme.Colors.Background,
+			ZIndex = 101,
+			Visible = function()
+				return Chat.MenuFolder() ~= nil
+			end,
+			Position = function()
+				return UDim2.fromOffset(Chat.MenuPosition().X, Chat.MenuPosition().Y)
+			end,
+
+			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
+			Create "UIStroke" {Color = Theme.Colors.Border},
+			Create "UIPadding" {
+				PaddingLeft = UDim.new(0, 3),
+				PaddingRight = UDim.new(0, 3),
+				PaddingTop = UDim.new(0, 3),
+				PaddingBottom = UDim.new(0, 3),
+			},
+			Create "UIListLayout" {
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				HorizontalFlex = Enum.UIFlexAlignment.Fill,
+			},
+			Item(function()
+				return if FolderHidden() then "Show in Claudio" else "Hide from Claudio"
+			end, 1, false, ToggleFolder),
 		},
 		Create "Frame" {
 			Name = "Menu",
@@ -143,6 +200,9 @@ return function()
 			Size = UDim2.fromOffset(160, 0),
 			BackgroundColor3 = Theme.Colors.Background,
 			ZIndex = 101,
+			Visible = function()
+				return Chosen() ~= nil
+			end,
 			Position = function()
 				return UDim2.fromOffset(Chat.MenuPosition().X, Chat.MenuPosition().Y)
 			end,

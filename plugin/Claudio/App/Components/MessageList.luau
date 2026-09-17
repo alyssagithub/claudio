@@ -22,8 +22,6 @@ const Tips = {
 	"Switch on the playtest picker in settings to grab objects mid-game.",
 }
 
-type Windowed = {Index: number, Message: Types.Message}
-
 const Create = Vide.create
 
 const function Describe(Model: string?, Effort: string?, Auto: boolean?): string?
@@ -228,6 +226,21 @@ return function()
 
 	local NearBottom = true
 
+	const First = Vide.derive(function()
+		return math.max(1, #Chat.Messages() - Chat.Shown() + 1)
+	end)
+
+	const Windowed = Vide.derive(function()
+		const Messages = Chat.Messages()
+		const Window: {Types.Message} = {}
+
+		for Index = First(), #Messages do
+			table.insert(Window, Messages[Index])
+		end
+
+		return Window
+	end)
+
 	return Create "ScrollingFrame" {
 		Name = "MessageList",
 		Size = UDim2.fromScale(1, 0),
@@ -392,85 +405,68 @@ return function()
 				PaddingBottom = UDim.new(0, 5),
 			},
 		},
-		Vide.indexes(function()
-			const Messages = Chat.Messages()
-			const First = math.max(1, #Messages - Chat.Shown() + 1)
-			const Window: {Windowed} = {}
-
-			for Index = First, #Messages do
-				table.insert(Window, {
-					Index = Index,
-					Message = Messages[Index],
-				})
-			end
-
-			return Window
-		end, function(Entry: () -> Windowed, _)
-			const function Message()
-				return Entry().Message
-			end
-
+		Vide.values(Windowed, function(Message: Types.Message, IndexSource: () -> number)
 			const function Position(): number
-				return Entry().Index
+				return First() + IndexSource() - 1
 			end
 
 			const Bubble = MessageBubble {
 				Role = function()
-					return Message().Role
+					return Message.Role
 				end,
 				Text = function()
-					return Message().Text
+					return Message.Text
 				end,
 				Activity = function()
-					return Message().Activity or {}
+					return Message.Activity or {}
 				end,
 				Thinking = function()
-					return Message().Thinking
+					return Message.Thinking
 				end,
 				Parts = function()
-					return Message().Parts
+					return Message.Parts
 				end,
 				Attachments = function()
-					return Message().Attachments or {}
+					return Message.Attachments or {}
 				end,
 				Images = function()
-					return Message().Images or {}
+					return Message.Images or {}
 				end,
 				Model = function()
-					return Describe(Message().Model, Message().Effort, Message().Auto)
+					return Describe(Message.Model, Message.Effort, Message.Auto)
 				end,
 				Calls = function()
-					return Message().Calls or {}
+					return Message.Calls or {}
 				end,
 				Edits = function()
-					return Message().Edits
+					return Message.Edits
 				end,
 				Tokens = function()
-					return Message().Tokens
+					return Message.Tokens
 				end,
 				Milliseconds = function()
-					return Message().Milliseconds
+					return Message.Milliseconds
 				end,
 				Failed = function()
-					return Message().Failed == true
+					return Message.Failed == true
 				end,
 				Error = function()
-					return Message().Error
+					return Message.Error
 				end,
 				Cost = function()
-					return Message().Cost
+					return Message.Cost
 				end,
 				Estimated = function()
-					return Message().Estimated
+					return Message.Estimated
 				end,
 				Prompt = function()
-					return Message().Prompt
+					return Message.Prompt
 				end,
 				At = function()
-					return Message().At
+					return Message.At
 				end,
 				Checkpoint = function()
-					return Message().Checkpoint
+					return Message.Checkpoint
 				end,
 				Index = Position,
 				LayoutOrder = function()

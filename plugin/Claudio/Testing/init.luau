@@ -43,6 +43,38 @@ const function Beside(): Instance?
 	return Mounted
 end
 
+const Shielded = {"Obsidian Vault"}
+
+const function ShieldOver(Folder: string?): string?
+	if not Folder then
+		return nil
+	end
+
+	const Name = Folder:match("[^\\/]+$") or Folder
+
+	return if table.find(Shielded, Name) then Name else nil
+end
+
+const function FolderOf(Mounted: Instance, Id: string): string?
+	const Listed, Result = Import((Mounted :: any).Client.Client).ListConversations()
+
+	if not Listed then
+		return nil
+	end
+
+	for _, Summary in Result.conversations do
+		if Summary.id == Id then
+			return Summary.folder
+		end
+	end
+
+	return nil
+end
+
+const function Kept(Name: string): string
+	return `Refused, because this chat works in {Name}, and the testing mount never touches a chat that works there. That folder is where the user's own sessions run, so a test that sends, opens or discards one of them lands in a conversation they are reading and working in. Call Testing.NewChat() with the mount's working folder set somewhere else and test there.`
+end
+
 const function Note()
 	const Folder = Beside()
 	const Progress = State()
@@ -67,7 +99,17 @@ const function Owned(): (boolean, string)
 
 	const Id = Import((Folder :: any).Store.Chat).ConversationId()
 
-	if Id == nil or State().Made[Id] then
+	if Id == nil then
+		return true, ""
+	end
+
+	const Shield = ShieldOver(FolderOf(Folder, Id))
+
+	if Shield then
+		return false, Kept(Shield)
+	end
+
+	if State().Made[Id] then
 		return true, ""
 	end
 
@@ -79,6 +121,12 @@ function Testing.NewChat(): string
 
 	if not Folder then
 		return "Nothing is mounted"
+	end
+
+	const Shield = ShieldOver(Import((Folder :: any).Settings).Get("WorkingFolder")())
+
+	if Shield then
+		return `Refused, because the mount's working folder is {Shield}, and the testing mount never starts a chat there. Set the mount's WorkingFolder to a project folder first, then call Testing.NewChat() again.`
 	end
 
 	Import((Folder :: any).Store.Chat).New()
@@ -185,6 +233,12 @@ function Testing.Open(Title: string): string
 
 	for _, Summary in Result.conversations do
 		if Summary.title:lower():find(Title:lower(), 1, true) then
+			const Shield = ShieldOver(Summary.folder)
+
+			if Shield then
+				return Kept(Shield)
+			end
+
 			if not State().Made[Summary.id] then
 				return `Refused, because "{Summary.title}" was not started by the testing mount. The mount shares one conversation store with the real plugin, so opening a chat the user owns puts the mount inside the conversation they are reading and working in, one send away from posting to it. Call Testing.NewChat() and test in a chat of your own.`
 			end
@@ -218,6 +272,12 @@ function Testing.Discard(): string
 
 	if not Id then
 		return "No chat is open"
+	end
+
+	const Shield = ShieldOver(FolderOf(Folder, Id))
+
+	if Shield then
+		return `Left {Id} alone because it works in {Shield}`
 	end
 
 	if not State().Made[Id] then

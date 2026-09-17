@@ -84,17 +84,28 @@ return function()
 			end)({
 				Settings = SettingsPage,
 				List = ChatList,
-				Messages = function()
-					return {
-						MessageList(),
-						GalleryBar(),
-						QuestionCard(),
-						TaskList(),
-						PlanBar(),
-						InputBar(),
-					}
-				end,
 			}),
+			Create "Frame" {
+				Name = "Messages",
+				Size = UDim2.fromScale(1, 0),
+				BackgroundTransparency = 1,
+				LayoutOrder = 2,
+				Visible = function()
+					return not Chat.SettingsOpen() and not Chat.ListOpen()
+				end,
+
+				Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
+				Create "UIListLayout" {
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					HorizontalAlignment = Enum.HorizontalAlignment.Center,
+				},
+				MessageList(),
+				GalleryBar(),
+				QuestionCard(),
+				TaskList(),
+				PlanBar(),
+				InputBar(),
+			},
 			Create "TextLabel" {
 				Name = "Notice",
 				Size = UDim2.fromScale(1, 0),

@@ -53,6 +53,7 @@ const Summary = Typed.table({
 	source = Typed.string(),
 	starred = Typed.optional(Typed.boolean()),
 	archived = Typed.optional(Typed.boolean()),
+	hidden = Typed.optional(Typed.boolean()),
 	createdAt = Typed.number(),
 	updatedAt = Typed.number(),
 })

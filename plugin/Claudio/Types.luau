@@ -224,6 +224,7 @@ export type ConversationSummary = {
 	source: "desktop" | "claudio",
 	starred: boolean?,
 	archived: boolean?,
+	hidden: boolean?,
 	createdAt: number,
 	updatedAt: number,
 }

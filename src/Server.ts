@@ -12,7 +12,7 @@ import { StudioTools } from "./Tools.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
 import { StudioProcesses } from "./StudioPresence.js";
 import { ActiveTurnFor, AddToTurn, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
-import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag } from "./Conversations.js";
+import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
 import { HandToken, TokenMatches } from "./Token.js";
@@ -93,6 +93,20 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
 
   if (Request.method === "GET" && !Id) {
     SendJson(Response, 200, { conversations: ListConversations() });
+    return;
+  }
+
+  if (Request.method === "POST" && Id === "folder" && Segments[2] === "hidden") {
+    const Body = await ReadBody(Request);
+    const Folder = typeof Body.folder === "string" ? Body.folder.trim() : "";
+
+    if (Folder === "") {
+      SendJson(Response, 400, { error: "A folder is needed" });
+      return;
+    }
+
+    SetFolderHidden(Folder, Body.value === true);
+    SendJson(Response, 200, { folder: Folder, hidden: Body.value === true });
     return;
   }
 

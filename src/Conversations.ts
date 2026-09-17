@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { ChaptersFile, CostsFile, DesktopSessionsRoot, OwnSessionsFile, PriceFor, SessionsRoot } from "./Config.js";
+import { ChaptersFile, CostsFile, DesktopSessionsRoot, HiddenFoldersFile, OwnSessionsFile, PriceFor, SessionsRoot } from "./Config.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import type { Chapter, Content, ContentBlock, StoredCall, StoredMessage, Tokens, TranscriptLine } from "./Types.js";
 
@@ -13,7 +13,7 @@ type DesktopRecord = Record<string, unknown> & { cliSessionId?: string; title?: 
 
 type CostStore = Record<string, number[] | Record<string, number>>;
 
-type Listing = { id: string; title: string; project: string; folder: string | null; source: string; starred: boolean; archived: boolean; createdAt: number; updatedAt: number };
+type Listing = { id: string; title: string; project: string; folder: string | null; source: string; starred: boolean; archived: boolean; hidden: boolean; createdAt: number; updatedAt: number };
 
 function FindFile(Id: string): string | null {
   if (!fs.existsSync(SessionsRoot)) {
@@ -405,6 +405,27 @@ function WorkingDirectoryOf(Lines: TranscriptEntry[]): string | null {
   return Line ? Line.cwd as string : null;
 }
 
+function SameFolder(Left: string, Right: string): boolean {
+  return path.resolve(Left).toLowerCase() === path.resolve(Right).toLowerCase();
+}
+
+export function ReadHiddenFolders(): string[] {
+  const Stored = ReadJson<unknown>(HiddenFoldersFile);
+
+  return Array.isArray(Stored) ? Stored.filter((Entry): Entry is string => typeof Entry === "string") : [];
+}
+
+export function SetFolderHidden(Folder: string, Hidden: boolean) {
+  const Kept = ReadHiddenFolders().filter((Entry) => !SameFolder(Entry, Folder));
+
+  if (Hidden) {
+    Kept.push(Folder);
+  }
+
+  fs.mkdirSync(path.dirname(HiddenFoldersFile), { recursive: true });
+  fs.writeFileSync(HiddenFoldersFile, JSON.stringify(Kept, null, 2));
+}
+
 export function ListConversations(): Listing[] {
   if (!fs.existsSync(SessionsRoot)) {
     return [];
@@ -412,6 +433,7 @@ export function ListConversations(): Listing[] {
 
   const Desktop = ReadDesktopSessions();
   const Own = ReadOwnSessions();
+  const Hidden = ReadHiddenFolders();
   const Deletable = DesktopSessionsFolder() !== null && Object.keys(Desktop).length > 0;
   const Summaries: Listing[] = [];
 
@@ -454,6 +476,7 @@ export function ListConversations(): Listing[] {
         source: Desktop[Id] ? "desktop" : "claudio",
         starred: Boolean(Desktop[Id] && Desktop[Id].starred),
         archived: Boolean(Desktop[Id] && Desktop[Id].archived),
+        hidden: WorkingDirectory !== null && Hidden.some((Entry) => SameFolder(Entry, WorkingDirectory)),
         createdAt: StartedAt(Lines, File),
         updatedAt: EndedAt(Lines, File),
       });

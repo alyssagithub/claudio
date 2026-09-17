@@ -98,6 +98,7 @@ export const ExtraModels = [
 export const SessionsRoot = path.join(os.homedir(), ".claude", "projects");
 export const DesktopSessionsRoot = path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), "Claude", "claude-code-sessions");
 export const OwnSessionsFile = path.join(os.homedir(), ".claudio", "sessions.json");
+export const HiddenFoldersFile = path.join(os.homedir(), ".claudio", "hidden.json");
 export const LogFile = path.join(os.homedir(), ".claudio", "bridge.log");
 export const MaxImageWidth = 480;
 export const ToolsFolder = path.join(os.homedir(), ".claudio", "tools");

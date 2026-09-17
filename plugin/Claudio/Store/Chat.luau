@@ -62,6 +62,7 @@ const Chat = {
 	ContextModel = Vide.source(""),
 	ContextParts = Vide.source({} :: {Types.Part}),
 	MenuFor = Vide.source(nil :: string?),
+	MenuFolder = Vide.source(nil :: string?),
 	MenuPosition = Vide.source(Vector2.zero),
 	Confirming = Vide.source(nil :: string?),
 	Rewinding = Vide.source(nil :: number?),
@@ -69,6 +70,7 @@ const Chat = {
 	VersionPick = Vide.source(""),
 	Renaming = Vide.source(nil :: string?),
 	ShowArchived = Vide.source(false),
+	ShowHidden = Vide.source(false),
 	Opened = Vide.source({} :: {[string]: boolean}),
 	Chapters = Vide.source({} :: {Types.Chapter}),
 	Versions = Vide.source(nil :: Types.Versions?),
@@ -3089,6 +3091,20 @@ function Chat.SetFlag(Id: string, Flag: string, Value: boolean)
 
 	if not Ok then
 		Chat.Say(`Could not update that chat: {Result}`)
+
+		return
+	end
+
+	Chat.Refresh()
+end
+
+function Chat.SetFolderHidden(Folder: string, Value: boolean)
+	Chat.MenuFolder(nil)
+
+	const Ok, Result = Client.SetFolderHidden(Folder, Value)
+
+	if not Ok then
+		Chat.Say(`Could not update that folder: {Result}`)
 
 		return
 	end

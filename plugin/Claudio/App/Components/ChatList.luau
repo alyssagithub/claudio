@@ -70,13 +70,14 @@ const function Spanned(Began: number, Ended: number): string
 	return `{Named(Began)} - {Named(Ended)}{Ago}`
 end
 
-const function Choice(Label: () -> string, LayoutOrder: number, OnClick: () -> ())
+const function Choice(Label: () -> string, LayoutOrder: number, OnClick: () -> (), Visible: (() -> boolean)?)
 	const Hovered = Vide.source(false)
 
 	return Create "TextButton" {
 		Name = "Choice",
 		Size = UDim2.fromScale(1, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
+		Visible = Visible,
 		BackgroundColor3 = Theme.Colors.Button,
 		BackgroundTransparency = function()
 			return if Hovered() then 0 else 1
@@ -110,10 +111,26 @@ const function GroupOf(Summary: Types.ConversationSummary): string
 	return if Summary.project ~= "" then Summary.project else "Other"
 end
 
+const function AnyHidden(): boolean
+	for _, Summary in Chat.Conversations() do
+		if Summary.hidden then
+			return true
+		end
+	end
+
+	return false
+end
+
 const function Ordered(): {Types.ConversationSummary}
 	const Folder = Settings.Get("WorkingFolder")()
 	const Here = Folder:match("[^\/]+$") or Folder
-	const Sorted = table.clone(Chat.Conversations())
+	const Sorted = {}
+
+	for _, Summary in Chat.Conversations() do
+		if Chat.ShowHidden() or not Summary.hidden then
+			table.insert(Sorted, Summary)
+		end
+	end
 
 	table.sort(Sorted, function(Left, Right)
 		if Left.id == Gallery.Id or Right.id == Gallery.Id then
@@ -167,8 +184,9 @@ const function Row(Summary: () -> Types.ConversationSummary, Index: number)
 			return Chat.ShowArchived() or not Summary().archived
 		end,
 		Activated = function()
-			if Chat.MenuFor() then
+			if Chat.MenuFor() or Chat.MenuFolder() then
 				Chat.MenuFor(nil)
+				Chat.MenuFolder(nil)
 
 				return
 			end
@@ -179,6 +197,7 @@ const function Row(Summary: () -> Types.ConversationSummary, Index: number)
 		Vide.action(function(Object: TextButton)
 			Vide.cleanup(Object.MouseButton2Click:Connect(function()
 				Chat.Renaming(nil)
+				Chat.MenuFolder(nil)
 
 				if Chat.Window then
 					const Where = Chat.Window:GetRelativeMousePosition()
@@ -372,6 +391,27 @@ const function Row(Summary: () -> Types.ConversationSummary, Index: number)
 					return if Mine then GroupOf(Mine) else ""
 				end,
 
+				Vide.action(function(Object: TextLabel)
+					Vide.cleanup(Object.InputBegan:Connect(function(Input)
+						const Mine = Ordered()[Index]
+
+						if Input.UserInputType ~= Enum.UserInputType.MouseButton2 or not Mine or not Mine.folder then
+							return
+						end
+
+						Chat.Renaming(nil)
+						Chat.MenuFor(nil)
+
+						if Chat.Window then
+							const Where = Chat.Window:GetRelativeMousePosition()
+							const Room = Chat.Window.AbsoluteSize
+
+							Chat.MenuPosition(Vector2.new(math.min(Where.X, math.max(0, Room.X - 160)), math.min(Where.Y, math.max(0, Room.Y - 40))))
+						end
+
+						Chat.MenuFolder(Mine.folder)
+					end))
+				end),
 				Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Shrink},
 			},
 			IconButton {
@@ -449,5 +489,10 @@ return function()
 		end, 1000000, function()
 			Chat.ShowArchived(not Chat.ShowArchived())
 		end),
+		Choice(function()
+			return if Chat.ShowHidden() then "Hide the folders you hid" else "Show the folders you hid"
+		end, 1000001, function()
+			Chat.ShowHidden(not Chat.ShowHidden())
+		end, AnyHidden),
 	}
 end

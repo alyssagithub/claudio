@@ -11,6 +11,7 @@ const Create = Vide.create
 
 const Edge = 32
 local Glyph: EditableImage?
+local Drawable: boolean?
 
 const function Drawn(): EditableImage
 	if Glyph then
@@ -37,16 +38,13 @@ type Props = {
 }
 
 return function(Props: Props)
-	const Allowed, Output = pcall(function()
-		const Made = AssetService:CreateEditableImage({Size = Vector2.new(Edge, Edge)})
+	if Drawable == nil then
+		Drawable = pcall(function()
+			AssetService:CreateEditableImage({Size = Vector2.new(Edge, Edge)}):DrawRectangle(Vector2.zero, Vector2.one, Color3.new(), 1, Enum.ImageCombineType.Overwrite)
+		end)
+	end
 
-		Made:DrawImageTransformed(Vector2.new(Edge / 2, Edge / 2), Vector2.one, 0, Drawn(), {PivotPoint = Vector2.new(Edge / 2, Edge / 2)})
-		Content.fromObject(Made)
-
-		return Made
-	end)
-
-	if not Allowed then
+	if not Drawable then
 		return Icon {
 			Name = function()
 				return if Props.Angle() > -45 then Config.Icons.Down else Config.Icons.Right
@@ -56,6 +54,8 @@ return function(Props: Props)
 			LayoutOrder = Props.LayoutOrder,
 		}
 	end
+
+	const Output = AssetService:CreateEditableImage({Size = Vector2.new(Edge, Edge)})
 
 	Vide.cleanup(function()
 		Output:Destroy()

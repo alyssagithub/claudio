@@ -25,33 +25,51 @@ import { RestartBridge } from "./Startup.js";
 
 type LoginState = {loggedIn: boolean, detail: string | null};
 
-let LastLogin: {CheckedAt: number, Result: Promise<LoginState> | null} = { CheckedAt: 0, Result: null };
+let LastLogin: {CheckedAt: number, Known: LoginState | null, Running: Promise<LoginState> | null} = { CheckedAt: 0, Known: null, Running: null };
 
-function CheckLogin() {
-  if (Date.now() - LastLogin.CheckedAt < 30000) {
-    return LastLogin.Result;
+function AskLogin() {
+  if (LastLogin.Running) {
+    return LastLogin.Running;
   }
 
-  LastLogin = {
-    CheckedAt: Date.now(),
-    Result: new Promise<LoginState>((Resolve) => {
-      exec("claude auth status", { timeout: 15000 }, (Error, Stdout) => {
-        if (Error) {
-          Resolve({ loggedIn: false, detail: Error.message });
-          return;
-        }
+  LastLogin.CheckedAt = Date.now();
+  LastLogin.Running = new Promise<LoginState>((Resolve) => {
+    exec("claude auth status", { timeout: 15000 }, (Error, Stdout) => {
+      if (Error) {
+        Resolve({ loggedIn: false, detail: Error.message });
+        return;
+      }
 
-        try {
-          const Status = JSON.parse(Stdout) as {loggedIn?: unknown, authMethod?: string};
-          Resolve({ loggedIn: Boolean(Status.loggedIn), detail: Status.authMethod || null });
-        } catch {
-          Resolve({ loggedIn: /logged in/i.test(Stdout), detail: Stdout.trim() });
-        }
-      });
-    }),
-  };
+      try {
+        const Status = JSON.parse(Stdout) as {loggedIn?: unknown, authMethod?: string};
+        Resolve({ loggedIn: Boolean(Status.loggedIn), detail: Status.authMethod || null });
+      } catch {
+        Resolve({ loggedIn: /logged in/i.test(Stdout), detail: Stdout.trim() });
+      }
+    });
+  }).then((Found) => {
+    LastLogin.Known = Found;
+    LastLogin.CheckedAt = Date.now();
+    LastLogin.Running = null;
 
-  return LastLogin.Result;
+    return Found;
+  });
+
+  return LastLogin.Running;
+}
+
+function CheckLogin() {
+  const Stale = Date.now() - LastLogin.CheckedAt >= 30000;
+
+  if (!LastLogin.Known) {
+    return AskLogin();
+  }
+
+  if (Stale) {
+    AskLogin().catch(() => {});
+  }
+
+  return Promise.resolve(LastLogin.Known);
 }
 
 type LintRun = { Done: boolean; Scripts: {path: string, lines: string[]}[] | null; Failed: string | null; At: number };
@@ -302,6 +320,8 @@ function WarmUsage() {
 }
 
 export function StartServer(Port: number) {
+  AskLogin().catch(() => {});
+
   process.on("uncaughtException", (Error) => {
     console.error("Unexpected error, the bridge is staying up: " + (Error && Error.stack ? Error.stack : Error));
   });

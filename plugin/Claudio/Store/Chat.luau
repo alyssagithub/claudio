@@ -2990,6 +2990,46 @@ const function Loaded(Given: {any}): {Types.Message}
 	return Messages
 end
 
+const Allowance = 7000
+
+const function Weight(Message: Types.Message): number
+	const Calls: {Types.ToolCall} = Message.Calls or {}
+	const Edits: {Types.Change} = Message.Edits or {}
+	const Pictures: {number} = Message.ImageIds or {}
+	local Cost = 140 + #(Message.Text or "")
+
+	for _, Call in Calls do
+		Cost += 180 + math.min(#Call.name, 60)
+	end
+
+	Cost += #Edits * 70
+	Cost += #Pictures * 420
+
+	return Cost
+end
+
+function Chat.Fits(Messages: {Types.Message}, Upto: number): number
+	local Spent = 0
+	local Taken = 0
+
+	for Index = Upto, 1, -1 do
+		const Entry = Messages[Index]
+
+		if not Entry then
+			break
+		end
+
+		Spent += Weight(Entry)
+		Taken += 1
+
+		if Spent >= Allowance then
+			break
+		end
+	end
+
+	return math.max(1, Taken)
+end
+
 function Chat.Open(Id: string)
 	if Id == Gallery.Id then
 		Chat.Stop()
@@ -2999,13 +3039,14 @@ function Chat.Open(Id: string)
 		table.clear(Requested)
 		Chat.ConversationId(Gallery.Id)
 		Chat.Title(Gallery.Title)
+		Chat.Shown(Chat.Fits(Gallery.Messages(), #Gallery.Messages()))
 		Chat.Messages(Gallery.Messages())
 		Chat.ListOpen(false)
 
 		return
 	end
 
-	const Ok, Conversation = Client.GetConversation(Id, nil, 40)
+	const Ok, Conversation = Client.GetConversation(Id, nil, 12)
 
 	if not Ok then
 		Chat.Say(`Could not open that chat: {Conversation}`)
@@ -3024,6 +3065,7 @@ function Chat.Open(Id: string)
 
 	Chat.Earlier((Conversation.first or 1) - 1)
 
+	Chat.Shown(Chat.Fits(Messages, #Messages))
 	Chat.Messages(Messages)
 	Chat.ConversationId(Conversation.id)
 	Chat.Title(Conversation.title)

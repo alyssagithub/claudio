@@ -590,7 +590,11 @@ return function(Props: Props)
 						BackgroundTransparency = 1,
 						LayoutOrder = 2 + Order,
 						Visible = function()
-							return Pair().Key ~= "description" or not IsCommand(Value().name)
+							if not IsCommand(Value().name) then
+								return true
+							end
+
+							return Pair().Key ~= "description" and Pair().Key ~= "command"
 						end,
 
 						Create "UIListLayout" {

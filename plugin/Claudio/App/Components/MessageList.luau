@@ -393,7 +393,7 @@ return function()
 			end,
 			Activated = function()
 				if #Chat.Messages() > Chat.Shown() then
-					Chat.Shown(Chat.Shown() + 40)
+					Chat.Shown(Chat.Shown() + Chat.Fits(Chat.Messages(), #Chat.Messages() - Chat.Shown()))
 				else
 					task.spawn(Chat.LoadEarlier)
 				end

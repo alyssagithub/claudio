@@ -1,5 +1,4 @@
 --!strict
-const UserInputService = game:GetService("UserInputService")
 const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Config = require(script.Parent.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Parent.Settings)
@@ -166,9 +165,8 @@ return function()
 		Vide.changed("Text", function(Text: string)
 			const Previous = Chat.Draft()
 			const Typed = Text:sub(-1) == "\n" and #Text == #Previous + 1
-			const Shifted = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
 
-			if Typed and not Shifted and Settings.Get("SendWithEnter")() then
+			if Typed and Settings.Get("SendWithEnter")() then
 				const Message = Text:sub(1, -2)
 
 				Chat.Draft("")

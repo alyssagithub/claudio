@@ -19,6 +19,7 @@ const Navigate = require(script.Parent.Parent.Navigate)
 
 local Generation = 0
 local Stopping = -1
+local KnownEnded = 0
 local Checkpoint = 0
 
 const Chat = {
@@ -126,6 +127,7 @@ end
 
 const function Reset()
 	Generation += 1
+	KnownEnded = 0
 	Chat.Earlier(0)
 
 	for _, Message in Chat.Messages() do
@@ -685,7 +687,9 @@ const function Playtest(Input: any): any
 	const Action = Input.action
 
 	const function Live(): boolean
-		return not StudioTestService.EditModeActive or RunService:IsRunning()
+		const Held = _G.ClaudioPlaytest :: any
+
+		return not StudioTestService.EditModeActive or RunService:IsRunning() or (Held ~= nil and Held.Done == false)
 	end
 
 	if Action == "status" then
@@ -750,16 +754,15 @@ const function Playtest(Input: any): any
 			pcall(require(script.Parent.Parent.Picker).Remove)
 		end)
 
-		const Deadline = os.clock() + 12
+		const Held = _G.ClaudioPlaytest :: any
+		const Deadline = os.clock() + if Mode == "multiplayer" then 4 else 20
 
-		while not Live() and os.clock() < Deadline do
+		while os.clock() < Deadline and not Held.Done and StudioTestService.EditModeActive and not RunService:IsRunning() do
 			task.wait(0.2)
 		end
 
-		if not Live() then
-			const Held = _G.ClaudioPlaytest :: any
-
-			return {error = `Studio did not start a {Mode} playtest{if Held and Held.Value and Held.Value ~= "nil" then `: {Held.Value}` else "."}`}
+		if Held.Done then
+			return {error = `Studio did not start a {Mode} playtest{if Held.Value and Held.Value ~= "nil" then `: {Held.Value}` else "."}`}
 		end
 
 		const Started = if Mode == "multiplayer" then `Multiplayer playtest started with {Players} players.` else `{Mode:sub(1, 1):upper()}{Mode:sub(2)} mode playtest started.`
@@ -2278,12 +2281,18 @@ function Chat.WatchStudioJobs()
 
 	const Mounted = script:IsDescendantOf(game)
 	local Asked = 0
+	local Checked = 0
 
 	task.spawn(function()
 		while Watching and task.wait(1) do
 			if Connection.Status() == "Connected" and os.clock() - Asked > 60 then
 				Asked = os.clock()
 				task.spawn(Chat.RefreshUsage)
+			end
+
+			if Connection.Status() == "Connected" and os.clock() - Checked > 3 then
+				Checked = os.clock()
+				task.spawn(Chat.Sync)
 			end
 
 			if not Mounted or script:IsDescendantOf(game) then
@@ -2502,6 +2511,16 @@ end
 local Start: (Types.QueuedMessage) -> ()
 local Attach: (string) -> ()
 
+const function Ended(Id: string): (number?, boolean)
+	const Ok, Result = Client.ActiveTurn(Id)
+
+	if not Ok or typeof(Result) ~= "table" then
+		return nil, false
+	end
+
+	return if typeof(Result.endedAt) == "number" then Result.endedAt else 0, typeof(Result.turn) == "table"
+end
+
 const function Finish(Status: string, Text: string, State: Types.Turn?)
 	Append({
 		Role = "assistant",
@@ -2545,6 +2564,14 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 	Chat.Sending(false)
 	Chat.Began(0)
 	Chat.RequestId = nil
+
+	task.spawn(function()
+		const Id = Chat.ConversationId()
+
+		if Id then
+			KnownEnded = Ended(Id) or KnownEnded
+		end
+	end)
 
 	if Settings.Get("FixLint")() then
 		const Edited = EditedScripts()
@@ -3121,7 +3148,35 @@ function Chat.Open(Id: string)
 	Chat.Title(Conversation.title)
 	Chat.LoadChapters()
 	Chat.ListOpen(false)
+	KnownEnded = Ended(Conversation.id) or 0
 	Attach(Conversation.id)
+end
+
+function Chat.Sync()
+	const Id = Chat.ConversationId()
+
+	if not Id or Id == Gallery.Id or Chat.Sending() or Chat.Yielding then
+		return
+	end
+
+	const EndedAt, Running = Ended(Id)
+
+	if not EndedAt or Chat.ConversationId() ~= Id or Chat.Sending() then
+		return
+	end
+
+	if Running then
+		Attach(Id)
+
+		return
+	end
+
+	if EndedAt == KnownEnded then
+		return
+	end
+
+	KnownEnded = EndedAt
+	Chat.Open(Id)
 end
 
 function Chat.LoadEarlier()

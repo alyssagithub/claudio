@@ -223,6 +223,13 @@ return function()
 	end)
 
 	local NearBottom = true
+	local Holding = false
+
+	const Loading = Vide.source(false)
+
+	const function More(): boolean
+		return #Chat.Messages() > Chat.Shown() or Chat.Earlier() > 0 or Chat.Partial()
+	end
 
 	const Ready = Vide.source(1)
 	local Filling = 0
@@ -345,13 +352,63 @@ return function()
 				end
 			end
 
+			local Measured = 0
+			local Check: () -> ()
+
+			const function LoadMore()
+				if Loading() or not More() then
+					return
+				end
+
+				Loading(true)
+				Holding = true
+				Measured = List.AbsoluteCanvasSize.Y
+
+				task.spawn(function()
+					if #Chat.Messages() > Chat.Shown() then
+						Chat.Shown(Chat.Shown() + Chat.Fits(Chat.Messages(), #Chat.Messages() - Chat.Shown()))
+					else
+						Chat.LoadEarlier()
+					end
+
+					while Ready() < Chat.Shown() do
+						task.wait()
+					end
+
+					task.wait(0.1)
+					Holding = false
+					Loading(false)
+					task.defer(Check)
+				end)
+			end
+
+			Check = function()
+				const Overflowing = List.AbsoluteCanvasSize.Y > List.AbsoluteWindowSize.Y
+
+				if Holding or List.CanvasPosition.Y >= 150 or (Overflowing and NearBottom) then
+					return
+				end
+
+				LoadMore()
+			end
+
 			Vide.cleanup(List:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
 				NearBottom = List.AbsoluteCanvasSize.Y - (List.CanvasPosition.Y + List.AbsoluteWindowSize.Y) < 40
 				RequestVisible()
+				Check()
 			end))
 			Vide.cleanup(List:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(RequestVisible))
 			task.defer(RequestVisible)
 			Vide.cleanup(List:GetPropertyChangedSignal("AbsoluteCanvasSize"):Connect(function()
+				if Holding then
+					const Grown = List.AbsoluteCanvasSize.Y - Measured
+
+					Measured = List.AbsoluteCanvasSize.Y
+					List.CanvasPosition = Vector2.new(0, math.max(0, List.CanvasPosition.Y + Grown))
+
+					return
+				end
+
 				if not NearBottom then
 					return
 				end
@@ -402,39 +459,17 @@ return function()
 				return #Chat.Messages() == 0
 			end,
 		},
-		Create "TextButton" {
+		Create "TextLabel" {
 			Name = "Earlier",
 			Size = UDim2.fromScale(1, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundColor3 = Theme.Colors.Button,
-			TextColor3 = Theme.Colors.ButtonText,
+			BackgroundTransparency = 1,
+			TextColor3 = Theme.Colors.DimText,
 			TextSize = Settings.SmallText,
 			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-			AutoButtonColor = true,
 			LayoutOrder = 0,
-			Visible = function()
-				return #Chat.Messages() > Chat.Shown() or Chat.Earlier() > 0 or Chat.Partial()
-			end,
-			Text = function()
-				if Chat.Partial() then
-					return "Show earlier messages"
-				end
-
-				return `Show earlier messages ({math.max(0, #Chat.Messages() - Chat.Shown()) + Chat.Earlier()} more)`
-			end,
-			Activated = function()
-				if #Chat.Messages() > Chat.Shown() then
-					Chat.Shown(Chat.Shown() + Chat.Fits(Chat.Messages(), #Chat.Messages() - Chat.Shown()))
-				else
-					task.spawn(Chat.LoadEarlier)
-				end
-			end,
-
-			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-			Create "UIPadding" {
-				PaddingTop = UDim.new(0, 5),
-				PaddingBottom = UDim.new(0, 5),
-			},
+			Visible = Loading,
+			Text = "Loading earlier messages…",
 		},
 		Vide.values(Windowed, function(Message: Types.Message, IndexSource: () -> number)
 			const function Position(): number

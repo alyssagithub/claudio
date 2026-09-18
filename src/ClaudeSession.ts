@@ -472,6 +472,7 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
   const Text = JoinText(Turn.CommittedText, Turn.PendingText);
 
   if (Turn.ConversationId) {
+    Ended.set(Turn.ConversationId, Date.now());
     UpdateDesktopSession(Turn.ConversationId, (Session) => {
       Session.lastActivityAt = Date.now();
       Session.completedTurns = ((Session.completedTurns as number) || 0) + 1;
@@ -519,6 +520,12 @@ export function AddToTurn(RequestId: string | null, ConversationId: string | nul
   }
 
   return null;
+}
+
+const Ended = new Map<string, number>();
+
+export function LastEndedAt(ConversationId: string): number {
+  return Ended.get(ConversationId) || 0;
 }
 
 export function ActiveTurnFor(ConversationId: string): Turn | null {

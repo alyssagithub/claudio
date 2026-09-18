@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import os from "node:os";
+import { execFileSync } from "node:child_process";
 import { z } from "zod/v3";
 import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport } from "./Ask.js";
 import type { LogAnswer, ExecuteAnswer } from "./Ask.js";
@@ -25,7 +27,37 @@ const PlaytestDescription = [
   "Always stop what you started.",
   "Check status first rather than assuming.",
   "This runs without a player character, so LocalPlayer and PlayerGui are not available.",
+  "A multiplayer test opens one more Studio process per player, each as heavy as the editor itself, so the tool measures free memory against that before starting one or adding players and refuses when the machine cannot carry it. Pass force to go ahead anyway.",
 ].join(" ");
+
+function StudioBytes(): number {
+  try {
+    if (process.platform === "win32") {
+      const Said = execFileSync("powershell", ["-NoProfile", "-Command", "(Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Sort-Object WorkingSet64 -Descending | Select-Object -First 1).WorkingSet64"], { encoding: "utf8", timeout: 8000 });
+
+      return Number(Said.trim()) || 0;
+    }
+
+    const Said = execFileSync("sh", ["-c", "ps -axo rss,comm | grep -i RobloxStudio | sort -rn | head -1 | awk '{print $1}'"], { encoding: "utf8", timeout: 8000 });
+
+    return (Number(Said.trim()) || 0) * 1024;
+  } catch {
+    return 0;
+  }
+}
+
+function Headroom(Players: number): string | null {
+  const Free = os.freemem();
+  const Each = Math.max(StudioBytes(), 512 * 1024 * 1024);
+  const Needed = Players * Each + 1536 * 1024 * 1024;
+  const Gigabytes = (Bytes: number) => (Bytes / (1024 * 1024 * 1024)).toFixed(1);
+
+  if (Free >= Needed) {
+    return null;
+  }
+
+  return `Not starting that: ${Players} more player${Players === 1 ? "" : "s"} means ${Players} more Studio process${Players === 1 ? "" : "es"} at about ${Gigabytes(Each)} GB each, and this machine has ${Gigabytes(Free)} GB free of ${Gigabytes(os.totalmem())} GB. It needs about ${Gigabytes(Needed)} GB free to do it without starving everything else. Close things, use fewer players, or pass force to try anyway.`;
+}
 
 const LintDescription = [
   "Check scripts in the open place for analyzer warnings, including scripts nobody has edited.",
@@ -294,8 +326,29 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         action: z.enum(["start", "stop", "status", "players"]).describe("What to do. Use status to find out what is happening before changing it."),
         mode: z.enum(["play", "run", "multiplayer"]).optional().describe("How to start it. play gives a character, run simulates without one, multiplayer starts a server with several clients. Defaults to play."),
         players: z.number().optional().describe("How many players, for multiplayer starts and for the players action."),
+        force: z.boolean().optional().describe("Start a multiplayer test or add players even when the memory check says the machine cannot carry it."),
       },
-      Run: async (Input: { action: "start" | "stop" | "status" | "players"; mode?: "play" | "run" | "multiplayer"; players?: number }) => {
+      Run: async (Input: { action: "start" | "stop" | "status" | "players"; mode?: "play" | "run" | "multiplayer"; players?: number; force?: boolean }) => {
+        const Reachable = await RuntimeLive();
+        const Adding = Input.action === "players" ? Math.max(1, Math.floor(Input.players || 1)) : (Input.action === "start" && Input.mode === "multiplayer" ? Math.max(2, Math.floor(Input.players || 2)) : 0);
+        const Refused = Adding > 0 && Input.force !== true ? Headroom(Adding) : null;
+
+        if (Refused) {
+          return { content: [{ type: "text", text: Refused }] };
+        }
+
+        if (Reachable && (Input.action === "stop" || Input.action === "players")) {
+          return { content: [{ type: "text", text: Said(await ReachIn("server", "playtest", { action: Input.action, players: Input.players }), "The session did not say what happened.") }] };
+        }
+
+        if (Reachable && Input.action === "start") {
+          return { content: [{ type: "text", text: "A playtest is already running and its session is reachable, so it was left alone. Stop it first if you want a fresh run." }] };
+        }
+
+        if (Reachable && Input.action === "status") {
+          return { content: [{ type: "text", text: "A playtest is running and its session is reachable, so stop and players work." }] };
+        }
+
         const Found: { error?: string; text?: string; relay?: string; players?: number } | null = await Reach("playtest", { action: Input.action, mode: Input.mode, players: Input.players });
 
         if (Found && Found.relay) {

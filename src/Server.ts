@@ -22,6 +22,7 @@ import { ArmClipboard, DisarmClipboard, ReadClipboardImage, ShowToast, WriteClip
 import { ForgetConversation, GetModels } from "./Models.js";
 import { Analyze, Warm } from "./Lint.js";
 import { RestartBridge } from "./Startup.js";
+import { DescribeReturn, StopWatchingReturn, WatchReturn } from "./Keys.js";
 
 type LoginState = {loggedIn: boolean, detail: string | null};
 
@@ -378,8 +379,27 @@ export function StartServer(Port: number) {
         return;
       }
 
+      if (Request.method === "POST" && Url.pathname === "/keys/watch") {
+        const Body = await ReadBody(Request);
+
+        if (Body.on === true) {
+          WatchReturn();
+        } else {
+          StopWatchingReturn();
+        }
+
+        SendJson(Response, 200, DescribeReturn());
+        return;
+      }
+
+      if (Request.method === "GET" && Url.pathname === "/keys/return") {
+        SendJson(Response, 200, DescribeReturn());
+        return;
+      }
+
       if (Request.method === "POST" && Url.pathname === "/quit") {
         SendJson(Response, 200, { quitting: true });
+        StopWatchingReturn(true);
         AbortAllTurns();
         setTimeout(() => process.exit(0), 500);
         return;

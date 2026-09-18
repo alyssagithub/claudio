@@ -292,6 +292,14 @@ function Client.GetConversation(Id: string, Before: number?, Count: number?): (b
 	return Checked(Ok, Result, Schemas.Conversation)
 end
 
+function Client.WatchKeys(On: boolean): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/keys/watch`, {on = On})
+end
+
+function Client.LastReturn(): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/keys/return`)
+end
+
 function Client.ConversationExists(Id: string): boolean
 	const Ok, Result = Http.Request("GET", `{BaseUrl()}/conversations/{Id}/exists`)
 

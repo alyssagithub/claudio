@@ -120,6 +120,37 @@ return function()
 
 	Vide.cleanup(Disarm)
 
+	local WantWatch = false
+	local Watching = false
+	local Syncing = false
+
+	const function Watch(On: boolean)
+		WantWatch = On
+
+		if Syncing then
+			return
+		end
+
+		Syncing = true
+
+		task.spawn(function()
+			while Watching ~= WantWatch do
+				const Wanted = WantWatch
+
+				Client.WatchKeys(Wanted)
+				Watching = Wanted
+			end
+
+			Syncing = false
+		end)
+	end
+
+	Vide.cleanup(function()
+		if Watching then
+			task.spawn(Client.WatchKeys, false)
+		end
+	end)
+
 	const function Attach(Token: string)
 		const Ok, Image = Client.GetClipboardImage(Token)
 
@@ -157,9 +188,11 @@ return function()
 		Text = Chat.Draft,
 		Focused = function()
 			Arm()
+			Watch(true)
 		end,
 		FocusLost = function()
 			Disarm()
+			Watch(false)
 		end,
 
 		Vide.changed("Text", function(Text: string)
@@ -167,11 +200,26 @@ return function()
 			const Typed = Text:sub(-1) == "\n" and #Text == #Previous + 1
 
 			if Typed and Settings.Get("SendWithEnter")() then
-				const Message = Text:sub(1, -2)
+				Chat.Draft(Text)
+				task.defer(function()
+					if Box.Text == Text then
+						Box.CursorPosition = #Text + 1
+					end
 
-				Chat.Draft("")
-				Box.Text = ""
-				Chat.Send(Message)
+					Follow()
+				end)
+				task.spawn(function()
+					const Ok, Seen = Client.LastReturn()
+					const Shifted = Ok and typeof(Seen) == "table" and Seen.watching == true and Seen.shift == true and typeof(Seen.now) == "number" and typeof(Seen.at) == "number" and Seen.now - Seen.at < 2000
+
+					if Shifted or Box.Text ~= Text then
+						return
+					end
+
+					Chat.Draft("")
+					Box.Text = ""
+					Chat.Send(Text:sub(1, -2))
+				end)
 
 				return
 			end

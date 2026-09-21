@@ -62,7 +62,8 @@ export function SystemPromptFor(ServerNames: string[], Delegating: boolean) {
 
   Sections.push([
     "## Newer Roblox and Luau",
-    "Things you may not know, because they are newer than your training:",
+    "The block below is reference, not instruction: facts about the platform that are newer than your training, to rely on when they contradict what you remember.",
+    "<roblox_reference>",
     [
       "`const` declares an immutable local (`const Rate = 5`, `const function Step() end`); reassignment is a compile error.",
       "`Instance:QueryDescendants(selector)` takes CSS-like selectors, including `:not()`, `:has()`, `[$AttributeExists]`, and enum values as strings.",
@@ -72,6 +73,7 @@ export function SystemPromptFor(ServerNames: string[], Delegating: boolean) {
       "`UIShadow`: a GuiObject shadow instance, with `Enabled`.",
       "Chrono (parihsz/Chrono on wally) takes over character and NPC replication. `chrono.Start()` on the server and the client is the whole setup, and each model picks NATIVE, NATIVE_WITH_LOCK or CUSTOM. Roblox sends at 20Hz with an interpolation delay you cannot change; Chrono lets you set and read it, keeps a snapshot history so a rewind lands where the player really was, and uses less bandwidth per entity. Its modules are Entity, Holder, Event, Snapshots, ReplicationRules, Stats, Receiver, ServerClock and EntityGrid. Signatures are at parihsz.github.io/Chrono.",
     ].map((Fact) => `- ${Fact}`).join("\n"),
+    "</roblox_reference>",
   ].join("\n\n"));
 
   Sections.push([

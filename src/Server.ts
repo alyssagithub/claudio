@@ -18,7 +18,7 @@ import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
 import { HandToken, TokenMatches } from "./Token.js";
 import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
-import { ArmClipboard, DisarmClipboard, ReadClipboardImage, ShowToast, WriteClipboard } from "./Notify.js";
+import { ArmClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, ShowToast, WriteClipboard } from "./Notify.js";
 import { ForgetConversation, GetModels } from "./Models.js";
 import { Analyze, Warm } from "./Lint.js";
 import { RestartBridge } from "./Startup.js";
@@ -322,6 +322,7 @@ function WarmUsage() {
 
 export function StartServer(Port: number) {
   AskLogin().catch(() => {});
+  RegisterToasts();
 
   process.on("uncaughtException", (Error) => {
     console.error("Unexpected error, the bridge is staying up: " + (Error && Error.stack ? Error.stack : Error));

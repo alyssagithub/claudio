@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { z } from "zod/v3";
 import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport } from "./Ask.js";
 import type { LogAnswer, ExecuteAnswer } from "./Ask.js";
+import { StopFlash } from "./Notify.js";
 
 const ExecuteDescription = [
   "Run Luau inside the open place and get back what it returned, what it printed, and where it failed.",
@@ -338,7 +339,11 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         }
 
         if (Reachable && (Input.action === "stop" || Input.action === "players")) {
-          return { content: [{ type: "text", text: Said(await ReachIn("server", "playtest", { action: Input.action, players: Input.players }), "The session did not say what happened.") }] };
+          const Answer = Said(await ReachIn("server", "playtest", { action: Input.action, players: Input.players }), "The session did not say what happened.");
+
+          StopFlash();
+
+          return { content: [{ type: "text", text: Answer }] };
         }
 
         if (Reachable && Input.action === "start") {
@@ -350,6 +355,10 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         }
 
         const Found: { error?: string; text?: string; relay?: string; players?: number } | null = await Reach("playtest", { action: Input.action, mode: Input.mode, players: Input.players });
+
+        if (Input.action === "start" || Input.action === "stop") {
+          StopFlash();
+        }
 
         if (Found && Found.relay) {
           const Missing = await NeedsSession(`Studio only allows ${Found.relay} from inside the running session, and the session is not reachable. It needs Allow HTTP Requests turned on in Game Settings before the playtest starts, otherwise stop it from Studio's toolbar.`);

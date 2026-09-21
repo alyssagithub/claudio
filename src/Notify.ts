@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -7,7 +8,21 @@ import notifier from "node-notifier";
 const ScriptPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "Notify.ps1");
 const IconFile = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "Icon.png");
 const ClipboardPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "Clipboard.ps1");
+const ToastPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "Toast.ps1");
+const SnoreToast = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "node_modules", "node-notifier", "vendor", "snoreToast", "snoretoast-x64.exe");
+const ToastShortcut = path.join(process.env.APPDATA || "", "Microsoft", "Windows", "Start Menu", "Programs", "Claudio.lnk");
 
+export function RegisterToasts() {
+  if (process.platform !== "win32" || !process.env.APPDATA || fs.existsSync(ToastShortcut)) {
+    return;
+  }
+
+  execFile(SnoreToast, ["-install", "Claudio", path.join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), "Claudio"], { windowsHide: true }, (Error) => {
+    if (Error) {
+      console.error(`Could not register Claudio for desktop notifications: ${Error.message.slice(0, 200)}`);
+    }
+  });
+}
 
 type ToastOptions = {
   Flash?: boolean;
@@ -70,21 +85,52 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
       return;
     }
 
-    notifier.notify({
-      appID: "Claudio",
-      title: Heading,
-      message: Detail,
-      icon: IconFile,
-      sound: false,
-      wait: false,
-    }, (Failure: Error | null) => {
-      if (Failure) {
-        console.error(`Toast failed: ${String(Failure).slice(0, 200)}`);
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ToastPath], {
+      windowsHide: true,
+      env: { ...process.env, CLAUDIO_TITLE: Heading, CLAUDIO_BODY: Detail, CLAUDIO_ICON: IconFile, CLAUDIO_APP_ID: "Claudio" },
+    }, (Trouble, Said) => {
+      if (!Trouble && Said.includes("shown")) {
+        return;
       }
+
+      notifier.notify({
+        appID: "Claudio",
+        title: Heading,
+        message: Detail,
+        icon: IconFile,
+        sound: false,
+        wait: false,
+      }, (Failure: Error | null) => {
+        if (Failure) {
+          console.error(`Toast failed: ${String(Failure).slice(0, 200)}`);
+        }
+      });
     });
   });
 
   return true;
+}
+
+const StopFlashCommand = [
+  "$Studio = Get-Process -Name RobloxStudioBeta, RobloxStudio -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1",
+  "if (-not $Studio) { exit }",
+  "Add-Type -Namespace Claudio -Name Flash -MemberDefinition '[StructLayout(LayoutKind.Sequential)] public struct FLASHWINFO { public uint cbSize; public IntPtr hwnd; public uint dwFlags; public uint uCount; public uint dwTimeout; } [DllImport(\"user32.dll\")] public static extern bool FlashWindowEx(ref FLASHWINFO pwfi);'",
+  "$Info = New-Object Claudio.Flash+FLASHWINFO",
+  "$Info.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($Info)",
+  "$Info.hwnd = $Studio.MainWindowHandle",
+  "[Claudio.Flash]::FlashWindowEx([ref] $Info) | Out-Null",
+].join("; ");
+
+export function StopFlash() {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  for (const Delay of [800, 2500, 5000]) {
+    setTimeout(() => {
+      execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", StopFlashCommand], { windowsHide: true }, () => {});
+    }, Delay);
+  }
 }
 
 export function WriteClipboard(Text: string): Promise<boolean> {

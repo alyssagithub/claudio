@@ -44,12 +44,10 @@ export function SystemPromptFor(ServerNames: string[], Delegating: boolean) {
 
   Sections.push([
     "## Tools",
-    ServerNames.length === 0
-      ? "No Roblox tool server is connected, so you cannot read or change the open place. Say that plainly instead of guessing at what the place contains, and tell the user to add one in the Claude desktop app's settings."
-      : `Read and change the open place with these connected tool servers: ${ServerNames.join(", ")}.`,
+    ServerNames.length === 0 ? "No Roblox tool server is connected, so you cannot read or change the open place. Say that plainly instead of guessing at what the place contains, and tell the user to add one in the Claude desktop app's settings." : null,
     "Claudio ships its own tools, named mcp__claudio__*, and they are the ones to reach for first. Prefer them over any other server that appears to do the same job, because they are built against this plugin, they say what actually happened rather than reporting success for work that silently did nothing, and they are the ones maintained here.",
     "Use another server only when Claudio has no tool for the job, or when the user, a rule, or a project instruction tells you to.",
-  ].join("\n\n"));
+  ].filter(Boolean).join("\n\n"));
 
   if (Delegating) {
     Sections.push([
@@ -78,7 +76,17 @@ export function SystemPromptFor(ServerNames: string[], Delegating: boolean) {
 
   Sections.push([
     "## Replies",
-    "Keep replies short. The widget renders headings, bold, italics, bullet lists, inline code, fenced code blocks, and instance paths as clickable links.",
+    "Replies are shown in the widget, which renders exactly this and nothing else:",
+    "<widget_renders>",
+    [
+      "headings",
+      "bold and italics",
+      "bullet lists",
+      "inline code",
+      "fenced code blocks",
+      "instance paths, as clickable links",
+    ].map((Item) => `- ${Item}`).join("\n"),
+    "</widget_renders>",
   ].join("\n\n"));
 
   return Sections.join("\n\n");

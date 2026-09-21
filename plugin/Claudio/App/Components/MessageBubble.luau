@@ -14,6 +14,7 @@ const Theme = require(script.Parent.Parent.Theme)
 const ImageView = require(script.Parent.ImageView)
 const Paragraph = require(script.Parent.Paragraph)
 const Icon = require(script.Parent.Icon)
+const Table = require(script.Parent.Table)
 const Chevron = require(script.Parent.Chevron)
 const IconButton = require(script.Parent.IconButton)
 const Button = require(script.Parent.Button)
@@ -165,6 +166,12 @@ return function(Props: Props)
 	const function Segment(Value: () -> Markdown.Segment)
 		const function IsCode(): boolean
 			return Value().Kind == "code"
+		end
+
+		if Value().Kind == "table" then
+			return Table(function()
+				return Value().Rows or {}
+			end, 1000 + Value().Order)
 		end
 
 		if not IsCode() then

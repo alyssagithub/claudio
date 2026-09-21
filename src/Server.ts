@@ -464,7 +464,6 @@ export function StartServer(Port: number) {
           Folder: typeof Body.workingDirectory === "string" ? Body.workingDirectory : null,
           OutputStyle: typeof Body.outputStyle === "string" ? Body.outputStyle : "default",
           StepDown: Body.stepDown !== false,
-          Renders: Array.isArray(Body.renders) ? Body.renders.filter((Item: unknown) => typeof Item === "string").slice(0, 20) : undefined,
         })));
         return;
       }

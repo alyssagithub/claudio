@@ -39,9 +39,7 @@ export const AllowedTools = [
   "WebFetch",
 ];
 export const CappedTools = ["Read", "Glob", "Grep"];
-export const DefaultRenders = ["headings", "bold and italics", "bullet lists", "inline code", "fenced code blocks", "instance paths, as clickable links"];
-
-export function SystemPromptFor(ServerNames: string[], Delegating: boolean, Renders?: string[]) {
+export function SystemPromptFor(ServerNames: string[], Delegating: boolean) {
   const Sections = ["# Claudio\n\nYou are Claudio, a chat assistant in a plugin widget docked in Roblox Studio."];
 
   Sections.push([
@@ -73,14 +71,6 @@ export function SystemPromptFor(ServerNames: string[], Delegating: boolean, Rend
       "`UIShadow`: a GuiObject shadow instance, with `Enabled`.",
     ].map((Fact) => `- ${Fact}`).join("\n"),
     "</roblox_reference>",
-  ].join("\n\n"));
-
-  Sections.push([
-    "## Replies",
-    "Replies are shown in the widget, which renders exactly this and nothing else:",
-    "<widget_renders>",
-    (Renders && Renders.length > 0 ? Renders : DefaultRenders).map((Item) => `- ${Item}`).join("\n"),
-    "</widget_renders>",
   ].join("\n\n"));
 
   return Sections.join("\n\n");

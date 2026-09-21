@@ -3,6 +3,7 @@ const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Markdown = require(script.Parent.Parent.Parent.Markdown)
 const Navigate = require(script.Parent.Parent.Parent.Navigate)
+const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Theme = require(script.Parent.Parent.Theme)
 
@@ -159,6 +160,55 @@ const function Word(Text: string, Link: string?, LayoutOrder: number)
 	}
 end
 
+const function Anchor(Label: string, Url: string, LayoutOrder: number)
+	const Hovered = Vide.source(false)
+
+	local Button: TextButton
+
+	Button = Create "TextButton" {
+		Name = "Anchor",
+		AutomaticSize = Enum.AutomaticSize.XY,
+		BackgroundTransparency = 1,
+		TextColor3 = function()
+			return if Hovered() then Theme.Colors.Text() else Theme.Colors.Accent()
+		end,
+		TextSize = Settings.TextSize,
+		FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+		RichText = true,
+		AutoButtonColor = false,
+		LayoutOrder = LayoutOrder,
+		Text = `<u>{Label}</u>`,
+		Activated = function()
+			task.spawn(Chat.Copy, Url)
+		end,
+		MouseEnter = function()
+			Hovered(true)
+
+			const Window = Chat.Window
+
+			if not Window then
+				return
+			end
+
+			const Corner = Button.AbsolutePosition - Window.AbsolutePosition
+			const Middle = Corner.X + Button.AbsoluteSize.X / 2
+
+			Chat.Tip({
+				Text = `{Url}  ·  click to copy`,
+				Where = Vector2.new(Middle, Corner.Y + Button.AbsoluteSize.Y + 4),
+				Side = if Window.AbsoluteSize.X - Middle < 90 then 1 elseif Middle < 90 then 0 else 0.5,
+				Below = true,
+			})
+		end,
+		MouseLeave = function()
+			Hovered(false)
+			Chat.Tip(nil)
+		end,
+	}
+
+	return Button
+end
+
 const function Snippet(Text: string, LayoutOrder: number)
 	return Create "TextLabel" {
 		Name = "Snippet",
@@ -209,13 +259,43 @@ const function Mentions(Line: string, Links: {[string]: string}): boolean
 end
 
 const function Row(Line: string, LayoutOrder: number, Links: {[string]: string})
-	if not Mentions(Line, Links) and not Line:find("`", 1, true) then
+	if not Mentions(Line, Links) and not Line:find("`", 1, true) and not Line:find("%]%(") then
 		return Plain(Line, LayoutOrder)
 	end
 
 	const Words: {Instance} = {}
+	const Anchors: {{Label: string, Url: string}} = {}
+	const Marked = Line:gsub("%[(.-)%]%((%S-)%)", function(Label: string, Url: string): string
+		table.insert(Anchors, {Label = Label, Url = Url})
 
-	for Index, Token in Split(Markdown.Rich(Line, Settings.TextSize())) do
+		return `{#Anchors}`
+	end)
+
+	for Index, Token in Split(Markdown.Rich(Marked, Settings.TextSize())) do
+		const Which = Token:match("^(%d+)(.*)$")
+
+		if Which and Anchors[tonumber(Which) :: number] then
+			const Found = Anchors[tonumber(Which) :: number]
+
+			table.insert(Words, (Create "Frame" {
+				Name = "Linked",
+				AutomaticSize = Enum.AutomaticSize.XY,
+				Size = UDim2.fromScale(0, 0),
+				BackgroundTransparency = 1,
+				LayoutOrder = Index,
+
+				Create "UIListLayout" {
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+				},
+				Anchor(Found.Label, Found.Url, 1),
+				Word(Token:match("^%d+(.*)$") or "", nil, 2),
+			}))
+
+			continue
+		end
+
 		const Body, Tail = Token:match("^`(.-)`(.*)$")
 
 		if Body then

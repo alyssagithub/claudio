@@ -282,7 +282,6 @@ export type Session = {
   FastMode: boolean;
   OutputStyle: string;
   StepDown: boolean;
-  Renders: string[];
   Effort: string | null;
   HasSpoken?: boolean;
   Ended?: boolean;
@@ -403,5 +402,4 @@ export type TurnRequest = {
   Folder?: string | null;
   OutputStyle?: string;
   StepDown?: boolean;
-  Renders?: string[];
 };

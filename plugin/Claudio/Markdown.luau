@@ -6,7 +6,16 @@ export type Segment = {
 	Language: string?,
 }
 
-const Markdown = {}
+const Markdown = {
+	Renders = {
+		"headings",
+		"bold and italics",
+		"bullet lists",
+		"inline code",
+		"fenced code blocks",
+		"instance paths, as clickable links",
+	},
+}
 
 const Cached: {[string]: string} = {}
 local Held = 0

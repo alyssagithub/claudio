@@ -39,7 +39,9 @@ export const AllowedTools = [
   "WebFetch",
 ];
 export const CappedTools = ["Read", "Glob", "Grep"];
-export function SystemPromptFor(ServerNames: string[], Delegating: boolean) {
+export const DefaultRenders = ["headings", "bold and italics", "bullet lists", "inline code", "fenced code blocks", "instance paths, as clickable links"];
+
+export function SystemPromptFor(ServerNames: string[], Delegating: boolean, Renders?: string[]) {
   const Sections = ["# Claudio\n\nYou are Claudio, a chat assistant in a plugin widget docked in Roblox Studio."];
 
   Sections.push([
@@ -69,7 +71,6 @@ export function SystemPromptFor(ServerNames: string[], Delegating: boolean) {
       "`math.tau`, `math.nan`, `math.e`, `math.phi`, `math.sqrt2`, `math.isnan`, `math.isinf`, `math.isfinite`.",
       "`EncodingService`: Base64, Blake/MD5/SHA hashes, zstd.",
       "`UIShadow`: a GuiObject shadow instance, with `Enabled`.",
-      "Chrono (parihsz/Chrono on wally) takes over character and NPC replication. `chrono.Start()` on the server and the client is the whole setup, and each model picks NATIVE, NATIVE_WITH_LOCK or CUSTOM. Roblox sends at 20Hz with an interpolation delay you cannot change; Chrono lets you set and read it, keeps a snapshot history so a rewind lands where the player really was, and uses less bandwidth per entity. Its modules are Entity, Holder, Event, Snapshots, ReplicationRules, Stats, Receiver, ServerClock and EntityGrid. Signatures are at parihsz.github.io/Chrono.",
     ].map((Fact) => `- ${Fact}`).join("\n"),
     "</roblox_reference>",
   ].join("\n\n"));
@@ -78,14 +79,7 @@ export function SystemPromptFor(ServerNames: string[], Delegating: boolean) {
     "## Replies",
     "Replies are shown in the widget, which renders exactly this and nothing else:",
     "<widget_renders>",
-    [
-      "headings",
-      "bold and italics",
-      "bullet lists",
-      "inline code",
-      "fenced code blocks",
-      "instance paths, as clickable links",
-    ].map((Item) => `- ${Item}`).join("\n"),
+    (Renders && Renders.length > 0 ? Renders : DefaultRenders).map((Item) => `- ${Item}`).join("\n"),
     "</widget_renders>",
   ].join("\n\n"));
 

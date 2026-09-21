@@ -3,6 +3,7 @@ const Http = require(script.Parent.Http)
 const Error = require(script.Parent.Error)
 const Config = require(script.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Settings)
+const Markdown = require(script.Parent.Parent.Markdown)
 const Types = require(script.Parent.Parent.Types)
 const Connection = require(script.Parent.Parent.Store.Connection)
 const Typed = require(script.Parent.Parent.Packages.typed)
@@ -105,6 +106,7 @@ function Client.StartTurn(Text: string, ConversationId: string?, Images: {Types.
 		escalate = Escalate,
 		outputStyle = string.lower(Settings.Get("OutputStyle")()),
 		stepDown = Settings.Get("StepDown")(),
+		renders = Markdown.Renders,
 		place = {
 			name = GetPlaceName(),
 			placeId = if game.PlaceId == 0 then nil else string.format("%d", game.PlaceId),

@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, DelegateModels, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, SystemPromptFor, WorkingDirectory } from "./Config.js";
+import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, DefaultRenders, DelegateModels, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, SystemPromptFor, WorkingDirectory } from "./Config.js";
 import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
@@ -1069,7 +1069,7 @@ export function LadderBelow(Model: string): string[] {
   return Index >= 0 ? Ladder.slice(Index + 1) : Ladder.slice(Ladder.indexOf("opus"));
 }
 
-function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string, Model: string, Effort: string | null, AskForTools: boolean, ExtraPrompt: boolean, FastMode: boolean, Planning: boolean, Delegating: boolean, Mode: string, Bypass: boolean, Delegate: string, OutputStyle: string, StepDown: boolean): Session {
+function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string, Model: string, Effort: string | null, AskForTools: boolean, ExtraPrompt: boolean, FastMode: boolean, Planning: boolean, Delegating: boolean, Mode: string, Bypass: boolean, Delegate: string, OutputStyle: string, StepDown: boolean, Renders: string[]): Session {
   const Pending: unknown[] = [];
   let Wake: ((Value?: unknown) => void) | null = null;
   let Ended = false;
@@ -1085,6 +1085,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
     FastMode: FastMode === true,
     OutputStyle,
     StepDown,
+    Renders,
     WorkingDirectory: TurnWorkingDirectory,
     Planning: Planning === true,
     Mode: PermissionModeFor(Mode, Bypass),
@@ -1259,7 +1260,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
             }],
           },
           mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions) as Promise<JobAnswer | null>, ((Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined))) as Reacher, ((Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined), Role)) as ReacherIn) },
-          systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.Delegating) },
+          systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.Delegating, Renders) },
         },
       });
 
@@ -1317,7 +1318,7 @@ export function KeepSpareWarm() {
 
   const Likely = AutoTier(0, AutoBias(ReadPluginSetting("Effort") as string | null));
 
-  Spare = OpenSession(null, LastFolder, Likely.model, Likely.effort, true, true, false, false, false, DefaultMode, false, Likely.delegate, LastStyle, LastStepDown);
+  Spare = OpenSession(null, LastFolder, Likely.model, Likely.effort, true, true, false, false, false, DefaultMode, false, Likely.delegate, LastStyle, LastStepDown, LastRenders);
 }
 
 function EffortRank(Effort: string | null) {
@@ -1350,6 +1351,7 @@ function DescribePlace(Place: {name?: string, placeId?: number, universeId?: num
 
 let LastStyle = "default";
 let LastStepDown = true;
+let LastRenders: string[] = DefaultRenders;
 
 function ApplyStyle(Session: Session, OutputStyle: string, StepDown: boolean) {
   if (Session.OutputStyle === OutputStyle && Session.StepDown === StepDown) {
@@ -1385,9 +1387,10 @@ export function ApplyStyleEverywhere(OutputStyle: string, StepDown: boolean) {
   }
 }
 
-export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForTools, GuardTools, Escalate, ExtraPrompt, FastMode, Mode, Bypass, Place, Folder, OutputStyle, StepDown }: TurnRequest) {
+export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForTools, GuardTools, Escalate, ExtraPrompt, FastMode, Mode, Bypass, Place, Folder, OutputStyle, StepDown, Renders }: TurnRequest) {
   LastStyle = OutputStyle || "default";
   LastStepDown = StepDown !== false;
+  LastRenders = Renders && Renders.length > 0 ? Renders : LastRenders;
 
   const Existing = ConversationId ? GetConversation(ConversationId) : null;
   const Lean = Model === LeanMode.value;
@@ -1486,7 +1489,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Turn.Effort = Warm.Effort;
   }
 
-  const Session = (Reusable ? Warm : null) || OpenSession(ConversationId, Turn.WorkingDirectory, Chosen.model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode, Turn.Planning, Turn.Delegating, Turn.Mode, Turn.Bypass, Turn.Delegate, Turn.OutputStyle, Turn.StepDown);
+  const Session = (Reusable ? Warm : null) || OpenSession(ConversationId, Turn.WorkingDirectory, Chosen.model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode, Turn.Planning, Turn.Delegating, Turn.Mode, Turn.Bypass, Turn.Delegate, Turn.OutputStyle, Turn.StepDown, LastRenders);
 
   if (Session.Model !== Chosen.model && Session.Query) {
     Session.Model = Chosen.model;

@@ -111,26 +111,45 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
   return true;
 }
 
-const StopFlashCommand = [
-  "$Studio = Get-Process -Name RobloxStudioBeta, RobloxStudio -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1",
-  "if (-not $Studio) { exit }",
-  "Add-Type -Namespace Claudio -Name Flash -MemberDefinition '[StructLayout(LayoutKind.Sequential)] public struct FLASHWINFO { public uint cbSize; public IntPtr hwnd; public uint dwFlags; public uint uCount; public uint dwTimeout; } [DllImport(\"user32.dll\")] public static extern bool FlashWindowEx(ref FLASHWINFO pwfi);'",
-  "$Info = New-Object Claudio.Flash+FLASHWINFO",
-  "$Info.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($Info)",
-  "$Info.hwnd = $Studio.MainWindowHandle",
-  "[Claudio.Flash]::FlashWindowEx([ref] $Info) | Out-Null",
-].join("; ");
+const QuietPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "Quiet.ps1");
 
-export function StopFlash() {
-  if (process.platform !== "win32") {
-    return;
-  }
+export function QuietFlash(Seconds: number): Promise<() => void> {
+  return new Promise((Resolve) => {
+    if (process.platform !== "win32") {
+      Resolve(() => {});
+      return;
+    }
 
-  for (const Delay of [800, 2500, 5000]) {
-    setTimeout(() => {
-      execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", StopFlashCommand], { windowsHide: true }, () => {});
-    }, Delay);
-  }
+    const Started = execFile("powershell.exe", ["-NoProfile", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", QuietPath], {
+      windowsHide: true,
+      env: { ...process.env, CLAUDIO_QUIET_SECONDS: String(Seconds) },
+    }, () => {});
+
+    const Release = () => {
+      try {
+        Started.stdin!.write("done\n");
+      } catch {
+        return;
+      }
+    };
+
+    let Settled = false;
+
+    const Ready = () => {
+      if (!Settled) {
+        Settled = true;
+        Resolve(Release);
+      }
+    };
+
+    Started.stdout!.on("data", (Chunk: Buffer) => {
+      if (Chunk.toString("utf8").includes("quiet")) {
+        Ready();
+      }
+    });
+    Started.on("exit", Ready);
+    setTimeout(Ready, 4000);
+  });
 }
 
 export function WriteClipboard(Text: string): Promise<boolean> {

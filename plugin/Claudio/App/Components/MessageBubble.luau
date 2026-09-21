@@ -1300,7 +1300,7 @@ return function(Props: Props)
 			BackgroundColor3 = Theme.Colors.Panel,
 			LayoutOrder = 2,
 			Visible = function()
-				return #Written() > 0
+				return not Props.Live and #Written() > 0
 			end,
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 8)},

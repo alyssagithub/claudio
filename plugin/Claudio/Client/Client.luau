@@ -103,6 +103,8 @@ function Client.StartTurn(Text: string, ConversationId: string?, Images: {Types.
 		bypass = Settings.Get("Bypass")(),
 		workingDirectory = Settings.Get("WorkingFolder")(),
 		escalate = Escalate,
+		outputStyle = string.lower(Settings.Get("OutputStyle")()),
+		stepDown = Settings.Get("StepDown")(),
 		place = {
 			name = GetPlaceName(),
 			placeId = if game.PlaceId == 0 then nil else string.format("%d", game.PlaceId),
@@ -290,6 +292,13 @@ function Client.GetConversation(Id: string, Before: number?, Count: number?): (b
 	const Ok, Result = Http.Request("GET", `{BaseUrl()}/conversations/{Id}?before={Before or ""}&count={Count or ""}`)
 
 	return Checked(Ok, Result, Schemas.Conversation)
+end
+
+function Client.PushStyle(): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/style`, {
+		outputStyle = string.lower(Settings.Get("OutputStyle")()),
+		stepDown = Settings.Get("StepDown")(),
+	})
 end
 
 function Client.WatchKeys(On: boolean): (boolean, any)

@@ -12,7 +12,7 @@ import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStud
 import { StudioTools } from "./Tools.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
 import { StudioProcesses } from "./StudioPresence.js";
-import { ActiveTurnFor, AddToTurn, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { ActiveTurnFor, AddToTurn, ApplyStyleEverywhere, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
@@ -379,6 +379,14 @@ export function StartServer(Port: number) {
         return;
       }
 
+      if (Request.method === "POST" && Url.pathname === "/style") {
+        const Body = await ReadBody(Request);
+
+        ApplyStyleEverywhere(typeof Body.outputStyle === "string" ? Body.outputStyle : "default", Body.stepDown !== false);
+        SendJson(Response, 200, { applied: true });
+        return;
+      }
+
       if (Request.method === "POST" && Url.pathname === "/keys/watch") {
         const Body = await ReadBody(Request);
 
@@ -454,6 +462,8 @@ export function StartServer(Port: number) {
           Escalate: Body.escalate === true,
           Place: Body.place && typeof Body.place === "object" ? Body.place : null,
           Folder: typeof Body.workingDirectory === "string" ? Body.workingDirectory : null,
+          OutputStyle: typeof Body.outputStyle === "string" ? Body.outputStyle : "default",
+          StepDown: Body.stepDown !== false,
         })));
         return;
       }

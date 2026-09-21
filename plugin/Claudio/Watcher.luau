@@ -2,6 +2,7 @@
 const Settings = require(script.Parent.Settings)
 const Format = require(script.Parent.Format)
 const Types = require(script.Parent.Types)
+const Breathe = require(script.Parent.Breathe)
 
 export type Entry = {
 	Object: Instance?,
@@ -9,6 +10,7 @@ export type Entry = {
 	Verb: string,
 	Class: string?,
 	Fields: {string},
+	Values: {[string]: string},
 	Before: string?,
 }
 
@@ -37,41 +39,9 @@ const Roots = {
 	TextChatService = true,
 }
 
-const Verbs = {
-	Name = "Renamed",
-	Parent = "Moved",
-	Size = "Resized",
-	Scale = "Resized",
-	CFrame = "Moved",
-	Position = "Moved",
-	Orientation = "Moved",
-	Rotation = "Moved",
-	PivotOffset = "Moved",
-	Source = "Edited",
-	Color = "Restyled",
-	Color3 = "Restyled",
-	BrickColor = "Restyled",
-	Material = "Restyled",
-	MaterialVariant = "Restyled",
-	Transparency = "Restyled",
-	Reflectance = "Restyled",
-	TextureID = "Restyled",
-	Image = "Restyled",
-	BackgroundColor3 = "Restyled",
-	TextColor3 = "Restyled",
-	Text = "Retyped",
-	Anchored = "Changed physics on",
-	CanCollide = "Changed physics on",
-	CanTouch = "Changed physics on",
-	CanQuery = "Changed physics on",
-	Massless = "Changed physics on",
-	Enabled = "Toggled",
-	Disabled = "Toggled",
-	Visible = "Toggled",
-	Value = "Set",
-}
-
 const Noise = {
+	CFrame = true,
+	Rotation = true,
 	Mass = true,
 	AssemblyMass = true,
 	AssemblyCenterOfMass = true,
@@ -117,6 +87,7 @@ end
 
 local Watching = false
 local Listeners: {[Instance]: RBXScriptConnection} = {}
+local Attributes: {[Instance]: RBXScriptConnection} = {}
 local Sources: {[Instance]: string} = {}
 local Paths: {[Instance]: string} = {}
 local Connections: {RBXScriptConnection} = {}
@@ -126,9 +97,10 @@ local Recording = false
 local Paused = false
 local Skipped = false
 local Busy = false
+local BusyUntil = 0
 
 const function CurrentBucket(): Bucket
-	return if Recording and Busy then Turn else Idle
+	return if Recording and (Busy or os.clock() < BusyUntil) then Turn else Idle
 end
 
 const Own = script.Parent
@@ -161,6 +133,10 @@ const function IsWatched(Object: Instance): boolean
 	local Parent = Highest.Parent
 
 	while Parent do
+		if Highest.Name:sub(1, 7) == "Claudio" then
+			return false
+		end
+
 		if Parent == game then
 			return Roots[Highest.Name] == true
 		end
@@ -170,6 +146,26 @@ const function IsWatched(Object: Instance): boolean
 	end
 
 	return false
+end
+
+const function Shown(Value: any): string
+	const Kind = typeof(Value)
+
+	if Kind == "string" then
+		return if #Value > 40 then `"{Value:sub(1, 37)}..."` else `"{Value}"`
+	end
+
+	if Kind == "Instance" then
+		return (Value :: Instance).Name
+	end
+
+	if Kind == "EnumItem" then
+		return (Value :: EnumItem).Name
+	end
+
+	const Text = tostring(Value)
+
+	return if #Text > 40 then `{Text:sub(1, 37)}...` else Text
 end
 
 const function Counted(Of: {[Instance]: any}): number
@@ -182,7 +178,7 @@ const function Counted(Of: {[Instance]: any}): number
 	return Total
 end
 
-const function Record(Object: Instance?, Path: string, Verb: string, Class: string?, Field: string?)
+const function Record(Object: Instance?, Path: string, Verb: string, Class: string?, Field: string?, Value: string?)
 	const Where = CurrentBucket()
 
 	if #Where.Entries >= 500 then
@@ -195,6 +191,10 @@ const function Record(Object: Instance?, Path: string, Verb: string, Class: stri
 	if Found then
 		if not Field then
 			return
+		end
+
+		if Value then
+			Found.Values[Field] = Value
 		end
 
 		for _, Existing in Found.Fields do
@@ -214,6 +214,7 @@ const function Record(Object: Instance?, Path: string, Verb: string, Class: stri
 		Verb = Verb,
 		Class = Class,
 		Fields = if Field then {Field} else {},
+		Values = if Field and Value then {[Field] = Value} else {},
 	}
 
 	Where.Keys[Key] = Made
@@ -249,7 +250,11 @@ const function AddListener(Object: Instance)
 			return
 		end
 
-		Record(Object, Object:GetFullName(), Verbs[Field] or "Changed", nil, Field)
+		const Readable, Value = pcall(function()
+			return (Object :: any)[Field]
+		end)
+
+		Record(Object, Object:GetFullName(), if Field == "Source" then "Edited" else "Changed", nil, Field, if Readable and Field ~= "Source" and Field ~= "Parent" then Shown(Value) else nil)
 
 		if Field ~= "Source" then
 			return
@@ -262,6 +267,22 @@ const function AddListener(Object: Instance)
 		end
 
 		Sources[Object] = (Object :: any).Source
+	end)
+
+	Attributes[Object] = Object.AttributeChanged:Connect(function(Name: string)
+		if Paused then
+			return
+		end
+
+		const Where = CurrentBucket()
+
+		if Where.Created[Object] or Where.Deleted[Object] then
+			return
+		end
+
+		const Value = Object:GetAttribute(Name)
+
+		Record(Object, Object:GetFullName(), "Changed", nil, `attribute {Name}`, if Value == nil then "nothing" else Shown(Value))
 	end)
 end
 
@@ -303,6 +324,13 @@ const function OnDescendantRemoving(Object: Instance)
 		Listeners[Object] = nil
 		Sources[Object] = nil
 		Paths[Object] = nil
+	end
+
+	const Watched = Attributes[Object]
+
+	if Watched then
+		Watched:Disconnect()
+		Attributes[Object] = nil
 	end
 
 	if Paused or (not Path and not IsWatched(Object)) then
@@ -352,7 +380,15 @@ const function Render(Where: Bucket): {string}
 		if Item.Verb == "Created" and Item.Class then
 			table.insert(Lines, `Created {Path} ({Item.Class})`)
 		elseif Item.Verb == "Changed" and #Item.Fields > 0 then
-			table.insert(Lines, `Changed {table.concat(Item.Fields, ", ")} on {Path}`)
+			const Told = {}
+
+			for _, Field in Item.Fields do
+				const Value = Item.Values[Field]
+
+				table.insert(Told, if Value then `{Field} to {Value}` else Field)
+			end
+
+			table.insert(Lines, `Set {table.concat(Told, ", ")} on {Path}`)
 		else
 			table.insert(Lines, `{Item.Verb} {Path}`)
 		end
@@ -473,6 +509,7 @@ function Watcher.Start()
 				AddListener(Service)
 
 				for _, Object in Service:GetDescendants() do
+					Breathe()
 					AddListener(Object)
 				end
 			end
@@ -497,8 +534,13 @@ function Watcher.Stop()
 		Listener:Disconnect()
 	end
 
+	for _, Watched in Attributes do
+		Watched:Disconnect()
+	end
+
 	table.clear(Connections)
 	table.clear(Listeners)
+	table.clear(Attributes)
 	table.clear(Sources)
 	Clear(Turn)
 	Clear(Idle)
@@ -515,6 +557,10 @@ function Watcher.BeginTurn()
 end
 
 function Watcher.SetBusy(Value: boolean)
+	if Busy and not Value then
+		BusyUntil = os.clock() + 2
+	end
+
 	Busy = Value
 end
 

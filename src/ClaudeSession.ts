@@ -471,6 +471,13 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
 
   const Text = JoinText(Turn.CommittedText, Turn.PendingText);
 
+  if (Turn.FallenFrom && Turn.Session && Turn.Session.Query) {
+    Turn.Session.Model = Turn.FallenFrom;
+    Turn.Session.Query.setModel(Turn.FallenFrom).catch(() => {});
+    Turn.Model = Turn.FallenFrom;
+    Turn.FallenFrom = null;
+  }
+
   if (Turn.ConversationId) {
     Ended.set(Turn.ConversationId, Date.now());
     UpdateDesktopSession(Turn.ConversationId, (Session) => {
@@ -720,8 +727,42 @@ function RouteMessage(Session: Session, Message: any) {
     RememberServers(Message);
 
     if (Turn && Turn.OpenedAt) {
-      console.log(`Turn ${Turn.Id}: session ready ${Date.now() - Turn.OpenedAt}ms after the turn started, ${Turn.Cold ? "cold" : "reused"}, ${(Message.mcp_servers || []).map((Server: {name: string, status: string}) => `${Server.name} ${Server.status}`).join(", ")}`);
+      console.log(`Turn ${Turn.Id}: session ready ${Date.now() - Turn.OpenedAt}ms after the turn started, ${Turn.Cold ? "cold" : "reused"}, ${Message.output_style || "default"} style, ${(Message.mcp_servers || []).map((Server: {name: string, status: string}) => `${Server.name} ${Server.status}`).join(", ")}`);
     }
+  }
+
+  if (Turn && Message.type === "system" && Message.subtype === "model_refusal_fallback" && Message.scope !== "local") {
+    const Original = String(Message.original_model || Turn.Model);
+    const Fallback = String(Message.fallback_model || "");
+
+    Session.Model = Fallback;
+    Publish(Turn, {
+      FallenFrom: Turn.FallenFrom || Original,
+      Model: Fallback,
+      Activity: Turn.Activity.concat([`stepped down to ${Fallback} after a safety refusal${Message.api_refusal_category ? ` (${Message.api_refusal_category})` : ""}`]),
+    });
+    console.log(`Turn ${Turn.Id}: ${Original} refused${Message.api_refusal_category ? ` (${Message.api_refusal_category})` : ""}, continuing on ${Fallback}`);
+
+    setTimeout(() => {
+      if (Turn.Status !== "running" || !Turn.FallenFrom || Session.Query === null || Session.CurrentTurn !== Turn) {
+        return;
+      }
+
+      const Back = Turn.FallenFrom;
+
+      Session.Model = Back;
+      Session.Query.setModel(Back).catch(() => {});
+      Publish(Turn, { FallenFrom: null, Model: Back, Activity: Turn.Activity.concat([`back on ${Back}`]) });
+      console.log(`Turn ${Turn.Id}: back on ${Back}`);
+    }, 45000);
+
+    return;
+  }
+
+  if (Turn && Message.type === "system" && Message.subtype === "model_refusal_no_fallback") {
+    Publish(Turn, { Activity: Turn.Activity.concat([`refused by ${Message.original_model || Turn.Model}${Message.api_refusal_category ? ` (${Message.api_refusal_category})` : ""}`]) });
+
+    return;
   }
 
   if (Turn && Message.type === "system" && Message.subtype === "status") {
@@ -1018,7 +1059,17 @@ function RouteMessage(Session: Session, Message: any) {
   CloseIdleSessions();
 }
 
-function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string, Model: string, Effort: string | null, AskForTools: boolean, ExtraPrompt: boolean, FastMode: boolean, Planning: boolean, Delegating: boolean, Mode: string, Bypass: boolean, Delegate: string): Session {
+const Ladder = ["claude-fable-5-1", "claude-fable-5", "opus", "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "sonnet", "claude-sonnet-4-6", "haiku"];
+
+export function LadderBelow(Model: string): string[] {
+  const Plain = Model.replace(/\[1m\]$/, "");
+  const Placed = Plain === "default" || Plain === "claude-opus-5" ? "opus" : (Plain === "claude-sonnet-5" ? "sonnet" : Plain);
+  const Index = Ladder.indexOf(Placed);
+
+  return Index >= 0 ? Ladder.slice(Index + 1) : Ladder.slice(Ladder.indexOf("opus"));
+}
+
+function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string, Model: string, Effort: string | null, AskForTools: boolean, ExtraPrompt: boolean, FastMode: boolean, Planning: boolean, Delegating: boolean, Mode: string, Bypass: boolean, Delegate: string, OutputStyle: string, StepDown: boolean): Session {
   const Pending: unknown[] = [];
   let Wake: ((Value?: unknown) => void) | null = null;
   let Ended = false;
@@ -1032,6 +1083,8 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
     AskForTools,
     ExtraPrompt: ExtraPrompt !== false,
     FastMode: FastMode === true,
+    OutputStyle,
+    StepDown,
     WorkingDirectory: TurnWorkingDirectory,
     Planning: Planning === true,
     Mode: PermissionModeFor(Mode, Bypass),
@@ -1108,7 +1161,8 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
           effort: (Effort || undefined) as EffortLevel | undefined,
           cwd: TurnWorkingDirectory,
           includePartialMessages: true,
-          settings: { fastMode: FastMode === true, todoFeatureEnabled: true },
+          settings: { fastMode: FastMode === true, todoFeatureEnabled: true, outputStyle: OutputStyle },
+          fallbackModel: StepDown && LadderBelow(Model).length > 0 ? LadderBelow(Model).join(",") : undefined,
           thinking: { type: "adaptive", display: "summarized" },
           permissionMode: Session.Mode as PermissionMode,
           planModeInstructions: PlanInstructions,
@@ -1263,7 +1317,7 @@ export function KeepSpareWarm() {
 
   const Likely = AutoTier(0, AutoBias(ReadPluginSetting("Effort") as string | null));
 
-  Spare = OpenSession(null, LastFolder, Likely.model, Likely.effort, true, true, false, false, false, DefaultMode, false, Likely.delegate);
+  Spare = OpenSession(null, LastFolder, Likely.model, Likely.effort, true, true, false, false, false, DefaultMode, false, Likely.delegate, LastStyle, LastStepDown);
 }
 
 function EffortRank(Effort: string | null) {
@@ -1294,7 +1348,47 @@ function DescribePlace(Place: {name?: string, placeId?: number, universeId?: num
   return `<studio_place>\n${Said}\n</studio_place>`;
 }
 
-export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForTools, GuardTools, Escalate, ExtraPrompt, FastMode, Mode, Bypass, Place, Folder }: TurnRequest) {
+let LastStyle = "default";
+let LastStepDown = true;
+
+function ApplyStyle(Session: Session, OutputStyle: string, StepDown: boolean) {
+  if (Session.OutputStyle === OutputStyle && Session.StepDown === StepDown) {
+    return;
+  }
+
+  Session.OutputStyle = OutputStyle;
+  Session.StepDown = StepDown;
+
+  if (!Session.Query) {
+    return;
+  }
+
+  const Below = LadderBelow(Session.Model);
+
+  Session.Query.applyFlagSettings({ outputStyle: OutputStyle, fallbackModel: StepDown && Below.length > 0 ? Below : null }).catch((Trouble: unknown) => {
+    console.error(`Could not apply the ${OutputStyle} style to ${Session.Key}: ${Trouble}`);
+  });
+}
+
+export function ApplyStyleEverywhere(OutputStyle: string, StepDown: boolean) {
+  LastStyle = OutputStyle;
+  LastStepDown = StepDown;
+
+  for (const Session of Sessions.values()) {
+    if (!Session.Ended) {
+      ApplyStyle(Session, OutputStyle, StepDown);
+    }
+  }
+
+  if (Spare && !Spare.Ended) {
+    ApplyStyle(Spare, OutputStyle, StepDown);
+  }
+}
+
+export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForTools, GuardTools, Escalate, ExtraPrompt, FastMode, Mode, Bypass, Place, Folder, OutputStyle, StepDown }: TurnRequest) {
+  LastStyle = OutputStyle || "default";
+  LastStepDown = StepDown !== false;
+
   const Existing = ConversationId ? GetConversation(ConversationId) : null;
   const Lean = Model === LeanMode.value;
   const Auto = Lean || !Model || Model === "auto";
@@ -1336,6 +1430,9 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Flushed: false,
     Streamed: 0,
     Compacting: false,
+    OutputStyle: LastStyle,
+    StepDown: LastStepDown,
+    FallenFrom: null,
     Activity: [],
     Calls: [],
     Usage: { Input: 0, Output: 0, Cached: 0 },
@@ -1389,12 +1486,14 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Turn.Effort = Warm.Effort;
   }
 
-  const Session = (Reusable ? Warm : null) || OpenSession(ConversationId, Turn.WorkingDirectory, Chosen.model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode, Turn.Planning, Turn.Delegating, Turn.Mode, Turn.Bypass, Turn.Delegate);
+  const Session = (Reusable ? Warm : null) || OpenSession(ConversationId, Turn.WorkingDirectory, Chosen.model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode, Turn.Planning, Turn.Delegating, Turn.Mode, Turn.Bypass, Turn.Delegate, Turn.OutputStyle, Turn.StepDown);
 
   if (Session.Model !== Chosen.model && Session.Query) {
     Session.Model = Chosen.model;
     Session.Query.setModel(Chosen.model).catch(() => {});
   }
+
+  ApplyStyle(Session, Turn.OutputStyle, Turn.StepDown);
 
   if (!ConversationId) {
     setTimeout(KeepSpareWarm, 1000);

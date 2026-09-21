@@ -120,6 +120,27 @@ const Definitions: {Definition} = {
 		Default = false,
 	},
 	{
+		Key = "StepDown",
+		Label = "Step down a model after a safety refusal",
+		Detail = "A refusal that stops the turn is retried on the next model down, Fable to Opus, Opus 5 to Opus 4.8, and the turn carries on. The original model comes back a little later in the same turn, because refusals are often false alarms",
+		Group = "Chat",
+		Default = true,
+	},
+	{
+		Key = "OutputStyle",
+		Label = "Output style",
+		Detail = "How Claude shapes its replies, the same styles as the desktop app. Default explains as it goes, Concise keeps to results, Explanatory adds the reasoning, Learning teaches while it works, Proactive suggests what to do next",
+		Group = "Chat",
+		Default = "Default",
+		Options = {
+			"Default",
+			"Concise",
+			"Explanatory",
+			"Learning",
+			"Proactive",
+		},
+	},
+	{
 		Key = "TranscriptView",
 		Label = "Transcript view",
 		Detail = "Thinking shows Claude's reasoning as well as every tool call. Normal shows the tools alone",

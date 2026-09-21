@@ -8,6 +8,7 @@ const Connection = require(script.Parent.Parent.Parent.Store.Connection)
 const Toggle = require(script.Parent.Toggle)
 const Button = require(script.Parent.Button)
 const Config = require(script.Parent.Parent.Parent.Config)
+const Icon = require(script.Parent.Icon)
 const IconButton = require(script.Parent.IconButton)
 
 const function PromptText(): string
@@ -271,6 +272,7 @@ return function()
 	task.spawn(Chat.LoadMcpServers)
 
 	const Open = Vide.source(Groups()[1])
+	const PromptOpen = Vide.source(false)
 
 	const function Tab(Name: string, LayoutOrder: number)
 		const function Showing(): boolean
@@ -395,7 +397,43 @@ return function()
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				HorizontalFlex = Enum.UIFlexAlignment.Fill,
 			},
-			Heading("Claudio's own instructions", 7900),
+			Create "TextButton" {
+				Name = "PromptHeading",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				Text = "",
+				LayoutOrder = 7900,
+				Activated = function()
+					PromptOpen(not PromptOpen())
+				end,
+
+				Create "UIPadding" {PaddingTop = UDim.new(0, 8)},
+				Create "UIListLayout" {
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 4),
+				},
+				Icon {
+					Name = function()
+						return if PromptOpen() then Config.Icons.Down else Config.Icons.Right
+					end,
+					Size = Settings.SmallText,
+					LayoutOrder = 1,
+				},
+				Create "TextLabel" {
+					AutomaticSize = Enum.AutomaticSize.XY,
+					BackgroundTransparency = 1,
+					TextColor3 = Theme.Colors.DimText,
+					TextSize = function()
+						return Settings.TextSize() - 1
+					end,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSansBold),
+					LayoutOrder = 2,
+					Text = "Claudio's own instructions",
+				},
+			},
 			Create "TextBox" {
 				Name = "Prompt",
 				Size = UDim2.fromScale(1, 0),
@@ -411,6 +449,7 @@ return function()
 				TextXAlignment = Enum.TextXAlignment.Left,
 				TextYAlignment = Enum.TextYAlignment.Top,
 				LayoutOrder = 7901,
+				Visible = PromptOpen,
 				Text = PromptText,
 
 				Create "UICorner" {CornerRadius = UDim.new(0, 6)},

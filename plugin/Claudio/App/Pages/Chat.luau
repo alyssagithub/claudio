@@ -2,6 +2,7 @@
 const RunService = game:GetService("RunService")
 const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
+const Client = require(script.Parent.Parent.Parent.Client.Client)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Context = require(script.Parent.Parent.Parent.Store.Context)
 const Theme = require(script.Parent.Parent.Theme)
@@ -30,6 +31,19 @@ return function()
 	task.spawn(Chat.Refresh)
 	task.spawn(Chat.RefreshUsage)
 	task.spawn(Chat.CheckVersions)
+
+	local Styled = false
+
+	Vide.effect(function()
+		Settings.Get("OutputStyle")()
+		Settings.Get("StepDown")()
+
+		if Styled then
+			task.spawn(Client.PushStyle)
+		end
+
+		Styled = true
+	end)
 
 	if not RunService:IsRunning() and Picker.Installed() then
 		Picker.Remove()

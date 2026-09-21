@@ -280,6 +280,8 @@ export type Session = {
   CapResults?: boolean;
   ExtraPrompt: boolean;
   FastMode: boolean;
+  OutputStyle: string;
+  StepDown: boolean;
   Effort: string | null;
   HasSpoken?: boolean;
   Ended?: boolean;
@@ -337,6 +339,9 @@ export type Turn = {
   CapResults: boolean;
   Planning: boolean;
   Compacting: boolean;
+  OutputStyle: string;
+  StepDown: boolean;
+  FallenFrom: string | null;
   Delegating: boolean;
   Tasks: Task[];
   Model: string;
@@ -395,4 +400,6 @@ export type TurnRequest = {
   Bypass?: boolean;
   Place?: {name?: string, placeId?: number, universeId?: number} | null;
   Folder?: string | null;
+  OutputStyle?: string;
+  StepDown?: boolean;
 };

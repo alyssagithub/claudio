@@ -14,6 +14,7 @@ const Watcher = require(script.Parent.Parent.Watcher)
 const Settings = require(script.Parent.Parent.Settings)
 const Client = require(script.Parent.Parent.Client.Client)
 const Pictures = require(script.Parent.Parent.Pictures)
+const Breathe = require(script.Parent.Parent.Breathe)
 const Context = require(script.Parent.Context)
 const Navigate = require(script.Parent.Parent.Navigate)
 
@@ -233,6 +234,8 @@ const function ScriptTree(): {any}
 				return Found
 			end
 
+			Breathe()
+
 			const Parts = {}
 			local Step: Instance? = Object
 
@@ -289,6 +292,8 @@ const function Sources(Root: Instance): {LuaSourceContainer}
 	end
 
 	for _, Object in Root:GetDescendants() do
+		Breathe()
+
 		if Object:IsA("LuaSourceContainer") then
 			table.insert(Found, Object)
 		end
@@ -318,6 +323,8 @@ const function Find(Input: any): any
 
 	for _, Script in Sources(Root) do
 		const Body = Script.Source
+
+		Breathe()
 
 		if Body == "" then
 			continue

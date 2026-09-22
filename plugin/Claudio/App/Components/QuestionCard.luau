@@ -4,6 +4,7 @@ const Config = require(script.Parent.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const Button = require(script.Parent.Button)
 const IconButton = require(script.Parent.IconButton)
@@ -140,12 +141,7 @@ return function()
 			Visible = function()
 				return not Shut()
 			end,
-			MouseEnter = function()
-				Hovered(true)
-			end,
-			MouseLeave = function()
-				Hovered(false)
-			end,
+			Vide.action(Covers.Hover(Hovered)),
 			Activated = function()
 				Take(Label())
 			end,

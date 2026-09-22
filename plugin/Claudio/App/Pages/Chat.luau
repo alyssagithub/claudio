@@ -5,6 +5,7 @@ const Settings = require(script.Parent.Parent.Parent.Settings)
 const Client = require(script.Parent.Parent.Parent.Client.Client)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Context = require(script.Parent.Parent.Parent.Store.Context)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const StatusBar = require(script.Parent.Parent.Components.StatusBar)
 const UpdateBanner = require(script.Parent.Parent.Components.UpdateBanner)
@@ -155,6 +156,7 @@ return function()
 		ModelPicker.EffortHelp(),
 		Create "ImageButton" {
 			Name = "Zoom",
+			Vide.action(Covers.Add),
 			Size = UDim2.fromScale(1, 1),
 			BackgroundColor3 = Color3.new(),
 			BackgroundTransparency = 0.25,

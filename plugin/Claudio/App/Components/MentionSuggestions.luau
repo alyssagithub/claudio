@@ -5,6 +5,7 @@ const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Context = require(script.Parent.Parent.Parent.Store.Context)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 
 const Create = Vide.create
@@ -91,6 +92,7 @@ return function()
 
 	return Create "Frame" {
 		Name = "MentionSuggestions",
+		Vide.action(Covers.Add),
 		Size = UDim2.fromScale(1, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,

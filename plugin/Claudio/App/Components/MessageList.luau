@@ -4,6 +4,7 @@ const Config = require(script.Parent.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Types = require(script.Parent.Parent.Parent.Types)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const Format = require(script.Parent.Parent.Parent.Format)
 const IconButton = require(script.Parent.IconButton)
@@ -44,12 +45,7 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		LayoutOrder = 900000 + Index,
-		MouseEnter = function()
-			Hovered(true)
-		end,
-		MouseLeave = function()
-			Hovered(false)
-		end,
+		Vide.action(Covers.Hover(Hovered)),
 
 		Vide.action(function(Frame: Frame)
 			Room(Frame.AbsoluteSize.X)

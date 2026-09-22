@@ -4,6 +4,7 @@ const Config = require(script.Parent.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const Icon = require(script.Parent.Icon)
 const Slider = require(script.Parent.Slider)
@@ -295,6 +296,7 @@ end
 function ModelPicker.Menu()
 	return Create "Frame" {
 		Name = "ModelMenu",
+		Vide.action(Covers.Add),
 		Size = UDim2.fromOffset(182, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),
@@ -423,6 +425,7 @@ function ModelPicker.Menu()
 
 			Create "Frame" {
 				Name = "More",
+				Vide.action(Covers.Add),
 				AutomaticSize = Enum.AutomaticSize.Y,
 				Size = UDim2.fromOffset(128, 0),
 				Position = UDim2.fromOffset(186, 0),
@@ -486,12 +489,36 @@ function ModelPicker.Menu()
 	}
 end
 
+const function Pill(Open: () -> boolean): (() -> boolean, {any})
+	const Hovered = Vide.source(false)
+
+	const function Lit(): boolean
+		return Hovered() or Open()
+	end
+
+	return Lit, {
+		Vide.action(Covers.Hover(Hovered)),
+		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+		Create "UIPadding" {
+			PaddingLeft = UDim.new(0, 5),
+			PaddingRight = UDim.new(0, 5),
+			PaddingTop = UDim.new(0, 2),
+			PaddingBottom = UDim.new(0, 2),
+		},
+	}
+end
+
 function ModelPicker.Button()
+	const Lit, Dressing = Pill(Chat.PickerOpen)
+
 	return Create "TextButton" {
 		Name = "ModelButton",
 		AutomaticSize = Enum.AutomaticSize.XY,
 		Size = UDim2.fromScale(0, 0),
-		BackgroundTransparency = 1,
+		BackgroundColor3 = Theme.Colors.Button,
+		BackgroundTransparency = function()
+			return if Lit() then 0 else 1
+		end,
 		Text = "",
 		AutoButtonColor = false,
 		LayoutOrder = 4,
@@ -510,11 +537,15 @@ function ModelPicker.Button()
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 			Padding = UDim.new(0, 2),
 		},
+		Dressing,
 		Create "TextLabel" {
 			Name = "Label",
 			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
-			TextColor3 = Theme.Colors.DimText,
+			TextColor3 = Theme.Colors.Text,
+			TextTransparency = function()
+				return if Lit() then 0 else 0.25
+			end,
 			TextSize = Settings.SmallText,
 			FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
 			LayoutOrder = 1,
@@ -528,6 +559,9 @@ function ModelPicker.Button()
 			Name = Config.Icons.Down,
 			Size = Settings.SmallText,
 			LayoutOrder = 2,
+			Colour = function()
+				return if Lit() then Theme.Colors.Text() else Theme.Colors.DimText()
+			end,
 		},
 	}
 end
@@ -569,6 +603,7 @@ end
 function ModelPicker.ModeMenu()
 	return Create "Frame" {
 		Name = "ModeMenu",
+		Vide.action(Covers.Add),
 		Size = UDim2.fromOffset(224, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),
@@ -683,13 +718,19 @@ function ModelPicker.ModeMenu()
 end
 
 function ModelPicker.EffortButton()
+	const Lit, Dressing = Pill(Chat.EffortOpen)
+
 	return Create "TextButton" {
 		Name = "EffortButton",
 		AutomaticSize = Enum.AutomaticSize.XY,
 		Size = UDim2.fromScale(0, 0),
-		BackgroundTransparency = 1,
-		TextColor3 = function()
-			return if Chat.EffortOpen() then Theme.Colors.Text() else Theme.Colors.DimText()
+		BackgroundColor3 = Theme.Colors.Button,
+		BackgroundTransparency = function()
+			return if Lit() then 0 else 1
+		end,
+		TextColor3 = Theme.Colors.Text,
+		TextTransparency = function()
+			return if Lit() then 0 else 0.25
 		end,
 		TextSize = Settings.SmallText,
 		FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
@@ -706,12 +747,15 @@ function ModelPicker.EffortButton()
 			Chat.ModeOpen(false)
 			Chat.EffortOpen(not Chat.EffortOpen())
 		end,
+
+		Dressing,
 	}
 end
 
 function ModelPicker.EffortHelp()
 	return Create "Frame" {
 		Name = "Bubble",
+		Vide.action(Covers.Add),
 		Size = UDim2.fromOffset(168, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),
@@ -775,6 +819,7 @@ end
 function ModelPicker.EffortMenu()
 	return Create "Frame" {
 		Name = "EffortMenu",
+		Vide.action(Covers.Add),
 		Size = UDim2.fromOffset(182, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),

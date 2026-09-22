@@ -3,6 +3,7 @@ const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 
 const Create = Vide.create
@@ -106,12 +107,7 @@ const function Item(Label: () -> string, LayoutOrder: number, Danger: boolean, O
 		AutoButtonColor = false,
 		LayoutOrder = LayoutOrder,
 		Activated = OnClick,
-		MouseEnter = function()
-			Hovered(true)
-		end,
-		MouseLeave = function()
-			Hovered(false)
-		end,
+		Vide.action(Covers.Hover(Hovered)),
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
 		Create "UIPadding" {
@@ -139,6 +135,7 @@ end
 return function()
 	return Create "Frame" {
 		Name = "ContextMenu",
+		Vide.action(Covers.Add),
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
 		ZIndex = 100,

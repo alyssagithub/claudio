@@ -10,6 +10,7 @@ const Syntax = require(script.Parent.Parent.Parent.Syntax)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Navigate = require(script.Parent.Parent.Parent.Navigate)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const ImageView = require(script.Parent.ImageView)
 const Paragraph = require(script.Parent.Paragraph)
@@ -1138,12 +1139,7 @@ return function(Props: Props)
 		Visible = function()
 			return not Empty()
 		end,
-		MouseEnter = function()
-			Hovered(true)
-		end,
-		MouseLeave = function()
-			Hovered(false)
-		end,
+		Vide.action(Covers.Hover(Hovered)),
 
 		Create "UIListLayout" {
 			SortOrder = Enum.SortOrder.LayoutOrder,
@@ -1435,12 +1431,7 @@ return function(Props: Props)
 					AutoButtonColor = false,
 					Text = "",
 					LayoutOrder = Index + 1,
-					MouseEnter = function()
-						Hovered(true)
-					end,
-					MouseLeave = function()
-						Hovered(false)
-					end,
+					Vide.action(Covers.Hover(Hovered)),
 					Activated = function()
 						const Path = Entry().Path
 

@@ -5,6 +5,7 @@ const Format = require(script.Parent.Parent.Parent.Format)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Config = require(script.Parent.Parent.Parent.Config)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const Icon = require(script.Parent.Icon)
 
@@ -399,6 +400,7 @@ return function()
 		},
 		Create "Frame" {
 			Name = "Panel",
+			Vide.action(Covers.Add),
 			Size = function()
 				return UDim2.fromOffset(Room(), 0)
 			end,

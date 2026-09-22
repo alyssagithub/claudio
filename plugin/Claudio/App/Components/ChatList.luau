@@ -6,6 +6,7 @@ const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Gallery = require(script.Parent.Parent.Parent.Store.Gallery)
 const IconButton = require(script.Parent.IconButton)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const Icon = require(script.Parent.Icon)
 
@@ -90,12 +91,7 @@ const function Choice(Label: () -> string, LayoutOrder: number, OnClick: () -> (
 		LayoutOrder = LayoutOrder,
 		Text = Label,
 		Activated = OnClick,
-		MouseEnter = function()
-			Hovered(true)
-		end,
-		MouseLeave = function()
-			Hovered(false)
-		end,
+		Vide.action(Covers.Hover(Hovered)),
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
 		Create "UIPadding" {

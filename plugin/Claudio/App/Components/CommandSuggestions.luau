@@ -3,6 +3,7 @@ const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 
 const Create = Vide.create
@@ -50,12 +51,7 @@ const function Row(Command: () -> Types.Command, Index: number)
 		Activated = function()
 			Chat.Draft(`/{Command().name} `)
 		end,
-		MouseEnter = function()
-			Hovered(true)
-		end,
-		MouseLeave = function()
-			Hovered(false)
-		end,
+		Vide.action(Covers.Hover(Hovered)),
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
 		Create "UIPadding" {
@@ -101,6 +97,7 @@ return function()
 
 	return Create "Frame" {
 		Name = "CommandSuggestions",
+		Vide.action(Covers.Add),
 		Size = UDim2.fromScale(1, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,

@@ -2,6 +2,7 @@
 const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const Button = require(script.Parent.Button)
 
@@ -16,6 +17,7 @@ end
 return function()
 	return Create "Frame" {
 		Name = "RewindDialog",
+		Vide.action(Covers.Add),
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.new(),
 		BackgroundTransparency = 0.5,

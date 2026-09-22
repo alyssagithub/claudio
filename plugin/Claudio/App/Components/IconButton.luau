@@ -3,6 +3,7 @@ const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Config = require(script.Parent.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 
 const Create = Vide.create
@@ -60,6 +61,18 @@ return function(Props: Props)
 		})
 	end
 
+	local Showing = false
+
+	Vide.effect(function()
+		if Hovered() then
+			Showing = true
+			Vide.untrack(Show)
+		elseif Showing then
+			Showing = false
+			Chat.Tip(nil)
+		end
+	end)
+
 	Vide.cleanup(function()
 		if Chat.Tip() then
 			Chat.Tip(nil)
@@ -103,14 +116,7 @@ return function(Props: Props)
 
 			Props.OnClick()
 		end,
-		MouseEnter = function()
-			Hovered(true)
-			Show()
-		end,
-		MouseLeave = function()
-			Hovered(false)
-			Chat.Tip(nil)
-		end,
+		Vide.action(Covers.Hover(Hovered)),
 
 		Vide.action(function(Object: TextButton)
 			Anchor = Object

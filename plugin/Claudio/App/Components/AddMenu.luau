@@ -3,6 +3,7 @@ const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Config = require(script.Parent.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Context = require(script.Parent.Parent.Parent.Store.Context)
+const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const Icon = require(script.Parent.Icon)
 
@@ -32,12 +33,7 @@ const function Row(IconName: string, Label: string, LayoutOrder: number, Add: ()
 
 			Insert(Token)
 		end,
-		MouseEnter = function()
-			Hovered(true)
-		end,
-		MouseLeave = function()
-			Hovered(false)
-		end,
+		Vide.action(Covers.Hover(Hovered)),
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 6)},
 		Create "UIPadding" {
@@ -77,6 +73,7 @@ return function(Open: (boolean?) -> boolean, Insert: (string) -> ())
 
 	return Create "Frame" {
 		Name = "AddMenu",
+		Vide.action(Covers.Add),
 		Size = UDim2.fromScale(1, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,

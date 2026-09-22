@@ -11,6 +11,7 @@ process.env.HOME = Home;
 process.env.APPDATA = path.join(Home, "Roaming");
 
 const { GetConversation, StripContext, ExtractContext } = await import("../src/Conversations.js");
+const { MostCallText } = await import("../src/Config.js");
 
 const Picture = { type: "image", source: { type: "base64", media_type: "image/png", data: "aGk=" } };
 
@@ -130,15 +131,18 @@ test("sidechain and meta lines are not messages", () => {
   assert.equal(Messages[1].text, "Reply.");
 });
 
-test("tool output is capped at two thousand characters", () => {
+test("tool output is kept whole up to the call text cap", () => {
   WriteTranscript("long", [
     Line("user", [{ type: "text", text: "go" }]),
     Line("assistant", [{ type: "tool_use", id: "t1", name: "Bash", input: { command: "cat big" } }]),
     Line("user", [{ type: "tool_result", tool_use_id: "t1", content: [{ type: "text", text: "x".repeat(5000) }] }]),
+    Line("user", [{ type: "tool_result", tool_use_id: "t1", content: [{ type: "text", text: "y".repeat(MostCallText + 500) }] }]),
     Line("assistant", [{ type: "text", text: "Long." }]),
   ]);
 
-  assert.equal(GetConversation("long")!.messages[1].calls![0].output.length, 2000);
+  const Calls = GetConversation("long")!.messages[1].calls!;
+
+  assert.equal(Calls[0].output.length, MostCallText);
 });
 
 test("an unknown conversation is null", () => {

@@ -11,6 +11,7 @@ import { AskServerFor, AskServerName } from "./Ask.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
 import { Request as RequestStudio } from "./Studio.js";
 import { ReadPluginSetting } from "./PluginSettings.js";
+import { MirrorSkills, MirrorSyncedSkills } from "./SyncedSkills.js";
 import { CountLines, EditedFile, ReadFileText } from "./Lines.js";
 import { ChooseModel, GetModels, NextEffort, RecordTurnOutcome, RememberModels, SupportsEffort } from "./Models.js";
 import type { Asked, Breakdown, Call, CallStatus, ContentBlock, Content, JobAnswer, LineCount, Part, Permission, Picture, Question, Query, SdkMessage, SentImage, Session, Task, Turn, TurnRequest, Usage } from "./Types.js";
@@ -276,6 +277,13 @@ function PluginFolders() {
 function ReadDescriptions(): Record<string, string | undefined> {
   const Found: Record<string, string | undefined> = {};
   const SkillsRoot = path.join(os.homedir(), ".claude", "skills");
+
+  for (const Root of [MirrorSkills, ProjectFolder ? path.join(ProjectFolder, ".claude", "skills") : null]) {
+    for (const Name of Root ? ReadFolder(Root) : []) {
+      Found[Name] = ReadDescription(path.join(Root as string, Name, "SKILL.md"));
+    }
+  }
+
   const CommandsRoot = path.join(os.homedir(), ".claude", "commands");
 
   try {
@@ -311,7 +319,11 @@ function ReadDescriptions(): Record<string, string | undefined> {
   return Found;
 }
 
-function RememberCommands(Init: {slash_commands?: string[], skills?: string[]}) {
+let ProjectFolder: string | null = null;
+
+function RememberCommands(Init: {slash_commands?: string[], skills?: string[], cwd?: string}) {
+  ProjectFolder = typeof Init.cwd === "string" ? Init.cwd : ProjectFolder;
+  Described = null;
   Commands = {
     slashCommands: Init.slash_commands || [],
     skills: Init.skills || [],
@@ -347,16 +359,13 @@ export function GetCommands() {
   };
 }
 
-export async function DiscoverCommands() {
-  if (Commands.ready) {
-    return;
-  }
-
+export async function DiscoverCommands(Folder?: string | null) {
   try {
     for await (const Message of query({
       prompt: "Reply with the single word ready.",
       options: {
-        cwd: WorkingDirectory,
+        cwd: Folder || WorkingDirectory,
+        additionalDirectories: [MirrorSyncedSkills()],
         model: "claude-haiku-4-5",
         maxTurns: 1,
         allowedTools: [],
@@ -368,6 +377,8 @@ export async function DiscoverCommands() {
       if (Message.type === "system" && Message.subtype === "init") {
         RememberCommands(Message);
         RememberServers(Message);
+
+        return;
       }
     }
   } catch (Error) {
@@ -1296,6 +1307,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
           model: Model,
           effort: (Effort || undefined) as EffortLevel | undefined,
           cwd: TurnWorkingDirectory,
+          additionalDirectories: [MirrorSyncedSkills()],
           includePartialMessages: true,
           settings: {
             fastMode: FastMode === true,

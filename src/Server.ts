@@ -904,7 +904,7 @@ export function StartServer(Port: number) {
     if (Reached === 0) {
       console.error("Could not hand the plugin its key: Studio has no settings file yet. Open Studio once, then restart the bridge.");
     }
-    DiscoverCommands();
+    DiscoverCommands(LastUsedFolder());
     KeepSpareWarm();
     WarmUsage();
   });

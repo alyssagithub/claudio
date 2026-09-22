@@ -7,6 +7,7 @@ type Job = {
 
 const Pending: Job[] = [];
 const Waiting = new Map<string, (Result: unknown) => void>();
+const Roles = new Map<string, string>();
 
 let Counter = 0;
 
@@ -21,6 +22,7 @@ export function Request(Kind: string, Input: unknown, Timeout?: number | null, R
       }
 
       Waiting.delete(Id);
+      Roles.delete(Id);
 
       if (Timer) {
         clearTimeout(Timer);
@@ -30,6 +32,7 @@ export function Request(Kind: string, Input: unknown, Timeout?: number | null, R
     };
 
     Waiting.set(Id, Give);
+    Roles.set(Id, Role || "edit");
     Pending.push({ Id, Kind, Input, Role: Role || "edit" });
 
     Timer = setTimeout(() => {
@@ -118,10 +121,10 @@ export function RuntimeLive() {
   return Date.now() - Last < 6000;
 }
 
-export function Deliver(Id: string, Result: unknown): boolean {
+export function Deliver(Id: string, Result: unknown, FromPlaytest?: boolean): boolean {
   const Give = Waiting.get(Id);
 
-  if (!Give) {
+  if (!Give || (FromPlaytest && Roles.get(Id) === "edit")) {
     return false;
   }
 

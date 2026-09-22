@@ -294,6 +294,16 @@ function Client.GetConversation(Id: string, Before: number?, Count: number?): (b
 	return Checked(Ok, Result, Schemas.Conversation)
 end
 
+function Client.PlaytestKey(): string?
+	const Ok, Result = Http.Request("POST", `{BaseUrl()}/playtest/key`, {})
+
+	return if Ok and typeof(Result) == "table" and typeof(Result.key) == "string" then Result.key else nil
+end
+
+function Client.RevokePlaytestKey(Key: string)
+	Http.Request("POST", `{BaseUrl()}/playtest/revoke`, {key = Key})
+end
+
 function Client.PushStyle(): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/style`, {
 		outputStyle = string.lower(Settings.Get("OutputStyle")()),

@@ -76,7 +76,7 @@ export type LineCount = {
   removed: number;
 };
 
-export type Delegate = {
+export type Subagent = {
   name: string;
   model: string;
 };
@@ -92,7 +92,7 @@ export type Call = {
   StartedAt: number;
   Milliseconds: number;
   Steps?: string[];
-  Delegate: Delegate | null;
+  Subagent: Subagent | null;
   Lines?: LineCount | null;
   Image?: number | null;
 };
@@ -104,7 +104,7 @@ export type SentCall = {
   status: string;
   steps: string[];
   milliseconds: number;
-  delegate: Delegate | null;
+  delegate: Subagent | null;
   lines: LineCount | null;
   image: number | null;
 };
@@ -272,8 +272,8 @@ export type Session = {
   WorkingDirectory: string;
   Model: string;
   Mode: string;
-  Delegate: string;
-  Delegating: boolean;
+  Subagent: string;
+  UsingSubagents: boolean;
   Planning: boolean;
   AskForTools: boolean;
   GuardTools: boolean;
@@ -342,11 +342,11 @@ export type Turn = {
   OutputStyle: string;
   StepDown: boolean;
   FallenFrom: string | null;
-  Delegating: boolean;
+  UsingSubagents: boolean;
   Tasks: Task[];
   Model: string;
   Effort: string | null;
-  Delegate: string;
+  Subagent: string;
   AskForTools: boolean;
   GuardTools: boolean;
   ExtraPrompt: boolean;

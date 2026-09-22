@@ -27,7 +27,7 @@ function Picker.Install()
 	const Copy = script.ClaudioPickerServer:Clone()
 
 	Copy:SetAttribute("Port", Settings.Get("Port")())
-	Copy:SetAttribute("Token", Settings.Token())
+	Copy:SetAttribute("Token", Client.PlaytestKey() or "")
 	Copy.Disabled = false
 	Copy.Parent = ServerScriptService
 
@@ -42,6 +42,12 @@ function Picker.Remove()
 	const Existing = ServerScriptService:FindFirstChild("ClaudioPickerServer")
 
 	if Existing then
+		const Key = Existing:GetAttribute("Token")
+
+		if typeof(Key) == "string" and Key ~= "" then
+			task.spawn(Client.RevokePlaytestKey, Key)
+		end
+
 		Existing:Destroy()
 	end
 

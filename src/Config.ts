@@ -40,7 +40,7 @@ export const AllowedTools = [
   "WebFetch",
 ];
 export const CappedTools = ["Read", "Glob", "Grep"];
-export function SystemPromptFor(ServerNames: string[], Delegating: boolean) {
+export function SystemPromptFor(ServerNames: string[], UsingSubagents: boolean) {
   const Sections = ["# Claudio\n\nYou are Claudio, a chat assistant in a plugin widget docked in Roblox Studio."];
 
   Sections.push([
@@ -50,7 +50,7 @@ export function SystemPromptFor(ServerNames: string[], Delegating: boolean) {
     "Use another server only when Claudio has no tool for the job, or when the user, a rule, or a project instruction tells you to.",
   ].filter(Boolean).join("\n\n"));
 
-  if (Delegating) {
+  if (UsingSubagents) {
     Sections.push([
       "## Reading",
       "Reading is delegated here. Count what the question needs before you touch a tool: if it needs more than one script, or the contents of a folder, or a search across the place, your first action is a single Agent call to the reader subagent describing everything you want at once, and it answers with a summary plus the paths and line numbers.",
@@ -148,8 +148,8 @@ export const PlanInstructions = [
   "Say plainly which steps you cannot verify without a playtest.",
   "Keep the plan short enough to read in one go. Do not write the code yet.",
 ].join(" ");
-export const DelegateModels = ["haiku", "sonnet"];
-export const Delegates = {
+export const SubagentModels = ["haiku", "sonnet"];
+export const Subagents = {
   reader: {
     description: "Reads Roblox instances, scripts and logs in bulk and returns a short summary. Use whenever a read would return more than a screen of text.",
     tools: ["mcp__robloxstudio-mcp__*", "mcp__Roblox_Studio__*", "Read", "Glob", "Grep"],

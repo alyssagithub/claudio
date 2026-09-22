@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, DelegateModels, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory } from "./Config.js";
+import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, SubagentModels, Subagents, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory } from "./Config.js";
 import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
@@ -384,7 +384,7 @@ function TaskNotice(Text: string): Call | null {
     Status: Status[1] === "failed" ? "error" : "done",
     StartedAt: Date.now(),
     Milliseconds: 0,
-    Delegate: null,
+    Subagent: null,
   };
 }
 
@@ -407,21 +407,21 @@ function Describe(Value: unknown): string {
 function AgentsOn(Model: string) {
   const Named: Record<string, unknown> = {};
 
-  for (const [Name, Agent] of Object.entries(Delegates)) {
+  for (const [Name, Agent] of Object.entries(Subagents)) {
     Named[Name] = { ...Agent, model: Model };
   }
 
   return Named;
 }
 
-function DelegateFor(Block: ContentBlock, Model: string) {
+function SubagentFor(Block: ContentBlock, Model: string) {
   if (Block.name !== "Agent" && Block.name !== "Task") {
     return null;
   }
 
   const Asked = (Block.input || {}) as {subagent_type?: string, description?: string, prompt?: string};
 
-  if (!Asked.subagent_type || !Delegates[Asked.subagent_type as keyof typeof Delegates]) {
+  if (!Asked.subagent_type || !Subagents[Asked.subagent_type as keyof typeof Subagents]) {
     return null;
   }
 
@@ -898,7 +898,7 @@ function RouteMessage(Session: Session, Message: any) {
           Status: "preparing",
           StartedAt: Date.now(),
           Milliseconds: 0,
-          Delegate: DelegateFor(Block, Turn.Delegate),
+          Subagent: SubagentFor(Block, Turn.Subagent),
         }]),
       });
     }
@@ -927,7 +927,7 @@ function RouteMessage(Session: Session, Message: any) {
       Status: "running" as CallStatus,
       StartedAt: Date.now(),
       Milliseconds: 0,
-      Delegate: DelegateFor(Block, Turn.Delegate),
+      Subagent: SubagentFor(Block, Turn.Subagent),
     }));
     const Readied = Turn.Calls.map((Call) => {
       const Block = Content.find((Candidate) => Candidate.type === "tool_use" && Candidate.id === Call.Id);
@@ -1080,7 +1080,7 @@ export function LadderBelow(Model: string): string[] {
   return Index >= 0 ? Ladder.slice(Index + 1) : Ladder.slice(Ladder.indexOf("opus"));
 }
 
-function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string, Model: string, Effort: string | null, AskForTools: boolean, ExtraPrompt: boolean, FastMode: boolean, Planning: boolean, Delegating: boolean, Mode: string, Bypass: boolean, Delegate: string, OutputStyle: string, StepDown: boolean): Session {
+function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string, Model: string, Effort: string | null, AskForTools: boolean, ExtraPrompt: boolean, FastMode: boolean, Planning: boolean, UsingSubagents: boolean, Mode: string, Bypass: boolean, Subagent: string, OutputStyle: string, StepDown: boolean): Session {
   const Pending: unknown[] = [];
   let Wake: ((Value?: unknown) => void) | null = null;
   let Ended = false;
@@ -1090,7 +1090,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
     ConversationId,
     Model,
     Effort,
-    Delegate,
+    Subagent,
     AskForTools,
     ExtraPrompt: ExtraPrompt !== false,
     FastMode: FastMode === true,
@@ -1099,7 +1099,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
     WorkingDirectory: TurnWorkingDirectory,
     Planning: Planning === true,
     Mode: PermissionModeFor(Mode, Bypass),
-    Delegating: Delegating === true,
+    UsingSubagents: UsingSubagents === true,
     GuardTools: false,
     FilesBefore: new Map(),
     LineCounts: new Map(),
@@ -1177,8 +1177,8 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
           thinking: { type: "adaptive", display: "summarized" },
           permissionMode: Session.Mode as PermissionMode,
           planModeInstructions: PlanInstructions,
-          agents: Session.Delegating ? AgentsOn(Session.Delegate) as Record<string, AgentDefinition> : undefined,
-          skills: Session.Delegating ? [] : undefined,
+          agents: Session.UsingSubagents ? AgentsOn(Session.Subagent) as Record<string, AgentDefinition> : undefined,
+          skills: Session.UsingSubagents ? [] : undefined,
           hooks: {
             PreToolUse: [{
               hooks: [async (HookInput, ToolUseId, Options) => {
@@ -1270,7 +1270,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
             }],
           },
           mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions) as Promise<JobAnswer | null>, ((Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined))) as Reacher, ((Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined), Role)) as ReacherIn) },
-          systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.Delegating) },
+          systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.UsingSubagents) },
         },
       });
 
@@ -1419,11 +1419,11 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Auto,
     CapResults: Lean,
     Planning,
-    Delegating: Lean,
+    UsingSubagents: Lean,
     Tasks: [],
     Model: Chosen.model,
     Effort: Chosen.effort,
-    Delegate: Chosen.delegate || DelegateModels[0],
+    Subagent: Chosen.delegate || SubagentModels[0],
     AskForTools: AskForTools !== false,
     GuardTools: GuardTools === true,
     ExtraPrompt: ExtraPrompt !== false,
@@ -1466,7 +1466,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
   LastFolder = Turn.WorkingDirectory;
 
   const Warm = ConversationId ? Sessions.get(ConversationId) : TakeSpare(Chosen.model, Chosen.effort);
-  const Reusable = Warm && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory && Warm.Planning === Turn.Planning && Warm.Mode === PermissionModeFor(Turn.Mode, Turn.Bypass) && Warm.Delegating === Turn.Delegating && Warm.Delegate === Turn.Delegate;
+  const Reusable = Warm && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory && Warm.Planning === Turn.Planning && Warm.Mode === PermissionModeFor(Turn.Mode, Turn.Bypass) && Warm.UsingSubagents === Turn.UsingSubagents && Warm.Subagent === Turn.Subagent;
 
   if (Warm && !Reusable) {
     const Reasons = [
@@ -1478,8 +1478,8 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
       Warm.WorkingDirectory !== Turn.WorkingDirectory && "folder",
       Warm.Planning !== Turn.Planning && "planning",
       Warm.Mode !== PermissionModeFor(Turn.Mode, Turn.Bypass) && `mode ${Warm.Mode} not ${PermissionModeFor(Turn.Mode, Turn.Bypass)}`,
-      Warm.Delegating !== Turn.Delegating && "delegating",
-      Warm.Delegate !== Turn.Delegate && "delegate",
+      Warm.UsingSubagents !== Turn.UsingSubagents && "delegating",
+      Warm.Subagent !== Turn.Subagent && "delegate",
     ].filter(Boolean);
 
     console.log(`Turn ${Turn.Id}: closing the ${ConversationId ? "kept" : "spare"} session, ${Reasons.join(", ")}`);
@@ -1497,7 +1497,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Turn.Effort = Warm.Effort;
   }
 
-  const Session = (Reusable ? Warm : null) || OpenSession(ConversationId, Turn.WorkingDirectory, Chosen.model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode, Turn.Planning, Turn.Delegating, Turn.Mode, Turn.Bypass, Turn.Delegate, Turn.OutputStyle, Turn.StepDown);
+  const Session = (Reusable ? Warm : null) || OpenSession(ConversationId, Turn.WorkingDirectory, Chosen.model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode, Turn.Planning, Turn.UsingSubagents, Turn.Mode, Turn.Bypass, Turn.Subagent, Turn.OutputStyle, Turn.StepDown);
 
   if (Session.Model !== Chosen.model && Session.Query) {
     Session.Model = Chosen.model;
@@ -1516,7 +1516,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
   Session.CapResults = Turn.CapResults;
   Session.Planning = Turn.Planning;
   Session.Mode = PermissionModeFor(Turn.Mode, Turn.Bypass);
-  Session.Delegating = Turn.Delegating;
+  Session.UsingSubagents = Turn.UsingSubagents;
   Session.CurrentTurn = Turn;
   Session.LastUsedAt = Date.now();
 
@@ -1654,7 +1654,7 @@ export function DescribeTurn(Turn: Turn) {
       status: Call.Status,
       steps: Call.Steps || [],
       milliseconds: Call.Milliseconds,
-      delegate: Call.Delegate || null,
+      delegate: Call.Subagent || null,
       lines: Call.Lines || null,
       image: Call.Image || null,
     })),

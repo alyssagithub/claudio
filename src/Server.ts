@@ -16,7 +16,7 @@ import { ActiveTurnFor, AddToTurn, ApplyStyleEverywhere, LastEndedAt, LastUsedFo
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
-import { HandToken, TokenMatches } from "./Token.js";
+import { HandToken, IssuePlaytestKey, PlaytestKeyMatches, PlaytestLive, RevokePlaytestKey, TokenMatches } from "./Token.js";
 import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
 import { ArmClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, RestoreFlashing, ShowToast, WriteClipboard } from "./Notify.js";
 import { ForgetConversation, GetModels } from "./Models.js";
@@ -343,8 +343,23 @@ export function StartServer(Port: number) {
         return;
       }
 
-      if (!TokenMatches(Request.headers["x-claudio-token"])) {
+      const Offered = Request.headers["x-claudio-token"];
+      const FromPlaytest = !TokenMatches(Offered) && PlaytestKeyMatches(Offered);
+      const Role = Url.searchParams.get("role") || "";
+
+      if (!TokenMatches(Offered) && !(FromPlaytest && ((Url.pathname === "/studio/job" && (Request.method === "POST" || Role === "server" || Role === "client")) || Url.pathname === "/picker"))) {
         SendJson(Response, 401, { error: "This request did not come from the Claudio plugin" });
+        return;
+      }
+
+      if (Request.method === "POST" && Url.pathname === "/playtest/key") {
+        SendJson(Response, 200, { key: IssuePlaytestKey() });
+        return;
+      }
+
+      if (Request.method === "POST" && Url.pathname === "/playtest/revoke") {
+        RevokePlaytestKey((await ReadBody(Request)).key);
+        SendJson(Response, 200, { revoked: true });
         return;
       }
 
@@ -460,7 +475,7 @@ export function StartServer(Port: number) {
           ExtraPrompt: Body.extraPrompt !== false,
           FastMode: Body.fastMode === true,
           Mode: typeof Body.mode === "string" ? Body.mode : DefaultMode,
-          Bypass: Body.bypass === true,
+          Bypass: Body.bypass === true && !PlaytestLive(),
           Escalate: Body.escalate === true,
           Place: Body.place && typeof Body.place === "object" ? Body.place : null,
           Folder: typeof Body.workingDirectory === "string" ? Body.workingDirectory : null,
@@ -498,7 +513,7 @@ export function StartServer(Port: number) {
         if (Request.method === "POST") {
           const Done = await ReadBody(Request);
 
-          SendJson(Response, DeliverStudio(Done.id, Done.result) ? 200 : 409, { ok: true });
+          SendJson(Response, DeliverStudio(Done.id, Done.result, FromPlaytest) ? 200 : 409, { ok: true });
           return;
         }
       }

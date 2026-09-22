@@ -4,6 +4,7 @@ const ReplicatedStorage = game:GetService("ReplicatedStorage")
 const HttpService = game:GetService("HttpService")
 
 const Settings = require(script.Parent.Settings)
+const Client = require(script.Parent.Client.Client)
 
 const Runtime = {}
 
@@ -14,14 +15,20 @@ const function Scripts(): (Instance?, Instance?)
 end
 
 function Runtime.Remove()
-	const Server, Client = Scripts()
+	const Server, Relay = Scripts()
 
 	if Server then
+		const Key = Server:GetAttribute("Token")
+
+		if typeof(Key) == "string" and Key ~= "" then
+			task.spawn(Client.RevokePlaytestKey, Key)
+		end
+
 		Server:Destroy()
 	end
 
-	if Client then
-		Client:Destroy()
+	if Relay then
+		Relay:Destroy()
 	end
 
 	if Switched then
@@ -54,7 +61,7 @@ function Runtime.Install()
 	const Server = (script :: any).ClaudioRuntimeServer:Clone()
 
 	Server:SetAttribute("Port", Settings.Get("Port")())
-	Server:SetAttribute("Token", Settings.Token())
+	Server:SetAttribute("Token", Client.PlaytestKey() or "")
 	Server.Disabled = false
 
 	pcall(function()

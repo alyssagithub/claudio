@@ -143,7 +143,7 @@ function Published(): string {
   return path.join(ToolsFolder, "studioflags.json");
 }
 
-async function Registry(Analyzer: string): Promise<string[]> {
+async function ReadAnalyzerFlags(Analyzer: string): Promise<string[]> {
   const Shown = await Run(Analyzer, ["--show-flags"]);
 
   return Shown.Text
@@ -186,7 +186,7 @@ async function Flags(Analyzer: string): Promise<string[]> {
   Tuned = process.env.CLAUDIO_NEW_SOLVER === "1" ? ["--flag:LuauSolverV2=True"] : [];
 
   try {
-    const [Names, Values] = await Promise.all([Registry(Analyzer), Settings()]);
+    const [Names, Values] = await Promise.all([ReadAnalyzerFlags(Analyzer), Settings()]);
 
     if (!Values) {
       return Tuned;

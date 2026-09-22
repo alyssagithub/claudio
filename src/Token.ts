@@ -49,6 +49,54 @@ export function HandToken() {
   return WritePluginSetting("BridgeToken", EnsureToken());
 }
 
+const PlaytestKeys = new Map<string, number>();
+
+export function IssuePlaytestKey(): string {
+  const Key = crypto.randomBytes(24).toString("hex");
+
+  PlaytestKeys.set(Key, Date.now() + 6 * 60 * 60 * 1000);
+
+  return Key;
+}
+
+export function RevokePlaytestKey(Key: unknown) {
+  if (typeof Key === "string") {
+    PlaytestKeys.delete(Key);
+  }
+}
+
+export function PlaytestKeyMatches(Given: unknown): boolean {
+  if (typeof Given !== "string") {
+    return false;
+  }
+
+  const Expires = PlaytestKeys.get(Given);
+
+  if (Expires === undefined) {
+    return false;
+  }
+
+  if (Expires < Date.now()) {
+    PlaytestKeys.delete(Given);
+
+    return false;
+  }
+
+  return true;
+}
+
+export function PlaytestLive(): boolean {
+  for (const [Key, Expires] of PlaytestKeys) {
+    if (Expires >= Date.now()) {
+      return true;
+    }
+
+    PlaytestKeys.delete(Key);
+  }
+
+  return false;
+}
+
 export function TokenMatches(Given: unknown): boolean {
   const Wanted = EnsureToken();
 

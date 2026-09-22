@@ -141,7 +141,7 @@ export const HiddenFoldersFile = path.join(os.homedir(), ".claudio", "hidden.jso
 export const LogFile = path.join(os.homedir(), ".claudio", "bridge.log");
 export const MaxImageWidth = 480;
 export const ToolsFolder = path.join(os.homedir(), ".claudio", "tools");
-export const AnalyzerVersion = "1.69.0";
+export const AnalyzerVersion = "1.70.0";
 export const DefinitionsUrl = "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau";
 export const LeanMode = {
   value: "token-saver",
@@ -207,6 +207,7 @@ export const InstalledPluginFile = path.join(os.homedir(), ".claudio", "plugin.j
 export const TokenFile = path.join(os.homedir(), ".claudio", "token.json");
 export const CommandsCacheFile = path.join(os.homedir(), ".claudio", "commands.json");
 export const MaxBodyBytes = 12 * 1024 * 1024;
+export const MaxLintBodyBytes = 64 * 1024 * 1024;
 export const KeepSessionsWarm = process.env.CLAUDIO_COLD !== "1";
 export const IdleSessionMilliseconds = 4 * 60 * 1000;
 export const MaxWarmSessions = 2;

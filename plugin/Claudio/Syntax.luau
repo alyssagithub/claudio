@@ -2,7 +2,7 @@
 const Theme = require(script.Parent.App.Theme)
 const Highlighter = require(script.Parent.Packages.highlighter)
 
-type Spec = {
+type Grammar = {
 	Keywords: {[string]: boolean},
 	Builtins: {[string]: boolean}?,
 	Line: {string}?,
@@ -43,12 +43,17 @@ end
 const Script = "break case catch class const continue debugger default delete do else export extends finally for from function if import in instanceof let new of return static super switch this throw try typeof var void while with yield async await get set null undefined true false"
 const ScriptBuiltins = Set("console process Math JSON Promise Object Array Buffer String Number Boolean Symbol Map Set WeakMap WeakSet Date RegExp Error TypeError RangeError require module exports window document globalThis setTimeout setInterval clearTimeout clearInterval fetch parseInt parseFloat isNaN structuredClone")
 
-const Specs: {[string]: Spec} = {
+const Grammars: {[string]: Grammar} = {
 	js = {
 		Keywords = Set(Script),
 		Builtins = ScriptBuiltins,
 		Line = {"//"},
-		Block = {{"/*", "*/"}},
+		Block = {
+			{
+				"/*",
+				"*/",
+			},
+		},
 		Quotes = "\"'`",
 		Template = true,
 		Decorators = true,
@@ -57,7 +62,12 @@ const Specs: {[string]: Spec} = {
 		Keywords = Set(`{Script} interface type enum implements private public protected readonly as keyof namespace declare abstract is infer satisfies never unknown any string number boolean symbol bigint object`),
 		Builtins = ScriptBuiltins,
 		Line = {"//"},
-		Block = {{"/*", "*/"}},
+		Block = {
+			{
+				"/*",
+				"*/",
+			},
+		},
 		Quotes = "\"'`",
 		Template = true,
 		Decorators = true,
@@ -83,7 +93,12 @@ const Specs: {[string]: Spec} = {
 	powershell = {
 		Keywords = Set("if else elseif foreach for while do until switch function param return break continue try catch finally throw begin process end filter class using in -eq -ne -gt -ge -lt -le -like -notlike -match -notmatch -contains -notcontains -in -notin -and -or -not -xor -is -isnot -replace -split -join $true $false $null"),
 		Line = {"#"},
-		Block = {{"<#", "#>"}},
+		Block = {
+			{
+				"<#",
+				"#>",
+			},
+		},
 		Quotes = "\"'",
 		Variables = true,
 		Flags = true,
@@ -94,7 +109,12 @@ const Specs: {[string]: Spec} = {
 	json = {
 		Keywords = Set("true false null"),
 		Line = {"//"},
-		Block = {{"/*", "*/"}},
+		Block = {
+			{
+				"/*",
+				"*/",
+			},
+		},
 		Quotes = "\"",
 		KeyStrings = true,
 	},
@@ -102,7 +122,12 @@ const Specs: {[string]: Spec} = {
 		Keywords = Set("select from where insert into values update set delete create table alter drop join left right inner outer full cross on group by order having limit offset as and or not null is in like between distinct union all primary key foreign references index view begin commit rollback transaction case when then else end exists default unique check constraint if returning with asc desc true false"),
 		Builtins = Set("count sum avg min max coalesce now lower upper cast length substr round date"),
 		Line = {"--"},
-		Block = {{"/*", "*/"}},
+		Block = {
+			{
+				"/*",
+				"*/",
+			},
+		},
 		Quotes = "'\"`",
 		Caseless = true,
 	},
@@ -110,14 +135,24 @@ const Specs: {[string]: Spec} = {
 		Keywords = Set("if else for while do switch case default break continue return goto struct union enum typedef static const extern void int char float double long short unsigned signed bool true false null nullptr NULL class public private protected virtual override new delete this namespace using template typename try catch throw throws finally import package interface extends implements abstract final var val let fn func mut pub impl trait match loop use mod crate self Self super where async await go defer chan map select type range readonly sealed internal string object dynamic def auto inline constexpr noexcept operator friend volatile sizeof typeof instanceof synchronized assert yield record when is as in out ref params base get set event delegate partial unsafe fixed lock implicit explicit"),
 		Builtins = Set("printf println print std cout cin cerr endl vector Console System Math String Integer List ArrayList HashMap Println Printf fmt len make append panic Some None Ok Err Box Vec Option Result"),
 		Line = {"//"},
-		Block = {{"/*", "*/"}},
+		Block = {
+			{
+				"/*",
+				"*/",
+			},
+		},
 		Quotes = "\"'`",
 		Preprocessor = true,
 		Decorators = true,
 	},
 	css = {
 		Keywords = Set("!important important inherit initial unset none auto"),
-		Block = {{"/*", "*/"}},
+		Block = {
+			{
+				"/*",
+				"*/",
+			},
+		},
 		Quotes = "\"'",
 		AtRules = true,
 		Hex = true,
@@ -134,7 +169,10 @@ const Specs: {[string]: Spec} = {
 	},
 	toml = {
 		Keywords = Set("true false"),
-		Line = {"#", ";"},
+		Line = {
+			"#",
+			";",
+		},
 		Quotes = "\"'",
 		Keys = "=",
 		Sections = true,
@@ -144,7 +182,7 @@ const Specs: {[string]: Spec} = {
 
 const Aliases: {[string]: string} = {}
 
-for Language, Names in {
+for Language, Names in ({
 	luau = "lua luau rbxlua roblox",
 	ts = "ts typescript tsx",
 	js = "js javascript jsx mjs cjs node",
@@ -160,7 +198,7 @@ for Language, Names in {
 	sql = "sql sqlite mysql postgres postgresql psql",
 	c = "c h cpp c++ cc cxx hpp cs csharp c# java kotlin kt go golang rust rs swift dart php scala",
 	text = "text txt plaintext plain output log md markdown",
-} do
+} :: {[string]: string}) do
 	for Name in Names:gmatch("%S+") do
 		Aliases[Name] = Language
 	end
@@ -180,6 +218,22 @@ end
 
 local Tinted = ""
 
+const function Signature(): string
+	const Colours = Theme.Colors
+
+	return table.concat({
+		Colours.Code():ToHex(),
+		Colours.CodeText():ToHex(),
+		Colours.Keyword():ToHex(),
+		Colours.Builtin():ToHex(),
+		Colours.LuauType():ToHex(),
+		Colours.String():ToHex(),
+		Colours.Number():ToHex(),
+		Colours.Comment():ToHex(),
+		Colours.Operator():ToHex(),
+	})
+end
+
 const function Luau(Code: string): string
 	const Colours = Theme.Colors
 	const Chosen = {
@@ -194,14 +248,10 @@ const function Luau(Code: string): string
 		operator = Colours.Operator(),
 		custom = Colours.Keyword(),
 	}
-	local Signature = ""
+	const Current = Signature()
 
-	for _, Colour in Chosen do
-		Signature ..= Colour:ToHex()
-	end
-
-	if Signature ~= Tinted then
-		Tinted = Signature
+	if Current ~= Tinted then
+		Tinted = Current
 		Highlighter.setTokenColors(Chosen)
 	end
 
@@ -247,19 +297,19 @@ const function Closing(Code: string, At: number, Quote: string, Multi: boolean):
 	local Index = At + 1
 
 	while Index <= #Code do
-		const Char = Code:sub(Index, Index)
+		const Character = Code:sub(Index, Index)
 
-		if Char == "\\" then
+		if Character == "\\" then
 			Index += 2
 
 			continue
 		end
 
-		if Char == Quote then
+		if Character == Quote then
 			return Index
 		end
 
-		if Char == "\n" and not Multi then
+		if Character == "\n" and not Multi then
 			return Index - 1
 		end
 
@@ -269,67 +319,64 @@ const function Closing(Code: string, At: number, Quote: string, Multi: boolean):
 	return #Code
 end
 
-local Tokens: (Code: string, Chosen: Spec) -> string
-
-const function Template(Body: string, Chosen: Spec): string
+const function Tokens(Code: string, Rules: Grammar): string
 	const Colours = Syntax.Palette()
-	const Parts = {}
-	local Index = 1
-	local Literal = 1
 
-	while Index <= #Body do
-		if Body:sub(Index, Index) == "\\" then
-			Index += 2
+	const function Template(Body: string, Rules: Grammar): string
+		const Parts = {}
+		local Index = 1
+		local Literal = 1
 
-			continue
-		end
+		while Index <= #Body do
+			if Body:sub(Index, Index) == "\\" then
+				Index += 2
 
-		if Body:sub(Index, Index + 1) ~= "${" then
-			Index += 1
+				continue
+			end
 
-			continue
-		end
+			if Body:sub(Index, Index + 1) ~= "${" then
+				Index += 1
 
-		local Depth = 0
-		local Close: number?
+				continue
+			end
 
-		for Scan = Index + 1, #Body do
-			const Char = Body:sub(Scan, Scan)
+			local Depth = 0
+			local Close: number?
 
-			if Char == "{" then
-				Depth += 1
-			elseif Char == "}" then
-				Depth -= 1
+			for Scan = Index + 1, #Body do
+				const Character = Body:sub(Scan, Scan)
 
-				if Depth == 0 then
-					Close = Scan
+				if Character == "{" then
+					Depth += 1
+				elseif Character == "}" then
+					Depth -= 1
 
-					break
+					if Depth == 0 then
+						Close = Scan
+
+						break
+					end
 				end
 			end
+
+			if not Close then
+				break
+			end
+
+			table.insert(Parts, Paint(Body:sub(Literal, Index - 1), Colours.String))
+			table.insert(Parts, Paint("${", Colours.Operator))
+			table.insert(Parts, Tokens(Body:sub(Index + 2, Close - 1), Rules))
+			table.insert(Parts, Paint("}", Colours.Operator))
+			Index = Close + 1
+			Literal = Index
 		end
 
-		if not Close then
-			break
-		end
+		table.insert(Parts, Paint(Body:sub(Literal), Colours.String))
 
-		table.insert(Parts, Paint(Body:sub(Literal, Index - 1), Colours.String))
-		table.insert(Parts, Paint("${", Colours.Operator))
-		table.insert(Parts, Tokens(Body:sub(Index + 2, Close - 1), Chosen))
-		table.insert(Parts, Paint("}", Colours.Operator))
-		Index = Close + 1
-		Literal = Index
+		return table.concat(Parts)
 	end
-
-	table.insert(Parts, Paint(Body:sub(Literal), Colours.String))
-
-	return table.concat(Parts)
-end
-
-Tokens = function(Code: string, Chosen: Spec): string
-	const Colours = Syntax.Palette()
 	const Out = {}
-	const Word = if Chosen.Dash then "^[%a_][%w_%-]*" else "^[%a_][%w_]*"
+	const Word = if Rules.Dash then "^[%a_][%w_%-]*" else "^[%a_][%w_]*"
 	local At = 1
 	local LineStart = 1
 	local Command = true
@@ -356,11 +403,11 @@ Tokens = function(Code: string, Chosen: Spec): string
 	end
 
 	while At <= #Code do
-		const Char = Code:sub(At, At)
+		const Character = Code:sub(At, At)
 		const Before = Code:sub(At - 1, At - 1)
 		local Comment: string?
 
-		for _, Pair in Chosen.Block or {} do
+		for _, Pair in (Rules.Block or {}) :: {{string}} do
 			if Code:sub(At, At + #Pair[1] - 1) == Pair[1] then
 				const Close = Code:find(Pair[2], At + #Pair[1], true)
 
@@ -371,8 +418,8 @@ Tokens = function(Code: string, Chosen: Spec): string
 		end
 
 		if not Comment then
-			for _, Prefix in Chosen.Line or {} do
-				if Code:sub(At, At + #Prefix - 1) == Prefix and (not Chosen.HashAfterSpace or At == 1 or Before:match("[%s;|&(]")) then
+			for _, Prefix in (Rules.Line or {}) :: {string} do
+				if Code:sub(At, At + #Prefix - 1) == Prefix and (not Rules.HashAfterSpace or At == 1 or Before:match("[%s;|&(]")) then
 					Comment = Code:match("^[^\n]*", At)
 
 					break
@@ -386,19 +433,19 @@ Tokens = function(Code: string, Chosen: Spec): string
 			continue
 		end
 
-		if Char == "#" and Chosen.Preprocessor and Fresh() then
+		if Character == "#" and Rules.Preprocessor and Fresh() then
 			Tint(Code:match("^[^\n]*", At) :: string, Colours.Keyword)
 
 			continue
 		end
 
-		if Char == "[" and ((Chosen.Sections and Fresh() and Code:match("^%[[^\n%]]*%]", At)) or (Chosen.Types and Code:match("^%[[%a_][%w_%.]*%]", At))) then
-			Tint(Code:match("^%[[^\n%]]*%]", At) :: string, if Chosen.Sections then Colours.Keyword else Colours.Builtin)
+		if Character == "[" and ((Rules.Sections and Fresh() and Code:match("^%[[^\n%]]*%]", At)) or (Rules.Types and Code:match("^%[[%a_][%w_%.]*%]", At))) then
+			Tint(Code:match("^%[[^\n%]]*%]", At) :: string, if Rules.Sections then Colours.Keyword else Colours.Builtin)
 
 			continue
 		end
 
-		if Chosen.Triple and (Code:sub(At, At + 2) == '"""' or Code:sub(At, At + 2) == "'''") then
+		if Rules.Triple and (Code:sub(At, At + 2) == '"""' or Code:sub(At, At + 2) == "'''") then
 			const Close = Code:find(Code:sub(At, At + 2), At + 3, true)
 
 			Tint(Code:sub(At, if Close then Close + 2 else #Code), Colours.String)
@@ -406,45 +453,45 @@ Tokens = function(Code: string, Chosen: Spec): string
 			continue
 		end
 
-		if Chosen.Quotes and Chosen.Quotes:find(Char, 1, true) then
-			const Body = Code:sub(At, Closing(Code, At, Char, Char == "`"))
+		if Rules.Quotes and Rules.Quotes:find(Character, 1, true) then
+			const Body = Code:sub(At, Closing(Code, At, Character, Character == "`"))
 
-			if Char == "`" and Chosen.Template then
-				Push(Body, Template(Body, Chosen))
+			if Character == "`" and Rules.Template then
+				Push(Body, Template(Body, Rules))
 			else
-				Tint(Body, if Chosen.KeyStrings and Code:match("^%s*:", At + #Body) then Colours.Variable else Colours.String)
+				Tint(Body, if Rules.KeyStrings and Code:match("^%s*:", At + #Body) then Colours.Variable else Colours.String)
 			end
 
 			continue
 		end
 
-		if Char == "$" and Chosen.Variables then
+		if Character == "$" and Rules.Variables then
 			const Name = Code:match("^%${[^}\n]*}", At) or Code:match("^%$[%a_][%w_]*:[%a_][%w_]*", At) or Code:match("^%$[%a_][%w_]*", At) or Code:match("^%$[%d#@%?%*!%$]", At)
 
 			if Name then
-				Tint(Name, if Chosen.Keywords[Name:lower()] then Colours.Keyword else Colours.Variable)
+				Tint(Name, if Rules.Keywords[Name:lower()] then Colours.Keyword else Colours.Variable)
 
 				continue
 			end
 		end
 
-		if Char == "@" and (Chosen.Decorators or Chosen.AtRules) then
+		if Character == "@" and (Rules.Decorators or Rules.AtRules) then
 			const Name = Code:match("^@[%a_][%w_%.%-]*", At)
 
 			if Name then
-				Tint(Name, if Chosen.AtRules then Colours.Keyword else Colours.Builtin)
+				Tint(Name, if Rules.AtRules then Colours.Keyword else Colours.Builtin)
 
 				continue
 			end
 		end
 
-		if Char == "#" and Chosen.Hex and Code:match("^#[%w_%-]+", At) then
+		if Character == "#" and Rules.Hex and Code:match("^#[%w_%-]+", At) then
 			Tint(Code:match("^#[%w_%-]+", At) :: string, Colours.Number)
 
 			continue
 		end
 
-		if (Char:match("%d") or (Char == "." and Code:sub(At + 1, At + 1):match("%d"))) and not Before:match("[%w_]") then
+		if (Character:match("%d") or (Character == "." and Code:sub(At + 1, At + 1):match("%d"))) and not Before:match("[%w_]") then
 			const Number = Code:match("^0[xX][%x_]+[%w_]*", At)
 				or Code:match("^0[bB][01_]+", At)
 				or Code:match("^%d[%d_]*%.?[%d_]*[eE][%+%-]?%d+[%w_]*", At)
@@ -458,15 +505,15 @@ Tokens = function(Code: string, Chosen: Spec): string
 			end
 		end
 
-		if Char == "-" and Chosen.Flags and (At == 1 or Before:match("%s")) and Code:match("^%-%-?%a[%w%-_]*", At) then
+		if Character == "-" and Rules.Flags and (At == 1 or Before:match("%s")) and Code:match("^%-%-?%a[%w%-_]*", At) then
 			const Flag = Code:match("^%-%-?%a[%w%-_]*", At) :: string
 
-			Tint(Flag, if Chosen.Keywords[Flag:lower()] then Colours.Keyword else Colours.Builtin)
+			Tint(Flag, if Rules.Keywords[Flag:lower()] then Colours.Keyword else Colours.Builtin)
 
 			continue
 		end
 
-		if Chosen.Cmdlets and Code:match("^%u%a+%-%u%w+", At) and not Before:match("[%w_]") then
+		if Rules.Cmdlets and Code:match("^%u%a+%-%u%w+", At) and not Before:match("[%w_]") then
 			Tint(Code:match("^%u%a+%-%u%w+", At) :: string, Colours.Call)
 			Command = false
 
@@ -478,24 +525,24 @@ Tokens = function(Code: string, Chosen: Spec): string
 		if Found then
 			const Next = Code:sub(At + #Found, At + #Found)
 
-			if Chosen.Prefixes and #Found <= 2 and Found:lower():match("^[rbfu]+$") and (Next == '"' or Next == "'") then
+			if Rules.Prefixes and #Found <= 2 and Found:lower():match("^[rbfu]+$") and (Next == '"' or Next == "'") then
 				Tint(Code:sub(At, Closing(Code, At + #Found, Next, false)), Colours.String)
 
 				continue
 			end
 
-			const Key = if Chosen.Caseless then Found:lower() else Found
+			const Key = if Rules.Caseless then Found:lower() else Found
 			local Colour: Color3?
 
-			if Chosen.Keys and Code:sub(LineStart, At - 1):match("^%s*%-?%s*$") and Code:match(`^%s*%{Chosen.Keys}`, At + #Found) and not Code:match("^%s*::", At + #Found) then
+			if Rules.Keys and Code:sub(LineStart, At - 1):match("^%s*%-?%s*$") and Code:match(`^%s*%{Rules.Keys}`, At + #Found) and not Code:match("^%s*::", At + #Found) then
 				Colour = Colours.Variable
-			elseif Before == "." or (Before == ":" and not Chosen.Keys) then
+			elseif Before == "." or (Before == ":" and not Rules.Keys) then
 				Colour = if Code:match("^%s*%(", At + #Found) then Colours.Call else nil
-			elseif Chosen.Keywords[Key] then
+			elseif Rules.Keywords[Key] then
 				Colour = Colours.Keyword
-			elseif Chosen.Builtins and Chosen.Builtins[Key] then
+			elseif Rules.Builtins and Rules.Builtins[Key] then
 				Colour = Colours.Builtin
-			elseif (Chosen.Commands and Command) or Code:match("^%s*%(", At + #Found) then
+			elseif (Rules.Commands and Command) or Code:match("^%s*%(", At + #Found) then
 				Colour = Colours.Call
 			end
 
@@ -505,17 +552,17 @@ Tokens = function(Code: string, Chosen: Spec): string
 			continue
 		end
 
-		if Char:match("[%+%-%*/%%%^=~<>:%.,;%(%)%[%]{}|&!?#$\\]") then
-			Tint(Char, Colours.Operator)
+		if Character:match("[%+%-%*/%%%^=~<>:%.,;%(%)%[%]{}|&!?#$\\]") then
+			Tint(Character, Colours.Operator)
 
-			if Chosen.Commands and (Char == "|" or Char == ";" or Char == "&" or Char == "(") then
+			if Rules.Commands and (Character == "|" or Character == ";" or Character == "&" or Character == "(") then
 				Command = true
 			end
 
 			continue
 		end
 
-		Tint(Code:match("^%s+", At) or Code:match("^[\192-\255][\128-\191]*", At) or Char, nil)
+		Tint(Code:match("^%s+", At) or Code:match("^[\192-\255][\128-\191]*", At) or Character, nil)
 	end
 
 	return table.concat(Out)
@@ -562,24 +609,24 @@ const function Markup(Code: string): string
 					break
 				end
 
-				const Char = Code:sub(At, At)
+				const Character = Code:sub(At, At)
 				const Attribute = Code:match("^[%w_:%-%.@]+", At)
 
 				if Attribute then
 					table.insert(Out, Paint(Attribute, Colours.Variable))
 					At += #Attribute
-				elseif Char == '"' or Char == "'" then
-					const Value = Code:sub(At, Closing(Code, At, Char, true))
+				elseif Character == '"' or Character == "'" then
+					const Value = Code:sub(At, Closing(Code, At, Character, true))
 
 					table.insert(Out, Paint(Value, Colours.String))
 					At += #Value
-				elseif Char == "=" then
-					table.insert(Out, Paint(Char, Colours.Operator))
+				elseif Character == "=" then
+					table.insert(Out, Paint(Character, Colours.Operator))
 					At += 1
-				elseif Char == "<" then
+				elseif Character == "<" then
 					break
 				else
-					table.insert(Out, Escape(Char))
+					table.insert(Out, Escape(Character))
 					At += 1
 				end
 			end
@@ -700,17 +747,18 @@ const Cached: {[string]: string} = {}
 local Held = 0
 
 function Syntax.Highlight(Code: string, Language: string?): string
-	const Chosen = Language or "text"
-	const Key = `{Chosen}|{Theme.Colors.Keyword():ToHex()}|{Code}`
+	const Key = `{Language or "?"}|{Signature()}|{Code}`
 
 	if Cached[Key] then
 		return Cached[Key]
 	end
 
+	const Chosen = Language or Syntax.Guess(Code)
+
 	const Built = if Chosen == "luau" then Luau(Code)
 		elseif Chosen == "diff" then Diff(Code)
 		elseif Chosen == "html" then Markup(Code)
-		elseif Specs[Chosen] then Tokens(Code, Specs[Chosen])
+		elseif Grammars[Chosen] then Tokens(Code, Grammars[Chosen])
 		else Escape(Code)
 
 	if Held > 200 then

@@ -1,4 +1,6 @@
 --!strict
+const Bounds = require(script.Parent.Parent.Bounds)
+
 const Covers = {}
 
 const Shown: {GuiObject} = {}
@@ -9,9 +11,11 @@ function Covers.Add(Object: GuiObject)
 	Object.Destroying:Once(function()
 		const Index = table.find(Shown, Object)
 
-		if Index then
-			table.remove(Shown, Index)
+		if not Index then
+			return
 		end
+
+		table.remove(Shown, Index)
 	end)
 end
 
@@ -31,14 +35,7 @@ end
 
 function Covers.Over(Object: GuiObject, X: number, Y: number): boolean
 	for _, Cover in Shown do
-		if Cover == Object or Object:IsDescendantOf(Cover) or not Seen(Cover) then
-			continue
-		end
-
-		const Corner = Cover.AbsolutePosition
-		const Size = Cover.AbsoluteSize
-
-		if X >= Corner.X and X <= Corner.X + Size.X and Y >= Corner.Y and Y <= Corner.Y + Size.Y then
+		if Cover ~= Object and not Object:IsDescendantOf(Cover) and Seen(Cover) and Bounds.Contains(Cover, Vector2.new(X, Y)) then
 			return true
 		end
 	end
@@ -51,9 +48,11 @@ function Covers.Hover(Hovered: (boolean?) -> boolean): (GuiObject) -> ()
 		const function Check(X: number, Y: number)
 			const Wanted = not Covers.Over(Object, X, Y)
 
-			if Hovered() ~= Wanted then
-				Hovered(Wanted)
+			if Hovered() == Wanted then
+				return
 			end
+
+			Hovered(Wanted)
 		end
 
 		Object.MouseEnter:Connect(Check)

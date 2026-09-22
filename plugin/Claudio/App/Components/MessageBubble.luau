@@ -189,9 +189,7 @@ return function(Props: Props)
 				return Value().Text
 			end,
 			Rich = function()
-				const Body = Value().Text
-
-				return Syntax.Highlight(Body, Syntax.Language(Value().Language) or Syntax.Guess(Body))
+				return Syntax.Highlight(Value().Text, Syntax.Language(Value().Language))
 			end,
 		}
 	end
@@ -593,9 +591,7 @@ return function(Props: Props)
 									return ""
 								end
 
-								const Body = Shortened(Pair().Value)
-
-								return Syntax.Highlight(Body, if Pair().Key == "command" then (if Value().name == "PowerShell" then "powershell" else "sh") else Syntax.Guess(Body))
+								return Syntax.Highlight(Shortened(Pair().Value), if Pair().Key ~= "command" then nil elseif Value().name == "PowerShell" then "powershell" else "sh")
 							end,
 						},
 					}

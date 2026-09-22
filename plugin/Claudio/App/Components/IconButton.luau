@@ -32,52 +32,48 @@ return function(Props: Props)
 	const Hovered = Vide.source(false)
 	local Anchor: TextButton
 
-	const function Wording(): string
-		if Props.Disabled and Props.Disabled() then
-			return Props.DisabledTooltip or Read(Props.Tooltip)
+	local Sent: any
+
+	const function Withdraw()
+		if Sent and Vide.untrack(Chat.Tip) == Sent then
+			Chat.Tip(nil)
 		end
 
-		return Read(Props.Tooltip)
+		Sent = nil
 	end
 
-	const function Show()
-		const Window = Chat.Window
+	Vide.effect(function()
+		if not Hovered() then
+			Withdraw()
 
-		if not Anchor or not Window or (Props.Tooltip == nil and Props.DisabledTooltip == nil) then
 			return
 		end
 
-		const Room = Window.AbsoluteSize
-		const Corner = Anchor.AbsolutePosition - Window.AbsolutePosition
-		const Middle = Corner.X + Anchor.AbsoluteSize.X / 2
-		const Under = Room.Y - (Corner.Y + Anchor.AbsoluteSize.Y) > 30
-		const Side = if Room.X - Middle < 90 then 1 elseif Middle < 90 then 0 else 0.5
+		const Text = if Props.Disabled and Props.Disabled() then Props.DisabledTooltip or Read(Props.Tooltip) else Read(Props.Tooltip)
 
-		Chat.Tip({
-			Text = Wording(),
-			Where = Vector2.new(Middle, if Under then Corner.Y + Anchor.AbsoluteSize.Y + 4 else Corner.Y - 4),
-			Side = Side,
-			Below = Under,
-		})
-	end
+		Vide.untrack(function()
+			const Window = Chat.Window
 
-	local Showing = false
+			if not Anchor or not Window or (Props.Tooltip == nil and Props.DisabledTooltip == nil) then
+				return
+			end
 
-	Vide.effect(function()
-		if Hovered() then
-			Showing = true
-			Vide.untrack(Show)
-		elseif Showing then
-			Showing = false
-			Chat.Tip(nil)
-		end
+			const Room = Window.AbsoluteSize
+			const Corner = Anchor.AbsolutePosition - Window.AbsolutePosition
+			const Middle = Corner.X + Anchor.AbsoluteSize.X / 2
+			const Under = Room.Y - (Corner.Y + Anchor.AbsoluteSize.Y) > 30
+
+			Sent = {
+				Text = Text,
+				Where = Vector2.new(Middle, if Under then Corner.Y + Anchor.AbsoluteSize.Y + 4 else Corner.Y - 4),
+				Side = if Room.X - Middle < 90 then 1 elseif Middle < 90 then 0 else 0.5,
+				Below = Under,
+			}
+			Chat.Tip(Sent)
+		end)
 	end)
 
-	Vide.cleanup(function()
-		if Chat.Tip() then
-			Chat.Tip(nil)
-		end
-	end)
+	Vide.cleanup(Withdraw)
 
 	const function Room(): number
 		return if Props.Size then Props.Size() else Settings.TextSize()

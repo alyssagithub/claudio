@@ -492,11 +492,9 @@ end
 const function Pill(Open: () -> boolean): (() -> boolean, {any})
 	const Hovered = Vide.source(false)
 
-	const function Lit(): boolean
+	return function()
 		return Hovered() or Open()
-	end
-
-	return Lit, {
+	end, {
 		Vide.action(Covers.Hover(Hovered)),
 		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
 		Create "UIPadding" {

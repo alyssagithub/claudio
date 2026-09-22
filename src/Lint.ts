@@ -107,18 +107,50 @@ async function Install(): Promise<void> {
   if (process.platform !== "win32") {
     fs.chmodSync(Binary(), 0o755);
   }
+
+  fs.writeFileSync(InstalledVersion(), AnalyzerVersion);
+}
+
+function InstalledVersion(): string {
+  return path.join(ToolsFolder, "analyzer-version.txt");
+}
+
+async function RefreshDefinitions(): Promise<void> {
+  const Age = fs.existsSync(Definitions()) ? Date.now() - fs.statSync(Definitions()).mtimeMs : Infinity;
+
+  if (Age < 24 * 60 * 60 * 1000) {
+    return;
+  }
+
+  fs.mkdirSync(ToolsFolder, {recursive: true});
+
+  const Fresh = `${Definitions()}.new`;
+
+  try {
+    await Download(DefinitionsUrl, Fresh);
+    fs.renameSync(Fresh, Definitions());
+  } catch (Trouble) {
+    fs.rmSync(Fresh, {force: true});
+
+    if (!fs.existsSync(Definitions())) {
+      throw Trouble;
+    }
+  }
 }
 
 async function Prepare(): Promise<string> {
   const Existing = process.env.CLAUDIO_LUAU_LSP;
 
-  if (!fs.existsSync(Definitions())) {
-    fs.mkdirSync(ToolsFolder, {recursive: true});
-    await Download(DefinitionsUrl, Definitions());
-  }
+  await RefreshDefinitions();
 
   if (Existing && fs.existsSync(Existing)) {
     return Existing;
+  }
+
+  const Current = fs.existsSync(InstalledVersion()) ? fs.readFileSync(InstalledVersion(), "utf8").trim() : null;
+
+  if (fs.existsSync(Binary()) && Current !== AnalyzerVersion) {
+    await Install();
   }
 
   if (!fs.existsSync(Binary())) {

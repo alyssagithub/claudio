@@ -695,6 +695,18 @@ const function LintPlace(Paths: {string}?): any
 		return {error = "Nothing in the place matched those paths, so there was nothing to check."}
 	end
 
+	const Checked = {}
+
+	for _, Entry in Wanted do
+		Checked[Entry] = true
+	end
+
+	for _, Entry in Tree do
+		if Entry.className ~= "ModuleScript" and not Checked[Entry] then
+			Entry.source = nil
+		end
+	end
+
 	const Ok, Result = Client.Lint(Wanted, Tree)
 
 	if not Ok then

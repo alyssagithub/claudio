@@ -26,7 +26,7 @@ return function(Text: () -> string, LayoutOrder: number, Live: boolean?)
 		const Found: {[string]: string} = {}
 
 		for Label, Url in Text():gmatch("%[([^%]]+)%]%(([^%)%s]+)%)") do
-			Found[Label] = Url
+			Found[Label :: string] = Url :: string
 		end
 
 		return Found

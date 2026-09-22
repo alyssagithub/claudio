@@ -15,13 +15,18 @@ export type Props = {
 	Size: (() -> number)?,
 	Font: Enum.Font?,
 	Colour: (() -> Color3)?,
-	Background: (() -> Color3)?,
-	Transparent: boolean?,
-	Wide: boolean?,
 	LayoutOrder: any,
 	Links: (() -> {[string]: string})?,
 	Urls: (() -> {[string]: string})?,
 	Children: {Instance}?,
+}
+
+const Entities = {
+	["&lt;"] = true,
+	["&gt;"] = true,
+	["&amp;"] = true,
+	["&quot;"] = true,
+	["&apos;"] = true,
 }
 
 const function Spanning(Text: string, Needle: string, At: number): boolean
@@ -72,7 +77,8 @@ const function Marked(Rich: string, From: number, To: number, Colour: string): s
 		end
 
 		const Entity = Rich:match("^&%a+;", At)
-		const Piece = Entity or Rich:match("^[%z\1-\127\194-\244][\128-\191]*", At) or Rich:sub(At, At)
+		const Known = Entity ~= nil and Entities[Entity] == true
+		const Piece = if Known then Entity :: string else Rich:match("^[%z\1-\127\194-\244][\128-\191]*", At) or Rich:sub(At, At)
 		const Chosen = Position >= From and Position < To
 
 		if Chosen and not Open then
@@ -85,7 +91,7 @@ const function Marked(Rich: string, From: number, To: number, Colour: string): s
 
 		table.insert(Pieces, Piece)
 		At += #Piece
-		Position += if Entity then 1 else #Piece
+		Position += if Known then 1 else #Piece
 	end
 
 	if Open then
@@ -101,7 +107,10 @@ return function(Props: Props)
 	local Focused = 0
 	local Holding = false
 
-	const Range = Vide.source({0, 0})
+	const Range = Vide.source({
+		0,
+		0,
+	})
 
 	const function Track()
 		if Selection.Crossing() then
@@ -109,12 +118,18 @@ return function(Props: Props)
 		end
 
 		if not Box:IsFocused() or Box.SelectionStart == -1 then
-			Range({0, 0})
+			Range({
+				0,
+				0,
+			})
 
 			return
 		end
 
-		Range({math.min(Box.CursorPosition, Box.SelectionStart), math.max(Box.CursorPosition, Box.SelectionStart)})
+		Range({
+			math.min(Box.CursorPosition, Box.SelectionStart),
+			math.max(Box.CursorPosition, Box.SelectionStart),
+		})
 	end
 
 	const Entry: Selection.Block = {
@@ -123,40 +138,11 @@ return function(Props: Props)
 		Native = Track,
 	}
 
-	const function Pressed()
-		if Selection.Crossing() then
-			return
-		end
-
-		if Box.SelectionStart ~= -1 and Box.SelectionStart ~= Box.CursorPosition then
-			return
-		end
-
-		const At = Box.CursorPosition - 1
-
-		for Path, Full in (if Props.Links then Props.Links() else {}) do
-			if Spanning(Box.Text, Path, At) then
-				task.spawn(Navigate.Go, {Path = Full})
-
-				return
-			end
-		end
-
-		for Label, Url in (if Props.Urls then Props.Urls() else {}) do
-			if Spanning(Box.Text, Label, At) then
-				task.spawn(Chat.Copy, Url)
-
-				return
-			end
-		end
-	end
-
 	Box = Create "TextBox" {
 		Name = Props.Name,
-		Size = if Props.Wide == false then UDim2.fromScale(0, 0) else UDim2.fromScale(1, 0),
-		AutomaticSize = if Props.Wide == false then Enum.AutomaticSize.XY else Enum.AutomaticSize.Y,
-		BackgroundColor3 = Props.Background or Theme.Colors.Code,
-		BackgroundTransparency = if Props.Transparent == false then 0 else 1,
+		Size = UDim2.fromScale(1, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
 		TextColor3 = Props.Colour or Theme.Colors.Text,
 		TextSize = Props.Size or Settings.TextSize,
 		FontFace = Font.fromEnum(Props.Font or Enum.Font.BuilderSans),
@@ -182,25 +168,32 @@ return function(Props: Props)
 			end
 
 			task.spawn(function()
-				while Focused == Mine and task.wait(0.15) do
+				while task.wait(0.15) and Focused == Mine do
 					Copies = Keys.CopySelection(Box, Copies, Selection.Text())
 				end
 			end)
 		end,
 		FocusLost = function()
 			Focused += 1
-			Range({0, 0})
+			Range({
+				0,
+				0,
+			})
 			Selection.Drop(Entry)
 
-			if Holding then
-				Holding = false
-				Keys.Release()
+			if not Holding then
+				return
 			end
+
+			Holding = false
+			Keys.Release()
 		end,
 		InputBegan = function(Input: InputObject)
-			if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-				Selection.Begin(Entry, Box:FindFirstAncestorWhichIsA("PluginGui"))
+			if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+				return
 			end
+
+			Selection.Begin(Entry, Box:FindFirstAncestorWhichIsA("PluginGui"))
 		end,
 		InputEnded = function(Input: InputObject)
 			if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then
@@ -209,9 +202,33 @@ return function(Props: Props)
 
 			Selection.Finish(Vector2.new(Input.Position.X, Input.Position.Y))
 
-			if Box:IsFocused() then
-				task.defer(Pressed)
+			if not Box:IsFocused() then
+				return
 			end
+
+			task.defer(function()
+				if Selection.Crossing() or (Box.SelectionStart ~= -1 and Box.SelectionStart ~= Box.CursorPosition) then
+					return
+				end
+
+				const At = Box.CursorPosition - 1
+
+				for Path, Full in (if Props.Links then Props.Links() else {}) :: {[string]: string} do
+					if Spanning(Box.Text, Path, At) then
+						task.spawn(Navigate.Go, {Path = Full})
+
+						return
+					end
+				end
+
+				for Label, Url in (if Props.Urls then Props.Urls() else {}) :: {[string]: string} do
+					if Spanning(Box.Text, Label, At) then
+						task.spawn(Chat.Copy, Url)
+
+						return
+					end
+				end
+			end)
 		end,
 
 		Vide.action(function(Object: TextBox)
@@ -223,8 +240,8 @@ return function(Props: Props)
 
 		Create "TextLabel" {
 			Name = "Shown",
-			Size = if Props.Wide == false then UDim2.fromScale(0, 0) else UDim2.fromScale(1, 0),
-			AutomaticSize = if Props.Wide == false then Enum.AutomaticSize.XY else Enum.AutomaticSize.Y,
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			TextColor3 = Props.Colour or Theme.Colors.Text,
 			TextSize = Props.Size or Settings.TextSize,
@@ -246,10 +263,12 @@ return function(Props: Props)
 	Vide.cleanup(function()
 		Focused += 1
 
-		if Holding then
-			Holding = false
-			Keys.Release()
+		if not Holding then
+			return
 		end
+
+		Holding = false
+		Keys.Release()
 	end)
 
 	return Box

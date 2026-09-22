@@ -39,14 +39,14 @@ function Keys.Release()
 	Sync()
 end
 
-function Keys.Last(): any?
+const function Last(): any?
 	const Ok, Seen = Client.LastReturn()
 
 	return if Ok and typeof(Seen) == "table" and Seen.watching == true then Seen else nil
 end
 
 function Keys.ShiftedReturn(): boolean
-	const Seen = Keys.Last()
+	const Seen = Last()
 
 	return Seen ~= nil and Seen.shift == true and typeof(Seen.now) == "number" and typeof(Seen.at) == "number" and Seen.now - Seen.at < 2000
 end
@@ -56,7 +56,7 @@ function Keys.Clean(Rich: string): string
 end
 
 function Keys.CopySelection(Box: TextBox, Since: number, Spanning: string?): number
-	const Seen = Keys.Last()
+	const Seen = Last()
 
 	if not Seen or typeof(Seen.copyAt) ~= "number" or Seen.copyAt <= Since then
 		return Since

@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { exec, execFile, spawn } from "node:child_process";
-import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, MostScriptsToCheck, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
+import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, MaxLintBodyBytes, MostScriptsToCheck, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
 import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving } from "./Studio.js";
@@ -144,7 +144,7 @@ function SendJson(Response: ServerResponse, StatusCode: number, Body: unknown) {
   Response.end(JSON.stringify(Body));
 }
 
-function ReadBody(Request: IncomingMessage): Promise<Record<string, any>> {
+function ReadBody(Request: IncomingMessage, Limit = MaxBodyBytes): Promise<Record<string, any>> {
   return new Promise((Resolve, Reject) => {
     const Chunks: Buffer[] = [];
     let Size = 0;
@@ -152,16 +152,16 @@ function ReadBody(Request: IncomingMessage): Promise<Record<string, any>> {
     Request.on("data", (Chunk) => {
       Size += Chunk.length;
 
-      if (Size > MaxBodyBytes) {
-        Reject(new Error("Body is too large"));
-        Request.destroy();
-
+      if (Size <= Limit) {
+        Chunks.push(Chunk);
+      }
+    });
+    Request.on("end", () => {
+      if (Size > Limit) {
+        Reject(new Error(`That request was ${Math.ceil(Size / 1048576)} MB, over the ${Math.round(Limit / 1048576)} MB the bridge accepts.`));
         return;
       }
 
-      Chunks.push(Chunk);
-    });
-    Request.on("end", () => {
       const Raw = Buffer.concat(Chunks).toString("utf8");
 
       try {
@@ -572,10 +572,16 @@ export function StartServer(Port: number) {
       }
 
       if (Request.method === "POST" && Url.pathname === "/lint") {
-        const Body = await ReadBody(Request);
-        const Usable = (Entry: {path?: unknown, source?: unknown}) => Entry && typeof Entry.path === "string" && typeof Entry.source === "string" && Entry.source !== "";
-        const Wanted = (Array.isArray(Body.scripts) ? Body.scripts : []).filter(Usable);
+        const Body = await ReadBody(Request, MaxLintBodyBytes);
         const Tree = (Array.isArray(Body.tree) ? Body.tree : []).filter((Entry: {path?: unknown, className?: unknown}) => Entry && typeof Entry.path === "string" && typeof Entry.className === "string").slice(0, 20000);
+        const Sources = new Map<string, string>(Tree.filter((Entry: {source?: unknown}) => typeof Entry.source === "string").map((Entry: {path: string, source: string}) => [Entry.path, Entry.source]));
+        const Wanted = (Array.isArray(Body.scripts) ? Body.scripts : [])
+          .filter((Entry: {path?: unknown}) => Entry && typeof Entry.path === "string")
+          .map((Entry: {path: string, source?: unknown}) => ({
+            path: Entry.path,
+            source: typeof Entry.source === "string" ? Entry.source : Sources.get(Entry.path) || "",
+          }))
+          .filter((Entry: {source: string}) => Entry.source !== "");
 
         if (Wanted.length > MostScriptsToCheck) {
           SendJson(Response, 413, {error: `${Wanted.length} scripts is more than the analyzer will check in one run. Narrow it with paths.`});

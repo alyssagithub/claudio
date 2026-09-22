@@ -195,8 +195,14 @@ function Client.GetCommands(): (boolean, any)
 end
 
 function Client.Lint(Scripts: {any}, Tree: {any}): (boolean, any)
+	const Paths = {}
+
+	for _, Entry in Scripts do
+		table.insert(Paths, {path = Entry.path})
+	end
+
 	const Sent, Started = Http.Request("POST", `{BaseUrl()}/lint`, {
-		scripts = Scripts,
+		scripts = Paths,
 		tree = Tree,
 	})
 

@@ -188,8 +188,8 @@ function Client.DecodeImage(Data: string, MediaType: string): (boolean, any)
 	})
 end
 
-function Client.GetCommands(): (boolean, any)
-	const Ok, Result = Http.Request("GET", `{BaseUrl()}/commands`)
+function Client.GetCommands(Folder: string): (boolean, any)
+	const Ok, Result = Http.Request("GET", `{BaseUrl()}/commands?folder={HttpService:UrlEncode(Folder)}`)
 
 	return Checked(Ok, Result, Schemas.Commands)
 end

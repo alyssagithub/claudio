@@ -344,17 +344,41 @@ function RememberCommands(Init: {slash_commands?: string[], skills?: string[], c
 let Described: Record<string, string | undefined> | null = null;
 let DescribedAt = 0;
 
-export function GetCommands() {
+function ProjectCommands(Folder: string): Map<string, string> {
+  const Found = new Map<string, string>();
+  const Skills = path.join(Folder, ".claude", "skills");
+  const Written = path.join(Folder, ".claude", "commands");
+
+  for (const Name of ReadFolder(Skills)) {
+    if (fs.existsSync(path.join(Skills, Name, "SKILL.md"))) {
+      Found.set(Name, ReadDescription(path.join(Skills, Name, "SKILL.md")));
+    }
+  }
+
+  for (const Name of ReadFolder(Written)) {
+    if (Name.endsWith(".md")) {
+      Found.set(Name.slice(0, -3), ReadDescription(path.join(Written, Name)));
+    }
+  }
+
+  return Found;
+}
+
+export function GetCommands(Folder?: string | null) {
   if (!Described || Date.now() - DescribedAt > 60000) {
     Described = ReadDescriptions();
     DescribedAt = Date.now();
   }
 
+  const Project = Folder && path.isAbsolute(Folder) ? ProjectCommands(Folder) : new Map<string, string>();
+  const Names = [...new Set([...Commands.slashCommands, ...Project.keys()])];
+
   return {
     ...Commands,
-    commands: Commands.slashCommands.map((Name: string) => ({
+    slashCommands: Names,
+    commands: Names.map((Name: string) => ({
       name: Name,
-      description: (Described || {})[Name] || "",
+      description: Project.get(Name) || (Described || {})[Name] || "",
     })),
   };
 }

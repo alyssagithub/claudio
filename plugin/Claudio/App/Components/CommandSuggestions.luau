@@ -93,6 +93,11 @@ const function Row(Command: () -> Types.Command, Index: number)
 end
 
 return function()
+	Vide.effect(function()
+		Settings.Get("WorkingFolder")()
+		task.spawn(Chat.LoadCommands)
+	end)
+
 	const Found = Vide.derive(Matches)
 
 	return Create "Frame" {

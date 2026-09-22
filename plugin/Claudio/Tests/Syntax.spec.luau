@@ -2,6 +2,15 @@
 --!nolint UnknownGlobal
 return function()
 	const Syntax = require(script.Parent.Parent.Syntax)
+	const Theme = require(script.Parent.Parent.App.Theme)
+
+	beforeAll(function()
+		Theme.Init()
+	end)
+
+	afterAll(function()
+		Theme.Destroy()
+	end)
 
 	const function Plain(Rich: string): string
 		return (Rich:gsub("<[^>]->", ""):gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&amp;", "&"))

@@ -67,7 +67,11 @@ return function()
 		end)
 
 		it("ignores calls that only look", function()
-			expect(#Changes.Describe({Call("mcp__claudio__find", "search: Part"), Call("mcp__claudio__capture", "of: viewport"), Call("Read", "file_path: C:/x")})).to.equal(0)
+			expect(#Changes.Describe({
+				Call("mcp__claudio__find", "search: Part"),
+				Call("mcp__claudio__capture", "of: viewport"),
+				Call("Read", "file_path: C:/x"),
+			})).to.equal(0)
 		end)
 
 		it("skips a call that failed and lists a change once", function()
@@ -113,7 +117,13 @@ return function()
 			const Found = Changes.For({
 				Role = "assistant",
 				Text = "",
-				Edits = {{Kind = "changed", Text = "Edited ServerScriptService.Main", Path = "ServerScriptService.Main", Added = 3, Removed = 1}},
+				Edits = {{
+					Kind = "changed",
+					Text = "Edited ServerScriptService.Main",
+					Path = "ServerScriptService.Main",
+					Added = 3,
+					Removed = 1,
+				}},
 			} :: any)
 
 			expect(#Found).to.equal(1)
@@ -126,7 +136,10 @@ return function()
 				Role = "assistant",
 				Text = "",
 				Edits = {},
-				Calls = {Call("Write", "file_path: C:/Repo/src/Thing.js", "done", {added = 21, removed = 0})},
+				Calls = {Call("Write", "file_path: C:/Repo/src/Thing.js", "done", {
+					added = 21,
+					removed = 0,
+				})},
 			} :: any)
 
 			expect(#Found).to.equal(1)
@@ -150,8 +163,16 @@ return function()
 				Role = "assistant",
 				Text = "",
 				Edits = {
-					{Kind = "changed", Text = "Edited Workspace.Part", Path = "Workspace.Part"},
-					{Kind = "changed", Text = "Edited Workspace.Part", Path = "Workspace.Part"},
+					{
+						Kind = "changed",
+						Text = "Edited Workspace.Part",
+						Path = "Workspace.Part",
+					},
+					{
+						Kind = "changed",
+						Text = "Edited Workspace.Part",
+						Path = "Workspace.Part",
+					},
 				},
 			} :: any)
 

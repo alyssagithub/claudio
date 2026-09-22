@@ -10,12 +10,15 @@ export function EncodePixels(Width: number, Height: number, Base64Pixels: string
   const Wanted = Width * Height * 4;
 
   if (Bytes.length < Wanted) {
-    return { error: `Studio sent ${Bytes.length} bytes for a ${Width} by ${Height} image, which needs ${Wanted}.` };
+    return {error: `Studio sent ${Bytes.length} bytes for a ${Width} by ${Height} image, which needs ${Wanted}.`};
   }
 
-  const Image = new PNG({ width: Width, height: Height });
+  const Image = new PNG({
+    width: Width,
+    height: Height,
+  });
 
   Bytes.copy(Image.data, 0, 0, Wanted);
 
-  return { data: PNG.sync.write(Image).toString("base64") };
+  return {data: PNG.sync.write(Image).toString("base64")};
 }

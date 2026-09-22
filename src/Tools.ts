@@ -34,12 +34,18 @@ const PlaytestDescription = [
 function StudioBytes(): number {
   try {
     if (process.platform === "win32") {
-      const Said = execFileSync("powershell", ["-NoProfile", "-Command", "(Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Sort-Object WorkingSet64 -Descending | Select-Object -First 1).WorkingSet64"], { encoding: "utf8", timeout: 8000 });
+      const Said = execFileSync("powershell", ["-NoProfile", "-Command", "(Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Sort-Object WorkingSet64 -Descending | Select-Object -First 1).WorkingSet64"], {
+        encoding: "utf8",
+        timeout: 8000,
+      });
 
       return Number(Said.trim()) || 0;
     }
 
-    const Said = execFileSync("sh", ["-c", "ps -axo rss,comm | grep -i RobloxStudio | sort -rn | head -1 | awk '{print $1}'"], { encoding: "utf8", timeout: 8000 });
+    const Said = execFileSync("sh", ["-c", "ps -axo rss,comm | grep -i RobloxStudio | sort -rn | head -1 | awk '{print $1}'"], {
+      encoding: "utf8",
+      timeout: 8000,
+    });
 
     return (Number(Said.trim()) || 0) * 1024;
   } catch {
@@ -114,7 +120,10 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       Name: "instances",
       Description: "Say whether Studio is open and whether the Claudio plugin has checked in. Ask this before assuming nothing is connected, and never open Studio yourself on the strength of an empty answer.",
       Schema: {},
-      Run: async () => ({ content: [{ type: "text", text: await Presence() }] }),
+      Run: async () => ({content: [{
+        type: "text",
+        text: await Presence(),
+      }]}),
     },
     {
       Name: "read",
@@ -124,7 +133,14 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         depth: z.number().optional().describe("How many levels deep, 3 by default."),
         contains: z.string().optional().describe("Only return script sources containing this text."),
       },
-      Run: async (Input: { path?: string; depth?: number; contains?: string }) => ({ content: [{ type: "text", text: ReadReport(await Reach("read", { path: Input.path || "game", depth: Input.depth, contains: Input.contains })) }] }),
+      Run: async (Input: { path?: string; depth?: number; contains?: string }) => ({content: [{
+        type: "text",
+        text: ReadReport(await Reach("read", {
+          path: Input.path || "game",
+          depth: Input.depth,
+          contains: Input.contains,
+        })),
+      }]}),
     },
     {
       Name: "properties",
@@ -133,7 +149,13 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         path: z.string().describe("Full instance path."),
         names: z.array(z.string()).optional().describe("Only these properties. Omit for all of them."),
       },
-      Run: async (Input: { path: string; names?: string[] }) => ({ content: [{ type: "text", text: PropertyReport(await Reach("properties", { path: Input.path, names: Input.names })) }] }),
+      Run: async (Input: { path: string; names?: string[] }) => ({content: [{
+        type: "text",
+        text: PropertyReport(await Reach("properties", {
+          path: Input.path,
+          names: Input.names,
+        })),
+      }]}),
     },
     {
       Name: "api",
@@ -146,7 +168,17 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         inherited: z.boolean().optional().describe("Include the members every instance has, such as Name and Destroy, which are left out by default."),
         deprecated: z.boolean().optional().describe("Only list members that are deprecated."),
       },
-      Run: async (Input: { className?: string; member?: string; search?: string; enumName?: string; inherited?: boolean; deprecated?: boolean }) => ({ content: [{ type: "text", text: ApiReport(await Reach("api", { className: Input.className, member: Input.member, search: Input.search, enumName: Input.enumName, inherited: Input.inherited === true, deprecated: Input.deprecated === true })) }] }),
+      Run: async (Input: { className?: string; member?: string; search?: string; enumName?: string; inherited?: boolean; deprecated?: boolean }) => ({content: [{
+        type: "text",
+        text: ApiReport(await Reach("api", {
+          className: Input.className,
+          member: Input.member,
+          search: Input.search,
+          enumName: Input.enumName,
+          inherited: Input.inherited === true,
+          deprecated: Input.deprecated === true,
+        })),
+      }]}),
     },
     {
       Name: "modify",
@@ -160,7 +192,10 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         properties: z.record(z.any()).optional().describe("Property names and values, for set and create."),
         undoName: z.string().optional().describe("What the undo step should be called."),
       },
-      Run: async (Input: { action: "set" | "create" | "delete" | "rename" | "reparent"; path?: string; parent?: string; className?: string; name?: string; properties?: Record<string, unknown>; undoName?: string }) => ({ content: [{ type: "text", text: Said(await Reach("modify", Input),"Studio did not say what happened.") }] }),
+      Run: async (Input: { action: "set" | "create" | "delete" | "rename" | "reparent"; path?: string; parent?: string; className?: string; name?: string; properties?: Record<string, unknown>; undoName?: string }) => ({content: [{
+        type: "text",
+        text: Said(await Reach("modify", Input),"Studio did not say what happened."),
+      }]}),
     },
     {
       Name: "capture",
@@ -189,25 +224,46 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
             }
           }
 
-          return { content: [{ type: "image", data: Data, mimeType: "image/png" }, { type: "text", text: Text }] };
+          return {content: [
+            {
+              type: "image",
+              data: Data,
+              mimeType: "image/png",
+            },
+            {
+              type: "text",
+              text: Text,
+            },
+          ]};
         };
 
         if (Input.of === "window") {
           const { CaptureWindow, CropToMarker } = await import("./Window.js");
-          const Marked: { error?: string; title: string; width: number; height: number } | null = Input.widget ? await Reach("mark", { widget: Input.widget }) : null;
+          const Marked: { error?: string; title: string; width: number; height: number } | null = Input.widget ? await Reach("mark", {widget: Input.widget}) : null;
 
           if (Marked && Marked.error) {
-            return { content: [{ type: "text", text: Marked.error }] };
+            return {content: [{
+              type: "text",
+              text: Marked.error,
+            }]};
           }
 
-          const Taken = await CaptureWindow(Input.window, Marked ? {} : { x: Input.x, y: Input.y, width: Input.width, height: Input.height }) as { error?: string; data: string; title: string; width: number; height: number };
+          const Taken = await CaptureWindow(Input.window, Marked ? {} : {
+            x: Input.x,
+            y: Input.y,
+            width: Input.width,
+            height: Input.height,
+          }) as { error?: string; data: string; title: string; width: number; height: number };
 
           if (Marked) {
             await Reach("unmark", {});
           }
 
           if (Taken.error) {
-            return { content: [{ type: "text", text: Taken.error }] };
+            return {content: [{
+              type: "text",
+              text: Taken.error,
+            }]};
           }
 
           if (!Marked) {
@@ -217,7 +273,10 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
           const Cropped = CropToMarker(Taken.data, Marked.width, Marked.height) as { error?: string; data: string; width: number; height: number; x: number; y: number };
 
           if (Cropped.error) {
-            return { content: [{ type: "text", text: Cropped.error }] };
+            return {content: [{
+              type: "text",
+              text: Cropped.error,
+            }]};
           }
 
           return Picture(Cropped.data, `${Cropped.width}x${Cropped.height} of the "${Marked.title}" panel, at ${Cropped.x}, ${Cropped.y} in the window "${Taken.title}"`);
@@ -228,27 +287,43 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         let Framed: { error?: string; framed?: string; restore?: boolean } | null = null;
 
         if (Input.path) {
-          Framed = await Reach("frame", { path: Input.path });
+          Framed = await Reach("frame", {path: Input.path});
 
           if (Framed && Framed.error) {
-            return { content: [{ type: "text", text: Framed.error }] };
+            return {content: [{
+              type: "text",
+              text: Framed.error,
+            }]};
           }
         }
 
-        const Shot: { error?: string; width: number; height: number; pixels: string; viewport: string; around?: string } | null = await Reach("shoot",{ x: Input.x, y: Input.y, width: Input.width, height: Input.height, around: Input.around, padding: Input.padding });
+        const Shot: { error?: string; width: number; height: number; pixels: string; viewport: string; around?: string } | null = await Reach("shoot",{
+          x: Input.x,
+          y: Input.y,
+          width: Input.width,
+          height: Input.height,
+          around: Input.around,
+          padding: Input.padding,
+        });
 
         if (Framed && Framed.restore) {
-          await Reach("frame", { restore: true });
+          await Reach("frame", {restore: true});
         }
 
         if (!Shot || Shot.error) {
-          return { content: [{ type: "text", text: (Shot && Shot.error) || "Studio did not answer." }] };
+          return {content: [{
+            type: "text",
+            text: (Shot && Shot.error) || "Studio did not answer.",
+          }]};
         }
 
         const Made = EncodePixels(Shot.width, Shot.height, Shot.pixels) as { error?: string; data: string };
 
         if (Made.error) {
-          return { content: [{ type: "text", text: Made.error }] };
+          return {content: [{
+            type: "text",
+            text: Made.error,
+          }]};
         }
 
         return Picture(Made.data, `${Shot.width}x${Shot.height} of the ${Shot.viewport} viewport${Shot.around ? `, cropped to ${Shot.around}` : ""}${Framed && Framed.framed ? `, framed on ${Framed.framed}` : ""}`);
@@ -271,14 +346,25 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
           const Missing = await NeedsSession("No play session is reachable. Start one with the playtest tool, or from the toolbar, and give it a moment to connect.");
 
           if (Missing) {
-            return { content: [{ type: "text", text: Missing }] };
+            return {content: [{
+              type: "text",
+              text: Missing,
+            }]};
           }
         }
 
-        const Sent = { code: Input.code, target: Where, readOnly: Input.readOnly === true, undoName: Input.undoName };
+        const Sent = {
+          code: Input.code,
+          target: Where,
+          readOnly: Input.readOnly === true,
+          undoName: Input.undoName,
+        };
         const Found: ExecuteAnswer = await ReachIn(Where === "edit" ? "edit" : "server", "execute", Sent, Input.timeout);
 
-        return { content: [{ type: "text", text: ExecuteReport(Found) }] };
+        return {content: [{
+          type: "text",
+          text: ExecuteReport(Found),
+        }]};
       },
     },
     {
@@ -296,28 +382,55 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       },
       Run: async (Input: { action: "press" | "type" | "key" | "hover" | "scroll" | "drag"; path?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number }) => {
         if (Input.action === "type" && !Input.text) {
-          return { content: [{ type: "text", text: "Typing needs text." }] };
+          return {content: [{
+            type: "text",
+            text: "Typing needs text.",
+          }]};
         }
 
         if (Input.action === "key" && !Input.key) {
-          return { content: [{ type: "text", text: "A key press needs key, the name of a KeyCode such as Return or E." }] };
+          return {content: [{
+            type: "text",
+            text: "A key press needs key, the name of a KeyCode such as Return or E.",
+          }]};
         }
 
         if (Input.action !== "type" && Input.action !== "key" && !Input.path) {
-          return { content: [{ type: "text", text: `${Input.action} needs path, the full instance path of the GuiObject to act on.` }] };
+          return {content: [{
+            type: "text",
+            text: `${Input.action} needs path, the full instance path of the GuiObject to act on.`,
+          }]};
         }
 
         if (Input.action === "drag" && !Input.to && Input.x === undefined && Input.y === undefined) {
-          return { content: [{ type: "text", text: "A drag needs somewhere to go: to for another GuiObject, or x and y to move by." }] };
+          return {content: [{
+            type: "text",
+            text: "A drag needs somewhere to go: to for another GuiObject, or x and y to move by.",
+          }]};
         }
 
         const Missing = await NeedsSession("No play session is reachable, and input has to happen on the client where the interface lives. Start one with the playtest tool and give it a moment to connect.");
 
         if (Missing) {
-          return { content: [{ type: "text", text: Missing }] };
+          return {content: [{
+            type: "text",
+            text: Missing,
+          }]};
         }
 
-        return { content: [{ type: "text", text: Said(await ReachIn("server", "input", { action: Input.action, path: Input.path, text: Input.text, key: Input.key, amount: Input.amount, to: Input.to, x: Input.x, y: Input.y }), "Studio did not say what happened.") }] };
+        return {content: [{
+          type: "text",
+          text: Said(await ReachIn("server", "input", {
+            action: Input.action,
+            path: Input.path,
+            text: Input.text,
+            key: Input.key,
+            amount: Input.amount,
+            to: Input.to,
+            x: Input.x,
+            y: Input.y,
+          }), "Studio did not say what happened."),
+        }]};
       },
     },
     {
@@ -335,28 +448,47 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         const Refused = Adding > 0 && Input.force !== true ? Headroom(Adding) : null;
 
         if (Refused) {
-          return { content: [{ type: "text", text: Refused }] };
+          return {content: [{
+            type: "text",
+            text: Refused,
+          }]};
         }
 
         if (Reachable && (Input.action === "stop" || Input.action === "players")) {
           const Release = Input.action === "stop" ? await QuietFlash(30) : () => {};
-          const Answer = Said(await ReachIn("server", "playtest", { action: Input.action, players: Input.players }), "The session did not say what happened.");
+          const Answer = Said(await ReachIn("server", "playtest", {
+            action: Input.action,
+            players: Input.players,
+          }), "The session did not say what happened.");
 
           setTimeout(Release, 12000);
 
-          return { content: [{ type: "text", text: Answer }] };
+          return {content: [{
+            type: "text",
+            text: Answer,
+          }]};
         }
 
         if (Reachable && Input.action === "start") {
-          return { content: [{ type: "text", text: "A playtest is already running and its session is reachable, so it was left alone. Stop it first if you want a fresh run." }] };
+          return {content: [{
+            type: "text",
+            text: "A playtest is already running and its session is reachable, so it was left alone. Stop it first if you want a fresh run.",
+          }]};
         }
 
         if (Reachable && Input.action === "status") {
-          return { content: [{ type: "text", text: "A playtest is running, so stop and players are available." }] };
+          return {content: [{
+            type: "text",
+            text: "A playtest is running, so stop and players are available.",
+          }]};
         }
 
         const Release = Input.action === "start" || Input.action === "stop" ? await QuietFlash(60) : () => {};
-        const Found: { error?: string; text?: string; relay?: string; players?: number } | null = await Reach("playtest", { action: Input.action, mode: Input.mode, players: Input.players });
+        const Found: { error?: string; text?: string; relay?: string; players?: number } | null = await Reach("playtest", {
+          action: Input.action,
+          mode: Input.mode,
+          players: Input.players,
+        });
 
         setTimeout(Release, 12000);
 
@@ -364,13 +496,25 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
           const Missing = await NeedsSession(`Studio only allows ${Found.relay} from inside the running session, and the session is not reachable. It needs Allow HTTP Requests turned on in Game Settings before the playtest starts, otherwise stop it from Studio's toolbar.`);
 
           if (Missing) {
-            return { content: [{ type: "text", text: Missing }] };
+            return {content: [{
+              type: "text",
+              text: Missing,
+            }]};
           }
 
-          return { content: [{ type: "text", text: Said(await ReachIn("server", "playtest", { action: Found.relay, players: Found.players }), "The session did not say what happened.") }] };
+          return {content: [{
+            type: "text",
+            text: Said(await ReachIn("server", "playtest", {
+              action: Found.relay,
+              players: Found.players,
+            }), "The session did not say what happened."),
+          }]};
         }
 
-        return { content: [{ type: "text", text: Said(Found, "Studio did not say what happened.") }] };
+        return {content: [{
+          type: "text",
+          text: Said(Found, "Studio did not say what happened."),
+        }]};
       },
     },
     {
@@ -386,13 +530,19 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         scaling: z.string().optional().describe("A DeviceSimulatorScalingMode name."),
         network: z.enum(["status", "great", "good", "poor", "off"]).optional().describe("Which network conditions to apply, for the network action."),
       },
-      Run: async (Input: { action?: "status" | "set" | "stop" | "network"; device?: string; orientation?: string; width?: number; height?: number; density?: number; scaling?: string; network?: "status" | "great" | "good" | "poor" | "off" }) => ({ content: [{ type: "text", text: Said(await Reach("device", Input),"Studio did not say what happened.") }] }),
+      Run: async (Input: { action?: "status" | "set" | "stop" | "network"; device?: string; orientation?: string; width?: number; height?: number; density?: number; scaling?: string; network?: "status" | "great" | "good" | "poor" | "off" }) => ({content: [{
+        type: "text",
+        text: Said(await Reach("device", Input),"Studio did not say what happened."),
+      }]}),
     },
     {
       Name: "layout",
       Description: "Measure a GuiObject: its size and position, how big it is against its own ScreenGui rather than the viewport, and whether anything hides, clips or pushes it off screen. Use this before believing UI is broken on a simulated device.",
-      Schema: { path: z.string().describe("Full instance path of the GuiObject to measure.") },
-      Run: async (Input: { path: string }) => ({ content: [{ type: "text", text: Said(await Reach("layout",{ path: Input.path }), "Studio did not say what happened.") }] }),
+      Schema: {path: z.string().describe("Full instance path of the GuiObject to measure.")},
+      Run: async (Input: { path: string }) => ({content: [{
+        type: "text",
+        text: Said(await Reach("layout",{path: Input.path}), "Studio did not say what happened."),
+      }]}),
     },
     {
       Name: "profile",
@@ -404,24 +554,33 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       },
       Run: async (Input: { action?: "memory"; least?: number; target?: "edit" | "server" }) => {
         const Where = Input.target || "edit";
-        const Sent = { least: Input.least };
+        const Sent = {least: Input.least};
         const Found: SaidAnswer = Where === "edit" ? await Reach("memory", Sent) : await ReachIn("server", "memory", Sent);
 
-        return { content: [{ type: "text", text: Said(Found, "Studio did not say what happened.") }] };
+        return {content: [{
+          type: "text",
+          text: Said(Found, "Studio did not say what happened."),
+        }]};
       },
     },
     {
       Name: "changes",
       Description: "List what has actually changed in the place since the turn started, so you can confirm an edit landed and catch anything that changed by accident. Claudio's own scaffolding is left out.",
-      Schema: { limit: z.number().optional().describe("How many to return, forty by default.") },
+      Schema: {limit: z.number().optional().describe("How many to return, forty by default.")},
       Run: async (Input: { limit?: number }) => {
-        const Found: { error?: string; text?: string; lines?: string[] } | null = await Reach("changes", { limit: Input.limit });
+        const Found: { error?: string; text?: string; lines?: string[] } | null = await Reach("changes", {limit: Input.limit});
 
         if (Found && Found.lines) {
-          return { content: [{ type: "text", text: Found.lines.join("\n") }] };
+          return {content: [{
+            type: "text",
+            text: Found.lines.join("\n"),
+          }]};
         }
 
-        return { content: [{ type: "text", text: Said(Found, "Studio did not say what happened.") }] };
+        return {content: [{
+          type: "text",
+          text: Said(Found, "Studio did not say what happened."),
+        }]};
       },
     },
     {
@@ -432,7 +591,14 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         path: z.string().optional().describe("Only search under here, such as ServerScriptService."),
         limit: z.number().optional().describe("How many matches to return, forty by default."),
       },
-      Run: async (Input: { text: string; path?: string; limit?: number }) => ({ content: [{ type: "text", text: FindReport(await Reach("find", { text: Input.text, path: Input.path, limit: Input.limit })) }] }),
+      Run: async (Input: { text: string; path?: string; limit?: number }) => ({content: [{
+        type: "text",
+        text: FindReport(await Reach("find", {
+          text: Input.text,
+          path: Input.path,
+          limit: Input.limit,
+        })),
+      }]}),
     },
     {
       Name: "source",
@@ -445,13 +611,19 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         text: z.string().optional().describe("The new source, for set, insert and replace."),
         undoName: z.string().optional().describe("What the undo step should be called."),
       },
-      Run: async (Input: { path: string; action?: "get" | "set" | "insert" | "replace" | "delete"; from?: number; to?: number; text?: string; undoName?: string }) => ({ content: [{ type: "text", text: SourceReport(await Reach("source", Input)) }] }),
+      Run: async (Input: { path: string; action?: "get" | "set" | "insert" | "replace" | "delete"; from?: number; to?: number; text?: string; undoName?: string }) => ({content: [{
+        type: "text",
+        text: SourceReport(await Reach("source", Input)),
+      }]}),
     },
     {
       Name: "select",
       Description: "Read or set what is selected in Studio. Selecting is how you show the user what you are talking about, and reading it is how you find out what they mean by \"this\".",
-      Schema: { paths: z.array(z.string()).optional().describe("Instance paths to select. Leave out to read the current selection.") },
-      Run: async (Input: { paths?: string[] }) => ({ content: [{ type: "text", text: SelectReport(await Reach("select", { paths: Input.paths })) }] }),
+      Schema: {paths: z.array(z.string()).optional().describe("Instance paths to select. Leave out to read the current selection.")},
+      Run: async (Input: { paths?: string[] }) => ({content: [{
+        type: "text",
+        text: SelectReport(await Reach("select", {paths: Input.paths})),
+      }]}),
     },
     {
       Name: "history",
@@ -460,7 +632,13 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         action: z.enum(["status", "undo", "redo", "mark", "restore"]).optional().describe("Defaults to status."),
         name: z.string().optional().describe("What to call the mark, for mark and restore."),
       },
-      Run: async (Input: { action?: "status" | "undo" | "redo" | "mark" | "restore"; name?: string }) => ({ content: [{ type: "text", text: Said(await Reach("history",{ action: Input.action, name: Input.name }), "Studio did not say what happened.") }] }),
+      Run: async (Input: { action?: "status" | "undo" | "redo" | "mark" | "restore"; name?: string }) => ({content: [{
+        type: "text",
+        text: Said(await Reach("history",{
+          action: Input.action,
+          name: Input.name,
+        }), "Studio did not say what happened."),
+      }]}),
     },
     {
       Name: "rbxm",
@@ -473,23 +651,35 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       },
       Run: async (Input: { file: string; paths?: string[]; path?: string; undoName?: string }) => {
         if (Input.paths && Input.paths.length > 0) {
-          const Found: { error?: string; text?: string; base64?: string; count?: number } | null = await Reach("rbxm", { paths: Input.paths });
+          const Found: { error?: string; text?: string; base64?: string; count?: number } | null = await Reach("rbxm", {paths: Input.paths});
 
           if (!Found || Found.error || !Found.base64) {
-            return { content: [{ type: "text", text: Said(Found, "Studio did not say what happened.") }] };
+            return {content: [{
+              type: "text",
+              text: Said(Found, "Studio did not say what happened."),
+            }]};
           }
 
           try {
             fs.writeFileSync(Input.file, Buffer.from(Found.base64, "base64"));
           } catch (Trouble) {
-            return { content: [{ type: "text", text: `Saved nothing, because the file could not be written: ${(Trouble as Error).message}`}] };
+            return {content: [{
+              type: "text",
+              text: `Saved nothing, because the file could not be written: ${(Trouble as Error).message}`,
+            }]};
           }
 
-          return { content: [{ type: "text", text: `Saved ${Found.count} to ${Input.file}.` }] };
+          return {content: [{
+            type: "text",
+            text: `Saved ${Found.count} to ${Input.file}.`,
+          }]};
         }
 
         if (!Input.path) {
-          return { content: [{ type: "text", text: "Give paths to save, or path to load it under." }] };
+          return {content: [{
+            type: "text",
+            text: "Give paths to save, or path to load it under.",
+          }]};
         }
 
         let Body: string;
@@ -497,10 +687,20 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         try {
           Body = fs.readFileSync(Input.file).toString("base64");
         } catch (Trouble) {
-          return { content: [{ type: "text", text: `Loaded nothing, because the file could not be read: ${(Trouble as Error).message}`}] };
+          return {content: [{
+            type: "text",
+            text: `Loaded nothing, because the file could not be read: ${(Trouble as Error).message}`,
+          }]};
         }
 
-        return { content: [{ type: "text", text: Said(await Reach("rbxm", { base64: Body, path: Input.path, undoName: Input.undoName }), "Studio did not say what happened.") }] };
+        return {content: [{
+          type: "text",
+          text: Said(await Reach("rbxm", {
+            base64: Body,
+            path: Input.path,
+            undoName: Input.undoName,
+          }), "Studio did not say what happened."),
+        }]};
       },
     },
     {
@@ -515,17 +715,28 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       },
       Run: async (Input: { level?: "all" | "print" | "warn" | "error" | "info" | "problems"; contains?: string; limit?: number; since?: number; target?: "edit" | "server" }) => {
         const Where = Input.target || "edit";
-        const Sent = { level: Input.level, contains: Input.contains, limit: Input.limit, since: Input.since };
+        const Sent = {
+          level: Input.level,
+          contains: Input.contains,
+          limit: Input.limit,
+          since: Input.since,
+        };
         const Found: LogAnswer = Where === "edit" ? await Reach("logs", Sent) : await ReachIn("server", "logs", Sent);
 
-        return { content: [{ type: "text", text: LogReport(Found) }] };
+        return {content: [{
+          type: "text",
+          text: LogReport(Found),
+        }]};
       },
     },
     {
       Name: "lint",
       Description: LintDescription,
-      Schema: { paths: z.array(z.string()).optional().describe("Instance paths to check, such as ServerScriptService.Main. Omit to check the whole place.") },
-      Run: async (Input: { paths?: string[] }) => ({ content: [{ type: "text", text: LintReport(await Reach("lint", { paths: Input.paths || [] })) }] }),
+      Schema: {paths: z.array(z.string()).optional().describe("Instance paths to check, such as ServerScriptService.Main. Omit to check the whole place.")},
+      Run: async (Input: { paths?: string[] }) => ({content: [{
+        type: "text",
+        text: LintReport(await Reach("lint", {paths: Input.paths || []})),
+      }]}),
     },
   ];
 }

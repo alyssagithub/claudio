@@ -51,7 +51,10 @@ export function CropToMarker(Data: string, Width: number, Height: number): CropR
 
       const Wide = Math.min(Width, Image.width - X);
       const Tall = Math.min(Height, Image.height - Y);
-      const Out = new PNG({ width: Wide, height: Tall });
+      const Out = new PNG({
+        width: Wide,
+        height: Tall,
+      });
 
       PNG.bitblt(Image, Out, X, Y, Wide, Tall, 0, 0);
 
@@ -67,11 +70,17 @@ export function CropToMarker(Data: string, Width: number, Height: number): CropR
         }
       }
 
-      return { data: PNG.sync.write(Out).toString("base64"), width: Wide, height: Tall, x: X, y: Y };
+      return {
+        data: PNG.sync.write(Out).toString("base64"),
+        width: Wide,
+        height: Tall,
+        x: X,
+        y: Y,
+      };
     }
   }
 
-  return { error: "The panel is open but not visible in the Studio window, so it could not be found in the capture. It may be collapsed behind another tab, or floated onto another screen; give its title as window instead." };
+  return {error: "The panel is open but not visible in the Studio window, so it could not be found in the capture. It may be collapsed behind another tab, or floated onto another screen; give its title as window instead."};
 }
 
 const Script = `
@@ -142,7 +151,7 @@ $Bitmap.Dispose()
 
 export function CaptureWindow(Title: string | null | undefined, Crop: CropBox): Promise<WindowShot> {
   if (process.platform !== "win32") {
-    return Promise.resolve({ error: "Capturing the Studio window only works on Windows, because it reads the window through Win32. Use the viewport capture instead." });
+    return Promise.resolve({error: "Capturing the Studio window only works on Windows, because it reads the window through Win32. Use the viewport capture instead."});
   }
 
   const File = path.join(os.tmpdir(), `claudio-window-${process.pid}-${Date.now()}.png`);
@@ -168,11 +177,11 @@ export function CaptureWindow(Title: string | null | undefined, Crop: CropBox): 
         if (Line.startsWith("NONE|")) {
           const Titles = Line.slice(5).split("|").filter(Boolean);
 
-          Resolve({ error: Title ? `No Studio window has "${Title}" in its title. Open ones: ${Titles.join(", ") || "none"}.` : "No Roblox Studio window is open." });
+          Resolve({error: Title ? `No Studio window has "${Title}" in its title. Open ones: ${Titles.join(", ") || "none"}.` : "No Roblox Studio window is open."});
           return;
         }
 
-        Resolve({ error: `Could not capture the Studio window: ${String(Errors || Trouble && Trouble.message || Line).trim().slice(0, 300)}` });
+        Resolve({error: `Could not capture the Studio window: ${String(Errors || Trouble && Trouble.message || Line).trim().slice(0, 300)}`});
         return;
       }
 
@@ -184,11 +193,16 @@ export function CaptureWindow(Title: string | null | undefined, Crop: CropBox): 
         Data = fs.readFileSync(File).toString("base64");
         fs.unlinkSync(File);
       } catch (Error) {
-        Resolve({ error: `The window capture was taken but could not be read back: ${(Error as NodeJS.ErrnoException).message}` });
+        Resolve({error: `The window capture was taken but could not be read back: ${(Error as NodeJS.ErrnoException).message}`});
         return;
       }
 
-      Resolve({ data: Data, width: Number(Width), height: Number(Height), title: Named });
+      Resolve({
+        data: Data,
+        width: Number(Width),
+        height: Number(Height),
+        title: Named,
+      });
     });
   });
 }

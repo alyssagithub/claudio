@@ -27,7 +27,10 @@ export function WatchReturn() {
   Ready = false;
   Failed = null;
 
-  const Started = spawn("powershell", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", WatchPath], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+  const Started = spawn("powershell", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", WatchPath], {
+    stdio: ["pipe", "pipe", "pipe"],
+    windowsHide: true,
+  });
 
   Watcher = Started;
 
@@ -51,7 +54,10 @@ export function WatchReturn() {
         if (typeof Parsed.at === "number" && Parsed.key === "copy") {
           LastCopy = Parsed.at;
         } else if (typeof Parsed.at === "number" && typeof Parsed.shift === "boolean") {
-          LastReturn = { at: Parsed.at, shift: Parsed.shift };
+          LastReturn = {
+            at: Parsed.at,
+            shift: Parsed.shift,
+          };
         }
       } catch {
         continue;

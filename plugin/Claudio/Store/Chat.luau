@@ -347,7 +347,11 @@ const function Find(Input: any): any
 		end
 	end
 
-	return {hits = Hits, scanned = Scanned, more = More}
+	return {
+		hits = Hits,
+		scanned = Scanned,
+		more = More,
+	}
 end
 
 const Seen: {[string]: string} = {}
@@ -406,7 +410,11 @@ const function Source(Input: any): any
 
 		Remember(Script)
 
-		return {path = Path, total = #Lines, lines = Window}
+		return {
+			path = Path,
+			total = #Lines,
+			lines = Window,
+		}
 	end
 
 	if Action ~= "set" or Script.Source ~= "" then
@@ -650,14 +658,21 @@ const function Logs(Input: any): any
 		table.insert(Lines, Kept[Index])
 	end
 
-	return {lines = Lines, scanned = Seen, skipped = Skipped}
+	return {
+		lines = Lines,
+		scanned = Seen,
+		skipped = Skipped,
+	}
 end
 
 const function LintPlace(Paths: {string}?): any
 	const Tree = ScriptTree()
 
 	if #Tree == 0 then
-		return {checked = 0, scripts = {}}
+		return {
+			checked = 0,
+			scripts = {},
+		}
 	end
 
 	local Wanted = Tree
@@ -686,7 +701,10 @@ const function LintPlace(Paths: {string}?): any
 		return {error = `The analyzer could not run: {tostring(Result)}`}
 	end
 
-	return {checked = #Wanted, scripts = Result.scripts}
+	return {
+		checked = #Wanted,
+		scripts = Result.scripts,
+	}
 end
 
 const function Playtest(Input: any): any
@@ -734,7 +752,11 @@ const function Playtest(Input: any): any
 			end
 		end)
 
-		_G.ClaudioPlaytest = {Mode = Mode, Done = false, Value = nil}
+		_G.ClaudioPlaytest = {
+			Mode = Mode,
+			Done = false,
+			Value = nil,
+		}
 
 		task.spawn(function()
 			const Ok, Result = pcall(function(): any
@@ -895,10 +917,26 @@ const function Device(Input: any): any
 	if Action == "network" then
 		const Settings = settings():GetService("NetworkSettings")
 		const Profiles = {
-			good = {50, 10, 0},
-			great = {15, 0, 0},
-			off = {0, 0, 0},
-			poor = {150, 100, 0.5},
+			good = {
+				50,
+				10,
+				0,
+			},
+			great = {
+				15,
+				0,
+				0,
+			},
+			off = {
+				0,
+				0,
+				0,
+			},
+			poor = {
+				150,
+				100,
+				0.5,
+			},
 		}
 		const Wanted = tostring(Input.network or "status")
 
@@ -913,15 +951,24 @@ const function Device(Input: any): any
 		end
 
 		const Applied, Trouble = pcall(function()
-			for Index, Name in {"InboundNetworkMinDelayMs", "OutboundNetworkMinDelayMs"} do
+			for Index, Name in {
+				"InboundNetworkMinDelayMs",
+				"OutboundNetworkMinDelayMs",
+			} do
 				(Settings :: any)[Name] = Chosen[1]
 			end
 
-			for Index, Name in {"InboundNetworkJitterMs", "OutboundNetworkJitterMs"} do
+			for Index, Name in {
+				"InboundNetworkJitterMs",
+				"OutboundNetworkJitterMs",
+			} do
 				(Settings :: any)[Name] = Chosen[2]
 			end
 
-			for Index, Name in {"InboundNetworkLossPercent", "OutboundNetworkLossPercent"} do
+			for Index, Name in {
+				"InboundNetworkLossPercent",
+				"OutboundNetworkLossPercent",
+			} do
 				(Settings :: any)[Name] = Chosen[3]
 			end
 		end)
@@ -1149,7 +1196,10 @@ const function Memory(Input: any): any
 		end)
 
 		if Ok and Used >= Least then
-			table.insert(Rows, {Name = Tag.Name, Used = Used})
+			table.insert(Rows, {
+				Name = Tag.Name,
+				Used = Used,
+			})
 		end
 	end
 
@@ -1252,7 +1302,10 @@ const function Rbxm(Input: any): any
 		return {error = `Encoding failed: {tostring(Text)}`}
 	end
 
-	return {base64 = Text, count = #Wanted}
+	return {
+		base64 = Text,
+		count = #Wanted,
+	}
 end
 
 const function Changed(Input: any): any
@@ -1261,7 +1314,10 @@ const function Changed(Input: any): any
 	const Limit = math.clamp(tonumber(Input.limit) or 40, 1, 200)
 	const Lines = {}
 
-	for _, Bucket in {Theirs, Mine} do
+	for _, Bucket in {
+		Theirs,
+		Mine,
+	} do
 		for _, Line in Bucket do
 			if #Lines >= Limit then
 				break
@@ -1344,7 +1400,12 @@ const function ScreenBounds(Object: Instance, Viewport: Vector2): any
 		return {error = `{Object.Name} is off screen, so it cannot be cropped to. Frame it first.`}
 	end
 
-	return {Left = Left, Top = Top, Right = Right, Bottom = Bottom}
+	return {
+		Left = Left,
+		Top = Top,
+		Right = Right,
+		Bottom = Bottom,
+	}
 end
 
 const function Shoot(Input: any): any
@@ -1482,7 +1543,11 @@ const function Mark(Input: any): any
 		Marker:Destroy()
 	end)
 
-	return {width = Window.AbsoluteSize.X, height = Window.AbsoluteSize.Y, title = Window.Title}
+	return {
+		width = Window.AbsoluteSize.X,
+		height = Window.AbsoluteSize.Y,
+		title = Window.Title,
+	}
 end
 
 const function Unmark(): any
@@ -1525,7 +1590,10 @@ const function Frame(Input: any): any
 
 	if Object then
 		if not _G.ClaudioFrameCamera then
-			_G.ClaudioFrameCamera = {CFrame = Camera.CFrame, FieldOfView = Camera.FieldOfView}
+			_G.ClaudioFrameCamera = {
+				CFrame = Camera.CFrame,
+				FieldOfView = Camera.FieldOfView,
+			}
 		end
 
 		const Model = if Object:IsA("Model") then Object :: Model else nil
@@ -1601,7 +1669,13 @@ const function Marks(Entry: any, Owner: string?, Kind: string?): string
 		end
 	end
 
-	for _, Name in {"Read", "Write", "Call", "Listen", "New"} do
+	for _, Name in {
+		"Read",
+		"Write",
+		"Call",
+		"Listen",
+		"New",
+	} do
 		const Level = Permits[Name]
 
 		if Level ~= nil and tostring(Level) ~= "" then
@@ -1630,7 +1704,10 @@ const function Api(Input: any): any
 					table.insert(Items, `{Item.Name} = {Item.Value}`)
 				end
 
-				return {enumName = Wanted, items = Items}
+				return {
+					enumName = Wanted,
+					items = Items,
+				}
 			end
 		end
 
@@ -1660,7 +1737,11 @@ const function Api(Input: any): any
 		end
 
 		if Input.className then
-			for _, Method in {"GetPropertiesOfClass", "GetMethodsOfClass", "GetEventsOfClass"} do
+			for _, Method in {
+				"GetPropertiesOfClass",
+				"GetMethodsOfClass",
+				"GetEventsOfClass",
+			} do
 				const Ok, Listed = pcall(function(): any
 					return (Reflection :: any)[Method](Reflection, Input.className, {})
 				end)
@@ -1675,7 +1756,10 @@ const function Api(Input: any): any
 			end
 		end
 
-		return {search = Input.search, hits = Hits}
+		return {
+			search = Input.search,
+			hits = Hits,
+		}
 	end
 
 	const Class = Input.className
@@ -1881,7 +1965,10 @@ const function ReadPlace(Input: any): any
 				const Body = Child.Source
 
 				if not Wanted or Body:lower():find(Wanted, 1, true) or Child.Name:lower():find(Wanted, 1, true) then
-					table.insert(Sources, {path = Child:GetFullName(), source = Body})
+					table.insert(Sources, {
+						path = Child:GetFullName(),
+						source = Body,
+					})
 					Remember(Child :: LuaSourceContainer)
 				end
 			end
@@ -1893,7 +1980,10 @@ const function ReadPlace(Input: any): any
 	table.insert(Tree, `{Root.Name} [{Root.ClassName}]`)
 
 	if Root:IsA("LuaSourceContainer") and Root.Source ~= "" then
-		table.insert(Sources, {path = Root:GetFullName(), source = Root.Source})
+		table.insert(Sources, {
+			path = Root:GetFullName(),
+			source = Root.Source,
+		})
 		Remember(Root :: LuaSourceContainer)
 	end
 
@@ -2083,7 +2173,10 @@ const function Execute(Input: any): any
 	end
 
 	const function Trouble(Broke: any): any
-		return {Message = tostring(Broke), Trace = debug.traceback(nil, 2)}
+		return {
+			Message = tostring(Broke),
+			Trace = debug.traceback(nil, 2),
+		}
 	end
 
 	const Built, Made = xpcall(function()
@@ -2451,7 +2544,10 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		Chat.StreamingText(State.text or "")
 		Chat.StreamingThinking(State.thinking or "")
 		Chat.StreamingParts(ReadParts(State.parts))
-		Chat.StreamingPick(if State.auto and State.model then {Model = State.model, Effort = State.effort} else nil)
+		Chat.StreamingPick(if State.auto and State.model then {
+			Model = State.model,
+			Effort = State.effort,
+		} else nil)
 		Chat.Limits(State.limits or Chat.Limits())
 		Chat.Tasks(State.tasks or {})
 		Chat.Planning(State.planning == true)
@@ -3377,13 +3473,19 @@ function Chat.Send(Text: string, Quiet: string?)
 	end
 
 	if Text:lower():match("^%s*aun%s*$") then
-		Append({Role = "user", Text = Text})
+		Append({
+			Role = "user",
+			Text = Text,
+		})
 
 		task.spawn(function()
 			const Ok, Found = Client.Aun()
 
 			if not Ok then
-				Append({Role = "assistant", Text = "aun is not answering right now."})
+				Append({
+					Role = "assistant",
+					Text = "aun is not answering right now.",
+				})
 
 				return
 			end

@@ -65,8 +65,14 @@ export function CapToolOutput(Name: string, Response: Response): Response | null
     }
 
     Placed = true;
-    Content.push({ ...Block, text: CapText(Name, Joined) });
+    Content.push({
+      ...Block,
+      text: CapText(Name, Joined),
+    });
   }
 
-  return Array.isArray(Response) ? Content : { ...Response, content: Content };
+  return Array.isArray(Response) ? Content : {
+    ...Response,
+    content: Content,
+  };
 }

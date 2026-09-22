@@ -191,7 +191,11 @@ const function Interact(Body: string): any
 		const Amount = tonumber(Input.amount) or -1
 		const Sent, Refused = pcall(function()
 			Virtual:SendMousePosition(Point)
-			Virtual:SendPointerAction(Point, {Wheel = Amount, Pan = Vector2.zero, Pinch = 0})
+			Virtual:SendPointerAction(Point, {
+				Wheel = Amount,
+				Pan = Vector2.zero,
+				Pinch = 0,
+			})
 		end)
 
 		if not Sent then

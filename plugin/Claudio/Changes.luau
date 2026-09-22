@@ -23,7 +23,10 @@ const function Line(Call: Types.ToolCall): Types.Change?
 	const Input = Call.input
 
 	if Name == "set_script_source" then
-		return {Kind = "changed", Text = `Rewrote {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`}
+		return {
+			Kind = "changed",
+			Text = `Rewrote {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`,
+		}
 	end
 
 	if Name == "source" and Field(Input, "action") and Field(Input, "action") ~= "get" then
@@ -37,33 +40,70 @@ const function Line(Call: Types.ToolCall): Types.Change?
 	end
 
 	if Name == "edit_script_lines" or Name == "insert_script_lines" or Name == "delete_script_lines" then
-		return {Kind = "changed", Text = `Edited {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`}
+		return {
+			Kind = "changed",
+			Text = `Edited {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`,
+		}
 	end
 
 	if Name == "set_properties" then
-		return {Kind = "changed", Text = `Changed properties on {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`}
+		return {
+			Kind = "changed",
+			Text = `Changed properties on {Format.Path(Field(Input, "instancePath") or Field(Input, "path"))}`,
+		}
 	end
 
 	if Name == "manage_instance" or Name == "modify" then
 		const Action = Field(Input, "action") or "changed"
 		const Past = {
-			create = {Kind = "added", Word = "Created"},
-			delete = {Kind = "removed", Word = "Deleted"},
-			destroy = {Kind = "removed", Word = "Deleted"},
-			remove = {Kind = "removed", Word = "Deleted"},
-			rename = {Kind = "changed", Word = "Renamed"},
-			clone = {Kind = "added", Word = "Cloned"},
-			reparent = {Kind = "changed", Word = "Moved"},
-			move = {Kind = "changed", Word = "Moved"},
+			create = {
+				Kind = "added",
+				Word = "Created",
+			},
+			delete = {
+				Kind = "removed",
+				Word = "Deleted",
+			},
+			destroy = {
+				Kind = "removed",
+				Word = "Deleted",
+			},
+			remove = {
+				Kind = "removed",
+				Word = "Deleted",
+			},
+			rename = {
+				Kind = "changed",
+				Word = "Renamed",
+			},
+			clone = {
+				Kind = "added",
+				Word = "Cloned",
+			},
+			reparent = {
+				Kind = "changed",
+				Word = "Moved",
+			},
+			move = {
+				Kind = "changed",
+				Word = "Moved",
+			},
 		}
 
-		const Done = Past[Action] or {Kind = "changed", Word = "Changed"}
+		const Done = Past[Action] or {
+			Kind = "changed",
+			Word = "Changed",
+		}
 
 		const Made = Field(Input, "name")
 		const Under = Field(Input, "parentPath") or Field(Input, "parent")
 		const Path = Field(Input, "instancePath") or Field(Input, "path") or (if Made and Under then `{Under}.{Made}` else nil) or Under or Field(Input, "className")
 
-		return {Kind = Done.Kind, Text = `{Done.Word} {Format.Path(Path)}`, Path = Path}
+		return {
+			Kind = Done.Kind,
+			Text = `{Done.Word} {Format.Path(Path)}`,
+			Path = Path,
+		}
 	end
 
 	if Name == "import_rbxm" or Name == "insert_asset" or (Name == "rbxm" and Field(Input, "file") and not Field(Input, "paths")) then
@@ -79,7 +119,10 @@ const function Line(Call: Types.ToolCall): Types.Change?
 	end
 
 	if Name == "Write" or Name == "Edit" then
-		return {Kind = "changed", Text = `Wrote {Format.Path(Field(Input, "file_path"))}`}
+		return {
+			Kind = "changed",
+			Text = `Wrote {Format.Path(Field(Input, "file_path"))}`,
+		}
 	end
 
 	return nil
@@ -103,7 +146,10 @@ function Changes.For(Message: Types.Message): {Types.Change}
 	const Seen = {}
 
 	for _, Written in Edits do
-		Push(Found, Seen, if typeof(Written) == "string" then {Kind = "changed", Text = Written} else Written)
+		Push(Found, Seen, if typeof(Written) == "string" then {
+			Kind = "changed",
+			Text = Written,
+		} else Written)
 	end
 
 	const Made: {Types.ToolCall} = Message.Calls or {}

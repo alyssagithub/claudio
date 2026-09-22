@@ -10,8 +10,11 @@ type RunResult = {
 
 function Run(Line: string): Promise<RunResult> {
   return new Promise<RunResult>((Resolve) => {
-    exec(Line, { timeout: 300000 }, (Error, Stdout, Stderr) => {
-      Resolve({ Ok: !Error, Output: `${Stdout || ""}${Stderr || ""}`.trim() });
+    exec(Line, {timeout: 300000}, (Error, Stdout, Stderr) => {
+      Resolve({
+        Ok: !Error,
+        Output: `${Stdout || ""}${Stderr || ""}`.trim(),
+      });
     });
   });
 }

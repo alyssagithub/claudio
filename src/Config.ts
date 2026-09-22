@@ -77,9 +77,18 @@ export function SystemPromptFor(ServerNames: string[], UsingSubagents: boolean) 
   return Sections.join("\n\n");
 }
 export const ModelPrices = {
-  opus: { input: 5, output: 25 },
-  sonnet: { input: 2, output: 10 },
-  haiku: { input: 1, output: 5 },
+  opus: {
+    input: 5,
+    output: 25,
+  },
+  sonnet: {
+    input: 2,
+    output: 10,
+  },
+  haiku: {
+    input: 1,
+    output: 5,
+  },
 };
 export function PriceFor(Model: string) {
   const Family = Object.keys(ModelPrices).find((Name) => String(Model).includes(Name));
@@ -87,14 +96,44 @@ export function PriceFor(Model: string) {
   return Family ? ModelPrices[Family as keyof typeof ModelPrices] : null;
 }
 export const NewerModels = [
-  { value: "claude-opus-5-5[1m]", displayName: "Opus 5.5", contextWindow: 1000000, description: "Newest Opus · 1M context" },
+  {
+    value: "claude-opus-5-5[1m]",
+    displayName: "Opus 5.5",
+    contextWindow: 1000000,
+    description: "Newest Opus · 1M context",
+  },
 ];
 export const ExtraModels = [
-  { value: "claude-fable-5", displayName: "Fable 5", contextWindow: 1000000, description: "Earlier Fable release · 1M context" },
-  { value: "claude-opus-4-8", displayName: "Opus 4.8", contextWindow: 1000000, description: "Earlier Opus release · 1M context" },
-  { value: "claude-opus-4-7", displayName: "Opus 4.7", contextWindow: 1000000, description: "Earlier Opus release · 1M context" },
-  { value: "claude-opus-4-6", displayName: "Opus 4.6", contextWindow: 200000, description: "Earlier Opus release · 200k context" },
-  { value: "claude-sonnet-4-6", displayName: "Sonnet 4.6", contextWindow: 200000, description: "Earlier Sonnet release · 200k context" },
+  {
+    value: "claude-fable-5",
+    displayName: "Fable 5",
+    contextWindow: 1000000,
+    description: "Earlier Fable release · 1M context",
+  },
+  {
+    value: "claude-opus-4-8",
+    displayName: "Opus 4.8",
+    contextWindow: 1000000,
+    description: "Earlier Opus release · 1M context",
+  },
+  {
+    value: "claude-opus-4-7",
+    displayName: "Opus 4.7",
+    contextWindow: 1000000,
+    description: "Earlier Opus release · 1M context",
+  },
+  {
+    value: "claude-opus-4-6",
+    displayName: "Opus 4.6",
+    contextWindow: 200000,
+    description: "Earlier Opus release · 200k context",
+  },
+  {
+    value: "claude-sonnet-4-6",
+    displayName: "Sonnet 4.6",
+    contextWindow: 200000,
+    description: "Earlier Sonnet release · 200k context",
+  },
 ];
 export const SessionsRoot = path.join(os.homedir(), ".claude", "projects");
 export const DesktopSessionsRoot = path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), "Claude", "claude-code-sessions");
@@ -174,15 +213,51 @@ export const IdleSessionMilliseconds = 4 * 60 * 1000;
 export const MaxWarmSessions = 2;
 export const ModelsCacheFile = path.join(os.homedir(), ".claudio", "models.json");
 export const AutoTiers = [
-  { model: "haiku", effort: null, delegate: "haiku" },
-  { model: "sonnet", effort: "none", delegate: "haiku" },
-  { model: "sonnet", effort: "low", delegate: "haiku" },
-  { model: "sonnet", effort: "medium", delegate: "haiku" },
-  { model: "default", effort: "low", delegate: "haiku" },
-  { model: "default", effort: "medium", delegate: "haiku" },
-  { model: "default", effort: "high", delegate: "haiku" },
-  { model: "default", effort: "xhigh", delegate: "sonnet" },
-  { model: "default", effort: "max", delegate: "sonnet" },
+  {
+    model: "haiku",
+    effort: null,
+    delegate: "haiku",
+  },
+  {
+    model: "sonnet",
+    effort: "none",
+    delegate: "haiku",
+  },
+  {
+    model: "sonnet",
+    effort: "low",
+    delegate: "haiku",
+  },
+  {
+    model: "sonnet",
+    effort: "medium",
+    delegate: "haiku",
+  },
+  {
+    model: "default",
+    effort: "low",
+    delegate: "haiku",
+  },
+  {
+    model: "default",
+    effort: "medium",
+    delegate: "haiku",
+  },
+  {
+    model: "default",
+    effort: "high",
+    delegate: "haiku",
+  },
+  {
+    model: "default",
+    effort: "xhigh",
+    delegate: "sonnet",
+  },
+  {
+    model: "default",
+    effort: "max",
+    delegate: "sonnet",
+  },
 ];
 export const CancelGraceMilliseconds = 5000;
 export const EffortOrder = ["none", "low", "medium", "high", "xhigh", "max"];

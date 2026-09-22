@@ -279,7 +279,10 @@ return function(Props: Props)
 		end
 
 		for Question, Given in Entry.output:gmatch('"([^"]+)"="([^"]*)"') do
-			table.insert(Pairs, {Question = Question, Given = Given or ""})
+			table.insert(Pairs, {
+				Question = Question,
+				Given = Given or "",
+			})
 		end
 
 		return Pairs
@@ -310,7 +313,10 @@ return function(Props: Props)
 			const Key, Value = Line:match("^([%w_]+): (.*)$")
 
 			if Key and Value then
-				table.insert(Found, {Key = Key, Value = Value})
+				table.insert(Found, {
+					Key = Key,
+					Value = Value,
+				})
 			elseif #Found > 0 then
 				Found[#Found].Value ..= `\n{Line}`
 			end
@@ -352,7 +358,16 @@ return function(Props: Props)
 		}
 	end
 
-	const CodeFields: {[string]: boolean} = {code = true, text = true, source = true, command = true, content = true, old_string = true, new_string = true, prompt = true}
+	const CodeFields: {[string]: boolean} = {
+		code = true,
+		text = true,
+		source = true,
+		command = true,
+		content = true,
+		old_string = true,
+		new_string = true,
+		prompt = true,
+	}
 
 	const function Call(Value: () -> Types.ToolCall, Index: number)
 		const Open = Vide.source(Busy(Value()))
@@ -685,7 +700,10 @@ return function(Props: Props)
 			const Thinking = if Props.Thinking then Props.Thinking() or "" else ""
 
 			if Thinking:match("%S") then
-				table.insert(Found, {Kind = "thinking", Text = Thinking})
+				table.insert(Found, {
+					Kind = "thinking",
+					Text = Thinking,
+				})
 			end
 
 			if #Calls > 0 then
@@ -695,11 +713,17 @@ return function(Props: Props)
 					table.insert(All, Index)
 				end
 
-				table.insert(Found, {Kind = "calls", Calls = All})
+				table.insert(Found, {
+					Kind = "calls",
+					Calls = All,
+				})
 			end
 
 			if Props.Text() ~= "" then
-				table.insert(Found, {Kind = "text", Text = Props.Text()})
+				table.insert(Found, {
+					Kind = "text",
+					Text = Props.Text(),
+				})
 			end
 
 			return Found
@@ -716,13 +740,19 @@ return function(Props: Props)
 				if Last and Last.Kind == "calls" and Last.Calls then
 					table.insert(Last.Calls, Piece.Call)
 				else
-					table.insert(Found, {Kind = "calls", Calls = {Piece.Call}})
+					table.insert(Found, {
+						Kind = "calls",
+						Calls = {Piece.Call},
+					})
 				end
 			elseif Piece.Kind == "thinking" or Piece.Kind == "text" or Piece.Kind == "user" then
 				if Last and Last.Kind == Piece.Kind and Piece.Kind ~= "user" then
 					Last.Text = `{Last.Text or ""}{if Piece.Kind == "text" then "\n\n" else "\n"}{Piece.Text or ""}`
 				else
-					table.insert(Found, {Kind = Piece.Kind, Text = Piece.Text or ""})
+					table.insert(Found, {
+						Kind = Piece.Kind,
+						Text = Piece.Text or "",
+					})
 				end
 			end
 		end
@@ -816,7 +846,13 @@ return function(Props: Props)
 		return `{Line:sub(1, 1):upper()}{Line:sub(2)}{if #Files > 0 and Measured then Counted(Added, Removed) else ""}`
 	end
 
-	const Blank: Types.ToolCall = {name = "", input = "", output = "", status = "done", milliseconds = 0}
+	const Blank: Types.ToolCall = {
+		name = "",
+		input = "",
+		output = "",
+		status = "done",
+		milliseconds = 0,
+	}
 
 	const function Group(Value: () -> Block, Index: number)
 		const Listed = Vide.source(false)

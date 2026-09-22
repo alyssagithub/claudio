@@ -73,7 +73,12 @@ function ReadDesktopSessions(): Record<string, DesktopSession> {
           continue;
         }
 
-        Sessions[Session.cliSessionId] = { title: Session.title, workingDirectory: Session.cwd, starred: Session.isStarred === true, archived: Session.isArchived === true };
+        Sessions[Session.cliSessionId] = {
+          title: Session.title,
+          workingDirectory: Session.cwd,
+          starred: Session.isStarred === true,
+          archived: Session.isArchived === true,
+        };
       }
     }
   }
@@ -100,7 +105,10 @@ function DesktopSessionsFolder(): string | null {
       const Stat = fs.statSync(Folder);
 
       if (Stat.isDirectory() && (!Newest || Stat.mtimeMs > Newest.mtimeMs)) {
-        Newest = { Folder, mtimeMs: Stat.mtimeMs };
+        Newest = {
+          Folder,
+          mtimeMs: Stat.mtimeMs,
+        };
       }
     }
   }
@@ -200,7 +208,7 @@ function ReadOwnSessions(): Map<string, boolean> {
 }
 
 function WriteOwnSessions(Own: Map<string, boolean>) {
-  fs.mkdirSync(path.dirname(OwnSessionsFile), { recursive: true });
+  fs.mkdirSync(path.dirname(OwnSessionsFile), {recursive: true});
   fs.writeFileSync(OwnSessionsFile, JSON.stringify(Object.fromEntries(Own), null, 2));
 }
 
@@ -352,7 +360,10 @@ function ReadLines(File: string, MaxBytes?: number): TranscriptEntry[] | null {
     try {
       const Stat = fs.statSync(File);
 
-      return { Stamp: `${Stat.mtimeMs}:${Stat.size}`, Size: Stat.size };
+      return {
+        Stamp: `${Stat.mtimeMs}:${Stat.size}`,
+        Size: Stat.size,
+      };
     } catch {
       return null;
     }
@@ -369,7 +380,11 @@ function ReadLines(File: string, MaxBytes?: number): TranscriptEntry[] | null {
     if (Added) {
       const Grown = Remembered.Lines.concat(Added.Lines);
 
-      Parsed.set(Key, { Stamp: Measured.Stamp, Lines: Grown, Read: Added.Read });
+      Parsed.set(Key, {
+        Stamp: Measured.Stamp,
+        Lines: Grown,
+        Read: Added.Read,
+      });
 
       return Grown;
     }
@@ -382,7 +397,11 @@ function ReadLines(File: string, MaxBytes?: number): TranscriptEntry[] | null {
       Parsed.delete(Parsed.keys().next().value as string);
     }
 
-    Parsed.set(Key, { Stamp: Measured.Stamp, Lines: Whole.Lines, Read: Whole.Read });
+    Parsed.set(Key, {
+      Stamp: Measured.Stamp,
+      Lines: Whole.Lines,
+      Read: Whole.Read,
+    });
   }
 
   return Whole ? Whole.Lines : null;
@@ -398,7 +417,10 @@ function ParseLines(File: string, MaxBytes?: number, From?: number): { Lines: Tr
     if (Length <= 0) {
       fs.closeSync(Descriptor);
 
-      return { Lines: [], Read: Size };
+      return {
+        Lines: [],
+        Read: Size,
+      };
     }
 
     const Buffer = new Uint8Array(Length);
@@ -417,7 +439,10 @@ function ParseLines(File: string, MaxBytes?: number, From?: number): { Lines: Tr
       }
     }).filter(Boolean) as TranscriptEntry[];
 
-    return { Lines, Read: Ended < 0 ? Start : Start + global.Buffer.byteLength(Whole, "utf8") + 1 };
+    return {
+      Lines,
+      Read: Ended < 0 ? Start : Start + global.Buffer.byteLength(Whole, "utf8") + 1,
+    };
   } catch {
     return null;
   }
@@ -488,7 +513,7 @@ export function SetFolderHidden(Folder: string, Hidden: boolean) {
     Kept.push(Folder);
   }
 
-  fs.mkdirSync(path.dirname(HiddenFoldersFile), { recursive: true });
+  fs.mkdirSync(path.dirname(HiddenFoldersFile), {recursive: true});
   fs.writeFileSync(HiddenFoldersFile, JSON.stringify(Kept, null, 2));
 }
 
@@ -605,7 +630,7 @@ export function RecordCost(Id: string, Cost: number) {
   const Costs = ReadCosts();
 
   Costs[Id] = CostList(Costs[Id]).concat(Cost);
-  fs.mkdirSync(path.dirname(CostsFile), { recursive: true });
+  fs.mkdirSync(path.dirname(CostsFile), {recursive: true});
   fs.writeFileSync(CostsFile, JSON.stringify(Costs, null, 2));
 }
 
@@ -627,14 +652,18 @@ function EstimateCost(Line: TranscriptEntry): number | null {
 
 function Plus(Left: Tokens | null, Right: Tokens | null): Tokens | null {
   if (!Left) {
-    return Right ? { ...Right } : null;
+    return Right ? {...Right} : null;
   }
 
   if (!Right) {
     return Left;
   }
 
-  return { input: Left.input + Right.input, output: Left.output + Right.output, cached: Left.cached + Right.cached };
+  return {
+    input: Left.input + Right.input,
+    output: Left.output + Right.output,
+    cached: Left.cached + Right.cached,
+  };
 }
 
 function UsageOf(Line: TranscriptEntry): Tokens | null {
@@ -686,7 +715,10 @@ export function GetConversation(Id: string, Least?: number): BuiltConversation |
             Built.delete(Built.keys().next().value as string);
           }
 
-          Built.set(Key, { Stamp, Result: Tried });
+          Built.set(Key, {
+            Stamp,
+            Result: Tried,
+          });
         }
 
         return Tried;
@@ -707,7 +739,10 @@ export function GetConversation(Id: string, Least?: number): BuiltConversation |
       Built.delete(Built.keys().next().value as string);
     }
 
-    Built.set(Key, { Stamp, Result: Whole });
+    Built.set(Key, {
+      Stamp,
+      Result: Whole,
+    });
   }
 
   return Whole;
@@ -740,7 +775,12 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
         Attached.push(ImageIndex);
       }
 
-      Messages.push({ role: "user", text: StripContext(TextOf(Line.message.content)), images: Attached, at: TimeOf(Line) });
+      Messages.push({
+        role: "user",
+        text: StripContext(TextOf(Line.message.content)),
+        images: Attached,
+        at: TimeOf(Line),
+      });
       PendingTools = [];
       PendingCalls = [];
       PendingParts = [];
@@ -750,7 +790,11 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
         const Pictures = ImagesInContent([Block]).length;
 
         if (Block.type === "tool_result") {
-          Results.set(Block.tool_use_id as string, { Output: TextOf(Block.content).slice(0, MostCallText), Failed: Block.is_error === true, Image: Pictures > 0 ? PendingImages.length + 1 : null });
+          Results.set(Block.tool_use_id as string, {
+            Output: TextOf(Block.content).slice(0, MostCallText),
+            Failed: Block.is_error === true,
+            Image: Pictures > 0 ? PendingImages.length + 1 : null,
+          });
         }
 
         for (let Count = 0; Count < Pictures; Count += 1) {
@@ -772,7 +816,7 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
 
       if (Counted) {
         PendingTokens = Plus(PendingTokens, Counted);
-        FirstTokens = FirstTokens || { ...Counted };
+        FirstTokens = FirstTokens || {...Counted};
       }
 
       let Seat = PendingCalls.length;
@@ -780,16 +824,29 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
       for (const Block of Content) {
         if (Block.type === "tool_use") {
           Seat += 1;
-          PendingParts.push({ kind: "call", call: Seat });
+          PendingParts.push({
+            kind: "call",
+            call: Seat,
+          });
         } else if (Block.type === "thinking" && typeof Block.thinking === "string" && Block.thinking.trim() !== "") {
-          PendingParts.push({ kind: "thinking", text: Block.thinking as string });
+          PendingParts.push({
+            kind: "thinking",
+            text: Block.thinking as string,
+          });
         } else if (Block.type === "text" && typeof Block.text === "string" && Block.text.trim() !== "") {
-          PendingParts.push({ kind: "text", text: Block.text as string });
+          PendingParts.push({
+            kind: "text",
+            text: Block.text as string,
+          });
         }
       }
 
       PendingTools = PendingTools.concat(Content.filter((Block) => Block.type === "tool_use").map((Block) => Block.name as string));
-      PendingCalls = PendingCalls.concat(Content.filter((Block) => Block.type === "tool_use").map((Block) => ({ Id: Block.id as string, name: Block.name as string, input: InputOf(Block.input) })));
+      PendingCalls = PendingCalls.concat(Content.filter((Block) => Block.type === "tool_use").map((Block) => ({
+        Id: Block.id as string,
+        name: Block.name as string,
+        input: InputOf(Block.input),
+      })));
 
       if (Text === "") {
         continue;
@@ -813,11 +870,21 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
 
       const Before = Last && Last.role === "assistant" ? Last.images.length : 0;
       const Already = Last && Last.role === "assistant" ? (Last.calls || []).length : 0;
-      const Ordered = PendingParts.map((Part) => (Part.kind === "call" && Part.call ? { ...Part, call: Part.call + Already } : Part));
+      const Ordered = PendingParts.map((Part) => (Part.kind === "call" && Part.call ? {
+        ...Part,
+        call: Part.call + Already,
+      } : Part));
       const Calls: StoredCall[] = PendingCalls.map((Call) => {
         const Result = Results.get(Call.Id);
 
-        return { name: Call.name, input: Call.input, output: Result ? Result.Output : "", status: Result && Result.Failed ? "error" : "done", milliseconds: 0, image: Result && Result.Image ? Result.Image + Before : null };
+        return {
+          name: Call.name,
+          input: Call.input,
+          output: Result ? Result.Output : "",
+          status: Result && Result.Failed ? "error" : "done",
+          milliseconds: 0,
+          image: Result && Result.Image ? Result.Image + Before : null,
+        };
       });
 
       if (Last && Last.role === "assistant") {
@@ -829,7 +896,18 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
         Last.tokens = Plus(Last.tokens || null, Used) || Last.tokens;
         Last.cost = (Last.cost || 0) + (Spent || 0);
       } else {
-        Messages.push({ role: "assistant", text: Text, activity: PendingTools, parts: Ordered, calls: Calls, images: PendingImages, at: TimeOf(Line), tokens: Used, cost: Spent, estimated: true });
+        Messages.push({
+          role: "assistant",
+          text: Text,
+          activity: PendingTools,
+          parts: Ordered,
+          calls: Calls,
+          images: PendingImages,
+          at: TimeOf(Line),
+          tokens: Used,
+          cost: Spent,
+          estimated: true,
+        });
       }
 
       PendingTools = [];
@@ -892,7 +970,7 @@ export function SetChapters(Id: string, Chapters: Chapter[]): Chapter[] {
     All[Id] = Chapters;
   }
 
-  fs.mkdirSync(path.dirname(ChaptersFile), { recursive: true });
+  fs.mkdirSync(path.dirname(ChaptersFile), {recursive: true});
   fs.writeFileSync(ChaptersFile, JSON.stringify(All, null, 2));
   return Chapters;
 }
@@ -904,7 +982,11 @@ export function RenameConversation(Id: string, Title: string): boolean {
     return false;
   }
 
-  fs.appendFileSync(File, `${EndsCleanly(File) ? "" : "\n"}${JSON.stringify({ type: "custom-title", customTitle: Title, timestamp: new Date().toISOString() })}\n`);
+  fs.appendFileSync(File, `${EndsCleanly(File) ? "" : "\n"}${JSON.stringify({
+    type: "custom-title",
+    customTitle: Title,
+    timestamp: new Date().toISOString(),
+  })}\n`);
   UpdateDesktopSession(Id, (Session) => {
     Session.title = Title;
     Session.titleSource = "user";
@@ -940,7 +1022,7 @@ function RemoveDesktopSession(Id: string) {
     const Session = ReadJson<DesktopRecord>(File);
 
     if (Session && Session.cliSessionId === Id) {
-      fs.rmSync(File, { force: true });
+      fs.rmSync(File, {force: true});
       return;
     }
   }
@@ -963,8 +1045,11 @@ export function DeleteConversation(Id: string): boolean {
     return false;
   }
 
-  fs.rmSync(File, { force: true });
-  fs.rmSync(File.slice(0, -6), { recursive: true, force: true });
+  fs.rmSync(File, {force: true});
+  fs.rmSync(File.slice(0, -6), {
+    recursive: true,
+    force: true,
+  });
   RemoveDesktopSession(Id);
   ForgetOwnSession(Id);
   ForgetCosts(Id);

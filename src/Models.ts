@@ -106,7 +106,7 @@ export function RememberModels(List: unknown): void {
   }
 
   try {
-    fs.mkdirSync(path.dirname(ModelsCacheFile), { recursive: true });
+    fs.mkdirSync(path.dirname(ModelsCacheFile), {recursive: true});
     fs.writeFileSync(ModelsCacheFile, JSON.stringify(Models));
   } catch {
     return;

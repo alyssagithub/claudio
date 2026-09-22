@@ -296,7 +296,10 @@ export function AskServerFor(Pose: (Questions: AskedQuestion[]) => Promise<JobAn
       const { Presence } = await import("./Studio.js");
       const { StudioProcesses } = await import("./StudioPresence.js");
 
-      return Say({ ...Presence(), processes: await StudioProcesses() });
+      return Say({
+        ...Presence(),
+        processes: await StudioProcesses(),
+      });
     },
     RuntimeLive: async () => {
       const { RuntimeLive } = await import("./Studio.js");
@@ -310,7 +313,7 @@ export function AskServerFor(Pose: (Questions: AskedQuestion[]) => Promise<JobAn
     version: "1.0.0",
     tools: [
       ...Shared.map((Entry) => tool(Entry.Name, Entry.Description, Entry.Schema, Entry.Run)),
-      tool("ask", Description, { questions: z.array(Question).min(1).max(4) }, async (Input: { questions: AskedQuestion[] }) => {
+      tool("ask", Description, {questions: z.array(Question).min(1).max(4)}, async (Input: { questions: AskedQuestion[] }) => {
         const Answers = await Pose(Input.questions);
 
         if (!Answers) {
@@ -322,7 +325,10 @@ export function AskServerFor(Pose: (Questions: AskedQuestion[]) => Promise<JobAn
           };
         }
 
-        return { content: [{ type: "text", text: Describe(Input.questions, Answers) }] };
+        return {content: [{
+          type: "text",
+          text: Describe(Input.questions, Answers),
+        }]};
       }),
     ],
   });

@@ -248,7 +248,7 @@ function Settings.Load(PluginObject: Plugin)
 		const Quiet = Prefix ~= "Claudio_" and Definition.Group == "Notifications"
 		const Stored = Read(Definition.Key, Quiet)
 
-		Sources[Definition.Key] = Vide.source(if Stored ~= nil then Stored elseif Quiet then false else Definition.Default)
+		Sources[Definition.Key] = Vide.source(if Stored ~= nil then Stored elseif Quiet and typeof(Definition.Default) == "boolean" then false else Definition.Default)
 	end
 
 	for Key, Default in Settings.Hidden do

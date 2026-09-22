@@ -55,11 +55,17 @@ function Keys.Clean(Rich: string): string
 	return (Rich:gsub("<[^>]->", ""):gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&amp;", "&"))
 end
 
-function Keys.CopySelection(Box: TextBox, Since: number): number
+function Keys.CopySelection(Box: TextBox, Since: number, Spanning: string?): number
 	const Seen = Keys.Last()
 
 	if not Seen or typeof(Seen.copyAt) ~= "number" or Seen.copyAt <= Since then
 		return Since
+	end
+
+	if Spanning then
+		task.spawn(Client.WriteClipboard, Spanning)
+
+		return Seen.copyAt
 	end
 
 	const From = math.min(Box.CursorPosition, Box.SelectionStart)

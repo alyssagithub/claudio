@@ -2,6 +2,7 @@
 const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Keys = require(script.Parent.Parent.Parent.Store.Keys)
+const Selection = require(script.Parent.Parent.Parent.Store.Selection)
 const Navigate = require(script.Parent.Parent.Parent.Navigate)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Theme = require(script.Parent.Parent.Theme)
@@ -103,6 +104,10 @@ return function(Props: Props)
 	const Range = Vide.source({0, 0})
 
 	const function Track()
+		if Selection.Crossing() then
+			return
+		end
+
 		if not Box:IsFocused() or Box.SelectionStart == -1 then
 			Range({0, 0})
 
@@ -112,7 +117,17 @@ return function(Props: Props)
 		Range({math.min(Box.CursorPosition, Box.SelectionStart), math.max(Box.CursorPosition, Box.SelectionStart)})
 	end
 
+	const Entry: Selection.Block = {
+		Box = nil :: any,
+		Range = Range,
+		Native = Track,
+	}
+
 	const function Pressed()
+		if Selection.Crossing() then
+			return
+		end
+
 		if Box.SelectionStart ~= -1 and Box.SelectionStart ~= Box.CursorPosition then
 			return
 		end
@@ -168,26 +183,40 @@ return function(Props: Props)
 
 			task.spawn(function()
 				while Focused == Mine and task.wait(0.15) do
-					Copies = Keys.CopySelection(Box, Copies)
+					Copies = Keys.CopySelection(Box, Copies, Selection.Text())
 				end
 			end)
 		end,
 		FocusLost = function()
 			Focused += 1
 			Range({0, 0})
+			Selection.Drop(Entry)
 
 			if Holding then
 				Holding = false
 				Keys.Release()
 			end
 		end,
+		InputBegan = function(Input: InputObject)
+			if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+				Selection.Begin(Entry, Box:FindFirstAncestorWhichIsA("PluginGui"))
+			end
+		end,
 		InputEnded = function(Input: InputObject)
-			if Input.UserInputType == Enum.UserInputType.MouseButton1 and Box:IsFocused() then
+			if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+				return
+			end
+
+			Selection.Finish(Vector2.new(Input.Position.X, Input.Position.Y))
+
+			if Box:IsFocused() then
 				task.defer(Pressed)
 			end
 		end,
 
 		Vide.action(function(Object: TextBox)
+			Entry.Box = Object
+			Vide.cleanup(Selection.Add(Entry))
 			Vide.cleanup(Object:GetPropertyChangedSignal("CursorPosition"):Connect(Track))
 			Vide.cleanup(Object:GetPropertyChangedSignal("SelectionStart"):Connect(Track))
 		end),

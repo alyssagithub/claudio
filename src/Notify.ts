@@ -30,6 +30,7 @@ type ToastOptions = {
   Banner?: boolean;
   Sound?: boolean;
   Anywhere?: boolean;
+  Seconds?: number;
 };
 
 type ClipboardPicture = {
@@ -87,7 +88,7 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
 
     execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ToastPath], {
       windowsHide: true,
-      env: { ...process.env, CLAUDIO_TITLE: Heading, CLAUDIO_BODY: Detail, CLAUDIO_ICON: IconFile, CLAUDIO_APP_ID: "Claudio" },
+      env: { ...process.env, CLAUDIO_TITLE: Heading, CLAUDIO_BODY: Detail, CLAUDIO_ICON: IconFile, CLAUDIO_APP_ID: "Claudio", CLAUDIO_TOAST_SECONDS: String(Wanted.Seconds || 0) },
     }, (Trouble, Said) => {
       if (!Trouble && Said.includes("shown")) {
         return;

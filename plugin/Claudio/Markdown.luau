@@ -14,14 +14,14 @@ local Held = 0
 
 const Mono = 'font family="rbxasset://fonts/families/RobotoMono.json"'
 
-function Markdown.Rich(Text: string, Size: number?): string
-	const Key = `{Size or 0}|{Text}`
+function Markdown.Rich(Text: string, Size: number?, Accent: string?): string
+	const Key = `{Size or 0}|{Accent or ""}|{Text}`
 
 	if Cached[Key] then
 		return Cached[Key]
 	end
 
-	const Built = Markdown.Build(Text, Size)
+	const Built = Markdown.Build(Text, Size, Accent)
 
 	if Held > 400 then
 		table.clear(Cached)
@@ -44,14 +44,64 @@ function Markdown.Inline(Text: string): string
 	Marked = Marked:gsub("%f[%w_]_(.-)_%f[^%w_]", function(Body: string): string
 		return `<i>{Body}</i>`
 	end)
-	Marked = Marked:gsub("%[(.-)%]%((.-)%)", function(Label: string, _Url: string): string
+	Marked = Marked:gsub("%[([^%]]-)%]%(([^%)]-)%)", function(Label: string, _Url: string): string
 		return `<u>{Label}</u>`
 	end)
 
 	return Marked
 end
 
-function Markdown.Build(Text: string, Size: number?): string
+function Markdown.Tokens(Text: string, Accent: string, Fade: boolean): string
+	const Pieces: {string} = {}
+	local At = 1
+
+	const function Plain(Body: string)
+		if Body == "" then
+			return
+		end
+
+		table.insert(Pieces, if Fade then `<font transparency="1">{Body}</font>` else Body)
+	end
+
+	const function Marked(Body: string)
+		table.insert(Pieces, `<font color="#{Accent}">{Body}</font>`)
+	end
+
+	while At <= #Text do
+		local Start, Stop = Text:find("%[[^%[%]\n]+%]", At)
+
+		while Start and Stop and Text:sub(Stop + 1, Stop + 1) == "(" do
+			Start, Stop = Text:find("%[[^%[%]\n]+%]", Stop + 1)
+		end
+
+		const CommandStart, CommandStop = Text:find("^/[%w%-_]+", At)
+		const MentionStart, MentionStop = Text:find("%f[@]@[%w_%.]+", At)
+		local Chosen: number? = Start
+		local Ended: number? = Stop
+
+		if At == 1 and CommandStart then
+			Chosen, Ended = CommandStart, CommandStop
+		end
+
+		if MentionStart and (not Chosen or MentionStart < Chosen) then
+			Chosen, Ended = MentionStart, MentionStop
+		end
+
+		if not Chosen or not Ended then
+			Plain(Text:sub(At))
+
+			break
+		end
+
+		Plain(Text:sub(At, Chosen - 1))
+		Marked(Text:sub(Chosen, Ended))
+		At = Ended + 1
+	end
+
+	return table.concat(Pieces)
+end
+
+function Markdown.Build(Text: string, Size: number?, Accent: string?): string
 	const Safe = Text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
 	const Lines: {string} = {}
 
@@ -84,6 +134,11 @@ function Markdown.Build(Text: string, Size: number?): string
 		Marked = Marked:gsub("^(%s*)[%*%-]%s+", "%1• ")
 		Marked = Marked:gsub("^&gt;%s?(.*)$", "▎ <i>%1</i>")
 		Marked = Markdown.Inline(Marked)
+
+		if Accent then
+			Marked = Markdown.Tokens(Marked, Accent, false)
+		end
+
 		table.insert(Lines, Marked)
 	end
 

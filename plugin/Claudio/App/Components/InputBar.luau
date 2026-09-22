@@ -5,6 +5,7 @@ const Settings = require(script.Parent.Parent.Parent.Settings)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Context = require(script.Parent.Parent.Parent.Store.Context)
 const Client = require(script.Parent.Parent.Parent.Client.Client)
+const Markdown = require(script.Parent.Parent.Parent.Markdown)
 const Theme = require(script.Parent.Parent.Theme)
 const IconButton = require(script.Parent.IconButton)
 const Attachments = require(script.Parent.Attachments)
@@ -263,6 +264,26 @@ return function()
 
 		Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
 		Box,
+		Create "TextLabel" {
+			Name = "Painted",
+			Size = function()
+				return UDim2.new(0, Wide(), 0, Tall())
+			end,
+			BackgroundTransparency = 1,
+			TextColor3 = Theme.Colors.Text,
+			TextSize = Settings.TextSize,
+			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+			TextWrapped = true,
+			RichText = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			ZIndex = 2,
+			Text = function()
+				const Safe = Chat.Draft():gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
+
+				return Markdown.Tokens(Safe, Theme.Colors.Accent():ToHex(), true)
+			end,
+		},
 	}
 
 	const Send = Create "TextButton" {

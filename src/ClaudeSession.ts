@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, DelegateModels, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, SystemPromptFor, WorkingDirectory } from "./Config.js";
+import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, DelegateModels, Delegates, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory } from "./Config.js";
 import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
@@ -390,17 +390,17 @@ function TaskNotice(Text: string): Call | null {
 
 function Describe(Value: unknown): string {
   if (typeof Value === "string") {
-    return Value.slice(0, 4000);
+    return Value.slice(0, MostCallText);
   }
 
   if (Array.isArray(Value)) {
-    return Value.filter((Block) => !(Block && Block.type === "image")).map((Block) => (Block && Block.type === "text" ? Block.text : JSON.stringify(Block))).join(NewLine).slice(0, 4000);
+    return Value.filter((Block) => !(Block && Block.type === "image")).map((Block) => (Block && Block.type === "text" ? Block.text : JSON.stringify(Block))).join(NewLine).slice(0, MostCallText);
   }
 
   try {
-    return JSON.stringify(Value, null, 2).slice(0, 4000);
+    return JSON.stringify(Value, null, 2).slice(0, MostCallText);
   } catch {
-    return String(Value).slice(0, 4000);
+    return String(Value).slice(0, MostCallText);
   }
 }
 
@@ -436,7 +436,7 @@ function DescribeInput(Input: unknown): string {
   return Object.entries(Input)
     .map(([Name, Value]) => `${Name}: ${typeof Value === "string" ? Value : JSON.stringify(Value)}`)
     .join(NewLine)
-    .slice(0, 4000);
+    .slice(0, MostCallText);
 }
 
 function CountUsage(Existing: Usage, Usage: {input_tokens?: number, output_tokens?: number, cache_read_input_tokens?: number}): Usage {
@@ -896,7 +896,7 @@ function RouteMessage(Session: Session, Message: any) {
       const Last = Turn.Calls[Turn.Calls.length - 1];
 
       if (Last && Last.Status === "preparing") {
-        Publish(Turn, { Calls: Turn.Calls.slice(0, -1).concat([{ ...Last, Input: (Last.Input + Event.delta.partial_json).slice(0, 4000) }]), Streamed: Turn.Streamed + Event.delta.partial_json.length });
+        Publish(Turn, { Calls: Turn.Calls.slice(0, -1).concat([{ ...Last, Input: (Last.Input + Event.delta.partial_json).slice(0, MostCallText) }]), Streamed: Turn.Streamed + Event.delta.partial_json.length });
       }
     }
 

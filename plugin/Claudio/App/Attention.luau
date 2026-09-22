@@ -12,6 +12,7 @@ function Attention.Notify(Text: string)
 		toast = Settings.Get("Toast")(),
 		banner = Settings.Get("Banner")(),
 		anywhere = Settings.Get("NotifyWhenFocused")(),
+		seconds = if Settings.Get("StickyToast")() then 0 else Settings.Get("ToastSeconds")(),
 	}
 
 	if not (Wanted.sound or Wanted.flash or Wanted.toast or Wanted.banner) then

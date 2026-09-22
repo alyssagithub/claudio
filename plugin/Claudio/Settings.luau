@@ -36,6 +36,22 @@ const Definitions: {Definition} = {
 		Default = true,
 	},
 	{
+		Key = "StickyToast",
+		Label = "Keep the desktop notification until dismissed",
+		Detail = "Off means it goes away by itself after the seconds below",
+		Group = "Notifications",
+		Default = true,
+	},
+	{
+		Key = "ToastSeconds",
+		Label = "Seconds a desktop notification stays",
+		Detail = "Only when the setting above is off",
+		Group = "Notifications",
+		Default = 10,
+		Minimum = 3,
+		Maximum = 120,
+	},
+	{
 		Key = "Banner",
 		Label = "Show notifications in fullscreen",
 		Detail = "Claudio draws its own banner, which Windows notifications cannot cover",

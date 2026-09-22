@@ -244,7 +244,7 @@ const function Plain(Line: string, LayoutOrder: number)
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		LayoutOrder = LayoutOrder,
-		Text = Markdown.Rich(Line, Settings.TextSize()),
+		Text = Markdown.Rich(Line, Settings.TextSize(), Theme.Colors.Accent():ToHex()),
 	}
 end
 
@@ -265,13 +265,13 @@ const function Row(Line: string, LayoutOrder: number, Links: {[string]: string})
 
 	const Words: {Instance} = {}
 	const Anchors: {{Label: string, Url: string}} = {}
-	const Marked = Line:gsub("%[(.-)%]%((%S-)%)", function(Label: string, Url: string): string
+	const Marked = Line:gsub("%[([^%]]-)%]%(([^%)%s]-)%)", function(Label: string, Url: string): string
 		table.insert(Anchors, {Label = Label, Url = Url})
 
 		return `{#Anchors}`
 	end)
 
-	for Index, Token in Split(Markdown.Rich(Marked, Settings.TextSize())) do
+	for Index, Token in Split(Markdown.Rich(Marked, Settings.TextSize(), Theme.Colors.Accent():ToHex())) do
 		const Which = Token:match("^(%d+)(.*)$")
 
 		if Which and Anchors[tonumber(Which) :: number] then

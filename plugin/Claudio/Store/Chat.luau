@@ -2183,6 +2183,7 @@ const function RunStudioJob(Job: any)
 	end
 
 	Running[Job.id] = true
+	Watcher.BeginJob()
 
 	task.spawn(function()
 		const Ok, Outcome = pcall(function()
@@ -2276,6 +2277,7 @@ const function RunStudioJob(Job: any)
 		Client.AnswerStudio(Job.id, if Ok then Outcome else {error = tostring(Outcome)})
 
 		Running[Job.id] = nil
+		Watcher.EndJob()
 	end)
 end
 

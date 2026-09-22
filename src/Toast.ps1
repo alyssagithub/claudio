@@ -28,5 +28,18 @@ $Document = New-Object Windows.Data.Xml.Dom.XmlDocument
 $Document.LoadXml($Xml)
 
 $Toast = New-Object Windows.UI.Notifications.ToastNotification $Document
-[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($env:CLAUDIO_APP_ID).Show($Toast)
-"shown"
+$Toast.Tag = "claudio-" + [guid]::NewGuid().ToString("N").Substring(0, 12)
+$Toast.Group = "claudio"
+
+$Notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($env:CLAUDIO_APP_ID)
+$Notifier.Show($Toast)
+
+[Console]::Out.WriteLine("shown")
+[Console]::Out.Flush()
+
+$Seconds = [double]$env:CLAUDIO_TOAST_SECONDS
+
+if ($Seconds -gt 0) {
+    Start-Sleep -Seconds $Seconds
+    [Windows.UI.Notifications.ToastNotificationManager]::History.Remove($Toast.Tag, $Toast.Group, $env:CLAUDIO_APP_ID)
+}

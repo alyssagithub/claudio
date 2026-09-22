@@ -349,7 +349,7 @@ function Client.DeleteConversation(Id: string): (boolean, any)
 	return Http.Request("DELETE", `{BaseUrl()}/conversations/{Id}`)
 end
 
-function Client.Notify(Title: string, Body: string, Options: {[string]: boolean}): (boolean, any)
+function Client.Notify(Title: string, Body: string, Options: {[string]: any}): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/notify`, {
 		title = Title,
 		body = Body,
@@ -358,6 +358,7 @@ function Client.Notify(Title: string, Body: string, Options: {[string]: boolean}
 		toast = Options.toast,
 		banner = Options.banner,
 		anywhere = Options.anywhere,
+		seconds = Options.seconds,
 	})
 end
 

@@ -6,6 +6,7 @@ export const Version = (createRequire(import.meta.url)("../../package.json") as 
 export const ProtocolVersion = 1;
 export const DefaultPort = 47225;
 export const MostScriptsToCheck = 1200;
+export const MostCallText = 120000;
 export const AunId = "264787011452403712";
 export const LongPollMilliseconds = 10000;
 export const CoalesceMilliseconds = 120;

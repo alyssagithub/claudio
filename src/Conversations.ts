@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { ChaptersFile, CostsFile, DesktopSessionsRoot, HiddenFoldersFile, OwnSessionsFile, PriceFor, SessionsRoot } from "./Config.js";
+import { ChaptersFile, CostsFile, DesktopSessionsRoot, HiddenFoldersFile, MostCallText, OwnSessionsFile, PriceFor, SessionsRoot } from "./Config.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import type { Chapter, Content, ContentBlock, Part, StoredCall, StoredMessage, Tokens, TranscriptLine } from "./Types.js";
 
@@ -223,7 +223,7 @@ function InputOf(Input: unknown): string {
   return Object.entries(Input)
     .map(([Name, Value]) => `${Name}: ${typeof Value === "string" ? Value : JSON.stringify(Value)}`)
     .join("\n")
-    .slice(0, 4000);
+    .slice(0, MostCallText);
 }
 
 function TextOf(Content: Content | undefined): string {
@@ -750,7 +750,7 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
         const Pictures = ImagesInContent([Block]).length;
 
         if (Block.type === "tool_result") {
-          Results.set(Block.tool_use_id as string, { Output: TextOf(Block.content).slice(0, 2000), Failed: Block.is_error === true, Image: Pictures > 0 ? PendingImages.length + 1 : null });
+          Results.set(Block.tool_use_id as string, { Output: TextOf(Block.content).slice(0, MostCallText), Failed: Block.is_error === true, Image: Pictures > 0 ? PendingImages.length + 1 : null });
         }
 
         for (let Count = 0; Count < Pictures; Count += 1) {

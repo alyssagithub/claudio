@@ -98,9 +98,19 @@ local Paused = false
 local Skipped = false
 local Busy = false
 local BusyUntil = 0
+local Jobs = 0
+local JobsUntil = 0
 
-const function CurrentBucket(): Bucket
-	return if Recording and (Busy or os.clock() < BusyUntil) then Turn else Idle
+const function CurrentBucket(): Bucket?
+	if Recording and (Busy or os.clock() < BusyUntil) then
+		return Turn
+	end
+
+	if Jobs > 0 or os.clock() < JobsUntil then
+		return if Recording then Turn else nil
+	end
+
+	return Idle
 end
 
 const Own = script.Parent
@@ -181,7 +191,7 @@ end
 const function Record(Object: Instance?, Path: string, Verb: string, Class: string?, Field: string?, Value: string?)
 	const Where = CurrentBucket()
 
-	if #Where.Entries >= 500 then
+	if not Where or #Where.Entries >= 500 then
 		return
 	end
 
@@ -242,7 +252,7 @@ const function AddListener(Object: Instance)
 
 		const Where = CurrentBucket()
 
-		if Where.Created[Object] or Where.Deleted[Object] then
+		if not Where or Where.Created[Object] or Where.Deleted[Object] then
 			return
 		end
 
@@ -276,7 +286,7 @@ const function AddListener(Object: Instance)
 
 		const Where = CurrentBucket()
 
-		if Where.Created[Object] or Where.Deleted[Object] then
+		if not Where or Where.Created[Object] or Where.Deleted[Object] then
 			return
 		end
 
@@ -299,6 +309,10 @@ const function OnDescendantAdded(Object: Instance)
 
 	const Where = CurrentBucket()
 	const Parent = Object.Parent
+
+	if not Where then
+		return
+	end
 
 	Where.Deleted[Object] = nil
 
@@ -340,7 +354,7 @@ const function OnDescendantRemoving(Object: Instance)
 	const Where = CurrentBucket()
 	const Parent = Object.Parent
 
-	if Counted(Where.Deleted) >= 500 then
+	if not Where or Counted(Where.Deleted) >= 500 then
 		return
 	end
 
@@ -525,6 +539,7 @@ function Watcher.Stop()
 	Recording = false
 	Paused = false
 	Busy = false
+	Jobs = 0
 
 	for _, Connection in Connections do
 		Connection:Disconnect()
@@ -564,6 +579,15 @@ function Watcher.SetBusy(Value: boolean)
 	Busy = Value
 end
 
+function Watcher.BeginJob()
+	Jobs += 1
+end
+
+function Watcher.EndJob()
+	Jobs = math.max(0, Jobs - 1)
+	JobsUntil = os.clock() + 2
+end
+
 function Watcher.GetTurnChanges(): {Types.Change}?
 	Recording = false
 	Busy = false
@@ -590,6 +614,7 @@ end
 function Watcher.Reset()
 	Recording = false
 	Busy = false
+	Jobs = 0
 	Clear(Turn)
 	Clear(Idle)
 end

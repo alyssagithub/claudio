@@ -374,6 +374,7 @@ export function StartServer(Port: number) {
           Banner: Body.banner !== false,
           Anywhere: Body.anywhere === true,
           Sound: Body.sound === true,
+          Seconds: typeof Body.seconds === "number" && Body.seconds > 0 ? Math.min(Body.seconds, 600) : 0,
         });
 
         SendJson(Response, 200, { shown: Shown });

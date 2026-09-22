@@ -2898,7 +2898,7 @@ function Chat.Say(Text: string)
 end
 
 function Chat.LoadCommands()
-	const Ok, Result = Client.GetCommands(Settings.Get("WorkingFolder")())
+	const Ok, Result = Client.GetCommands(Settings.Get("WorkingFolder")(), Chat.ConversationId())
 
 	if not Ok then
 		return

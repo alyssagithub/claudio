@@ -800,7 +800,10 @@ export function StartServer(Port: number) {
       }
 
       if (Request.method === "GET" && Url.pathname === "/commands") {
-        SendJson(Response, 200, GetCommands(Url.searchParams.get("folder")));
+        const Open = Url.searchParams.get("conversation");
+        const Folder = (Open ? ListConversations().find((Entry) => Entry.id === Open)?.folder : null) || Url.searchParams.get("folder");
+
+        SendJson(Response, 200, GetCommands(Folder));
         return;
       }
 

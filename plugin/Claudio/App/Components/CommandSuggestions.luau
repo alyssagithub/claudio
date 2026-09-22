@@ -93,8 +93,16 @@ const function Row(Command: () -> Types.Command, Index: number)
 end
 
 return function()
+	local Loaded: string?
+
 	Vide.effect(function()
-		Settings.Get("WorkingFolder")()
+		const Wanted = `{Chat.ConversationId() or ""}|{Settings.Get("WorkingFolder")()}`
+
+		if Wanted == Loaded then
+			return
+		end
+
+		Loaded = Wanted
 		task.spawn(Chat.LoadCommands)
 	end)
 

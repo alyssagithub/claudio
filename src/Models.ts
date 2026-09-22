@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { AutoTier, EffortOrder, LeanMode, ModelsCacheFile, ExtraModels, NewerModels } from "./Config.js";
+import { AutoTier, EffortOrder, LeanMode, ModelsCacheFile, ExtraModels } from "./Config.js";
 
 type ModelEntry = {
   value: string;
@@ -78,18 +78,6 @@ export function RememberModels(List: unknown): void {
     supportedEffortLevels: Model.supportedEffortLevels || [],
     contextWindow: Model.contextWindow || 0,
   }));
-
-  const Plain = (Value: string) => Value.replace(/\[1m\]$/, "");
-  const Missing = NewerModels.filter((Newer) => !Models.some((Model) => Plain(Model.value) === Plain(Newer.value)));
-
-  Models.splice(Models.findIndex((Model) => Model.value === "default") + 1, 0, ...Missing.map((Newer) => ({
-    value: Newer.value,
-    displayName: Newer.displayName,
-    description: Newer.description,
-    supportsEffort: true,
-    supportedEffortLevels: ["low", "medium", "high", "xhigh", "max"],
-    contextWindow: Newer.contextWindow,
-  })));
 
   for (const Extra of ExtraModels) {
     if (!Models.some((Model) => Model.value === Extra.value)) {

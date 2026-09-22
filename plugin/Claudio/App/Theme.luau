@@ -33,7 +33,6 @@ const Guide: {[string]: Enum.StudioStyleGuideColor} = {
 	Builtin = Enum.StudioStyleGuideColor.ScriptBuiltInFunction,
 	Call = Enum.StudioStyleGuideColor.ScriptFunctionName,
 	LuauType = Enum.StudioStyleGuideColor.ScriptLuauKeyword,
-	Bool = Enum.StudioStyleGuideColor.ScriptBool,
 }
 
 const Theme = {

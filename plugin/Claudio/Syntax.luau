@@ -192,7 +192,7 @@ const function Luau(Code: string): string
 		number = Colours.Number(),
 		comment = Colours.Comment(),
 		operator = Colours.Operator(),
-		custom = Colours.Bool(),
+		custom = Colours.Keyword(),
 	}
 	local Signature = ""
 
@@ -205,7 +205,10 @@ const function Luau(Code: string): string
 		Highlighter.setTokenColors(Chosen)
 	end
 
-	return table.concat(Highlighter.buildRichTextLines({src = Code}), "\n")
+	return table.concat(Highlighter.buildRichTextLines({
+		src = Code,
+		customLang = {const = "keyword"},
+	}), "\n")
 end
 
 const Dark = {

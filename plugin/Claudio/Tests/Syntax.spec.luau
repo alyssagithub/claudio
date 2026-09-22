@@ -140,6 +140,13 @@ return function()
 			expect(ColourOf(Rich, "Thing")).never.to.equal(Hex("Keyword"))
 		end)
 
+		it("colours luau const like local", function()
+			const Rich = Syntax.Highlight("const Rate = 5 local Other = Rate", "luau")
+
+			expect(ColourOf(Rich, "const")).to.equal(Hex("Keyword"))
+			expect(ColourOf(Rich, "const")).to.equal(ColourOf(Rich, "local"))
+		end)
+
 		it("keeps a keyword inside a string as part of the string", function()
 			const Rich = Syntax.Highlight('print("local end")', "luau")
 

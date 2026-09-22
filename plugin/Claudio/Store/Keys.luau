@@ -69,7 +69,7 @@ function Keys.CopySelection(Box: TextBox, Since: number): number
 		return Seen.copyAt
 	end
 
-	task.spawn(Client.WriteClipboard, Keys.Clean(Box.Text):sub(From, To - 1))
+	task.spawn(Client.WriteClipboard, Box.Text:sub(From, To - 1))
 
 	return Seen.copyAt
 end

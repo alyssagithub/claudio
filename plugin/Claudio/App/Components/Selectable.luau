@@ -51,16 +51,17 @@ return function(Props: Props)
 	local Focused = 0
 	local Holding = false
 
+	const Selecting = Vide.source(false)
+
 	const function Pressed()
 		if Box.SelectionStart ~= -1 and Box.SelectionStart ~= Box.CursorPosition then
 			return
 		end
 
 		const At = Box.CursorPosition - 1
-		const Plain = Keys.Clean(Box.Text)
 
 		for Path, Full in (if Props.Links then Props.Links() else {}) do
-			if Spanning(Plain, Path, At) then
+			if Spanning(Box.Text, Path, At) then
 				task.spawn(Navigate.Go, {Path = Full})
 
 				return
@@ -68,7 +69,7 @@ return function(Props: Props)
 		end
 
 		for Label, Url in (if Props.Urls then Props.Urls() else {}) do
-			if Spanning(Plain, Label, At) then
+			if Spanning(Box.Text, Label, At) then
 				task.spawn(Chat.Copy, Url)
 
 				return
@@ -86,16 +87,21 @@ return function(Props: Props)
 		TextSize = Props.Size or Settings.TextSize,
 		FontFace = Font.fromEnum(Props.Font or Enum.Font.BuilderSans),
 		TextWrapped = true,
-		RichText = true,
+		RichText = function()
+			return not Selecting()
+		end,
 		MultiLine = true,
 		TextEditable = false,
 		ClearTextOnFocus = false,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		LayoutOrder = Props.LayoutOrder,
-		Text = Props.Text,
+		Text = function()
+			return if Selecting() then Keys.Clean(Props.Text()) else Props.Text()
+		end,
 		Focused = function()
 			Focused += 1
+			Selecting(true)
 
 			const Mine = Focused
 
@@ -112,6 +118,7 @@ return function(Props: Props)
 		end,
 		FocusLost = function()
 			Focused += 1
+			Selecting(false)
 
 			if Holding then
 				Holding = false

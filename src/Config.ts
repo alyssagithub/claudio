@@ -86,6 +86,9 @@ export function PriceFor(Model: string) {
 
   return Family ? ModelPrices[Family as keyof typeof ModelPrices] : null;
 }
+export const NewerModels = [
+  { value: "claude-opus-5-5[1m]", displayName: "Opus 5.5", contextWindow: 1000000, description: "Newest Opus · 1M context" },
+];
 export const ExtraModels = [
   { value: "claude-fable-5", displayName: "Fable 5", contextWindow: 1000000, description: "Earlier Fable release · 1M context" },
   { value: "claude-opus-4-8", displayName: "Opus 4.8", contextWindow: 1000000, description: "Earlier Opus release · 1M context" },

@@ -3,32 +3,32 @@ const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Markdown = require(script.Parent.Parent.Parent.Markdown)
 const Theme = require(script.Parent.Parent.Theme)
+const Selectable = require(script.Parent.Selectable)
 
 const Create = Vide.create
 
 const function Cell(Text: string, Columns: number, Header: boolean, LayoutOrder: number)
-	return Create "TextLabel" {
+	const Box = Selectable {
 		Name = if Header then "Heading" else "Cell",
-		Size = UDim2.fromScale(1 / Columns, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
-		TextColor3 = Theme.Colors.Text,
-		TextSize = Settings.SmallText,
-		FontFace = Font.fromEnum(if Header then Enum.Font.BuilderSansBold else Enum.Font.BuilderSans),
-		TextWrapped = true,
-		RichText = true,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextYAlignment = Enum.TextYAlignment.Top,
+		Font = if Header then Enum.Font.BuilderSansBold else Enum.Font.BuilderSans,
+		Size = Settings.SmallText,
 		LayoutOrder = LayoutOrder,
-		Text = Markdown.Cell(Text),
-
-		Create "UIPadding" {
-			PaddingLeft = UDim.new(0, 8),
-			PaddingRight = UDim.new(0, 8),
-			PaddingTop = UDim.new(0, 5),
-			PaddingBottom = UDim.new(0, 5),
+		Text = function()
+			return Markdown.Cell(Text)
+		end,
+		Children = {
+			Create "UIPadding" {
+				PaddingLeft = UDim.new(0, 8),
+				PaddingRight = UDim.new(0, 8),
+				PaddingTop = UDim.new(0, 5),
+				PaddingBottom = UDim.new(0, 5),
+			},
 		},
 	}
+
+	Box.Size = UDim2.fromScale(1 / Columns, 0)
+
+	return Box
 end
 
 const function Line(Row: {string}, Columns: number, Index: number)

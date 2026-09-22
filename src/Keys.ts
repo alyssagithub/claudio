@@ -8,6 +8,7 @@ const WatchPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..",
 type ReturnPress = { at: number; shift: boolean };
 
 let LastReturn: ReturnPress | null = null;
+let LastCopy = 0;
 let Watcher: ChildProcess | null = null;
 let Ready = false;
 let Failed: string | null = null;
@@ -41,13 +42,15 @@ export function WatchReturn() {
 
     for (const Line of Lines) {
       try {
-        const Parsed = JSON.parse(Line) as Partial<ReturnPress> & { ready?: boolean };
+        const Parsed = JSON.parse(Line) as Partial<ReturnPress> & { ready?: boolean; key?: string };
 
         if (Parsed.ready === true) {
           Ready = true;
         }
 
-        if (typeof Parsed.at === "number" && typeof Parsed.shift === "boolean") {
+        if (typeof Parsed.at === "number" && Parsed.key === "copy") {
+          LastCopy = Parsed.at;
+        } else if (typeof Parsed.at === "number" && typeof Parsed.shift === "boolean") {
           LastReturn = { at: Parsed.at, shift: Parsed.shift };
         }
       } catch {
@@ -105,6 +108,7 @@ export function DescribeReturn() {
     trouble: Failed,
     at: LastReturn ? LastReturn.at : 0,
     shift: LastReturn ? LastReturn.shift : false,
+    copyAt: LastCopy,
     now: Date.now(),
   };
 }

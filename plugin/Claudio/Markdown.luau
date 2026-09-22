@@ -134,6 +134,7 @@ function Markdown.Build(Text: string, Size: number?, Accent: string?): string
 		Marked = Marked:gsub("^(%s*)[%*%-]%s+", "%1• ")
 		Marked = Marked:gsub("^&gt;%s?(.*)$", "▎ <i>%1</i>")
 		Marked = Markdown.Inline(Marked)
+		Marked = Marked:gsub("`(.-)`", `<{Mono}>%1</font>`)
 
 		if Accent then
 			Marked = Markdown.Tokens(Marked, Accent, false)

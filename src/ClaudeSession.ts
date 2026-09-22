@@ -1059,7 +1059,7 @@ function RouteMessage(Session: Session, Message: any) {
   CloseIdleSessions();
 }
 
-const Ladder = ["claude-fable-5-1", "claude-fable-5", "opus", "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "sonnet", "claude-sonnet-4-6", "haiku"];
+const Ladder = ["claude-fable-5-1", "claude-fable-5", "claude-opus-5-5", "opus", "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "sonnet", "claude-sonnet-4-6", "haiku"];
 
 export function LadderBelow(Model: string): string[] {
   const Plain = Model.replace(/\[1m\]$/, "");

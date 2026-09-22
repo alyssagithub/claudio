@@ -449,31 +449,38 @@ function ModelPicker.Menu()
 				end),
 			},
 		},
-		Create "TextLabel" {
-			Name = "Tip",
+		Create "Frame" {
+			Name = "TipAnchor",
 			Size = UDim2.new(1, 0, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			AnchorPoint = Vector2.new(0, 1),
-			Position = UDim2.new(0, 0, 0, -6),
-			BackgroundColor3 = Theme.Colors.Panel,
-			TextColor3 = Theme.Colors.DimText,
-			TextSize = Settings.SmallText,
-			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-			TextWrapped = true,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			ZIndex = 200,
-			Visible = function()
-				return Tip() ~= ""
-			end,
-			Text = Tip,
+			BackgroundTransparency = 1,
+			LayoutOrder = -1,
 
-			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-			Create "UIStroke" {Color = Theme.Colors.Button},
-			Create "UIPadding" {
-				PaddingLeft = UDim.new(0, 8),
-				PaddingRight = UDim.new(0, 8),
-				PaddingTop = UDim.new(0, 5),
-				PaddingBottom = UDim.new(0, 5),
+			Create "TextLabel" {
+				Name = "Tip",
+				Size = UDim2.new(1, 0, 0, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				AnchorPoint = Vector2.new(0, 1),
+				Position = UDim2.new(0, 0, 0, -10),
+				BackgroundColor3 = Theme.Colors.Panel,
+				TextColor3 = Theme.Colors.DimText,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				ZIndex = 200,
+				Visible = function()
+					return Tip() ~= ""
+				end,
+				Text = Tip,
+
+				Create "UICorner" {CornerRadius = UDim.new(0, 6)},
+				Create "UIStroke" {Color = Theme.Colors.Button},
+				Create "UIPadding" {
+					PaddingLeft = UDim.new(0, 8),
+					PaddingRight = UDim.new(0, 8),
+					PaddingTop = UDim.new(0, 5),
+					PaddingBottom = UDim.new(0, 5),
+				},
 			},
 		},
 	}

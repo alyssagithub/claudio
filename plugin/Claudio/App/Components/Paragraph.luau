@@ -3,404 +3,62 @@ const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Markdown = require(script.Parent.Parent.Parent.Markdown)
 const Navigate = require(script.Parent.Parent.Parent.Navigate)
-const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Theme = require(script.Parent.Parent.Theme)
+const Selectable = require(script.Parent.Selectable)
 
-const TextService = game:GetService("TextService")
-
-const Create = Vide.create
-
-const Trailing = "[%.,;:%)%]]+$"
-const Spaces: {[number]: number} = {}
-
-const function SpaceWidth(): number
-	const Size = Settings.TextSize()
-
-	if not Spaces[Size] then
-		const Room = Vector2.new(9999, 9999)
-
-		Spaces[Size] = TextService:GetTextSize("a a", Size, Enum.Font.BuilderSans, Room).X - TextService:GetTextSize("aa", Size, Enum.Font.BuilderSans, Room).X
-	end
-
-	return Spaces[Size]
-end
-
-const function Bare(Token: string): string
-	return (Token:gsub("<[^>]->", ""):gsub(Trailing, ""))
-end
-
-const function Pieces(Line: string): {string}
-	const Found: {string} = {}
-	local Current = ""
-	local Index = 1
-
-	while Index <= #Line do
-		const Letter = Line:sub(Index, Index)
-
-		if Letter == "<" then
-			const Close = Line:find(">", Index, true)
-
-			if not Close then
-				Current ..= Letter
-				Index += 1
-
-				continue
-			end
-
-			Current ..= Line:sub(Index, Close)
-			Index = Close + 1
-		elseif Letter == "`" then
-			const Close = Line:find("`", Index + 1, true)
-
-			if not Close then
-				Current ..= Letter
-				Index += 1
-
-				continue
-			end
-
-			Current ..= Line:sub(Index, Close)
-			Index = Close + 1
-		elseif Letter == " " then
-			if Current ~= "" then
-				table.insert(Found, Current)
-				Current = ""
-			end
-
-			Index += 1
-		else
-			Current ..= Letter
-			Index += 1
-		end
-	end
-
-	if Current ~= "" then
-		table.insert(Found, Current)
-	end
-
-	return Found
-end
-
-const function Split(Line: string): {string}
-	const Tokens: {string} = {}
-	const Open: {string} = {}
-
-	for _, Piece in Pieces(Line) do
-		const Prefix = table.concat(Open)
-
-		for Tag in Piece:gmatch("<(/?[^>]+)>") do
-			if Tag:sub(1, 1) == "/" then
-				table.remove(Open)
-			else
-				table.insert(Open, `<{Tag}>`)
-			end
-		end
-
-		const Suffix: {string} = {}
-
-		for Index = #Open, 1, -1 do
-			table.insert(Suffix, `</{Open[Index]:match("<(%a+)")}>`)
-		end
-
-		table.insert(Tokens, `{Prefix}{Piece}{table.concat(Suffix)}`)
-	end
-
-	return Tokens
-end
-
-const function Word(Text: string, Link: string?, LayoutOrder: number)
-	if not Link then
-		return Create "TextLabel" {
-			Name = "Word",
-			AutomaticSize = Enum.AutomaticSize.XY,
-			BackgroundTransparency = 1,
-			TextColor3 = Theme.Colors.Text,
-			TextSize = Settings.TextSize,
-			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-			RichText = true,
-			LayoutOrder = LayoutOrder,
-			Text = Text,
-		}
-	end
-
-	const Hovered = Vide.source(false)
-
-	return Create "TextButton" {
-		Name = "Link",
-		AutomaticSize = Enum.AutomaticSize.XY,
-		BackgroundColor3 = function()
-			return if Hovered() then Theme.Colors.Accent() else Theme.Colors.Button()
-		end,
-		TextColor3 = function()
-			return if Hovered() then Theme.Colors.AccentText() else Theme.Colors.ButtonText()
-		end,
-		TextSize = Settings.SmallText,
-		FontFace = Font.fromEnum(Enum.Font.Code),
-		AutoButtonColor = false,
-		LayoutOrder = LayoutOrder,
-		Text = Text,
-		Activated = function()
-			task.spawn(Navigate.Go, {Path = Link})
-		end,
-		MouseEnter = function()
-			Hovered(true)
-		end,
-		MouseLeave = function()
-			Hovered(false)
-		end,
-
-		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-		Create "UIPadding" {
-			PaddingLeft = UDim.new(0, 5),
-			PaddingRight = UDim.new(0, 5),
-			PaddingTop = UDim.new(0, 1),
-			PaddingBottom = UDim.new(0, 1),
-		},
-	}
-end
-
-const function Anchor(Label: string, Url: string, LayoutOrder: number)
-	const Hovered = Vide.source(false)
-
-	local Button: TextButton
-
-	Button = Create "TextButton" {
-		Name = "Anchor",
-		AutomaticSize = Enum.AutomaticSize.XY,
-		BackgroundTransparency = 1,
-		TextColor3 = function()
-			return if Hovered() then Theme.Colors.Text() else Theme.Colors.Accent()
-		end,
-		TextSize = Settings.TextSize,
-		FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-		RichText = true,
-		AutoButtonColor = false,
-		LayoutOrder = LayoutOrder,
-		Text = `<u>{Label}</u>`,
-		Activated = function()
-			task.spawn(Chat.Copy, Url)
-		end,
-		MouseEnter = function()
-			Hovered(true)
-
-			const Window = Chat.Window
-
-			if not Window then
-				return
-			end
-
-			const Corner = Button.AbsolutePosition - Window.AbsolutePosition
-			const Middle = Corner.X + Button.AbsoluteSize.X / 2
-
-			Chat.Tip({
-				Text = `{Url}  ·  click to copy`,
-				Where = Vector2.new(Middle, Corner.Y + Button.AbsoluteSize.Y + 4),
-				Side = if Window.AbsoluteSize.X - Middle < 90 then 1 elseif Middle < 90 then 0 else 0.5,
-				Below = true,
-			})
-		end,
-		MouseLeave = function()
-			Hovered(false)
-			Chat.Tip(nil)
-		end,
-	}
-
-	return Button
-end
-
-const function Snippet(Text: string, LayoutOrder: number)
-	return Create "TextLabel" {
-		Name = "Snippet",
-		AutomaticSize = Enum.AutomaticSize.XY,
-		BackgroundColor3 = Theme.Colors.Code,
-		TextColor3 = Theme.Colors.CodeText,
-		TextSize = Settings.SmallText,
-		FontFace = Font.fromEnum(Enum.Font.Code),
-		LayoutOrder = LayoutOrder,
-		Text = Text,
-
-		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-		Create "UIPadding" {
-			PaddingLeft = UDim.new(0, 5),
-			PaddingRight = UDim.new(0, 5),
-			PaddingTop = UDim.new(0, 1),
-			PaddingBottom = UDim.new(0, 1),
-		},
-	}
-end
-
-const function Plain(Line: string, LayoutOrder: number)
-	return Create "TextLabel" {
-		Name = "Text",
-		Size = UDim2.fromScale(1, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
-		TextColor3 = Theme.Colors.Text,
-		TextSize = Settings.TextSize,
-		FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-		TextWrapped = true,
-		RichText = true,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextYAlignment = Enum.TextYAlignment.Top,
-		LayoutOrder = LayoutOrder,
-		Text = Markdown.Rich(Line, Settings.TextSize(), Theme.Colors.Accent():ToHex()),
-	}
-end
-
-const function Mentions(Line: string, Links: {[string]: string}): boolean
-	for Path in Links do
-		if Line:find(Path, 1, true) then
-			return true
-		end
-	end
-
-	return false
-end
-
-const function Row(Line: string, LayoutOrder: number, Links: {[string]: string})
-	if not Mentions(Line, Links) and not Line:find("`", 1, true) and not Line:find("%]%(") then
-		return Plain(Line, LayoutOrder)
-	end
-
-	const Words: {Instance} = {}
-	const Anchors: {{Label: string, Url: string}} = {}
-	const Marked = Line:gsub("%[([^%]]-)%]%(([^%)%s]-)%)", function(Label: string, Url: string): string
-		table.insert(Anchors, {Label = Label, Url = Url})
-
-		return `{#Anchors}`
-	end)
-
-	for Index, Token in Split(Markdown.Rich(Marked, Settings.TextSize(), Theme.Colors.Accent():ToHex())) do
-		const Which = Token:match("^(%d+)(.*)$")
-
-		if Which and Anchors[tonumber(Which) :: number] then
-			const Found = Anchors[tonumber(Which) :: number]
-
-			table.insert(Words, (Create "Frame" {
-				Name = "Linked",
-				AutomaticSize = Enum.AutomaticSize.XY,
-				Size = UDim2.fromScale(0, 0),
-				BackgroundTransparency = 1,
-				LayoutOrder = Index,
-
-				Create "UIListLayout" {
-					FillDirection = Enum.FillDirection.Horizontal,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-				},
-				Anchor(Found.Label, Found.Url, 1),
-				Word(Token:match("^%d+(.*)$") or "", nil, 2),
-			}))
-
-			continue
-		end
-
-		const Body, Tail = Token:match("^`(.-)`(.*)$")
-
-		if Body then
-			table.insert(Words, (Create "Frame" {
-				Name = "Inline",
-				AutomaticSize = Enum.AutomaticSize.XY,
-				Size = UDim2.fromScale(0, 0),
-				BackgroundTransparency = 1,
-				LayoutOrder = Index,
-
-				Create "UIListLayout" {
-					FillDirection = Enum.FillDirection.Horizontal,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-				},
-				Snippet(Body, 1),
-				Word(Tail or "", nil, 2),
-			}))
-
-			continue
-		end
-
-		const Path = Bare(Token)
-		const Link = Links[Path]
-
-		if not Link then
-			table.insert(Words, (Word(Token, nil, Index)))
-
-			continue
-		end
-
-		const Ending = Token:match(Trailing) or ""
-
-		table.insert(Words, (Create "Frame" {
-			Name = "Mention",
-			AutomaticSize = Enum.AutomaticSize.XY,
-			Size = UDim2.fromScale(0, 0),
-			BackgroundTransparency = 1,
-			LayoutOrder = Index,
-
-			Create "UIListLayout" {
-				FillDirection = Enum.FillDirection.Horizontal,
-				VerticalAlignment = Enum.VerticalAlignment.Center,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			},
-			Word(Path, Link, 1),
-			Word(Ending, nil, 2),
-		}))
-	end
-
-	return Create "Frame" {
-		Name = "Line",
-		Size = UDim2.fromScale(1, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
-		LayoutOrder = LayoutOrder,
-
-		Create "UIListLayout" {
-			FillDirection = Enum.FillDirection.Horizontal,
-			Wraps = true,
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = function()
-				return UDim.new(0, SpaceWidth())
-			end,
-		},
-		Words,
-	}
+const function Escaped(Text: string): string
+	return (Text:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"))
 end
 
 return function(Text: () -> string, LayoutOrder: number, Live: boolean?)
-	return Create "Frame" {
+	const Links = Vide.derive(function(): {[string]: string}
+		const Found: {[string]: string} = {}
+
+		for _, Reference in (if Live then {} else Navigate.FindReferences(Text())) :: {Types.Reference} do
+			Found[(Reference.Path:gsub("^game%.", ""))] = Reference.Path
+		end
+
+		return Found
+	end)
+
+	const Urls = Vide.derive(function(): {[string]: string}
+		const Found: {[string]: string} = {}
+
+		for Label, Url in Text():gmatch("%[([^%]]-)%]%(([^%)%s]-)%)") do
+			Found[Label] = Url
+		end
+
+		return Found
+	end)
+
+	return Selectable {
 		Name = "Paragraph",
-		Size = UDim2.fromScale(1, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundTransparency = 1,
 		LayoutOrder = LayoutOrder,
+		Links = Links,
+		Urls = Urls,
+		Text = function()
+			const Accent = Theme.Colors.Accent():ToHex()
+			local Rich = Markdown.Rich(Text(), Settings.TextSize(), Accent)
+			const Paths = {}
 
-		Create "UIListLayout" {
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			HorizontalFlex = Enum.UIFlexAlignment.Fill,
-			Padding = UDim.new(0, 2),
-		},
-		Vide.indexes(function()
-			const Body = Text()
-			const Links: {[string]: string} = {}
-
-			for _, Reference in (if Live then {} else Navigate.FindReferences(Body)) :: {Types.Reference} do
-				Links[(Reference.Path:gsub("^game%.", ""))] = Reference.Path
+			for Path in Links() do
+				table.insert(Paths, Path)
 			end
 
-			const Rows: {[string]: {Line: string, Links: {[string]: string}, Order: number}} = {}
+			table.sort(Paths, function(Left, Right)
+				return #Left > #Right
+			end)
 
-			for Order, Line in string.split(Body, "\n") do
-				Rows[`{Order}|{Line}`] = {
-					Line = Line,
-					Links = Links,
-					Order = Order,
-				}
+			for Index, Path in Paths do
+				Rich = Rich:gsub(Escaped(Path), `\1{Index}\1`)
 			end
 
-			return Rows
-		end, function(Entry)
-			const Found = Entry()
+			return (Rich:gsub("\1(%d+)\1", function(Index: string): string
+				const Path = Paths[tonumber(Index) :: number]
 
-			return Row(Found.Line, Found.Order, Found.Links)
-		end),
+				return `<font color="#{Accent}"><u>{Path}</u></font>`
+			end))
+		end,
 	}
 end

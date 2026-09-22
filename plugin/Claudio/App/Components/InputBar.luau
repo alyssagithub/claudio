@@ -6,6 +6,7 @@ const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Context = require(script.Parent.Parent.Parent.Store.Context)
 const Client = require(script.Parent.Parent.Parent.Client.Client)
 const Markdown = require(script.Parent.Parent.Parent.Markdown)
+const Keys = require(script.Parent.Parent.Parent.Store.Keys)
 const Theme = require(script.Parent.Parent.Theme)
 const IconButton = require(script.Parent.IconButton)
 const Attachments = require(script.Parent.Attachments)
@@ -121,37 +122,6 @@ return function()
 
 	Vide.cleanup(Disarm)
 
-	local WantWatch = false
-	local Watching = false
-	local Syncing = false
-
-	const function Watch(On: boolean)
-		WantWatch = On
-
-		if Syncing then
-			return
-		end
-
-		Syncing = true
-
-		task.spawn(function()
-			while Watching ~= WantWatch do
-				const Wanted = WantWatch
-
-				Client.WatchKeys(Wanted)
-				Watching = Wanted
-			end
-
-			Syncing = false
-		end)
-	end
-
-	Vide.cleanup(function()
-		if Watching then
-			task.spawn(Client.WatchKeys, false)
-		end
-	end)
-
 	const function Attach(Token: string)
 		const Ok, Image = Client.GetClipboardImage(Token)
 
@@ -189,37 +159,44 @@ return function()
 		Text = Chat.Draft,
 		Focused = function()
 			Arm()
-			Watch(true)
+			Keys.Hold()
 		end,
 		FocusLost = function()
 			Disarm()
-			Watch(false)
+			Keys.Release()
 		end,
 
 		Vide.changed("Text", function(Text: string)
 			const Previous = Chat.Draft()
-			const Typed = Text:sub(-1) == "\n" and #Text == #Previous + 1
+			local Where = 0
 
-			if Typed and Settings.Get("SendWithEnter")() then
+			if #Text == #Previous + 1 then
+				for Index = 1, #Text do
+					if Text:sub(Index, Index) ~= Previous:sub(Index, Index) then
+						Where = Index
+
+						break
+					end
+				end
+			end
+
+			if Where > 0 and Text:sub(Where, Where) == "\n" and Settings.Get("SendWithEnter")() then
 				Chat.Draft(Text)
 				task.defer(function()
 					if Box.Text == Text then
-						Box.CursorPosition = #Text + 1
+						Box.CursorPosition = Where + 1
 					end
 
 					Follow()
 				end)
 				task.spawn(function()
-					const Ok, Seen = Client.LastReturn()
-					const Shifted = Ok and typeof(Seen) == "table" and Seen.watching == true and Seen.shift == true and typeof(Seen.now) == "number" and typeof(Seen.at) == "number" and Seen.now - Seen.at < 2000
-
-					if Shifted or Box.Text ~= Text then
+					if Keys.ShiftedReturn() or Box.Text ~= Text then
 						return
 					end
 
 					Chat.Draft("")
 					Box.Text = ""
-					Chat.Send(Text:sub(1, -2))
+					Chat.Send(Previous)
 				end)
 
 				return

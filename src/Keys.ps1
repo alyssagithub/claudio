@@ -29,10 +29,12 @@ public static class ReturnWatch {
         if (Code >= 0 && (Kind == (IntPtr)0x0100 || Kind == (IntPtr)0x0104)) {
             int Key = Marshal.ReadInt32(Info);
 
-            if (Key == 0x0D) {
+            bool Control = (GetAsyncKeyState(0x11) & 0x8000) != 0;
+
+            if (Key == 0x0D || (Key == 0x43 && Control)) {
                 bool Shift = (GetAsyncKeyState(0x10) & 0x8000) != 0;
 
-                Console.Out.WriteLine("{\"at\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"shift\":" + (Shift ? "true" : "false") + "}");
+                Console.Out.WriteLine("{\"at\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"shift\":" + (Shift ? "true" : "false") + ",\"key\":\"" + (Key == 0x0D ? "return" : "copy") + "\"}");
                 Console.Out.Flush();
             }
         }

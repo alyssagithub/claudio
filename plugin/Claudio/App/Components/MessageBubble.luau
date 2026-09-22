@@ -15,6 +15,7 @@ const ImageView = require(script.Parent.ImageView)
 const Paragraph = require(script.Parent.Paragraph)
 const Icon = require(script.Parent.Icon)
 const Table = require(script.Parent.Table)
+const Selectable = require(script.Parent.Selectable)
 const Chevron = require(script.Parent.Chevron)
 const IconButton = require(script.Parent.IconButton)
 const Button = require(script.Parent.Button)
@@ -180,48 +181,26 @@ return function(Props: Props)
 			end, 1000 + Value().Order, Props.Index == nil)
 		end
 
-		const function CodePadding(): UDim
-			return UDim.new(0, if IsCode() then 8 else 0)
-		end
-
-		return Create "TextLabel" {
-			Name = function()
-				return if IsCode() then "Code" else "Text"
-			end,
-			Size = UDim2.fromScale(1, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundColor3 = Theme.Colors.Code,
-			BackgroundTransparency = function()
-				return if IsCode() then 0 else 1
-			end,
-			TextColor3 = function()
-				return if IsCode() then Theme.Colors.CodeText() else Theme.Colors.Text()
-			end,
-			TextSize = Settings.TextSize,
-			FontFace = function()
-				return Font.fromEnum(if IsCode() then Enum.Font.Code else Enum.Font.BuilderSans)
-			end,
-			TextWrapped = true,
-			RichText = true,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextYAlignment = Enum.TextYAlignment.Top,
+		return Selectable {
+			Name = "Code",
+			Font = Enum.Font.Code,
+			Colour = Theme.Colors.CodeText,
+			Background = Theme.Colors.Code,
+			Transparent = false,
+			LayoutOrder = 1000 + Value().Order,
 			Text = function()
 				const Body = Value().Text
 
-				return if IsCode() then Syntax.Highlight(Body, Syntax.Language(Value().Language) or Syntax.Guess(Body)) else Markdown.Rich(Body, Settings.TextSize())
+				return Syntax.Highlight(Body, Syntax.Language(Value().Language) or Syntax.Guess(Body))
 			end,
-			LayoutOrder = 1000 + Value().Order,
-
-			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-			Create "UIPadding" {
-				PaddingLeft = CodePadding,
-				PaddingRight = CodePadding,
-				PaddingTop = function()
-					return UDim.new(0, if IsCode() then 6 else 0)
-				end,
-				PaddingBottom = function()
-					return UDim.new(0, if IsCode() then 6 else 0)
-				end,
+			Children = {
+				Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+				Create "UIPadding" {
+					PaddingLeft = UDim.new(0, 8),
+					PaddingRight = UDim.new(0, 8),
+					PaddingTop = UDim.new(0, 6),
+					PaddingBottom = UDim.new(0, 6),
+				},
 			},
 		}
 	end

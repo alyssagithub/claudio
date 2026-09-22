@@ -528,7 +528,7 @@ export function StartServer(Port: number) {
           Bypass: Body.bypass === true && !PlaytestLive(),
           Escalate: Body.escalate === true,
           Place: Body.place && typeof Body.place === "object" ? Body.place : null,
-          Folder: typeof Body.workingDirectory === "string" ? Body.workingDirectory : null,
+          Folder: (ConversationId ? ListConversations().find((Entry) => Entry.id === ConversationId)?.folder : null) || (typeof Body.workingDirectory === "string" ? Body.workingDirectory : null),
           OutputStyle: typeof Body.outputStyle === "string" ? Body.outputStyle : "default",
           StepDown: Body.stepDown !== false,
         })));

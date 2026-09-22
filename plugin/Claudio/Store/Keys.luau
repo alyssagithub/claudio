@@ -52,7 +52,7 @@ function Keys.ShiftedReturn(): boolean
 end
 
 function Keys.Clean(Rich: string): string
-	return (Rich:gsub("<[^>]->", ""):gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&amp;", "&"))
+	return (Rich:gsub("<[^>]->", ""):gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&quot;", '"'):gsub("&apos;", "'"):gsub("&amp;", "&"))
 end
 
 function Keys.CopySelection(Box: TextBox, Since: number, Spanning: string?): number

@@ -16,7 +16,7 @@ const ImageView = require(script.Parent.ImageView)
 const Paragraph = require(script.Parent.Paragraph)
 const Icon = require(script.Parent.Icon)
 const Table = require(script.Parent.Table)
-const Selectable = require(script.Parent.Selectable)
+const CodeBox = require(script.Parent.CodeBox)
 const Chevron = require(script.Parent.Chevron)
 const IconButton = require(script.Parent.IconButton)
 const Button = require(script.Parent.Button)
@@ -182,27 +182,17 @@ return function(Props: Props)
 			end, 1000 + Value().Order, Props.Index == nil)
 		end
 
-		return Selectable {
-			Name = "Code",
-			Font = Enum.Font.Code,
-			Colour = Theme.Colors.CodeText,
-			Background = Theme.Colors.Code,
-			Transparent = false,
+		return CodeBox {
+			Name = "CodeBlock",
 			LayoutOrder = 1000 + Value().Order,
 			Text = function()
+				return Value().Text
+			end,
+			Rich = function()
 				const Body = Value().Text
 
 				return Syntax.Highlight(Body, Syntax.Language(Value().Language) or Syntax.Guess(Body))
 			end,
-			Children = {
-				Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-				Create "UIPadding" {
-					PaddingLeft = UDim.new(0, 8),
-					PaddingRight = UDim.new(0, 8),
-					PaddingTop = UDim.new(0, 6),
-					PaddingBottom = UDim.new(0, 6),
-				},
-			},
 		}
 	end
 
@@ -326,38 +316,6 @@ return function(Props: Props)
 		return Found
 	end
 
-	const function CodeBlock(Name: string, Text: () -> string, Language: () -> string?, LayoutOrder: number, Small: boolean?)
-		return Create "TextLabel" {
-			Name = Name,
-			Size = UDim2.fromScale(1, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundColor3 = Theme.Colors.Code,
-			TextColor3 = Theme.Colors.CodeText,
-			TextSize = if Small then Settings.SmallText else Settings.TextSize,
-			FontFace = Font.fromEnum(Enum.Font.Code),
-			TextWrapped = true,
-			RichText = true,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextYAlignment = Enum.TextYAlignment.Top,
-			LayoutOrder = LayoutOrder,
-			Visible = function()
-				return Text() ~= ""
-			end,
-			Text = function()
-				const Body = Text()
-
-				return Syntax.Highlight(Body, Language() or Syntax.Guess(Body))
-			end,
-
-			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-			Create "UIPadding" {
-				PaddingLeft = UDim.new(0, 8),
-				PaddingRight = UDim.new(0, 8),
-				PaddingTop = UDim.new(0, 6),
-				PaddingBottom = UDim.new(0, 6),
-			},
-		}
-	end
 
 	const CodeFields: {[string]: boolean} = {
 		code = true,
@@ -622,35 +580,43 @@ return function(Props: Props)
 								return `<font color="#{Theme.Colors.DimText():ToHex()}">{Pair().Key}:</font>{Shown}`
 							end,
 						},
-						CodeBlock("Code", function()
-							return if IsCode() then Shortened(Pair().Value) else ""
-						end, function()
-							return if Pair().Key == "command" then "sh" else nil
-						end, 2, true),
+						CodeBox {
+							Name = "Code",
+							LayoutOrder = 2,
+							Small = true,
+							Visible = IsCode,
+							Text = function()
+								return Pair().Value
+							end,
+							Rich = function()
+								if not IsCode() then
+									return ""
+								end
+
+								const Body = Shortened(Pair().Value)
+
+								return Syntax.Highlight(Body, if Pair().Key == "command" then (if Value().name == "PowerShell" then "powershell" else "sh") else Syntax.Guess(Body))
+							end,
+						},
 					}
 				end),
-				Create "TextLabel" {
+				CodeBox {
 					Name = "Output",
-					Size = UDim2.fromScale(1, 0),
-					AutomaticSize = Enum.AutomaticSize.Y,
-					BackgroundTransparency = 1,
-					TextColor3 = function()
+					LayoutOrder = 1000,
+					Small = true,
+					Bare = true,
+					Colour = function()
 						return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.DimText()
 					end,
-					TextSize = Settings.SmallText,
-					FontFace = Font.fromEnum(Enum.Font.Code),
-					TextWrapped = true,
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextYAlignment = Enum.TextYAlignment.Top,
-					LayoutOrder = 1000,
 					Visible = function()
 						return Open() and Value().output ~= ""
 					end,
 					Text = function()
-						return if Open() then Shortened(Value().output) else ""
+						return Value().output
 					end,
-
-					Create "UIPadding" {PaddingTop = UDim.new(0, 2)},
+					Rich = function()
+						return if Open() then (Shortened(Value().output):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")) else ""
+					end,
 				},
 				Vide.show(function()
 					const Slot = Value().image

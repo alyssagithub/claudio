@@ -38,7 +38,7 @@ function Markdown.Inline(Text: string): string
 	local Marked = Text:gsub("%*%*%*(.-)%*%*%*", "<b><i>%1</i></b>")
 
 	Marked = Marked:gsub("%*%*(.-)%*%*", "<b>%1</b>")
-	Marked = Marked:gsub("__(.-)__", "<b>%1</b>")
+	Marked = Marked:gsub("%f[%w_]__(.-)__%f[^%w_]", "<b>%1</b>")
 	Marked = Marked:gsub("%*(.-)%*", "<i>%1</i>")
 	Marked = Marked:gsub("~~(.-)~~", "<s>%1</s>")
 	Marked = Marked:gsub("%f[%w_]_(.-)_%f[^%w_]", function(Body: string): string

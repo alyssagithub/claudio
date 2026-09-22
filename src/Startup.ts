@@ -15,13 +15,8 @@ function VisualBasicString(Value: string): string {
   return `"${Value.replace(/"/g, '""')}"`;
 }
 
-export async function InstallStartup(Port?: number | null): Promise<void> {
-  if (process.platform !== "win32") {
-    throw new Error("Startup install is only written for Windows so far.");
-  }
-
+function WriteLauncher(Port?: number | null) {
   const CliPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "bin", "claudio.js");
-
   const Chosen = Port && Port !== DefaultPort ? ` --port ${Number(Port)}` : "";
   const Command = `cmd /c ""${process.execPath}" "${CliPath}"${Chosen} >> "${LogFile}" 2>&1"`;
 
@@ -31,7 +26,14 @@ export async function InstallStartup(Port?: number | null): Promise<void> {
     `Shell.Run ${VisualBasicString(Command)}, 0, False`,
     "",
   ].join("\r\n"));
+}
 
+export async function InstallStartup(Port?: number | null): Promise<void> {
+  if (process.platform !== "win32") {
+    throw new Error("Startup install is only written for Windows so far.");
+  }
+
+  WriteLauncher(Port);
   console.log(`Installed ${LauncherPath}`);
 
   await RestartBridge(Port);
@@ -85,6 +87,16 @@ export async function StopBridge(Port?: number | null): Promise<boolean> {
 export async function RestartBridge(Port?: number | null): Promise<void> {
   if (!fs.existsSync(LauncherPath)) {
     throw new Error("Run `claudio install-startup` first.");
+  }
+
+  const Launcher = fs.readFileSync(LauncherPath, "utf8");
+  const Target = Launcher.match(/""([^"]+claudio\.js)""/);
+
+  if (!Target || !fs.existsSync(Target[1])) {
+    const Kept = Launcher.match(/--port (\d+)/);
+
+    WriteLauncher(Port || (Kept ? Number(Kept[1]) : null));
+    console.log("The startup launcher pointed at a Claudio that is no longer there, so it now points at this one.");
   }
 
   await StopBridge(Port);

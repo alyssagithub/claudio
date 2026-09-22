@@ -491,7 +491,7 @@ return function()
 				Text = function()
 					const Folder = Settings.Get("WorkingFolder")()
 
-					return if Folder == "" then "Claude runs without a folder, so it only reaches your place through the Roblox tools" else `Claude runs in {Folder}`
+					return if Folder == "" then "No folder. Claude can still work in your place, but can't read files on disk" else `Claude runs in {Folder}`
 				end,
 			},
 			Create "Frame" {
@@ -556,10 +556,10 @@ return function()
 					end
 
 					if Found.bridge and Found.bridge ~= Running then
-						return `The plugin is on {Running} and the bridge is on {Found.bridge}. Pick a version below to bring them level.`
+						return `The plugin is on {Running} and the bridge is on {Found.bridge}. Pick one below so they match.`
 					end
 
-					return `You are on {Running}. Pick another and switch to install it. Studio has to restart for it to take effect.`
+					return `You are on {Running}. Pick another version to install. It loads after you restart Studio.`
 				end,
 			},
 			Create "Frame" {

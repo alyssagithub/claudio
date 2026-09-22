@@ -3,6 +3,8 @@ const HttpService = game:GetService("HttpService")
 const Players = game:GetService("Players")
 const ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+const Token = "{{Token}}"
+
 const Link = Instance.new("RemoteEvent")
 
 Link.Name = "ClaudioPicker"
@@ -11,11 +13,11 @@ Link.Parent = ReplicatedStorage
 const function Send(Name: string, Description: string): (boolean, string)
 	const Ok, Result = pcall(function()
 		return HttpService:RequestAsync({
-			Url = `http://127.0.0.1:{script:GetAttribute("Port") or 47225}/picker`,
+			Url = `http://127.0.0.1:{tonumber("{{Port}}") or 47225}/picker`,
 			Method = "POST",
 			Headers = {
 				["Content-Type"] = "application/json",
-				["X-Claudio-Token"] = script:GetAttribute("Token") or "",
+				["X-Claudio-Token"] = Token,
 			},
 			Body = HttpService:JSONEncode({
 				name = Name:sub(1, 120),
@@ -32,7 +34,16 @@ const function Send(Name: string, Description: string): (boolean, string)
 end
 
 const function Dress(Player: Player)
-	const Gui = Player:WaitForChild("PlayerGui")
+	local Gui = Player:FindFirstChildOfClass("PlayerGui")
+
+	while not Gui and Player.Parent and Player.ChildAdded:Wait() do
+		Gui = Player:FindFirstChildOfClass("PlayerGui")
+	end
+
+	if not Gui then
+		return
+	end
+
 	const Existing = Gui:FindFirstChild("ClaudioPickerClient")
 
 	if Existing then

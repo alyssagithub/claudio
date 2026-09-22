@@ -17,7 +17,7 @@ const Definitions: {Definition} = {
 	{
 		Key = "Sound",
 		Label = "Play a sound",
-		Detail = "A Windows chime when a reply lands",
+		Detail = "Plays when Claude finishes or needs you",
 		Group = "Notifications",
 		Default = true,
 	},
@@ -38,14 +38,14 @@ const Definitions: {Definition} = {
 	{
 		Key = "StickyToast",
 		Label = "Keep the desktop notification until dismissed",
-		Detail = "Off means it goes away by itself after the seconds below",
+		Detail = "Off: it closes after the time below",
 		Group = "Notifications",
 		Default = true,
 	},
 	{
 		Key = "ToastSeconds",
-		Label = "Seconds a desktop notification stays",
-		Detail = "Only when the setting above is off",
+		Label = "Notification time (seconds)",
+		Detail = "Used when the setting above is off",
 		Group = "Notifications",
 		Default = 10,
 		Minimum = 3,
@@ -54,21 +54,21 @@ const Definitions: {Definition} = {
 	{
 		Key = "Banner",
 		Label = "Show notifications in fullscreen",
-		Detail = "Claudio draws its own banner, which Windows notifications cannot cover",
+		Detail = "Windows hides its notifications over fullscreen apps, so Claudio draws its own",
 		Group = "Notifications",
 		Default = true,
 	},
 	{
 		Key = "NotifyWhenFocused",
 		Label = "Notify even when Studio is in front",
-		Detail = "Off means only the sound plays when Studio is in front",
+		Detail = "When off, you only hear the sound while Studio is in front",
 		Group = "Notifications",
 		Default = false,
 	},
 	{
 		Key = "PlaytestPicker",
 		Label = "Pick objects in playtests",
-		Detail = "Adds a picker toolbar to playtests. Its helper script sits in ServerScriptService while this is on",
+		Detail = "Adds a picker to playtests. Puts a helper script in ServerScriptService while on",
 		Group = "Chat",
 		Default = false,
 	},
@@ -124,7 +124,7 @@ const Definitions: {Definition} = {
 	{
 		Key = "FixLint",
 		Label = "Fix script warnings automatically",
-		Detail = "After Claude edits a script, its warnings are sent back so Claude can correct them. Uses extra tokens",
+		Detail = "Claude sees warnings in scripts it edits and fixes them. Uses more of your limits",
 		Group = "Chat",
 		Default = true,
 	},
@@ -137,15 +137,15 @@ const Definitions: {Definition} = {
 	},
 	{
 		Key = "StepDown",
-		Label = "Step down a model after a safety refusal",
-		Detail = "A refusal that stops the turn is retried on the next model down, Fable to Opus, Opus 5 to Opus 4.8, and the turn carries on. The original model comes back a little later in the same turn, because refusals are often false alarms",
+		Label = "Retry on a smaller model after a refusal",
+		Detail = "Carries on with the next model down, then switches back. Refusals are often false alarms",
 		Group = "Chat",
 		Default = true,
 	},
 	{
 		Key = "OutputStyle",
 		Label = "Output style",
-		Detail = "How Claude shapes its replies, the same styles as the desktop app. Default explains as it goes, Concise keeps to results, Explanatory adds the reasoning, Learning teaches while it works, Proactive suggests what to do next",
+		Detail = "How Claude writes its replies. Same styles as the desktop app",
 		Group = "Chat",
 		Default = "Default",
 		Options = {
@@ -159,7 +159,7 @@ const Definitions: {Definition} = {
 	{
 		Key = "TranscriptView",
 		Label = "Transcript view",
-		Detail = "Thinking shows Claude's reasoning as well as every tool call. Normal shows the tools alone",
+		Detail = "Thinking also shows Claude's reasoning. Normal shows just the tool calls",
 		Group = "Appearance",
 		Default = "Normal",
 		Options = {
@@ -191,15 +191,15 @@ const Definitions: {Definition} = {
 	},
 	{
 		Key = "ExtraPrompt",
-		Label = "Send Claudio's own instructions",
-		Detail = "What Claude is told before your message. Shown below",
+		Label = "Send Claudio's instructions",
+		Detail = "The extra prompt Claude gets about Studio. Shown below",
 		Group = "Connection",
 		Default = true,
 	},
 	{
 		Key = "Port",
 		Label = "Bridge port",
-		Detail = "",
+		Detail = "Must match claudio start --port",
 		Group = "Connection",
 		Default = Config.DefaultPort,
 		Minimum = 1024,

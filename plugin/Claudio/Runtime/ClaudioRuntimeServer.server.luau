@@ -9,26 +9,31 @@ if not RunService:IsRunning() then
 	return
 end
 
-const Port = script:GetAttribute("Port") or 47225
-const Token = script:GetAttribute("Token") or ""
-const Base = `http://127.0.0.1:{Port}`
+const Token = "{{Token}}"
+const Secret = "{{Secret}}"
+const Base = `http://127.0.0.1:{tonumber("{{Port}}") or 47225}`
 
 const Remote = Instance.new("RemoteEvent")
 
 Remote.Name = "ClaudioRuntime"
 Remote.Parent = ReplicatedStorage
 
+const Asked: {[string]: Player} = {}
 const Replies = {}
 
-Remote.OnServerEvent:Connect(function(_, Id: any, Result: any)
-	if typeof(Id) == "string" then
-		Replies[Id] = if Result == nil then {error = "The client sent nothing back."} else Result
+Remote.OnServerEvent:Connect(function(Sender: Player, Id: any, Result: any)
+	if typeof(Id) ~= "string" or Asked[Id] ~= Sender then
+		return
 	end
+
+	Asked[Id] = nil
+	Replies[Id] = if Result == nil then {error = "The client sent nothing back."} else Result
 end)
 
 const function AskClient(Player: Player, Kind: string, Body: string): any
-	const Id = `{os.clock()}-{math.random(1, 1000000)}`
+	const Id = HttpService:GenerateGUID(false)
 
+	Asked[Id] = Player
 	Remote:FireClient(Player, Id, Kind, Body)
 
 	const Deadline = os.clock() + 20
@@ -39,10 +44,11 @@ const function AskClient(Player: Player, Kind: string, Body: string): any
 
 	const Answer = Replies[Id]
 
+	Asked[Id] = nil
 	Replies[Id] = nil
 
 	if Answer == nil then
-		return {error = "The client did not answer within twenty seconds. Its agent may not have loaded."}
+		return {error = "The client didn't answer within 20 seconds. Claudio's client script may not have loaded."}
 	end
 
 	return Answer
@@ -125,7 +131,7 @@ const function Run(Code: string): any
 		return Finish({error = "Claudio's plugin is not running inside this play session, so there is nothing to build the code with. Stop the playtest and start it again, and if that does not help, reinstall the plugin."})
 	end
 
-	const Payload = Making:Invoke(`return function()\n{Code}\nend`)
+	const Payload = Making:Invoke(Secret, `return function()\n{Code}\nend`)
 
 	if not Payload then
 		return Finish({error = "Claudio could not turn that code into a module to run it."})

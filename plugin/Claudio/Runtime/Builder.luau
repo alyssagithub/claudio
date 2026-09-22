@@ -3,6 +3,8 @@ const ReplicatedStorage = game:GetService("ReplicatedStorage")
 const RunService = game:GetService("RunService")
 const ServerScriptService = game:GetService("ServerScriptService")
 
+const Settings = require(script.Parent.Parent.Settings)
+
 const Name = "ClaudioBuild"
 
 const Builder = {}
@@ -19,8 +21,10 @@ function Builder.Serve()
 
 	Bindable.Name = Name
 
-	Bindable.OnInvoke = function(Source: any): any
-		if typeof(Source) ~= "string" then
+	Bindable.OnInvoke = function(Given: any, Source: any): any
+		const Secret = Settings.Get("RelayToken")()
+
+		if Secret == "" or Given ~= Secret or typeof(Source) ~= "string" then
 			return nil
 		end
 

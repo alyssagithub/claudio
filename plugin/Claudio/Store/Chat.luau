@@ -3467,7 +3467,7 @@ function Chat.Send(Text: string, Quiet: string?)
 	end
 
 	if Chat.ConversationId() == Gallery.Id then
-		Chat.Say("The design gallery is a fixture, so it cannot be replied to. Press New to start a real chat.")
+		Chat.Say("This is the design gallery, not a real chat. Press New to start one.")
 
 		return
 	end
@@ -3484,7 +3484,7 @@ function Chat.Send(Text: string, Quiet: string?)
 			if not Ok then
 				Append({
 					Role = "assistant",
-					Text = "aun is not answering right now.",
+					Text = "aun isn't answering right now. Try again in a moment.",
 				})
 
 				return
@@ -3631,7 +3631,7 @@ function Chat.Restore(Position: number)
 	if not Reached then
 		Watcher.Pause(false)
 		Chat.Restoring(false)
-		Chat.Say(`Rolled back {Steps} Studio step{if Steps == 1 then "" else "s"}, but could not reach the point this message was sent from, so the chat is unchanged. Undo history may have been trimmed.`)
+		Chat.Say(`Undid {Steps} step{if Steps == 1 then "" else "s"} but couldn't get back to this message, so the chat wasn't changed. Studio may have trimmed its undo history.`)
 
 		return
 	end
@@ -3708,7 +3708,7 @@ function Chat.ToggleChapter(Index: number, Title: string)
 	const Id = Chat.ConversationId()
 
 	if not Id then
-		Chat.Say("Send a message first. A chapter needs a saved chat to live in.")
+		Chat.Say("Send a message before pinning a chapter.")
 
 		return
 	end

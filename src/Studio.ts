@@ -16,6 +16,11 @@ export function Request(Kind: string, Input: unknown, Timeout?: number | null, R
     const Id = `job-${Counter += 1}-${Math.random().toString(36).slice(2, 8)}`;
     let Timer: NodeJS.Timeout | null = null;
 
+    if (Pending.length >= 200) {
+      Resolve({error: "Studio has 200 jobs waiting already. Check the plugin is connected, then try again."});
+      return;
+    }
+
     const Give = (Result: unknown) => {
       if (!Waiting.has(Id)) {
         return;
@@ -72,6 +77,10 @@ export function Serving(Version: string, Root: string, Tools: number): void {
 }
 
 export function Seen(Role?: string | null, Able?: boolean, Attached?: number, Plugin?: string): void {
+  if (Role && !/^(edit|server|client(-\d+)?)$/.test(Role)) {
+    return;
+  }
+
   Heard.set(Role || "edit", Date.now());
 
   if (Able !== undefined) {

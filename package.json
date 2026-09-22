@@ -35,5 +35,10 @@
     "@types/node-notifier": "^8.0.5",
     "@types/pngjs": "^6.0.5",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "node-notifier": {
+      "uuid": "^11.1.1"
+    }
   }
 }

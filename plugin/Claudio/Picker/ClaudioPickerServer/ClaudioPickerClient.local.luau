@@ -6,8 +6,8 @@ const ReplicatedStorage = game:GetService("ReplicatedStorage")
 const UserInputService = game:GetService("UserInputService")
 
 const Player = Players.LocalPlayer
-const Screen = Player:WaitForChild("PlayerGui")
-const Link = ReplicatedStorage:WaitForChild("ClaudioPicker") :: RemoteEvent
+const Screen = script:FindFirstAncestorOfClass("PlayerGui") :: PlayerGui
+const Link = ReplicatedStorage.ClaudioPicker :: RemoteEvent
 
 const Accent = Color3.fromRGB(90, 160, 255)
 const Idle = Color3.fromRGB(32, 32, 34)

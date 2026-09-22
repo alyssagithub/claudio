@@ -12,7 +12,7 @@ import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStud
 import { StudioTools } from "./Tools.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
 import { StudioProcesses } from "./StudioPresence.js";
-import { ActiveTurnFor, AddToTurn, ApplyStyleEverywhere, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { ActiveTurnFor, AddToTurn, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
@@ -177,6 +177,11 @@ function ReadBody(Request: IncomingMessage): Promise<Record<string, any>> {
 async function HandleConversations(Request: IncomingMessage, Response: ServerResponse, Segments: string[]) {
   const Id = Segments[1];
 
+  if (Id && !/^[\w-]{1,64}$/.test(Id)) {
+    SendJson(Response, 404, {error: "No such chat"});
+    return;
+  }
+
   if (Request.method === "GET" && !Id) {
     SendJson(Response, 200, {conversations: ListConversations()});
     return;
@@ -282,7 +287,7 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     const Body = await ReadBody(Request);
     const Chapters = Array.isArray(Body.chapters)
       ? Body.chapters
-        .filter((Entry) => Number.isInteger(Entry.index) && typeof Entry.title === "string")
+        .filter((Entry) => Entry && Number.isInteger(Entry.index) && typeof Entry.title === "string")
         .map((Entry) => ({
           index: Entry.index,
           title: Entry.title.slice(0, 80),
@@ -305,12 +310,13 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
   }
 
   if (Request.method === "DELETE" && Id) {
+    CloseConversation(Id);
     ForgetConversation(Id);
 
     if (DeleteConversation(Id)) {
       SendJson(Response, 200, {deleted: Id});
     } else {
-      SendJson(Response, 403, {error: "Delete this chat from the Claude desktop app instead."});
+      SendJson(Response, 404, {error: "No such chat"});
     }
     return;
   }
@@ -885,7 +891,7 @@ export function StartServer(Port: number) {
     console.log(`Claudio ${Version} from ${Root}, serving ${Tools} tools`);
 
     if (Tools < 2) {
-      console.error("No tools were built, so every Claudio tool will be missing from its sessions. This is a bug in Tools.js, not a configuration problem.");
+      console.error("No tools were built, so Claude can't reach Studio. This is a Claudio bug, please report it.");
     }
     Warm().catch(() => {});
 

@@ -156,8 +156,12 @@ export async function InstallBridge(Version: string): Promise<string> {
   const Package = await PackageFor(Version);
   const Commit = await CommitFor(Version);
 
+  if (!/^https:\/\/github\.com\/[\w.\/-]+$/.test(Package)) {
+    throw new Error(`Refusing to install from an unexpected address: ${Package}`);
+  }
+
   await new Promise<void>((Resolve, Reject) => {
-    exec(`npm install -g ${Package}`, {timeout: 300000}, (Trouble, Stdout, Stderr) => {
+    exec(`npm install -g "${Package}"`, {timeout: 300000}, (Trouble, Stdout, Stderr) => {
       if (Trouble) {
         const Said = `${Stderr || ""}${Stdout || ""}`.trim().split(/\r?\n/).slice(-3).join(" ");
 

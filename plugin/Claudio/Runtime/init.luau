@@ -14,16 +14,29 @@ const function Scripts(): (Instance?, Instance?)
 	return ServerScriptService:FindFirstChild("ClaudioRuntimeServer"), ReplicatedStorage:FindFirstChild("ClaudioRuntimeClient")
 end
 
+function Runtime.Fill(Script: Instance, Key: string)
+	const Values = {
+		Port = tostring(Settings.Get("Port")()),
+		Token = Key,
+		Secret = Settings.Get("RelayToken")(),
+	}
+
+	(Script :: any).Source = ((Script :: any).Source :: string):gsub("{{(%a+)}}", Values)
+end
+
+function Runtime.Revoke(Script: Instance)
+	const Key = ((Script :: any).Source :: string):match('const Token = "([^"]*)"')
+
+	if Key and Key ~= "" and Key ~= "{{Token}}" then
+		task.spawn(Client.RevokePlaytestKey, Key)
+	end
+end
+
 function Runtime.Remove()
 	const Server, Relay = Scripts()
 
 	if Server then
-		const Key = Server:GetAttribute("Token")
-
-		if typeof(Key) == "string" and Key ~= "" then
-			task.spawn(Client.RevokePlaytestKey, Key)
-		end
-
+		Runtime.Revoke(Server)
 		Server:Destroy()
 	end
 
@@ -60,8 +73,7 @@ function Runtime.Install()
 
 	const Server = (script :: any).ClaudioRuntimeServer:Clone()
 
-	Server:SetAttribute("Port", Settings.Get("Port")())
-	Server:SetAttribute("Token", Client.PlaytestKey() or "")
+	Runtime.Fill(Server, Client.PlaytestKey() or "")
 	Server.Disabled = false
 
 	pcall(function()
@@ -70,16 +82,16 @@ function Runtime.Install()
 
 	Server.Parent = ServerScriptService
 
-	const Client = (script :: any).ClaudioRuntimeClient:Clone()
+	const Relay = (script :: any).ClaudioRuntimeClient:Clone()
 
-	Client.Disabled = false
+	Runtime.Fill(Relay, "")
+	Relay.Disabled = false
 
 	pcall(function()
-		Client.RunContext = Enum.RunContext.Client
+		Relay.RunContext = Enum.RunContext.Client
 	end)
 
-	Client.Parent = ReplicatedStorage
-
+	Relay.Parent = ReplicatedStorage
 end
 
 return Runtime

@@ -248,15 +248,19 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
             }]};
           }
 
-          const Taken = await CaptureWindow(Input.window, Marked ? {} : {
-            x: Input.x,
-            y: Input.y,
-            width: Input.width,
-            height: Input.height,
-          }) as { error?: string; data: string; title: string; width: number; height: number };
+          let Taken: { error?: string; data: string; title: string; width: number; height: number };
 
-          if (Marked) {
-            await Reach("unmark", {});
+          try {
+            Taken = await CaptureWindow(Input.window, Marked ? {} : {
+              x: Input.x,
+              y: Input.y,
+              width: Input.width,
+              height: Input.height,
+            }) as typeof Taken;
+          } finally {
+            if (Marked) {
+              await Reach("unmark", {});
+            }
           }
 
           if (Taken.error) {
@@ -678,7 +682,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         if (!Input.path) {
           return {content: [{
             type: "text",
-            text: "Give paths to save, or path to load it under.",
+            text: "Give paths and a file to save, or a file and a path to load.",
           }]};
         }
 

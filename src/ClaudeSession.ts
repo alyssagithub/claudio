@@ -487,6 +487,23 @@ function JoinText(Existing: string, Added: string): string {
   return `${Existing}\n\n${Added}`;
 }
 
+function JobLimit(Kind: string, Timeout?: number): number | undefined {
+  if (typeof Timeout === "number" && Number.isFinite(Timeout) && Timeout > 0) {
+    return Math.min(Math.max(Timeout, 1), 1800) * 1000;
+  }
+
+  return Kind === "execute" ? 300000 : undefined;
+}
+
+function TakeLines(Session: Session, Id: string) {
+  const Lines = Session.LineCounts.get(Id) || null;
+
+  Session.LineCounts.delete(Id);
+  Session.FilesBefore.delete(Id);
+
+  return Lines;
+}
+
 function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
   if (Turn.Status !== "running" && Turn.Status !== "cancelling") {
     return;
@@ -631,16 +648,17 @@ function AskPermission(Turn: Turn, ToolName: string, Input: unknown, Options: {s
       Options.signal.addEventListener("abort", () => {
         const Index = Turn.Permissions.indexOf(Permission);
 
-        if (Index !== -1) {
-          Turn.Permissions.splice(Index, 1);
-          Publish(Turn, {});
+        if (Index === -1) {
+          return;
         }
 
+        Turn.Permissions.splice(Index, 1);
+        Publish(Turn, {});
         Resolve({
           behavior: "deny",
           message: "Cancelled.",
         });
-      });
+      }, {once: true});
     }
   });
 }
@@ -1102,7 +1120,7 @@ function RouteMessage(Session: Session, Message: any) {
           Output: CleanOutput(Call.Name, Describe(Result.content)),
           Status: Result.is_error ? "error" : "done",
           Milliseconds: Date.now() - Call.StartedAt,
-          Lines: Session.LineCounts.get(Call.Id) || null,
+          Lines: TakeLines(Session, Call.Id),
           Image: Slots.get(Call.Id) || null,
         };
       });
@@ -1397,7 +1415,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
           },
           mcpServers: {
             ...ReadMcpServers(),
-            [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions) as Promise<JobAnswer | null>, ((Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined))) as Reacher, ((Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined), Role)) as ReacherIn),
+            [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions) as Promise<JobAnswer | null>, ((Kind, Input, Timeout) => RequestStudio(Kind, Input, JobLimit(Kind, Timeout))) as Reacher, ((Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, JobLimit(Kind, Timeout), Role)) as ReacherIn),
           },
           systemPrompt: {
             type: "preset",
@@ -1486,8 +1504,8 @@ function DescribePlace(Place: {name?: string, placeId?: number, universeId?: num
   }
 
   const Said = (!Place.placeId || !Place.universeId)
-    ? `The open place is "${Place.name}". It has not been published, so it has no place id or universe id yet.`
-    : `The open place is "${Place.name}", place id ${Place.placeId}, universe id ${Place.universeId}.`;
+    ? `The open place is ${JSON.stringify(String(Place.name).replace(/\s+/g, " ").slice(0, 100))}. It has not been published, so it has no place id or universe id yet.`
+    : `The open place is ${JSON.stringify(String(Place.name).replace(/\s+/g, " ").slice(0, 100))}, place id ${Place.placeId}, universe id ${Place.universeId}.`;
 
   return `<studio_place>\n${Said}\n</studio_place>`;
 }
@@ -1711,6 +1729,20 @@ export function CancelTurn(Turn: Turn) {
     Session.Close();
     FinishTurn(Turn, "cancelled");
   });
+}
+
+export function CloseConversation(Id: string) {
+  const Session = Sessions.get(Id);
+
+  if (!Session) {
+    return;
+  }
+
+  if (Session.CurrentTurn) {
+    CancelTurn(Session.CurrentTurn);
+  }
+
+  Session.Close();
 }
 
 export function AbortAllTurns() {

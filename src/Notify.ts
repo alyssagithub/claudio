@@ -59,6 +59,7 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
   const Heading = Clean(Title, 60);
   const Detail = Clean(Body, 160);
 
+  LastShownAt = Date.now();
   execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ScriptPath], {
     windowsHide: true,
     env: {
@@ -76,10 +77,6 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
     if (Error) {
       console.error(`Notification failed: ${(Stderr || Error.message).slice(0, 300)}`);
       return;
-    }
-
-    if (!Stdout.includes("quiet")) {
-      LastShownAt = Date.now();
     }
 
     if (!Stdout.includes("toast")) {
@@ -187,15 +184,11 @@ export function WriteClipboard(Text: string): Promise<boolean> {
       return;
     }
 
-    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "Set-Clipboard -Value $env:CLAUDIO_TEXT"], {
-      windowsHide: true,
-      env: {
-        ...process.env,
-        CLAUDIO_TEXT: Text,
-      },
-    }, (Error) => {
+    const Writing = execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "[Console]::InputEncoding = [Text.Encoding]::UTF8; Set-Clipboard -Value ([Console]::In.ReadToEnd())"], {windowsHide: true}, (Error) => {
       Resolve(!Error);
     });
+
+    Writing.stdin!.end(Text, "utf8");
   });
 }
 

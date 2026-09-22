@@ -174,6 +174,8 @@ export function CaptureWindow(Title: string | null | undefined, Crop: CropBox): 
       const Line = String(Output || "").trim().split(/\r?\n/).pop() || "";
 
       if (Trouble || !Line.startsWith("OK|")) {
+        fs.rmSync(File, {force: true});
+
         if (Line.startsWith("NONE|")) {
           const Titles = Line.slice(5).split("|").filter(Boolean);
 
@@ -191,10 +193,11 @@ export function CaptureWindow(Title: string | null | undefined, Crop: CropBox): 
 
       try {
         Data = fs.readFileSync(File).toString("base64");
-        fs.unlinkSync(File);
       } catch (Error) {
         Resolve({error: `The window capture was taken but could not be read back: ${(Error as NodeJS.ErrnoException).message}`});
         return;
+      } finally {
+        fs.rmSync(File, {force: true});
       }
 
       Resolve({

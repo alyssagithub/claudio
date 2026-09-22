@@ -5,6 +5,7 @@ const HttpService = game:GetService("HttpService")
 const Vide = require(script.Parent.Packages.vide)
 const Settings = require(script.Parent.Settings)
 const Client = require(script.Parent.Client.Client)
+const Runtime = require(script.Parent.Runtime)
 
 const Picker = {
 	Active = Vide.source(false),
@@ -26,8 +27,7 @@ function Picker.Install()
 
 	const Copy = script.ClaudioPickerServer:Clone()
 
-	Copy:SetAttribute("Port", Settings.Get("Port")())
-	Copy:SetAttribute("Token", Client.PlaytestKey() or "")
+	Runtime.Fill(Copy, Client.PlaytestKey() or "")
 	Copy.Disabled = false
 	Copy.Parent = ServerScriptService
 
@@ -42,12 +42,7 @@ function Picker.Remove()
 	const Existing = ServerScriptService:FindFirstChild("ClaudioPickerServer")
 
 	if Existing then
-		const Key = Existing:GetAttribute("Token")
-
-		if typeof(Key) == "string" and Key ~= "" then
-			task.spawn(Client.RevokePlaytestKey, Key)
-		end
-
+		Runtime.Revoke(Existing)
 		Existing:Destroy()
 	end
 

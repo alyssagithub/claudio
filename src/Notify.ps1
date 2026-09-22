@@ -89,8 +89,6 @@ if (-not $IconPath -or -not (Test-Path $IconPath)) {
     if (-not (Test-Path $IconPath)) {
         New-Item -ItemType Directory -Force -Path (Split-Path $IconPath) | Out-Null
 
-        # Studio running elevated or as another user makes its path unreadable,
-        # which is no reason to lose the whole notification.
         try {
             [System.Drawing.Icon]::ExtractAssociatedIcon($Studio.Path).ToBitmap().Save($IconPath, [System.Drawing.Imaging.ImageFormat]::Png)
         } catch {

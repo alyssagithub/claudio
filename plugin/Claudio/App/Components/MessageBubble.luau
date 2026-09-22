@@ -1553,7 +1553,7 @@ return function(Props: Props)
 					return #Written() > 5
 				end,
 				Text = function()
-					return if Expanded() then "Show fewer" else `Show {#Written() - 5} more  >`
+					return if Expanded() then "Show fewer" else `Show {#Written() - 5} more`
 				end,
 				Activated = function()
 					Expanded(not Expanded())

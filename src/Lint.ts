@@ -336,7 +336,17 @@ function Parse(Text: string): Map<string, Set<string>> {
   return Joined;
 }
 
-export async function Analyze(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]) {
+let Queue: Promise<unknown> = Promise.resolve();
+
+export function Analyze(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]) {
+  const Run = Queue.then(() => AnalyzeNow(Entries, Raw, Tree));
+
+  Queue = Run.catch(() => {});
+
+  return Run;
+}
+
+async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]) {
   if (!Ready) {
     Ready = Prepare().catch((Error) => {
       console.error(`Could not prepare the Luau analyzer: ${Error.message}`);

@@ -446,6 +446,8 @@ const function CountLines(Before: string, After: string): (number, number)
 	local Row = table.create(Added + 1, 0)
 
 	for Left = Start, OldEnd do
+		Breathe()
+
 		const Next = table.create(Added + 1, 0)
 
 		for Right = Start, NewEnd do
@@ -556,6 +558,7 @@ function Watcher.Stop()
 	table.clear(Connections)
 	table.clear(Listeners)
 	table.clear(Attributes)
+	table.clear(Paths)
 	table.clear(Sources)
 	Clear(Turn)
 	Clear(Idle)

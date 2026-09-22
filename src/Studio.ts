@@ -13,26 +13,36 @@ let Counter = 0;
 export function Request(Kind: string, Input: unknown, Timeout?: number | null, Role?: string | null): Promise<unknown> {
   return new Promise<unknown>((Resolve) => {
     const Id = `job-${Counter += 1}-${Math.random().toString(36).slice(2, 8)}`;
+    let Timer: NodeJS.Timeout | null = null;
+
     const Give = (Result: unknown) => {
       if (!Waiting.has(Id)) {
         return;
       }
 
       Waiting.delete(Id);
+
+      if (Timer) {
+        clearTimeout(Timer);
+      }
+
       Resolve(Result);
     };
 
     Waiting.set(Id, Give);
     Pending.push({ Id, Kind, Input, Role: Role || "edit" });
 
-    setTimeout(() => {
+    Timer = setTimeout(() => {
       const Index = Pending.findIndex((Job) => Job.Id === Id);
 
       if (Index >= 0) {
         Pending.splice(Index, 1);
+        Give({ error: "Studio did not pick this up. Check the plugin is connected and a place is open." });
+
+        return;
       }
 
-      Give({ error: "Studio did not pick this up. Check the plugin is connected and a place is open." });
+      Give({ error: `Studio took this but did not finish within ${Math.round((Timeout || 60000) / 1000)} seconds. It may still be running, so check the place before trying it again.` });
     }, Timeout || 60000);
   });
 }

@@ -122,6 +122,15 @@ return function()
 
 	Vide.cleanup(Disarm)
 
+	local Holding = false
+
+	Vide.cleanup(function()
+		if Holding then
+			Holding = false
+			Keys.Release()
+		end
+	end)
+
 	const function Attach(Token: string)
 		const Ok, Image = Client.GetClipboardImage(Token)
 
@@ -159,11 +168,19 @@ return function()
 		Text = Chat.Draft,
 		Focused = function()
 			Arm()
-			Keys.Hold()
+
+			if not Holding then
+				Holding = true
+				Keys.Hold()
+			end
 		end,
 		FocusLost = function()
 			Disarm()
-			Keys.Release()
+
+			if Holding then
+				Holding = false
+				Keys.Release()
+			end
 		end,
 
 		Vide.changed("Text", function(Text: string)

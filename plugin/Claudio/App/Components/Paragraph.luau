@@ -25,7 +25,7 @@ return function(Text: () -> string, LayoutOrder: number, Live: boolean?)
 	const Urls = Vide.derive(function(): {[string]: string}
 		const Found: {[string]: string} = {}
 
-		for Label, Url in Text():gmatch("%[([^%]]-)%]%(([^%)%s]-)%)") do
+		for Label, Url in Text():gmatch("%[([^%]]+)%]%(([^%)%s]+)%)") do
 			Found[Label] = Url
 		end
 

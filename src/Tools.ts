@@ -352,7 +352,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         }
 
         if (Reachable && Input.action === "status") {
-          return { content: [{ type: "text", text: "A playtest is running and its session is reachable, so stop and players work." }] };
+          return { content: [{ type: "text", text: "A playtest is running, so stop and players are available." }] };
         }
 
         const Release = Input.action === "start" || Input.action === "stop" ? await QuietFlash(60) : () => {};

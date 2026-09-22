@@ -133,8 +133,7 @@ function Markdown.Build(Text: string, Size: number?, Accent: string?): string
 		end)
 		Marked = Marked:gsub("^(%s*)[%*%-]%s+", "%1• ")
 		Marked = Marked:gsub("^&gt;%s?(.*)$", "▎ <i>%1</i>")
-		Marked = Markdown.Inline(Marked)
-		Marked = Marked:gsub("`(.-)`", `<{Mono}>%1</font>`)
+		Marked = Markdown.Coded(Marked)
 
 		if Accent then
 			Marked = Markdown.Tokens(Marked, Accent, false)
@@ -146,10 +145,21 @@ function Markdown.Build(Text: string, Size: number?, Accent: string?): string
 	return table.concat(Lines, "\n")
 end
 
-function Markdown.Cell(Text: string): string
-	const Safe = Text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
+function Markdown.Coded(Text: string): string
+	const Spans: {string} = {}
+	const Held = Text:gsub("`(.-)`", function(Body: string): string
+		table.insert(Spans, Body)
 
-	return (Markdown.Inline(Safe):gsub("`(.-)`", `<{Mono}>%1</font>`))
+		return `\2{#Spans}\2`
+	end)
+
+	return (Markdown.Inline(Held):gsub("\2(%d+)\2", function(Index: string): string
+		return `<{Mono}>{Spans[tonumber(Index) :: number]}</font>`
+	end))
+end
+
+function Markdown.Cell(Text: string): string
+	return Markdown.Coded((Text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")))
 end
 
 const function IsTableRow(Line: string): boolean

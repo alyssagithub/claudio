@@ -4,7 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { exec, execFile } from "node:child_process";
+import { exec, execFile, spawn } from "node:child_process";
 import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, MostScriptsToCheck, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
@@ -18,15 +18,14 @@ import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
 import { HandToken, TokenMatches } from "./Token.js";
 import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
-import { ArmClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, ShowToast, WriteClipboard } from "./Notify.js";
+import { ArmClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, RestoreFlashing, ShowToast, WriteClipboard } from "./Notify.js";
 import { ForgetConversation, GetModels } from "./Models.js";
 import { Analyze, Warm } from "./Lint.js";
-import { RestartBridge } from "./Startup.js";
 import { DescribeReturn, StopWatchingReturn, WatchReturn } from "./Keys.js";
 
 type LoginState = {loggedIn: boolean, detail: string | null};
 
-let LastLogin: {CheckedAt: number, Known: LoginState | null, Running: Promise<LoginState> | null} = { CheckedAt: 0, Known: null, Running: null };
+const LastLogin: {CheckedAt: number, Known: LoginState | null, Running: Promise<LoginState> | null} = { CheckedAt: 0, Known: null, Running: null };
 
 function AskLogin() {
   if (LastLogin.Running) {
@@ -81,7 +80,7 @@ const LintSeen = new Map<string, {path: string, lines: string[]}[]>();
 function StartLint(Wanted: {path: string, source: string}[], Raw: boolean, Tree: {path: string, className: string}[]): string {
   const Ticket = crypto.randomUUID();
   const Run: LintRun = { Done: false, Scripts: null, Failed: null, At: Date.now() };
-  const Fingerprint = crypto.createHash("sha1").update(JSON.stringify([Raw, Wanted])).digest("hex");
+  const Fingerprint = crypto.createHash("sha1").update(JSON.stringify([Raw, Wanted, Tree])).digest("hex");
   const Remembered = LintSeen.get(Fingerprint);
 
   LintRuns.set(Ticket, Run);
@@ -208,7 +207,7 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     const Conversation = GetConversation(Id, Paging || Asked === 0 ? undefined : Asked);
 
     if (!Conversation) {
-      SendJson(Response, 404, { error: "No such conversation" });
+      SendJson(Response, 404, { error: "No such chat" });
       return;
     }
 
@@ -239,7 +238,7 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     const Value = Body.value === true;
 
     if (!SetConversationFlag(Id, Field, Value)) {
-      SendJson(Response, 404, { error: "No such conversation" });
+      SendJson(Response, 404, { error: "No such chat" });
       return;
     }
 
@@ -323,6 +322,7 @@ function WarmUsage() {
 export function StartServer(Port: number) {
   AskLogin().catch(() => {});
   RegisterToasts();
+  RestoreFlashing();
 
   process.on("uncaughtException", (Error) => {
     console.error("Unexpected error, the bridge is staying up: " + (Error && Error.stack ? Error.stack : Error));
@@ -683,10 +683,11 @@ export function StartServer(Port: number) {
           const Commit = await InstallBridge(Body.version);
           const Installed = await InstallVersion(Body.version);
 
+          const Restarter = spawn(process.execPath, [process.argv[1], "restart"], { detached: true, stdio: "ignore", windowsHide: true });
+
+          Restarter.on("error", (Error) => console.error("Could not restart onto the new version: " + Error.message));
+          Restarter.unref();
           SendJson(Response, 200, { installed: Installed, commit: Commit, restarting: true });
-          setTimeout(() => {
-            RestartBridge(Port).catch((Error) => console.error("Could not restart onto the new version: " + Error.message));
-          }, 500);
         } catch (Error) {
           SendJson(Response, 502, { error: (Error as Error).message });
         }

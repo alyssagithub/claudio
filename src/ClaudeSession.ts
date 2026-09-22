@@ -194,7 +194,7 @@ function IsAllowedTool(ToolName: string) {
   return AllowedTools.some((Pattern) => Pattern.endsWith("*") ? ToolName.startsWith(Pattern.slice(0, -1)) : ToolName === Pattern);
 }
 
-let ServerStatuses: Record<string, string> = {};
+const ServerStatuses: Record<string, string> = {};
 
 export function GetMcpServers() {
   const Configured = ReadMcpServers();
@@ -471,6 +471,13 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
 
   const Text = JoinText(Turn.CommittedText, Turn.PendingText);
 
+  if (Turn.Question) {
+    const Unanswered = Turn.Question;
+
+    Turn.Question = null;
+    Unanswered.Resolve(null);
+  }
+
   if (Turn.FallenFrom && Turn.Session && Turn.Session.Query) {
     Turn.Session.Model = Turn.FallenFrom;
     Turn.Session.Query.setModel(Turn.FallenFrom).catch(() => {});
@@ -599,6 +606,10 @@ function AskQuestion(Session: Session, Questions: Question[]) {
     if (!Turn) {
       Resolve(null);
       return;
+    }
+
+    if (Turn.Question) {
+      Turn.Question.Resolve(null);
     }
 
     Turn.Question = {

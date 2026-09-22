@@ -113,6 +113,23 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
 }
 
 const QuietPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "Quiet.ps1");
+const FlashingSaved = path.join(process.env.USERPROFILE || "", ".claudio", "flashing.txt");
+
+export function RestoreFlashing() {
+  if (process.platform !== "win32" || !fs.existsSync(FlashingSaved)) {
+    return;
+  }
+
+  const Before = fs.readFileSync(FlashingSaved, "utf8").replace(/^\uFEFF/, "").trim();
+  const Key = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced";
+  const Command = Before === "-1"
+    ? `Remove-ItemProperty -Path '${Key}' -Name TaskbarFlashing -ErrorAction SilentlyContinue`
+    : `Set-ItemProperty -Path '${Key}' -Name TaskbarFlashing -Value ${Number(Before) || 1} -Type DWord`;
+
+  execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", Command], { windowsHide: true }, () => {
+    fs.rmSync(FlashingSaved, { force: true });
+  });
+}
 
 export function QuietFlash(Seconds: number): Promise<() => void> {
   return new Promise((Resolve) => {

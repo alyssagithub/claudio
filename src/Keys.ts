@@ -27,7 +27,7 @@ export function WatchReturn() {
   Ready = false;
   Failed = null;
 
-  const Started = spawn("powershell", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", WatchPath], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  const Started = spawn("powershell", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", WatchPath], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
 
   Watcher = Started;
 

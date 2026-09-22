@@ -1063,9 +1063,9 @@ const function Layout(Input: any): any
 	const Size = Target.AbsoluteSize
 	const Lines = {`{math.floor(Size.X)}x{math.floor(Size.Y)} at {math.floor(Target.AbsolutePosition.X)}, {math.floor(Target.AbsolutePosition.Y)}`}
 
-	local Surface: Instance? = nil
-	local Hidden: string? = nil
-	local Clipped: string? = nil
+	local Surface: Instance?
+	local Hidden: string?
+	local Clipped: string?
 	local Ancestor: Instance? = Target.Parent
 
 	while Ancestor and Ancestor ~= game do
@@ -1352,7 +1352,7 @@ const function Shoot(Input: any): any
 	const AssetService = game:GetService("AssetService")
 	const Base64 = require(script.Parent.Parent.Base64)
 
-	local Captured: any = nil
+	local Captured: any
 	local Done = false
 
 	CaptureService:CaptureScreenshot(function(Content: any)
@@ -2051,7 +2051,7 @@ const function Execute(Input: any): any
 		end
 	end)
 
-	local Recording: string? = nil
+	local Recording: string?
 
 	if Input.readOnly ~= true then
 		Recording = ChangeHistoryService:TryBeginRecording("ClaudioExecute", Input.undoName or "Claudio ran a script")
@@ -2647,17 +2647,18 @@ function Chat.Flush()
 			continue
 		end
 
-		const Sent = Client.SendNow(Entry.Full, Chat.ConversationId(), Chat.RequestId, Entry.Images)
+		const Rest = table.clone(Waiting)
 
-		if not Sent then
+		table.remove(Rest, 1)
+		Chat.Queue(Rest)
+
+		if not Client.SendNow(Entry.Full, Chat.ConversationId(), Chat.RequestId, Entry.Images) then
+			const Back = table.clone(Chat.Queue() :: {Types.QueuedMessage})
+
+			table.insert(Back, 1, Entry)
+			Chat.Queue(Back)
+
 			break
-		end
-
-		const Rest = table.clone(Chat.Queue() :: {Types.QueuedMessage})
-
-		if Rest[1] == Entry then
-			table.remove(Rest, 1)
-			Chat.Queue(Rest)
 		end
 
 		DestroyImages(Entry.Previews)
@@ -2742,6 +2743,12 @@ Start = function(Entry: Types.QueuedMessage)
 
 			if not Started then
 				return "error", `Could not reach the bridge: {Turn}`, nil
+			end
+
+			if CurrentGeneration ~= Generation then
+				task.spawn(Client.CancelTurn, Turn.requestId)
+
+				return "cancelled", "", nil
 			end
 
 			Chat.RequestId = Turn.requestId

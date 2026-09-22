@@ -667,7 +667,7 @@ return function()
 					end,
 				},
 			},
-			Heading("MCP Servers", 7999),
+			Heading("MCP servers", 7999),
 			Vide.indexes(Chat.McpServers, Server),
 			Create "TextLabel" {
 				Name = "NoServers",

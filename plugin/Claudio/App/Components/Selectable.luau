@@ -24,6 +24,10 @@ export type Props = {
 }
 
 const function Spanning(Text: string, Needle: string, At: number): boolean
+	if Needle == "" then
+		return false
+	end
+
 	local From = 1
 
 	while true do
@@ -45,6 +49,7 @@ return function(Props: Props)
 	local Box: TextBox
 	local Copies = 0
 	local Focused = 0
+	local Holding = false
 
 	const function Pressed()
 		if Box.SelectionStart ~= -1 and Box.SelectionStart ~= Box.CursorPosition then
@@ -94,7 +99,11 @@ return function(Props: Props)
 
 			const Mine = Focused
 
-			Keys.Hold()
+			if not Holding then
+				Holding = true
+				Keys.Hold()
+			end
+
 			task.spawn(function()
 				while Focused == Mine and task.wait(0.15) do
 					Copies = Keys.CopySelection(Box, Copies)
@@ -103,7 +112,11 @@ return function(Props: Props)
 		end,
 		FocusLost = function()
 			Focused += 1
-			Keys.Release()
+
+			if Holding then
+				Holding = false
+				Keys.Release()
+			end
 		end,
 		InputEnded = function(Input: InputObject)
 			if Input.UserInputType == Enum.UserInputType.MouseButton1 and Box:IsFocused() then
@@ -115,7 +128,10 @@ return function(Props: Props)
 	}
 
 	Vide.cleanup(function()
-		if Focused > 0 and Box:IsFocused() then
+		Focused += 1
+
+		if Holding then
+			Holding = false
 			Keys.Release()
 		end
 	end)

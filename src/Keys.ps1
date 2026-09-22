@@ -14,6 +14,8 @@ public static class ReturnWatch {
     [DllImport("user32.dll")] private static extern IntPtr CallNextHookEx(IntPtr Handle, int Code, IntPtr Kind, IntPtr Info);
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int Key);
     [DllImport("kernel32.dll")] private static extern IntPtr GetModuleHandle(string Name);
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr Window, out uint Owner);
 
     private static Hook Kept;
 
@@ -22,7 +24,29 @@ public static class ReturnWatch {
         SetWindowsHookEx(13, Kept, GetModuleHandle(Process.GetCurrentProcess().MainModule.ModuleName), 0);
         Console.Out.WriteLine("{\"ready\":true}");
         Console.Out.Flush();
+
+        System.Threading.Thread Watch = new System.Threading.Thread(() => {
+            while (Console.In.ReadLine() != null) {
+            }
+
+            Environment.Exit(0);
+        });
+
+        Watch.IsBackground = true;
+        Watch.Start();
         Application.Run();
+    }
+
+    private static bool StudioInFront() {
+        uint Owner;
+
+        GetWindowThreadProcessId(GetForegroundWindow(), out Owner);
+
+        try {
+            return Process.GetProcessById((int)Owner).ProcessName.StartsWith("RobloxStudio");
+        } catch {
+            return false;
+        }
     }
 
     private static IntPtr Handle(int Code, IntPtr Kind, IntPtr Info) {
@@ -31,7 +55,7 @@ public static class ReturnWatch {
 
             bool Control = (GetAsyncKeyState(0x11) & 0x8000) != 0;
 
-            if (Key == 0x0D || (Key == 0x43 && Control)) {
+            if ((Key == 0x0D || (Key == 0x43 && Control)) && StudioInFront()) {
                 bool Shift = (GetAsyncKeyState(0x10) & 0x8000) != 0;
 
                 Console.Out.WriteLine("{\"at\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"shift\":" + (Shift ? "true" : "false") + ",\"key\":\"" + (Key == 0x0D ? "return" : "copy") + "\"}");

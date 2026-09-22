@@ -30,7 +30,10 @@ function Installed(): InstalledRecord | null {
 
 async function LatestCommit(): Promise<CommitRecord> {
   const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/commits/main`, {
-    headers: { "User-Agent": "claudio", "Cache-Control": "no-cache" },
+    headers: {
+      "User-Agent": "claudio",
+      "Cache-Control": "no-cache",
+    },
   });
 
   if (!Response.ok) {

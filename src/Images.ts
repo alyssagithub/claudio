@@ -7,11 +7,18 @@ function DecodeBytes(MediaType: string, Bytes: Buffer): DecodedImage | null {
   try {
     if (MediaType === "image/png") {
       const Decoded = PNG.sync.read(Bytes);
-      return { width: Decoded.width, height: Decoded.height, data: Decoded.data };
+      return {
+        width: Decoded.width,
+        height: Decoded.height,
+        data: Decoded.data,
+      };
     }
 
     if (MediaType === "image/jpeg" || MediaType === "image/jpg") {
-      return jpeg.decode(Bytes, { useTArray: true, formatAsRGBA: true });
+      return jpeg.decode(Bytes, {
+        useTArray: true,
+        formatAsRGBA: true,
+      });
     }
   } catch {
     return null;
@@ -43,7 +50,11 @@ export function DecodeImage(MediaType: string, Base64: string): SentImage | null
     }
   }
 
-  return { width: Width, height: Height, pixels: Pixels.toString("base64") };
+  return {
+    width: Width,
+    height: Height,
+    pixels: Pixels.toString("base64"),
+  };
 }
 
 export function ImagesInContent(Content: Content | undefined): Picture[] {
@@ -53,7 +64,10 @@ export function ImagesInContent(Content: Content | undefined): Picture[] {
     if (Block.type === "tool_result") {
       Images.push(...ImagesInContent(Block.content));
     } else if (Block.type === "image" && Block.source && Block.source.type === "base64") {
-      Images.push({ mediaType: Block.source.media_type, data: Block.source.data });
+      Images.push({
+        mediaType: Block.source.media_type,
+        data: Block.source.data,
+      });
     }
   }
 

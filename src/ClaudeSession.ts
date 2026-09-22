@@ -24,9 +24,16 @@ const AllowedServers = AllowedTools
 
 function ReadCommandsCache() {
   try {
-    return { ...JSON.parse(fs.readFileSync(CommandsCacheFile, "utf8")), ready: true };
+    return {
+      ...JSON.parse(fs.readFileSync(CommandsCacheFile, "utf8")),
+      ready: true,
+    };
   } catch {
-    return { slashCommands: [], skills: [], ready: false };
+    return {
+      slashCommands: [],
+      skills: [],
+      ready: false,
+    };
   }
 }
 
@@ -163,7 +170,11 @@ export function ReadMcpServers() {
         continue;
       }
 
-      Servers[Name] = { command: Definition.command, args: Definition.args || [], env: Definition.env };
+      Servers[Name] = {
+        command: Definition.command,
+        args: Definition.args || [],
+        env: Definition.env,
+      };
     }
 
     return Servers;
@@ -308,8 +319,11 @@ function RememberCommands(Init: {slash_commands?: string[], skills?: string[]}) 
   };
 
   try {
-    fs.mkdirSync(path.dirname(CommandsCacheFile), { recursive: true });
-    fs.writeFileSync(CommandsCacheFile, JSON.stringify({ slashCommands: Commands.slashCommands, skills: Commands.skills }));
+    fs.mkdirSync(path.dirname(CommandsCacheFile), {recursive: true});
+    fs.writeFileSync(CommandsCacheFile, JSON.stringify({
+      slashCommands: Commands.slashCommands,
+      skills: Commands.skills,
+    }));
   } catch {
     return;
   }
@@ -326,7 +340,10 @@ export function GetCommands() {
 
   return {
     ...Commands,
-    commands: Commands.slashCommands.map((Name: string) => ({ name: Name, description: (Described || {})[Name] || "" })),
+    commands: Commands.slashCommands.map((Name: string) => ({
+      name: Name,
+      description: (Described || {})[Name] || "",
+    })),
   };
 }
 
@@ -408,7 +425,10 @@ function AgentsOn(Model: string) {
   const Named: Record<string, unknown> = {};
 
   for (const [Name, Agent] of Object.entries(Subagents)) {
-    Named[Name] = { ...Agent, model: Model };
+    Named[Name] = {
+      ...Agent,
+      model: Model,
+    };
   }
 
   return Named;
@@ -425,7 +445,10 @@ function SubagentFor(Block: ContentBlock, Model: string) {
     return null;
   }
 
-  return { name: Asked.subagent_type, model: Model };
+  return {
+    name: Asked.subagent_type,
+    model: Model,
+  };
 }
 
 function DescribeInput(Input: unknown): string {
@@ -494,7 +517,10 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
   }
 
   for (const Permission of Turn.Permissions.splice(0)) {
-    Permission.Resolve({ behavior: "deny", message: "The turn ended before the user answered." });
+    Permission.Resolve({
+      behavior: "deny",
+      message: "The turn ended before the user answered.",
+    });
   }
 
   RecordTurnOutcome(Turn.ConversationId || "", {
@@ -505,7 +531,12 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
     Turn.Session.CurrentTurn = null;
   }
 
-  Publish(Turn, { Status, Error: Error || null, CommittedText: Text, PendingText: "" });
+  Publish(Turn, {
+    Status,
+    Error: Error || null,
+    CommittedText: Text,
+    PendingText: "",
+  });
   setTimeout(() => Turns.delete(Turn.Id), FinishedTurnLifetimeMilliseconds);
 }
 
@@ -520,9 +551,18 @@ export function AddToTurn(RequestId: string | null, ConversationId: string | nul
     Turn.Session.Send(UserMessage(Text, Images));
     Publish(Turn, {
       Parts: Turn.Parts.concat(
-        Turn.PendingThinking.trim() !== "" ? [{ kind: "thinking", text: Turn.PendingThinking }] : [],
-        Turn.PendingText.trim() !== "" ? [{ kind: "text", text: Turn.PendingText }] : [],
-        [{ kind: "user", text: StripContext(Text) }],
+        Turn.PendingThinking.trim() !== "" ? [{
+          kind: "thinking",
+          text: Turn.PendingThinking,
+        }] : [],
+        Turn.PendingText.trim() !== "" ? [{
+          kind: "text",
+          text: Turn.PendingText,
+        }] : [],
+        [{
+          kind: "user",
+          text: StripContext(Text),
+        }],
       ),
       CommittedThinking: JoinText(Turn.CommittedThinking, Turn.PendingThinking),
       CommittedText: JoinText(Turn.CommittedText, Turn.PendingText),
@@ -570,7 +610,10 @@ function AskPermission(Turn: Turn, ToolName: string, Input: unknown, Options: {s
   const Allowed = SessionAllowances.get(AllowanceKey(Turn));
 
   if (Allowed && Allowed.has(ToolName)) {
-    return Promise.resolve({ behavior: "allow", updatedInput: Input });
+    return Promise.resolve({
+      behavior: "allow",
+      updatedInput: Input,
+    });
   }
 
   return new Promise((Resolve) => {
@@ -593,7 +636,10 @@ function AskPermission(Turn: Turn, ToolName: string, Input: unknown, Options: {s
           Publish(Turn, {});
         }
 
-        Resolve({ behavior: "deny", message: "Cancelled." });
+        Resolve({
+          behavior: "deny",
+          message: "Cancelled.",
+        });
       });
     }
   });
@@ -657,20 +703,36 @@ export function AnswerPermission(Turn: Turn, PermissionId: string, Allow: boolea
 
   Publish(Turn, {});
   Permission.Resolve(Allow
-    ? { behavior: "allow", updatedInput: Permission.Input }
-    : { behavior: "deny", message: "The user declined this tool use in Claudio." });
+    ? {
+      behavior: "allow",
+      updatedInput: Permission.Input,
+    }
+    : {
+      behavior: "deny",
+      message: "The user declined this tool use in Claudio.",
+    });
   return true;
 }
 
 function UserMessage(Text: string, Images: Picture[]) {
   const Pictures = (Images || []).map((Image: Picture) => ({
     type: "image",
-    source: { type: "base64", media_type: Image.mediaType, data: Image.data },
+    source: {
+      type: "base64",
+      media_type: Image.mediaType,
+      data: Image.data,
+    },
   }));
 
   return {
     type: "user",
-    message: { role: "user", content: (Pictures as unknown[]).concat([{ type: "text", text: Text }]) },
+    message: {
+      role: "user",
+      content: (Pictures as unknown[]).concat([{
+        type: "text",
+        text: Text,
+      }]),
+    },
     parent_tool_use_id: null,
   };
 }
@@ -727,7 +789,7 @@ function RecordStep(Turn: Turn, Message: SdkMessage & {parent_tool_use_id?: stri
   }
 
   Call.Steps = (Call.Steps || []).concat(Lines).slice(-40);
-  Publish(Turn, { Calls: Turn.Calls.slice() });
+  Publish(Turn, {Calls: Turn.Calls.slice()});
 }
 
 function RouteMessage(Session: Session, Message: any) {
@@ -763,7 +825,11 @@ function RouteMessage(Session: Session, Message: any) {
 
       Session.Model = Back;
       Session.Query.setModel(Back).catch(() => {});
-      Publish(Turn, { FallenFrom: null, Model: Back, Activity: Turn.Activity.concat([`back on ${Back}`]) });
+      Publish(Turn, {
+        FallenFrom: null,
+        Model: Back,
+        Activity: Turn.Activity.concat([`back on ${Back}`]),
+      });
       console.log(`Turn ${Turn.Id}: back on ${Back}`);
     }, 45000);
 
@@ -771,7 +837,7 @@ function RouteMessage(Session: Session, Message: any) {
   }
 
   if (Turn && Message.type === "system" && Message.subtype === "model_refusal_no_fallback") {
-    Publish(Turn, { Activity: Turn.Activity.concat([`refused by ${Message.original_model || Turn.Model}${Message.api_refusal_category ? ` (${Message.api_refusal_category})` : ""}`]) });
+    Publish(Turn, {Activity: Turn.Activity.concat([`refused by ${Message.original_model || Turn.Model}${Message.api_refusal_category ? ` (${Message.api_refusal_category})` : ""}`])});
 
     return;
   }
@@ -851,7 +917,10 @@ function RouteMessage(Session: Session, Message: any) {
       AddDesktopSession(Message.session_id, Session.WorkingDirectory, StripContext(Turn.Prompt).replace(/\s+/g, " ").trim().slice(0, 60));
     }
 
-    Publish(Turn, { SessionId: Message.session_id, ConversationId: Message.session_id });
+    Publish(Turn, {
+      SessionId: Message.session_id,
+      ConversationId: Message.session_id,
+    });
     return;
   }
 
@@ -868,11 +937,17 @@ function RouteMessage(Session: Session, Message: any) {
         console.log(`Turn ${Turn.Id}: first reply text ${Turn.FirstTextAt - Turn.OpenedAt}ms after the turn started`);
       }
 
-      Publish(Turn, { PendingText: Turn.PendingText + Event.delta.text, Streamed: Turn.Streamed + Event.delta.text.length });
+      Publish(Turn, {
+        PendingText: Turn.PendingText + Event.delta.text,
+        Streamed: Turn.Streamed + Event.delta.text.length,
+      });
     }
 
     if (Event.type === "content_block_delta" && Event.delta.type === "thinking_delta") {
-      Publish(Turn, { PendingThinking: Turn.PendingThinking + Event.delta.thinking, Streamed: Turn.Streamed + Event.delta.thinking.length });
+      Publish(Turn, {
+        PendingThinking: Turn.PendingThinking + Event.delta.thinking,
+        Streamed: Turn.Streamed + Event.delta.thinking.length,
+      });
     }
 
     if (Event.type === "content_block_start" && Event.content_block && Event.content_block.type === "tool_use") {
@@ -880,9 +955,18 @@ function RouteMessage(Session: Session, Message: any) {
 
       Publish(Turn, {
         Parts: Turn.Parts.concat(
-          Turn.PendingThinking.trim() !== "" ? [{ kind: "thinking", text: Turn.PendingThinking }] : [],
-          Turn.PendingText.trim() !== "" ? [{ kind: "text", text: Turn.PendingText }] : [],
-          [{ kind: "call", id: Block.id }],
+          Turn.PendingThinking.trim() !== "" ? [{
+            kind: "thinking",
+            text: Turn.PendingThinking,
+          }] : [],
+          Turn.PendingText.trim() !== "" ? [{
+            kind: "text",
+            text: Turn.PendingText,
+          }] : [],
+          [{
+            kind: "call",
+            id: Block.id,
+          }],
         ),
         CommittedThinking: JoinText(Turn.CommittedThinking, Turn.PendingThinking),
         CommittedText: JoinText(Turn.CommittedText, Turn.PendingText),
@@ -907,7 +991,13 @@ function RouteMessage(Session: Session, Message: any) {
       const Last = Turn.Calls[Turn.Calls.length - 1];
 
       if (Last && Last.Status === "preparing") {
-        Publish(Turn, { Calls: Turn.Calls.slice(0, -1).concat([{ ...Last, Input: (Last.Input + Event.delta.partial_json).slice(0, MostCallText) }]), Streamed: Turn.Streamed + Event.delta.partial_json.length });
+        Publish(Turn, {
+          Calls: Turn.Calls.slice(0, -1).concat([{
+            ...Last,
+            Input: (Last.Input + Event.delta.partial_json).slice(0, MostCallText),
+          }]),
+          Streamed: Turn.Streamed + Event.delta.partial_json.length,
+        });
       }
     }
 
@@ -932,19 +1022,33 @@ function RouteMessage(Session: Session, Message: any) {
     const Readied = Turn.Calls.map((Call) => {
       const Block = Content.find((Candidate) => Candidate.type === "tool_use" && Candidate.id === Call.Id);
 
-      return Block && Call.Status === "preparing" ? { ...Call, Input: DescribeInput(Block.input), Status: "running" as CallStatus, StartedAt: Date.now() } : Call;
+      return Block && Call.Status === "preparing" ? {
+        ...Call,
+        Input: DescribeInput(Block.input),
+        Status: "running" as CallStatus,
+        StartedAt: Date.now(),
+      } : Call;
     });
 
     const Parts = Turn.Flushed ? [] : Content.map((Block) => {
       if (Block.type === "thinking") {
-        return { kind: "thinking", text: Block.thinking };
+        return {
+          kind: "thinking",
+          text: Block.thinking,
+        };
       }
 
       if (Block.type === "tool_use") {
-        return { kind: "call", id: Block.id };
+        return {
+          kind: "call",
+          id: Block.id,
+        };
       }
 
-      return Block.type === "text" ? { kind: "text", text: Block.text || "" } : null;
+      return Block.type === "text" ? {
+        kind: "text",
+        text: Block.text || "",
+      } : null;
     }).filter((Part) => Part && (Part.kind === "call" || (Part.text || "").trim() !== "")) as Part[];
 
     Publish(Turn, {
@@ -1008,7 +1112,10 @@ function RouteMessage(Session: Session, Message: any) {
 
     if (Notice) {
       Changes.Calls = (Changes.Calls || Turn.Calls).concat([Notice]);
-      Changes.Parts = Turn.Parts.concat([{ kind: "call", id: Notice.Id }]);
+      Changes.Parts = Turn.Parts.concat([{
+        kind: "call",
+        id: Notice.Id,
+      }]);
     }
 
     if (Object.keys(Changes).length > 0) {
@@ -1172,9 +1279,16 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
           effort: (Effort || undefined) as EffortLevel | undefined,
           cwd: TurnWorkingDirectory,
           includePartialMessages: true,
-          settings: { fastMode: FastMode === true, todoFeatureEnabled: true, outputStyle: OutputStyle },
+          settings: {
+            fastMode: FastMode === true,
+            todoFeatureEnabled: true,
+            outputStyle: OutputStyle,
+          },
           fallbackModel: StepDown && LadderBelow(Model).length > 0 ? LadderBelow(Model).join(",") : undefined,
-          thinking: { type: "adaptive", display: "summarized" },
+          thinking: {
+            type: "adaptive",
+            display: "summarized",
+          },
           permissionMode: Session.Mode as PermissionMode,
           planModeInstructions: PlanInstructions,
           agents: Session.UsingSubagents ? AgentsOn(Session.Subagent) as Record<string, AgentDefinition> : undefined,
@@ -1190,7 +1304,10 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
                 }
 
                 if ((IsAllowedTool(Asked.tool_name) || !Session.AskForTools) && !(Session.GuardTools && IsRisky(Asked.tool_name, Asked.tool_input))) {
-                  return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" } };
+                  return {hookSpecificOutput: {
+                    hookEventName: "PreToolUse",
+                    permissionDecision: "allow",
+                  }};
                 }
 
                 if (!Session.CurrentTurn) {
@@ -1232,7 +1349,10 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
 
                 Session.Place = Session.PendingPlace || Session.Place;
 
-                return { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: Context } };
+                return {hookSpecificOutput: {
+                  hookEventName: "UserPromptSubmit",
+                  additionalContext: Context,
+                }};
               }],
             }],
             PostToolUse: [{
@@ -1250,7 +1370,10 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
                   const Shown = Said.match(/ \+(\d+) -(\d+)/);
 
                   if (Shown) {
-                    Session.LineCounts.set(ToolUseId, { added: Number(Shown[1]), removed: Number(Shown[2]) });
+                    Session.LineCounts.set(ToolUseId, {
+                      added: Number(Shown[1]),
+                      removed: Number(Shown[2]),
+                    });
                   }
                 }
 
@@ -1265,12 +1388,22 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
                   return {};
                 }
 
-                return { hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: Capped } };
+                return {hookSpecificOutput: {
+                  hookEventName: "PostToolUse",
+                  updatedToolOutput: Capped,
+                }};
               }],
             }],
           },
-          mcpServers: { ...ReadMcpServers(), [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions) as Promise<JobAnswer | null>, ((Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined))) as Reacher, ((Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined), Role)) as ReacherIn) },
-          systemPrompt: { type: "preset", preset: "claude_code", append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.UsingSubagents) },
+          mcpServers: {
+            ...ReadMcpServers(),
+            [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions) as Promise<JobAnswer | null>, ((Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined))) as Reacher, ((Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, Timeout ? Math.min(Timeout, 1800) * 1000 : (Kind === "execute" ? 300000 : undefined), Role)) as ReacherIn),
+          },
+          systemPrompt: {
+            type: "preset",
+            preset: "claude_code",
+            append: ExtraPrompt === false ? "" : SystemPromptFor(Object.keys(ReadMcpServers()), Session.UsingSubagents),
+          },
         },
       });
 
@@ -1376,7 +1509,10 @@ function ApplyStyle(Session: Session, OutputStyle: string, StepDown: boolean) {
 
   const Below = LadderBelow(Session.Model);
 
-  Session.Query.applyFlagSettings({ outputStyle: OutputStyle, fallbackModel: StepDown && Below.length > 0 ? Below : null }).catch((Trouble: unknown) => {
+  Session.Query.applyFlagSettings({
+    outputStyle: OutputStyle,
+    fallbackModel: StepDown && Below.length > 0 ? Below : null,
+  }).catch((Trouble: unknown) => {
     console.error(`Could not apply the ${OutputStyle} style to ${Session.Key}: ${Trouble}`);
   });
 }
@@ -1406,12 +1542,19 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
   const Planning = Mode === "plan";
 
   if (Escalate && Auto) {
-    RecordTurnOutcome(ConversationId || "", { Failed: true, Denied: false });
+    RecordTurnOutcome(ConversationId || "", {
+      Failed: true,
+      Denied: false,
+    });
   }
 
   const Chosen = Auto
     ? ChooseModel(ConversationId || "", Text, Boolean(Images && Images.length) || Text.includes("<studio_context>"), AutoBias(Effort))
-    : { model: Model, effort: Escalate ? NextEffort(Model, Effort) : (SupportsEffort(Model, Effort) ? Effort : null), delegate: "" };
+    : {
+      model: Model,
+      effort: Escalate ? NextEffort(Model, Effort) : (SupportsEffort(Model, Effort) ? Effort : null),
+      delegate: "",
+    };
   const Turn: Turn = {
     Id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
     ConversationId,
@@ -1446,7 +1589,11 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     FallenFrom: null,
     Activity: [],
     Calls: [],
-    Usage: { Input: 0, Output: 0, Cached: 0 },
+    Usage: {
+      Input: 0,
+      Output: 0,
+      Cached: 0,
+    },
     StartedAt: Date.now(),
     Milliseconds: 0,
     Cost: 0,
@@ -1550,7 +1697,7 @@ export function CancelTurn(Turn: Turn) {
     return;
   }
 
-  Publish(Turn, { Status: "cancelling" });
+  Publish(Turn, {Status: "cancelling"});
   setTimeout(() => FinishTurn(Turn, "cancelled"), CancelGraceMilliseconds);
 
   const Session = Turn.Session;
@@ -1634,17 +1781,33 @@ export function DescribeTurn(Turn: Turn) {
     text: JoinText(Turn.CommittedText, Turn.PendingText),
     thinking: JoinText(Turn.CommittedThinking, Turn.PendingThinking),
     parts: Turn.Parts.concat(
-      Turn.PendingThinking.trim() !== "" ? [{ kind: "thinking", text: Turn.PendingThinking }] : [],
-      Turn.PendingText.trim() !== "" ? [{ kind: "text", text: Turn.PendingText }] : [],
-    ).map((Part) => (Part.kind === "call" ? { kind: "call", call: Turn.Calls.findIndex((Call) => Call.Id === Part.id) + 1 } : Part)),
+      Turn.PendingThinking.trim() !== "" ? [{
+        kind: "thinking",
+        text: Turn.PendingThinking,
+      }] : [],
+      Turn.PendingText.trim() !== "" ? [{
+        kind: "text",
+        text: Turn.PendingText,
+      }] : [],
+    ).map((Part) => (Part.kind === "call" ? {
+      kind: "call",
+      call: Turn.Calls.findIndex((Call) => Call.Id === Part.id) + 1,
+    } : Part)),
     activity: Turn.Activity,
     model: Turn.Model,
     effort: Turn.Effort,
     auto: Turn.Auto,
     imageCount: Turn.Images.length,
-    question: Turn.Question ? { id: Turn.Question.Id, questions: Turn.Question.Questions } : null,
+    question: Turn.Question ? {
+      id: Turn.Question.Id,
+      questions: Turn.Question.Questions,
+    } : null,
     permission: Turn.Permissions.length > 0
-      ? { id: Turn.Permissions[0].Id, tool: Turn.Permissions[0].ToolName, input: JSON.stringify(Turn.Permissions[0].Input).slice(0, 600) }
+      ? {
+        id: Turn.Permissions[0].Id,
+        tool: Turn.Permissions[0].ToolName,
+        input: JSON.stringify(Turn.Permissions[0].Input).slice(0, 600),
+      }
       : null,
     error: Turn.Error,
     calls: Turn.Calls.map((Call) => ({
@@ -1669,7 +1832,11 @@ export function DescribeTurn(Turn: Turn) {
     planning: Turn.Planning === true,
     compacting: Turn.Compacting === true,
     milliseconds: Turn.Milliseconds || (Turn.Status === "running" ? Date.now() - Turn.StartedAt : 0),
-    tokens: { input: Turn.Usage.Input, output: Turn.OutputShown, cached: Turn.Usage.Cached },
+    tokens: {
+      input: Turn.Usage.Input,
+      output: Turn.OutputShown,
+      cached: Turn.Usage.Cached,
+    },
     limits: GetLimits(),
     context: (Turn.Session && Turn.Session.Breakdown) || null,
     contextWindow: Turn.ContextWindow || 0,

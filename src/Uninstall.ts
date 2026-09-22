@@ -15,7 +15,10 @@ async function Remove(Target: string, Label: string, Removed: string[], Kept: st
 
   for (let Attempt = 1; Attempt <= 12; Attempt += 1) {
     try {
-      fs.rmSync(Target, { recursive: true, force: true });
+      fs.rmSync(Target, {
+        recursive: true,
+        force: true,
+      });
       Removed.push(`${Label} (${Target})`);
       return;
     } catch (Error) {
@@ -41,7 +44,7 @@ export async function RunUninstall() {
 
       try {
         await fetch(`http://127.0.0.1:${Port}/health`, {
-          headers: { "X-Claudio-Token": EnsureToken() },
+          headers: {"X-Claudio-Token": EnsureToken()},
         });
       } catch {
         break;
@@ -62,7 +65,7 @@ export async function RunUninstall() {
   }
 
   await Remove(path.join(GetPluginsFolder(), PluginFileName), "the Studio plugin", Removed, Kept);
-  fs.rmSync(path.join(GetPluginsFolder(), `${PluginFileName}.claudio-writing`), { force: true });
+  fs.rmSync(path.join(GetPluginsFolder(), `${PluginFileName}.claudio-writing`), {force: true});
   await Remove(path.join(os.homedir(), ".claudio"), "Claudio's own folder", Removed, Kept);
 
   console.log("Removed:");

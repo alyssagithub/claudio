@@ -33,19 +33,24 @@ export function Request(Kind: string, Input: unknown, Timeout?: number | null, R
 
     Waiting.set(Id, Give);
     Roles.set(Id, Role || "edit");
-    Pending.push({ Id, Kind, Input, Role: Role || "edit" });
+    Pending.push({
+      Id,
+      Kind,
+      Input,
+      Role: Role || "edit",
+    });
 
     Timer = setTimeout(() => {
       const Index = Pending.findIndex((Job) => Job.Id === Id);
 
       if (Index >= 0) {
         Pending.splice(Index, 1);
-        Give({ error: "Studio did not pick this up. Check the plugin is connected and a place is open." });
+        Give({error: "Studio did not pick this up. Check the plugin is connected and a place is open."});
 
         return;
       }
 
-      Give({ error: `Studio took this but did not finish within ${Math.round((Timeout || 60000) / 1000)} seconds. It may still be running, so check the place before trying it again.` });
+      Give({error: `Studio took this but did not finish within ${Math.round((Timeout || 60000) / 1000)} seconds. It may still be running, so check the place before trying it again.`});
     }, Timeout || 60000);
   });
 }
@@ -95,7 +100,11 @@ export function Take(Role?: string | null, Able?: boolean, Attached?: number, Pl
 
   const [Job] = Pending.splice(At, 1) as [Job];
 
-  return { id: Job.Id, kind: Job.Kind, input: Job.Input };
+  return {
+    id: Job.Id,
+    kind: Job.Kind,
+    input: Job.Input,
+  };
 }
 
 export function Presence() {

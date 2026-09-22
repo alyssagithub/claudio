@@ -25,7 +25,11 @@ import { DescribeReturn, StopWatchingReturn, WatchReturn } from "./Keys.js";
 
 type LoginState = {loggedIn: boolean, detail: string | null};
 
-const LastLogin: {CheckedAt: number, Known: LoginState | null, Running: Promise<LoginState> | null} = { CheckedAt: 0, Known: null, Running: null };
+const LastLogin: {CheckedAt: number, Known: LoginState | null, Running: Promise<LoginState> | null} = {
+  CheckedAt: 0,
+  Known: null,
+  Running: null,
+};
 
 function AskLogin() {
   if (LastLogin.Running) {
@@ -34,17 +38,26 @@ function AskLogin() {
 
   LastLogin.CheckedAt = Date.now();
   LastLogin.Running = new Promise<LoginState>((Resolve) => {
-    exec("claude auth status", { timeout: 15000 }, (Error, Stdout) => {
+    exec("claude auth status", {timeout: 15000}, (Error, Stdout) => {
       if (Error) {
-        Resolve({ loggedIn: false, detail: Error.message });
+        Resolve({
+          loggedIn: false,
+          detail: Error.message,
+        });
         return;
       }
 
       try {
         const Status = JSON.parse(Stdout) as {loggedIn?: unknown, authMethod?: string};
-        Resolve({ loggedIn: Boolean(Status.loggedIn), detail: Status.authMethod || null });
+        Resolve({
+          loggedIn: Boolean(Status.loggedIn),
+          detail: Status.authMethod || null,
+        });
       } catch {
-        Resolve({ loggedIn: /logged in/i.test(Stdout), detail: Stdout.trim() });
+        Resolve({
+          loggedIn: /logged in/i.test(Stdout),
+          detail: Stdout.trim(),
+        });
       }
     });
   }).then((Found) => {
@@ -79,7 +92,12 @@ const LintSeen = new Map<string, {path: string, lines: string[]}[]>();
 
 function StartLint(Wanted: {path: string, source: string}[], Raw: boolean, Tree: {path: string, className: string}[]): string {
   const Ticket = crypto.randomUUID();
-  const Run: LintRun = { Done: false, Scripts: null, Failed: null, At: Date.now() };
+  const Run: LintRun = {
+    Done: false,
+    Scripts: null,
+    Failed: null,
+    At: Date.now(),
+  };
   const Fingerprint = crypto.createHash("sha1").update(JSON.stringify([Raw, Wanted, Tree])).digest("hex");
   const Remembered = LintSeen.get(Fingerprint);
 
@@ -122,7 +140,7 @@ function StartLint(Wanted: {path: string, source: string}[], Raw: boolean, Tree:
 }
 
 function SendJson(Response: ServerResponse, StatusCode: number, Body: unknown) {
-  Response.writeHead(StatusCode, { "Content-Type": "application/json" });
+  Response.writeHead(StatusCode, {"Content-Type": "application/json"});
   Response.end(JSON.stringify(Body));
 }
 
@@ -160,7 +178,7 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
   const Id = Segments[1];
 
   if (Request.method === "GET" && !Id) {
-    SendJson(Response, 200, { conversations: ListConversations() });
+    SendJson(Response, 200, {conversations: ListConversations()});
     return;
   }
 
@@ -169,12 +187,15 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     const Folder = typeof Body.folder === "string" ? Body.folder.trim() : "";
 
     if (Folder === "") {
-      SendJson(Response, 400, { error: "A folder is needed" });
+      SendJson(Response, 400, {error: "A folder is needed"});
       return;
     }
 
     SetFolderHidden(Folder, Body.value === true);
-    SendJson(Response, 200, { folder: Folder, hidden: Body.value === true });
+    SendJson(Response, 200, {
+      folder: Folder,
+      hidden: Body.value === true,
+    });
     return;
   }
 
@@ -182,7 +203,7 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     const Image = GetConversationImage(Id, Number(Segments[3]));
 
     if (!Image) {
-      SendJson(Response, 404, { error: "No such image" });
+      SendJson(Response, 404, {error: "No such image"});
       return;
     }
 
@@ -191,12 +212,12 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
   }
 
   if (Request.method === "GET" && Id && Segments[2] === "exists") {
-    SendJson(Response, 200, { exists: ConversationExists(Id) });
+    SendJson(Response, 200, {exists: ConversationExists(Id)});
     return;
   }
 
   if (Request.method === "GET" && Id && Segments[2] === "chapters") {
-    SendJson(Response, 200, { chapters: GetChapters(Id) });
+    SendJson(Response, 200, {chapters: GetChapters(Id)});
     return;
   }
 
@@ -207,7 +228,7 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     const Conversation = GetConversation(Id, Paging || Asked === 0 ? undefined : Asked);
 
     if (!Conversation) {
-      SendJson(Response, 404, { error: "No such chat" });
+      SendJson(Response, 404, {error: "No such chat"});
       return;
     }
 
@@ -215,7 +236,12 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     const Before = Number(Query.get("before")) || Total;
     const First = Asked > 0 ? Math.max(0, Before - Asked) : 0;
 
-    SendJson(Response, 200, { ...Conversation, messages: Conversation.messages.slice(First, Before), total: Total, first: First + 1 });
+    SendJson(Response, 200, {
+      ...Conversation,
+      messages: Conversation.messages.slice(First, Before),
+      total: Total,
+      first: First + 1,
+    });
     return;
   }
 
@@ -224,11 +250,14 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     const Title = typeof Body.title === "string" ? Body.title.trim() : "";
 
     if (Title === "" || Title.length > 120) {
-      SendJson(Response, 400, { error: "A chat name has to be between 1 and 120 characters." });
+      SendJson(Response, 400, {error: "A chat name has to be between 1 and 120 characters."});
       return;
     }
 
-    SendJson(Response, RenameConversation(Id, Title) ? 200 : 404, { id: Id, title: Title });
+    SendJson(Response, RenameConversation(Id, Title) ? 200 : 404, {
+      id: Id,
+      title: Title,
+    });
     return;
   }
 
@@ -238,11 +267,14 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     const Value = Body.value === true;
 
     if (!SetConversationFlag(Id, Field, Value)) {
-      SendJson(Response, 404, { error: "No such chat" });
+      SendJson(Response, 404, {error: "No such chat"});
       return;
     }
 
-    SendJson(Response, 200, { id: Id, [Segments[2]]: Value });
+    SendJson(Response, 200, {
+      id: Id,
+      [Segments[2]]: Value,
+    });
     return;
   }
 
@@ -251,19 +283,22 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     const Chapters = Array.isArray(Body.chapters)
       ? Body.chapters
         .filter((Entry) => Number.isInteger(Entry.index) && typeof Entry.title === "string")
-        .map((Entry) => ({ index: Entry.index, title: Entry.title.slice(0, 80) }))
+        .map((Entry) => ({
+          index: Entry.index,
+          title: Entry.title.slice(0, 80),
+        }))
         .slice(0, 100)
       : [];
 
-    SendJson(Response, 200, { chapters: SetChapters(Id, Chapters) });
+    SendJson(Response, 200, {chapters: SetChapters(Id, Chapters)});
     return;
   }
 
   if (Request.method === "POST" && Id && Segments[2] === "fork") {
     try {
-      SendJson(Response, 200, { id: await ForkConversation(Id) });
+      SendJson(Response, 200, {id: await ForkConversation(Id)});
     } catch (Error) {
-      SendJson(Response, 500, { error: `Could not fork this chat: ${(Error as Error).message}` });
+      SendJson(Response, 500, {error: `Could not fork this chat: ${(Error as Error).message}`});
     }
 
     return;
@@ -273,20 +308,23 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     ForgetConversation(Id);
 
     if (DeleteConversation(Id)) {
-      SendJson(Response, 200, { deleted: Id });
+      SendJson(Response, 200, {deleted: Id});
     } else {
-      SendJson(Response, 403, { error: "Delete this chat from the Claude desktop app instead." });
+      SendJson(Response, 403, {error: "Delete this chat from the Claude desktop app instead."});
     }
     return;
   }
 
-  SendJson(Response, 404, { error: "Not found" });
+  SendJson(Response, 404, {error: "Not found"});
 }
 
 let Armed = false;
 let Picks: {name: string, description: string, at: number}[] = [];
 
-let Picking: {Busy: boolean, Path: string | null} = { Busy: false, Path: null };
+let Picking: {Busy: boolean, Path: string | null} = {
+  Busy: false,
+  Path: null,
+};
 
 function BrowseForFolder() {
   if (Picking.Busy || process.platform !== "win32") {
@@ -295,9 +333,15 @@ function BrowseForFolder() {
 
   const Script = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "PickFolder.ps1");
 
-  Picking = { Busy: true, Path: null };
-  execFile("powershell.exe", ["-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File", Script], { timeout: 600000 }, (Error, Stdout) => {
-    Picking = { Busy: false, Path: Error ? null : String(Stdout || "").trim() };
+  Picking = {
+    Busy: true,
+    Path: null,
+  };
+  execFile("powershell.exe", ["-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File", Script], {timeout: 600000}, (Error, Stdout) => {
+    Picking = {
+      Busy: false,
+      Path: Error ? null : String(Stdout || "").trim(),
+    };
   });
 
   return true;
@@ -339,7 +383,7 @@ export function StartServer(Port: number) {
 
     try {
       if (Request.headers.origin !== undefined) {
-        SendJson(Response, 403, { error: "Browser requests are not accepted" });
+        SendJson(Response, 403, {error: "Browser requests are not accepted"});
         return;
       }
 
@@ -348,18 +392,18 @@ export function StartServer(Port: number) {
       const Role = Url.searchParams.get("role") || "";
 
       if (!TokenMatches(Offered) && !(FromPlaytest && ((Url.pathname === "/studio/job" && (Request.method === "POST" || Role === "server" || Role === "client")) || Url.pathname === "/picker"))) {
-        SendJson(Response, 401, { error: "This request did not come from the Claudio plugin" });
+        SendJson(Response, 401, {error: "This request did not come from the Claudio plugin"});
         return;
       }
 
       if (Request.method === "POST" && Url.pathname === "/playtest/key") {
-        SendJson(Response, 200, { key: IssuePlaytestKey() });
+        SendJson(Response, 200, {key: IssuePlaytestKey()});
         return;
       }
 
       if (Request.method === "POST" && Url.pathname === "/playtest/revoke") {
         RevokePlaytestKey((await ReadBody(Request)).key);
-        SendJson(Response, 200, { revoked: true });
+        SendJson(Response, 200, {revoked: true});
         return;
       }
 
@@ -392,7 +436,7 @@ export function StartServer(Port: number) {
           Seconds: typeof Body.seconds === "number" && Body.seconds > 0 ? Math.min(Body.seconds, 600) : 0,
         });
 
-        SendJson(Response, 200, { shown: Shown });
+        SendJson(Response, 200, {shown: Shown});
         return;
       }
 
@@ -400,7 +444,7 @@ export function StartServer(Port: number) {
         const Body = await ReadBody(Request);
 
         ApplyStyleEverywhere(typeof Body.outputStyle === "string" ? Body.outputStyle : "default", Body.stepDown !== false);
-        SendJson(Response, 200, { applied: true });
+        SendJson(Response, 200, {applied: true});
         return;
       }
 
@@ -423,7 +467,7 @@ export function StartServer(Port: number) {
       }
 
       if (Request.method === "POST" && Url.pathname === "/quit") {
-        SendJson(Response, 200, { quitting: true });
+        SendJson(Response, 200, {quitting: true});
         StopWatchingReturn(true);
         AbortAllTurns();
         setTimeout(() => process.exit(0), 500);
@@ -439,7 +483,7 @@ export function StartServer(Port: number) {
         const Body = await ReadBody(Request);
 
         if (typeof Body.text !== "string" || Body.text.trim() === "") {
-          SendJson(Response, 400, { error: "text is required" });
+          SendJson(Response, 400, {error: "text is required"});
           return;
         }
 
@@ -452,7 +496,7 @@ export function StartServer(Port: number) {
           const Joined = Body.now === true ? AddToTurn(typeof Body.requestId === "string" ? Body.requestId : null, ConversationId, Body.text, Pictures) : null;
 
           if (!Joined) {
-            SendJson(Response, 409, { error: "That chat is still answering. Stop it first." });
+            SendJson(Response, 409, {error: "That chat is still answering. Stop it first."});
             return;
           }
 
@@ -486,7 +530,10 @@ export function StartServer(Port: number) {
       }
 
       if (Request.method === "GET" && Url.pathname === "/studio/presence") {
-        SendJson(Response, 200, { ...StudioPresence(), processes: await StudioProcesses() });
+        SendJson(Response, 200, {
+          ...StudioPresence(),
+          processes: await StudioProcesses(),
+        });
         return;
       }
 
@@ -506,14 +553,14 @@ export function StartServer(Port: number) {
           const Attached = Url.searchParams.get("clients");
           const Plugin = Url.searchParams.get("plugin");
 
-          SendJson(Response, 200, { job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true", Attached === null ? undefined : Number(Attached), Plugin || undefined) });
+          SendJson(Response, 200, {job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true", Attached === null ? undefined : Number(Attached), Plugin || undefined)});
           return;
         }
 
         if (Request.method === "POST") {
           const Done = await ReadBody(Request);
 
-          SendJson(Response, DeliverStudio(Done.id, Done.result, FromPlaytest) ? 200 : 409, { ok: true });
+          SendJson(Response, DeliverStudio(Done.id, Done.result, FromPlaytest) ? 200 : 409, {ok: true});
           return;
         }
       }
@@ -525,13 +572,13 @@ export function StartServer(Port: number) {
         const Tree = (Array.isArray(Body.tree) ? Body.tree : []).filter((Entry: {path?: unknown, className?: unknown}) => Entry && typeof Entry.path === "string" && typeof Entry.className === "string").slice(0, 20000);
 
         if (Wanted.length > MostScriptsToCheck) {
-          SendJson(Response, 413, { error: `${Wanted.length} scripts is more than the analyzer will check in one run. Narrow it with paths.` });
+          SendJson(Response, 413, {error: `${Wanted.length} scripts is more than the analyzer will check in one run. Narrow it with paths.`});
           return;
         }
 
         const Ticket = StartLint(Wanted, Body.raw === true, Tree);
 
-        SendJson(Response, 200, { ticket: Ticket });
+        SendJson(Response, 200, {ticket: Ticket});
         return;
       }
 
@@ -539,23 +586,23 @@ export function StartServer(Port: number) {
         const Run = LintRuns.get(Segments[1]);
 
         if (!Run) {
-          SendJson(Response, 404, { error: "No such lint" });
+          SendJson(Response, 404, {error: "No such lint"});
           return;
         }
 
         if (!Run.Done) {
-          SendJson(Response, 200, { running: true });
+          SendJson(Response, 200, {running: true});
           return;
         }
 
         LintRuns.delete(Segments[1]);
 
         if (Run.Failed || Run.Scripts === null) {
-          SendJson(Response, 500, { error: Run.Failed || "The analyzer did not produce trustworthy output, so nothing was checked." });
+          SendJson(Response, 500, {error: Run.Failed || "The analyzer did not produce trustworthy output, so nothing was checked."});
           return;
         }
 
-        SendJson(Response, 200, { scripts: Run.Scripts });
+        SendJson(Response, 200, {scripts: Run.Scripts});
         return;
       }
 
@@ -563,7 +610,7 @@ export function StartServer(Port: number) {
         try {
           SendJson(Response, 200, await AvatarFor(AunId));
         } catch (Failure) {
-          SendJson(Response, 502, { error: (Failure as Error).message });
+          SendJson(Response, 502, {error: (Failure as Error).message});
         }
 
         return;
@@ -573,7 +620,7 @@ export function StartServer(Port: number) {
         const Body = await ReadBody(Request);
         const Decoded = typeof Body.data === "string" ? DecodeImage(Body.mediaType || "image/png", Body.data) : null;
 
-        SendJson(Response, Decoded ? 200 : 400, Decoded || { error: "Could not decode that image" });
+        SendJson(Response, Decoded ? 200 : 400, Decoded || {error: "Could not decode that image"});
         return;
       }
 
@@ -582,7 +629,7 @@ export function StartServer(Port: number) {
         const Marker = typeof Body.marker === "string" ? Body.marker.slice(0, 64) : "";
         const Outcome = Url.pathname === "/clipboard/arm" ? await ArmClipboard(Marker) : await DisarmClipboard(Marker);
 
-        SendJson(Response, 200, { outcome: Outcome });
+        SendJson(Response, 200, {outcome: Outcome});
         return;
       }
 
@@ -590,11 +637,11 @@ export function StartServer(Port: number) {
         const Body = await ReadBody(Request);
 
         if (typeof Body.text !== "string" || Body.text === "") {
-          SendJson(Response, 400, { error: "text is required" });
+          SendJson(Response, 400, {error: "text is required"});
           return;
         }
 
-        SendJson(Response, 200, { copied: await WriteClipboard(Body.text) });
+        SendJson(Response, 200, {copied: await WriteClipboard(Body.text)});
         return;
       }
 
@@ -603,7 +650,11 @@ export function StartServer(Port: number) {
           const Body = await ReadBody(Request);
 
           if (typeof Body.name === "string" && typeof Body.description === "string") {
-            Picks.push({ name: Body.name.slice(0, 120), description: Body.description.slice(0, 8000), at: Date.now() });
+            Picks.push({
+              name: Body.name.slice(0, 120),
+              description: Body.description.slice(0, 8000),
+              at: Date.now(),
+            });
             Picks = Picks.slice(-20);
           } else {
             Armed = Body.armed === true;
@@ -619,19 +670,25 @@ export function StartServer(Port: number) {
           Picks = [];
         }
 
-        SendJson(Response, 200, { armed: Armed, picks: Waiting });
+        SendJson(Response, 200, {
+          armed: Armed,
+          picks: Waiting,
+        });
         return;
       }
 
       if (Request.method === "GET" && Url.pathname === "/clipboard") {
         const Image = await ReadClipboardImage(Url.searchParams.get("marker") || "");
 
-        SendJson(Response, 200, Image || { data: null, id: null });
+        SendJson(Response, 200, Image || {
+          data: null,
+          id: null,
+        });
         return;
       }
 
       if (Request.method === "GET" && Url.pathname === "/mcp") {
-        SendJson(Response, 200, { servers: GetMcpServers() });
+        SendJson(Response, 200, {servers: GetMcpServers()});
         return;
       }
 
@@ -639,17 +696,24 @@ export function StartServer(Port: number) {
         const For = Url.searchParams.get("conversationId");
         const Asked = await PollUsage(For);
 
-        SendJson(Response, 200, { asked: Asked, limits: GetLimits(), context: GetBreakdown(For) });
+        SendJson(Response, 200, {
+          asked: Asked,
+          limits: GetLimits(),
+          context: GetBreakdown(For),
+        });
         return;
       }
 
       if (Request.method === "POST" && Url.pathname === "/folder/browse") {
-        SendJson(Response, 200, { started: BrowseForFolder() });
+        SendJson(Response, 200, {started: BrowseForFolder()});
         return;
       }
 
       if (Request.method === "GET" && Url.pathname === "/folder/browse") {
-        SendJson(Response, 200, { pending: Picking.Busy, path: Picking.Path || "" });
+        SendJson(Response, 200, {
+          pending: Picking.Busy,
+          path: Picking.Path || "",
+        });
         return;
       }
 
@@ -663,7 +727,7 @@ export function StartServer(Port: number) {
           Usable = false;
         }
 
-        SendJson(Response, 200, { usable: Usable });
+        SendJson(Response, 200, {usable: Usable});
         return;
       }
 
@@ -690,7 +754,7 @@ export function StartServer(Port: number) {
         const Body = await ReadBody(Request);
 
         if (typeof Body.version !== "string" || !/^[0-9.]+$/.test(Body.version)) {
-          SendJson(Response, 400, { error: "A version looks like 1.0.0" });
+          SendJson(Response, 400, {error: "A version looks like 1.0.0"});
           return;
         }
 
@@ -698,20 +762,28 @@ export function StartServer(Port: number) {
           const Commit = await InstallBridge(Body.version);
           const Installed = await InstallVersion(Body.version);
 
-          const Restarter = spawn(process.execPath, [process.argv[1], "restart"], { detached: true, stdio: "ignore", windowsHide: true });
+          const Restarter = spawn(process.execPath, [process.argv[1], "restart"], {
+            detached: true,
+            stdio: "ignore",
+            windowsHide: true,
+          });
 
           Restarter.on("error", (Error) => console.error("Could not restart onto the new version: " + Error.message));
           Restarter.unref();
-          SendJson(Response, 200, { installed: Installed, commit: Commit, restarting: true });
+          SendJson(Response, 200, {
+            installed: Installed,
+            commit: Commit,
+            restarting: true,
+          });
         } catch (Error) {
-          SendJson(Response, 502, { error: (Error as Error).message });
+          SendJson(Response, 502, {error: (Error as Error).message});
         }
 
         return;
       }
 
       if (Request.method === "GET" && Url.pathname === "/models") {
-        SendJson(Response, 200, { models: GetModels() });
+        SendJson(Response, 200, {models: GetModels()});
         return;
       }
 
@@ -724,7 +796,10 @@ export function StartServer(Port: number) {
         const Wanted = Url.searchParams.get("conversation") || "";
         const Turn = ActiveTurnFor(Wanted);
 
-        SendJson(Response, 200, { turn: Turn ? DescribeTurn(Turn) : null, endedAt: LastEndedAt(Wanted) });
+        SendJson(Response, 200, {
+          turn: Turn ? DescribeTurn(Turn) : null,
+          endedAt: LastEndedAt(Wanted),
+        });
         return;
       }
 
@@ -732,7 +807,7 @@ export function StartServer(Port: number) {
         const Turn = GetTurn(Segments[1]);
 
         if (!Turn) {
-          SendJson(Response, 404, { error: "No such turn" });
+          SendJson(Response, 404, {error: "No such turn"});
           return;
         }
 
@@ -756,7 +831,7 @@ export function StartServer(Port: number) {
           const Image = Turn.Images[Wanted - 1];
 
           if (!Image) {
-            SendJson(Response, 404, { error: "No such image" });
+            SendJson(Response, 404, {error: "No such image"});
             return;
           }
 
@@ -778,9 +853,9 @@ export function StartServer(Port: number) {
         }
       }
 
-      SendJson(Response, 404, { error: "Not found" });
+      SendJson(Response, 404, {error: "Not found"});
     } catch (Error) {
-      SendJson(Response, 500, { error: (Error as Error).message });
+      SendJson(Response, 500, {error: (Error as Error).message});
     }
   });
 
@@ -797,7 +872,12 @@ export function StartServer(Port: number) {
     const Reached = HandToken();
 
     const Root = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
-    const Tools = StudioTools({ Reach: (async () => ({})) as Reacher, ReachIn: (async () => ({})) as ReacherIn, Presence: async () => "", RuntimeLive: async () => false }).length + 1;
+    const Tools = StudioTools({
+      Reach: (async () => ({})) as Reacher,
+      ReachIn: (async () => ({})) as ReacherIn,
+      Presence: async () => "",
+      RuntimeLive: async () => false,
+    }).length + 1;
 
     Serving(Version, Root, Tools);
 

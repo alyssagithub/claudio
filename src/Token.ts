@@ -8,8 +8,8 @@ let Current: string | null = null;
 
 function Remember(Value: string): boolean {
   try {
-    fs.mkdirSync(path.dirname(TokenFile), { recursive: true });
-    fs.writeFileSync(TokenFile, JSON.stringify({ token: Value }, null, 2), { mode: 0o600 });
+    fs.mkdirSync(path.dirname(TokenFile), {recursive: true});
+    fs.writeFileSync(TokenFile, JSON.stringify({token: Value}, null, 2), {mode: 0o600});
 
     return true;
   } catch (Error) {

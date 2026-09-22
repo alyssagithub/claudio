@@ -25,7 +25,10 @@ type GitHubRelease = {
   assets?: GitHubAsset[];
 };
 
-let Releases: { At: number; List: ReleaseEntry[] } = { At: 0, List: [] };
+let Releases: { At: number; List: ReleaseEntry[] } = {
+  At: 0,
+  List: [],
+};
 
 export function LooksLikeVersion(Text: unknown): Text is string {
   return typeof Text === "string" && /^v?\d+(\.\d+)*$/.test(Text.trim());
@@ -76,7 +79,7 @@ export async function ListReleases(): Promise<ReleaseEntry[]> {
 
   try {
     const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/releases`, {
-      headers: { "User-Agent": "claudio-installer" },
+      headers: {"User-Agent": "claudio-installer"},
     });
 
     if (!Response.ok) {
@@ -92,7 +95,10 @@ export async function ListReleases(): Promise<ReleaseEntry[]> {
         notes: String(Entry.body || "").slice(0, 400),
       }));
 
-    Releases = { At: Date.now(), List: Found };
+    Releases = {
+      At: Date.now(),
+      List: Found,
+    };
   } catch (Error) {
     console.error("Could not list releases: " + (Error as NodeJS.ErrnoException).message);
   }
@@ -112,7 +118,7 @@ function FromGitHub(Url: string): boolean {
 
 async function CommitFor(Version: string): Promise<string> {
   const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/commits/v${Version}`, {
-    headers: { "User-Agent": "claudio-installer" },
+    headers: {"User-Agent": "claudio-installer"},
   });
 
   if (!Response.ok) {
@@ -130,7 +136,7 @@ async function CommitFor(Version: string): Promise<string> {
 
 async function PackageFor(Version: string): Promise<string> {
   const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/releases/tags/v${Version}`, {
-    headers: { "User-Agent": "claudio-installer" },
+    headers: {"User-Agent": "claudio-installer"},
   });
 
   if (!Response.ok) {
@@ -151,7 +157,7 @@ export async function InstallBridge(Version: string): Promise<string> {
   const Commit = await CommitFor(Version);
 
   await new Promise<void>((Resolve, Reject) => {
-    exec(`npm install -g ${Package}`, { timeout: 300000 }, (Trouble, Stdout, Stderr) => {
+    exec(`npm install -g ${Package}`, {timeout: 300000}, (Trouble, Stdout, Stderr) => {
       if (Trouble) {
         const Said = `${Stderr || ""}${Stdout || ""}`.trim().split(/\r?\n/).slice(-3).join(" ");
 
@@ -173,7 +179,7 @@ export async function InstallVersion(Version: string): Promise<string> {
   }
 
   const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/releases/tags/v${Version}`, {
-    headers: { "User-Agent": "claudio-installer" },
+    headers: {"User-Agent": "claudio-installer"},
   });
 
   if (!Response.ok) {
@@ -191,7 +197,7 @@ export async function InstallVersion(Version: string): Promise<string> {
     throw new Error("That release points its download somewhere other than GitHub");
   }
 
-  const Download = await fetch(Asset.browser_download_url, { headers: { "User-Agent": "claudio-installer" } });
+  const Download = await fetch(Asset.browser_download_url, {headers: {"User-Agent": "claudio-installer"}});
 
   if (!Download.ok) {
     throw new Error(`Download failed (${Download.status})`);
@@ -199,7 +205,7 @@ export async function InstallVersion(Version: string): Promise<string> {
 
   const PluginsFolder = GetPluginsFolder();
 
-  fs.mkdirSync(PluginsFolder, { recursive: true });
+  fs.mkdirSync(PluginsFolder, {recursive: true});
   WritePlugin(path.join(PluginsFolder, PluginFileName), Buffer.from(await Download.arrayBuffer()));
   RememberInstalled(String(Release.tag_name).replace(/^v/, ""));
 
@@ -218,8 +224,8 @@ export function InstalledPluginVersion(): string | null {
 
 function RememberInstalled(Installed: string | null): void {
   try {
-    fs.mkdirSync(path.dirname(InstalledPluginFile), { recursive: true });
-    fs.writeFileSync(InstalledPluginFile, JSON.stringify({ version: Installed }, null, 2));
+    fs.mkdirSync(path.dirname(InstalledPluginFile), {recursive: true});
+    fs.writeFileSync(InstalledPluginFile, JSON.stringify({version: Installed}, null, 2));
   } catch (Error) {
     console.error("Could not record the installed plugin version: " + (Error as NodeJS.ErrnoException).message);
   }
@@ -236,7 +242,7 @@ function WritePlugin(Target: string, Body: Buffer): void {
     fs.writeFileSync(Temporary, Body);
     fs.renameSync(Temporary, Target);
   } catch (Error) {
-    fs.rmSync(Temporary, { force: true });
+    fs.rmSync(Temporary, {force: true});
 
     throw Error;
   }
@@ -246,7 +252,7 @@ export async function InstallPlugin(LocalPath?: string | null): Promise<void> {
   const PluginsFolder = GetPluginsFolder();
   const Target = path.join(PluginsFolder, PluginFileName);
 
-  fs.mkdirSync(PluginsFolder, { recursive: true });
+  fs.mkdirSync(PluginsFolder, {recursive: true});
 
   if (LocalPath) {
     WritePlugin(Target, fs.readFileSync(LocalPath));
@@ -257,7 +263,7 @@ export async function InstallPlugin(LocalPath?: string | null): Promise<void> {
   }
 
   const ReleaseResponse = await fetch(`https://api.github.com/repos/${GitHubRepo}/releases/latest`, {
-    headers: { "User-Agent": "claudio-installer" },
+    headers: {"User-Agent": "claudio-installer"},
   });
 
   if (!ReleaseResponse.ok) {
@@ -276,7 +282,7 @@ export async function InstallPlugin(LocalPath?: string | null): Promise<void> {
   }
 
   const AssetResponse = await fetch(Asset.browser_download_url, {
-    headers: { "User-Agent": "claudio-installer" },
+    headers: {"User-Agent": "claudio-installer"},
   });
 
   if (!AssetResponse.ok) {

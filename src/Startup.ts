@@ -25,7 +25,7 @@ export async function InstallStartup(Port?: number | null): Promise<void> {
   const Chosen = Port && Port !== DefaultPort ? ` --port ${Number(Port)}` : "";
   const Command = `cmd /c ""${process.execPath}" "${CliPath}"${Chosen} >> "${LogFile}" 2>&1"`;
 
-  fs.mkdirSync(path.dirname(LogFile), { recursive: true });
+  fs.mkdirSync(path.dirname(LogFile), {recursive: true});
   fs.writeFileSync(LauncherPath, [
     `Set Shell = CreateObject("WScript.Shell")`,
     `Shell.Run ${VisualBasicString(Command)}, 0, False`,
@@ -42,7 +42,7 @@ export function LaunchHidden() {
     throw new Error("Run `claudio install-startup` first.");
   }
 
-  const Launched = execFile("wscript.exe", [LauncherPath], { detached: true } as ExecFileOptionsWithStringEncoding);
+  const Launched = execFile("wscript.exe", [LauncherPath], {detached: true} as ExecFileOptionsWithStringEncoding);
 
   Launched.on("error", (Error) => {
     console.error("Could not start the bridge launcher: " + Error.message);
@@ -53,7 +53,7 @@ export function LaunchHidden() {
 async function PortIsBusy(Port?: number | null): Promise<boolean> {
   try {
     await fetch(`http://127.0.0.1:${Port || DefaultPort}/health`, {
-      headers: { "X-Claudio-Token": EnsureToken() },
+      headers: {"X-Claudio-Token": EnsureToken()},
     });
 
     return true;
@@ -66,7 +66,7 @@ export async function StopBridge(Port?: number | null): Promise<boolean> {
   try {
     const Answer = await fetch(`http://127.0.0.1:${Port || DefaultPort}/quit`, {
       method: "POST",
-      headers: { "X-Claudio-Token": EnsureToken() },
+      headers: {"X-Claudio-Token": EnsureToken()},
     });
 
     if (Answer.status === 401) {

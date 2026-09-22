@@ -68,18 +68,18 @@ async function OnPath(): Promise<string | null> {
 
 async function Extract(Asset: string): Promise<string> {
   if (process.platform === "win32") {
-    const Shell = await Run("powershell", ["-NoProfile", "-NonInteractive", "-Command", `Expand-Archive -LiteralPath '${Asset}' -DestinationPath '.' -Force`], { cwd: ToolsFolder });
+    const Shell = await Run("powershell", ["-NoProfile", "-NonInteractive", "-Command", `Expand-Archive -LiteralPath '${Asset}' -DestinationPath '.' -Force`], {cwd: ToolsFolder});
 
     return Shell.Text;
   }
 
-  const Unzipped = await Run("unzip", ["-o", Asset], { cwd: ToolsFolder });
+  const Unzipped = await Run("unzip", ["-o", Asset], {cwd: ToolsFolder});
 
   if (!Unzipped.Failed) {
     return Unzipped.Text;
   }
 
-  const Tarred = await Run("tar", ["-xf", Asset], { cwd: ToolsFolder });
+  const Tarred = await Run("tar", ["-xf", Asset], {cwd: ToolsFolder});
 
   return Tarred.Text;
 }
@@ -93,12 +93,12 @@ async function Install(): Promise<void> {
 
   const Archive = path.join(ToolsFolder, Asset);
 
-  fs.mkdirSync(ToolsFolder, { recursive: true });
+  fs.mkdirSync(ToolsFolder, {recursive: true});
   await Download(`https://github.com/JohnnyMorganz/luau-lsp/releases/download/${AnalyzerVersion}/${Asset}`, Archive);
 
   const Extracted = await Extract(Asset);
 
-  fs.rmSync(Archive, { force: true });
+  fs.rmSync(Archive, {force: true});
 
   if (!fs.existsSync(Binary())) {
     throw new Error(`extract produced no binary: ${Extracted.slice(0, 200)}`);
@@ -113,7 +113,7 @@ async function Prepare(): Promise<string> {
   const Existing = process.env.CLAUDIO_LUAU_LSP;
 
   if (!fs.existsSync(Definitions())) {
-    fs.mkdirSync(ToolsFolder, { recursive: true });
+    fs.mkdirSync(ToolsFolder, {recursive: true});
     await Download(DefinitionsUrl, Definitions());
   }
 
@@ -172,7 +172,7 @@ async function Settings(): Promise<Record<string, unknown> | null> {
   const Body = await Answer.json() as Record<string, unknown> & { applicationSettings?: Record<string, unknown> };
   const Values = Body.applicationSettings || Body;
 
-  fs.mkdirSync(ToolsFolder, { recursive: true });
+  fs.mkdirSync(ToolsFolder, {recursive: true});
   fs.writeFileSync(Published(), JSON.stringify(Values));
 
   return Values;
@@ -227,7 +227,11 @@ function FileFor(Where: string): string {
 }
 
 function Node(Name: string, Class: string, Children: TreeNode[], Where: string | null): TreeNode {
-  const Made: TreeNode = { name: Name, className: Class, filePaths: [] };
+  const Made: TreeNode = {
+    name: Name,
+    className: Class,
+    filePaths: [],
+  };
 
   if (Where) {
     Made.filePaths.push(Where);
@@ -241,14 +245,22 @@ function Node(Name: string, Class: string, Children: TreeNode[], Where: string |
 }
 
 function Build(Tree: TreeItem[]) {
-  const Root: Holder = { Children: new Map(), Class: "Folder", Source: null };
+  const Root: Holder = {
+    Children: new Map(),
+    Class: "Folder",
+    Source: null,
+  };
 
   for (const Entry of Tree) {
     let At = Root;
 
     for (const Piece of Array.isArray(Entry.parts) ? Entry.parts : Entry.path.split(".")) {
       if (!At.Children.has(Piece)) {
-        At.Children.set(Piece, { Children: new Map(), Class: "Folder", Source: null });
+        At.Children.set(Piece, {
+          Children: new Map(),
+          Class: "Folder",
+          Source: null,
+        });
       }
 
       At = At.Children.get(Piece)!;
@@ -269,7 +281,10 @@ function Build(Tree: TreeItem[]) {
 
     const Leaf = Children.length > 0 ? `${FileFor(Trail)}/init.luau` : `${FileFor(Trail)}.luau`;
 
-    Written.push({ File: Leaf, Source: Holder.Source });
+    Written.push({
+      File: Leaf,
+      Source: Holder.Source,
+    });
 
     return Node(Name, Holder.Class, Children, Leaf);
   }
@@ -277,21 +292,30 @@ function Build(Tree: TreeItem[]) {
   const Top = [...Root.Children.entries()].map(([Child, Held]) => Walk(Child, Held, Child));
 
   Top.push(Node(Canary, "ModuleScript", [], `${Canary}.luau`));
-  Written.push({ File: `${Canary}.luau`, Source: "--!strict\nreturn ClaudioCanaryMissingGlobal\n" });
+  Written.push({
+    File: `${Canary}.luau`,
+    Source: "--!strict\nreturn ClaudioCanaryMissingGlobal\n",
+  });
 
-  return { Map: Node("Root", "DataModel", Top, null), Files: Written };
+  return {
+    Map: Node("Root", "DataModel", Top, null),
+    Files: Written,
+  };
 }
 
 function Lay(Tree: TreeItem[]) {
   const { Map: Shaped, Files } = Build(Tree);
 
-  fs.rmSync(Workspace(), { recursive: true, force: true });
-  fs.mkdirSync(Workspace(), { recursive: true });
+  fs.rmSync(Workspace(), {
+    recursive: true,
+    force: true,
+  });
+  fs.mkdirSync(Workspace(), {recursive: true});
 
   for (const Entry of Files) {
     const Full = path.join(Workspace(), Entry.File);
 
-    fs.mkdirSync(path.dirname(Full), { recursive: true });
+    fs.mkdirSync(path.dirname(Full), {recursive: true});
     fs.writeFileSync(Full, Entry.Source);
   }
 
@@ -322,7 +346,10 @@ function Parse(Text: string): Map<string, Set<string>> {
       Found.set(Where, []);
     }
 
-    Open = { Where, Parts: [`line ${Match[2]}: ${Match[3]}`] };
+    Open = {
+      Where,
+      Parts: [`line ${Match[2]}: ${Match[3]}`],
+    };
 
     Found.get(Where)!.push(Open);
   }
@@ -391,7 +418,7 @@ async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]
     const Full = path.join(Workspace(), Leaf);
 
     if (typeof Entry.source === "string" && Entry.source !== "") {
-      fs.mkdirSync(path.dirname(Full), { recursive: true });
+      fs.mkdirSync(path.dirname(Full), {recursive: true});
       fs.writeFileSync(Full, Entry.source);
     }
 
@@ -411,7 +438,7 @@ async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]
   let Text = "";
 
   for (const Batch of Batches) {
-    const Outcome = await Run(Analyzer, Arguments.concat([`${Canary}.luau`], Batch), { cwd: Workspace() });
+    const Outcome = await Run(Analyzer, Arguments.concat([`${Canary}.luau`], Batch), {cwd: Workspace()});
 
     if (Outcome.Stopped) {
       console.error(Outcome.Text);
@@ -442,7 +469,10 @@ async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]
     const Kept = Raw === true ? Unique : Unique.filter((Line) => !Ignored.test(Line));
 
     if (Kept.length > 0) {
-      Report.push({ path: Where.replace(/\/init\.luau$/, "").replace(/\.luau$/, "").split("/").join("."), lines: Kept.slice(0, 40) });
+      Report.push({
+        path: Where.replace(/\/init\.luau$/, "").replace(/\.luau$/, "").split("/").join("."),
+        lines: Kept.slice(0, 40),
+      });
     }
   }
 

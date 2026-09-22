@@ -25,7 +25,10 @@ export function CountLines(Before: string, After: string): LineCount {
   const Added = NewEnd - Start;
 
   if (Removed === 0 || Added === 0 || Removed * Added > 4000000) {
-    return { added: Added, removed: Removed };
+    return {
+      added: Added,
+      removed: Removed,
+    };
   }
 
   let Row = new Array(Added + 1).fill(0);
@@ -44,7 +47,10 @@ export function CountLines(Before: string, After: string): LineCount {
 
   const Common = Row[Added];
 
-  return { added: Added - Common, removed: Removed - Common };
+  return {
+    added: Added - Common,
+    removed: Removed - Common,
+  };
 }
 
 export function EditedFile(ToolName: string, Input: unknown): string | null {

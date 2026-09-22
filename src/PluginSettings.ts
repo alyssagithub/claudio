@@ -74,7 +74,7 @@ export function WritePluginSetting(Key: string, Value: unknown): number {
       fs.renameSync(Temporary, File);
       Written += 1;
     } catch (Error) {
-      fs.rmSync(Temporary, { force: true });
+      fs.rmSync(Temporary, {force: true});
       console.error(`Could not write the plugin setting ${Key}: ${(Error as NodeJS.ErrnoException).message}`);
     }
   }
@@ -104,7 +104,7 @@ export function ForgetPluginSettings(): number {
       fs.renameSync(Temporary, File);
       Cleared += Keys.length;
     } catch (Error) {
-      fs.rmSync(Temporary, { force: true });
+      fs.rmSync(Temporary, {force: true});
       console.error(`Could not clear the plugin's settings in ${File}: ${(Error as NodeJS.ErrnoException).message}`);
     }
   }

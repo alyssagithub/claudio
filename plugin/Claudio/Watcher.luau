@@ -467,7 +467,10 @@ const function Describe(Where: Bucket): {Types.Change}
 
 	for Index, Item in Where.Entries do
 		if Index > Cap then
-			table.insert(Found, {Kind = "changed", Text = `and {#Where.Entries - Cap} more changes`} :: Types.Change)
+			table.insert(Found, {
+				Kind = "changed",
+				Text = `and {#Where.Entries - Cap} more changes`,
+			} :: Types.Change)
 
 			break
 		end
@@ -476,7 +479,12 @@ const function Describe(Where: Bucket): {Types.Change}
 		const Path = Format.Path(if Object and Object.Parent then Object:GetFullName() else Item.Path)
 		const Change: Types.Change = {
 			Kind = if Item.Verb == "Created" then "added" elseif Item.Verb == "Deleted" then "removed" else "changed",
-			Text = Render({Entries = {Item}, Keys = {}, Created = {}, Deleted = {}})[1],
+			Text = Render({
+				Entries = {Item},
+				Keys = {},
+				Created = {},
+				Deleted = {},
+			})[1],
 			Path = Path,
 		}
 

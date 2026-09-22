@@ -34,18 +34,41 @@ function Gallery.Messages(): {Types.Message}
 	const Now = os.time()
 
 	return {
-		{Role = "user", Text = "A short user message.", At = Now - 3600},
-		{Role = "assistant", Text = "A short assistant reply.", At = Now - 3590},
-		{Role = "user", Text = Long, At = Now - 3500},
-		{Role = "assistant", Text = Markdown, At = Now - 3400},
+		{
+			Role = "user",
+			Text = "A short user message.",
+			At = Now - 3600,
+		},
+		{
+			Role = "assistant",
+			Text = "A short assistant reply.",
+			At = Now - 3590,
+		},
+		{
+			Role = "user",
+			Text = Long,
+			At = Now - 3500,
+		},
+		{
+			Role = "assistant",
+			Text = Markdown,
+			At = Now - 3400,
+		},
 		{
 			Role = "assistant",
 			Text = "A reply that also carries thinking, activity and a cost footer.",
 			Thinking = "Weighing two approaches before answering, then picking the simpler one.",
-			Activity = {"Read Workspace", "Searched scripts"},
+			Activity = {
+				"Read Workspace",
+				"Searched scripts",
+			},
 			Model = "sonnet",
 			Effort = "medium",
-			Tokens = {input = 1200, output = 340, cached = 90000},
+			Tokens = {
+				input = 1200,
+				output = 340,
+				cached = 90000,
+			},
 			Milliseconds = 4200,
 			Cost = 0.0421,
 			At = Now - 3300,
@@ -54,9 +77,23 @@ function Gallery.Messages(): {Types.Message}
 			Role = "assistant",
 			Text = "A reply that changed things in the place.",
 			Edits = {
-				{Kind = "changed", Text = "Edited ServerScriptService.Main", Path = "ServerScriptService.Main", Added = 108, Removed = 12} :: Types.Change,
-				{Kind = "added", Text = "Created Workspace.Baseplate.Sign (Part)", Path = "Workspace.Baseplate.Sign"} :: Types.Change,
-				{Kind = "removed", Text = "Deleted ReplicatedStorage.Shared.Config", Path = "ReplicatedStorage.Shared.Config"} :: Types.Change,
+				{
+					Kind = "changed",
+					Text = "Edited ServerScriptService.Main",
+					Path = "ServerScriptService.Main",
+					Added = 108,
+					Removed = 12,
+				} :: Types.Change,
+				{
+					Kind = "added",
+					Text = "Created Workspace.Baseplate.Sign (Part)",
+					Path = "Workspace.Baseplate.Sign",
+				} :: Types.Change,
+				{
+					Kind = "removed",
+					Text = "Deleted ReplicatedStorage.Shared.Config",
+					Path = "ReplicatedStorage.Shared.Config",
+				} :: Types.Change,
 			},
 			Checkpoint = 3,
 			At = Now - 3200,
@@ -65,41 +102,127 @@ function Gallery.Messages(): {Types.Message}
 			Role = "assistant",
 			Text = "A reply with tool calls in every state.",
 			Calls = {
-				{name = "get_script_source", input = "{\"path\":\"ServerScriptService.Main\"}", output = "42 lines", status = "done", milliseconds = 320},
-				{name = "execute_luau", input = "{\"code\":\"return 1\"}", output = "", status = "running", milliseconds = 0},
-				{name = "set_properties", input = "{\"path\":\"Workspace.Missing\"}", output = "Instance not found", status = "error", milliseconds = 120},
+				{
+					name = "get_script_source",
+					input = "{\"path\":\"ServerScriptService.Main\"}",
+					output = "42 lines",
+					status = "done",
+					milliseconds = 320,
+				},
+				{
+					name = "execute_luau",
+					input = "{\"code\":\"return 1\"}",
+					output = "",
+					status = "running",
+					milliseconds = 0,
+				},
+				{
+					name = "set_properties",
+					input = "{\"path\":\"Workspace.Missing\"}",
+					output = "Instance not found",
+					status = "error",
+					milliseconds = 120,
+				},
 			} :: {Types.ToolCall},
 			At = Now - 3100,
 		},
 		{
 			Role = "assistant",
 			Text = "A reply that estimated its own token count rather than being told.",
-			Tokens = {input = 800, output = 120, cached = 0},
+			Tokens = {
+				input = 800,
+				output = 120,
+				cached = 0,
+			},
 			Estimated = true,
 			At = Now - 3000,
 		},
-		{Role = "user", Text = "A user message with attachments.", Attachments = {"Workspace.Baseplate", "Output"}, At = Now - 2900},
-		{Role = "assistant", Text = "", Failed = true, At = Now - 2800},
-		{Role = "assistant", Text = "The last reply, so the message actions can be checked on a final bubble.", At = Now - 2700},
+		{
+			Role = "user",
+			Text = "A user message with attachments.",
+			Attachments = {
+				"Workspace.Baseplate",
+				"Output",
+			},
+			At = Now - 2900,
+		},
+		{
+			Role = "assistant",
+			Text = "",
+			Failed = true,
+			At = Now - 2800,
+		},
+		{
+			Role = "assistant",
+			Text = "The last reply, so the message actions can be checked on a final bubble.",
+			At = Now - 2700,
+		},
 	}
 end
 
 function Gallery.Live(): {[string]: any}
 	return {
-		Activity = {"Reading Workspace", "Editing ServerScriptService.Main"},
+		Activity = {
+			"Reading Workspace",
+			"Editing ServerScriptService.Main",
+		},
 		StreamingThinking = "Working out which of the two approaches keeps the existing callers intact, then checking whether anything else reads the same value.",
 		StreamingText = "This reply is still streaming in, so the caret and the growing bubble can both be looked at while they animate.",
 		Tasks = {
-			{id = "1", description = "Reading Workspace", kind = "read", status = "running", background = true, depth = 1},
-			{id = "2", description = "Checking the analyzer", kind = "lint", status = "pending", background = false, depth = 2},
-			{id = "3", description = "Writing the fix", kind = "edit", status = "completed", background = false, depth = 1},
-			{id = "4", description = "Publishing", kind = "publish", status = "failed", background = false, depth = 1},
+			{
+				id = "1",
+				description = "Reading Workspace",
+				kind = "read",
+				status = "running",
+				background = true,
+				depth = 1,
+			},
+			{
+				id = "2",
+				description = "Checking the analyzer",
+				kind = "lint",
+				status = "pending",
+				background = false,
+				depth = 2,
+			},
+			{
+				id = "3",
+				description = "Writing the fix",
+				kind = "edit",
+				status = "completed",
+				background = false,
+				depth = 1,
+			},
+			{
+				id = "4",
+				description = "Publishing",
+				kind = "publish",
+				status = "failed",
+				background = false,
+				depth = 1,
+			},
 		},
 		Queue = {
-			{Display = "A queued message, waiting its turn.", Full = "A queued message, waiting its turn.", Attachments = {}, Images = {}, Previews = {}},
-			{Display = "A second queued message, so the reorder arrows appear.", Full = "A second queued message.", Attachments = {}, Images = {}, Previews = {}},
+			{
+				Display = "A queued message, waiting its turn.",
+				Full = "A queued message, waiting its turn.",
+				Attachments = {},
+				Images = {},
+				Previews = {},
+			},
+			{
+				Display = "A second queued message, so the reorder arrows appear.",
+				Full = "A second queued message.",
+				Attachments = {},
+				Images = {},
+				Previews = {},
+			},
 		},
-		Permission = {id = "gallery", tool = "set_properties", input = "{\"path\":\"Workspace.Baseplate\",\"Anchored\":false}"},
+		Permission = {
+			id = "gallery",
+			tool = "set_properties",
+			input = "{\"path\":\"Workspace.Baseplate\",\"Anchored\":false}",
+		},
 		Question = {
 			id = "gallery-ask",
 			questions = {
@@ -108,9 +231,19 @@ function Gallery.Live(): {[string]: any}
 					header = "Radius",
 					multiSelect = false,
 					options = {
-						{label = "Four (Recommended)", description = "Matches the inline chrome already used everywhere else.", preview = "UICorner { CornerRadius = UDim.new(0, 4) }"},
-						{label = "Six", description = "Softer, and what the menus already use."},
-						{label = "Eight", description = "Softer still, currently only used by message bubbles."},
+						{
+							label = "Four (Recommended)",
+							description = "Matches the inline chrome already used everywhere else.",
+							preview = "UICorner { CornerRadius = UDim.new(0, 4) }",
+						},
+						{
+							label = "Six",
+							description = "Softer, and what the menus already use.",
+						},
+						{
+							label = "Eight",
+							description = "Softer still, currently only used by message bubbles.",
+						},
 					} :: {Types.Choice},
 				},
 				{
@@ -118,9 +251,18 @@ function Gallery.Live(): {[string]: any}
 					header = "Extras",
 					multiSelect = true,
 					options = {
-						{label = "Tooltips", description = "Five implementations with five anchoring rules."},
-						{label = "Spacing", description = "Thirteen padding values with a long tail of one offs."},
-						{label = "Icons", description = "Two icon vocabularies in one interface."},
+						{
+							label = "Tooltips",
+							description = "Five implementations with five anchoring rules.",
+						},
+						{
+							label = "Spacing",
+							description = "Thirteen padding values with a long tail of one offs.",
+						},
+						{
+							label = "Icons",
+							description = "Two icon vocabularies in one interface.",
+						},
 					},
 				},
 			} :: {Types.Question},

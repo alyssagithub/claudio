@@ -18,7 +18,7 @@ function Key() {
 
 async function Get<Found>(Where: string): Promise<Found | null> {
   try {
-    const Answer = await fetch(`http://127.0.0.1:${Port}${Where}`, { headers: { "x-claudio-token": Key() } });
+    const Answer = await fetch(`http://127.0.0.1:${Port}${Where}`, {headers: {"x-claudio-token": Key()}});
 
     return Answer.ok ? await Answer.json() as Found : null;
   } catch {
@@ -30,21 +30,32 @@ async function Send<Found>(Role: string | undefined, Kind: string, Input: unknow
   try {
     const Answer = await fetch(`http://127.0.0.1:${Port}/studio/enqueue`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-claudio-token": Key() },
-      body: JSON.stringify({ kind: Kind, input: Input, role: Role, timeout: Timeout }),
+      headers: {
+        "content-type": "application/json",
+        "x-claudio-token": Key(),
+      },
+      body: JSON.stringify({
+        kind: Kind,
+        input: Input,
+        role: Role,
+        timeout: Timeout,
+      }),
     });
 
     if (!Answer.ok) {
-      return { error: `The Claudio bridge answered ${Answer.status}. Is it running?` } as Found;
+      return {error: `The Claudio bridge answered ${Answer.status}. Is it running?`} as Found;
     }
 
     return await Answer.json() as Found;
   } catch (Trouble) {
-    return { error: `Could not reach the Claudio bridge on port ${Port}: ${(Trouble as Error).message}. Start it with "claudio" and open a place in Studio.` } as Found;
+    return {error: `Could not reach the Claudio bridge on port ${Port}: ${(Trouble as Error).message}. Start it with "claudio" and open a place in Studio.`} as Found;
   }
 }
 
-const Server = new McpServer({ name: "claudio", version: "1.0.0" });
+const Server = new McpServer({
+  name: "claudio",
+  version: "1.0.0",
+});
 
 for (const Entry of StudioTools({
   Reach: <Found,>(Kind: string, Input?: unknown, Timeout?: number): Promise<Found> => Send<Found>(undefined, Kind, Input, Timeout),

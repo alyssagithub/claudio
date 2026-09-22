@@ -80,7 +80,11 @@ return function(Rows: () -> {{string}}, LayoutOrder: number)
 			const Keyed: {[string]: {Row: {string}, Columns: number, Index: number}} = {}
 
 			for Index, Row in Found do
-				Keyed[`{Columns}|{Index}|{table.concat(Row, "|")}`] = {Row = Row, Columns = Columns, Index = Index}
+				Keyed[`{Columns}|{Index}|{table.concat(Row, "|")}`] = {
+					Row = Row,
+					Columns = Columns,
+					Index = Index,
+				}
 			end
 
 			return Keyed

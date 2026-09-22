@@ -44,7 +44,7 @@ function Markdown.Inline(Text: string): string
 	Marked = Marked:gsub("%f[%w_]_(.-)_%f[^%w_]", function(Body: string): string
 		return `<i>{Body}</i>`
 	end)
-	Marked = Marked:gsub("%[([^%]]-)%]%(([^%)]-)%)", function(Label: string, _Url: string): string
+	Marked = Marked:gsub("%[([^%]]-)%]%([^%)]-%)", function(Label: string): string
 		return `<u>{Label}</u>`
 	end)
 
@@ -128,7 +128,9 @@ function Markdown.Build(Text: string, Size: number?, Accent: string?): string
 			return `<font size="{Size + Raised}"><b>{Heading}</b></font>`
 		end)
 
-		Marked = Marked:gsub("^(%s*)[%*%-]%s+%[([ xX])%]%s+", function(Indent: string, Mark: string): string
+		Marked = Marked:gsub("^(%s*)[%*%-]%s+%[([ xX])%]%s+", function(...: string): string
+			const Indent, Mark = ...
+
 			return `{Indent}{if Mark == " " then "☐" else "☑"} `
 		end)
 		Marked = Marked:gsub("^(%s*)[%*%-]%s+", "%1• ")

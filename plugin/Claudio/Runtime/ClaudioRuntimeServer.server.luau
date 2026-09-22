@@ -53,7 +53,10 @@ const function Call(Method: string, Where: string, Body: any): (boolean, any)
 		return HttpService:RequestAsync({
 			Url = `{Base}{Where}`,
 			Method = Method,
-			Headers = {["Content-Type"] = "application/json", ["x-claudio-token"] = Token},
+			Headers = {
+				["Content-Type"] = "application/json",
+				["x-claudio-token"] = Token,
+			},
 			Body = if Body then HttpService:JSONEncode(Body) else nil,
 		})
 	end)
@@ -169,7 +172,10 @@ task.spawn(function()
 					const StudioTestService = game:GetService("StudioTestService")
 
 					if Job.input.action == "stop" then
-						Call("POST", "/studio/job", {id = Job.id, result = {text = "Playtest stopped."}})
+						Call("POST", "/studio/job", {
+							id = Job.id,
+							result = {text = "Playtest stopped."},
+						})
 
 						task.wait(0.2)
 
@@ -241,7 +247,11 @@ task.spawn(function()
 						table.insert(Lines, Kept[Index])
 					end
 
-					return {lines = Lines, scanned = #History, skipped = 0}
+					return {
+						lines = Lines,
+						scanned = #History,
+						skipped = 0,
+					}
 				end
 
 				if Job.kind == "memory" then
@@ -260,7 +270,10 @@ task.spawn(function()
 						end)
 
 						if Ok and Used >= Least then
-							table.insert(Rows, {Name = Tag.Name, Used = Used})
+							table.insert(Rows, {
+								Name = Tag.Name,
+								Used = Used,
+							})
 						end
 					end
 
@@ -303,7 +316,10 @@ task.spawn(function()
 			end)
 
 			if not (Done and Outcome == nil) then
-				Call("POST", "/studio/job", {id = Job.id, result = if Done then Outcome else {error = tostring(Outcome)}})
+				Call("POST", "/studio/job", {
+					id = Job.id,
+					result = if Done then Outcome else {error = tostring(Outcome)},
+				})
 			end
 			end)
 		end

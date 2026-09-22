@@ -19,7 +19,7 @@ async function HashFor(Id: string): Promise<Avatar> {
     return Held;
   }
 
-  const Answer = await fetch(`${Lookup}${Id}`, { headers: { "user-agent": "Claudio" } });
+  const Answer = await fetch(`${Lookup}${Id}`, {headers: {"user-agent": "Claudio"}});
 
   if (!Answer.ok) {
     throw new Error(`the lookup answered ${Answer.status}`);
@@ -58,5 +58,8 @@ export async function AvatarFor(Id: string) {
     throw new Error("that avatar could not be decoded");
   }
 
-  return { ...Decoded, name: Found.Name };
+  return {
+    ...Decoded,
+    name: Found.Name,
+  };
 }

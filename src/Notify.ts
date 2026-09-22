@@ -17,7 +17,7 @@ export function RegisterToasts() {
     return;
   }
 
-  execFile(SnoreToast, ["-install", "Claudio", path.join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), "Claudio"], { windowsHide: true }, (Error) => {
+  execFile(SnoreToast, ["-install", "Claudio", path.join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), "Claudio"], {windowsHide: true}, (Error) => {
     if (Error) {
       console.error(`Could not register Claudio for desktop notifications: ${Error.message.slice(0, 200)}`);
     }
@@ -88,7 +88,14 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
 
     execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ToastPath], {
       windowsHide: true,
-      env: { ...process.env, CLAUDIO_TITLE: Heading, CLAUDIO_BODY: Detail, CLAUDIO_ICON: IconFile, CLAUDIO_APP_ID: "Claudio", CLAUDIO_TOAST_SECONDS: String(Wanted.Seconds || 0) },
+      env: {
+        ...process.env,
+        CLAUDIO_TITLE: Heading,
+        CLAUDIO_BODY: Detail,
+        CLAUDIO_ICON: IconFile,
+        CLAUDIO_APP_ID: "Claudio",
+        CLAUDIO_TOAST_SECONDS: String(Wanted.Seconds || 0),
+      },
     }, (Trouble, Said) => {
       if (!Trouble && Said.includes("shown")) {
         return;
@@ -126,8 +133,8 @@ export function RestoreFlashing() {
     ? `Remove-ItemProperty -Path '${Key}' -Name TaskbarFlashing -ErrorAction SilentlyContinue`
     : `Set-ItemProperty -Path '${Key}' -Name TaskbarFlashing -Value ${Number(Before) || 1} -Type DWord`;
 
-  execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", Command], { windowsHide: true }, () => {
-    fs.rmSync(FlashingSaved, { force: true });
+  execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", Command], {windowsHide: true}, () => {
+    fs.rmSync(FlashingSaved, {force: true});
   });
 }
 
@@ -140,7 +147,10 @@ export function QuietFlash(Seconds: number): Promise<() => void> {
 
     const Started = execFile("powershell.exe", ["-NoProfile", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", QuietPath], {
       windowsHide: true,
-      env: { ...process.env, CLAUDIO_QUIET_SECONDS: String(Seconds) },
+      env: {
+        ...process.env,
+        CLAUDIO_QUIET_SECONDS: String(Seconds),
+      },
     }, () => {});
 
     const Release = () => {
@@ -179,7 +189,10 @@ export function WriteClipboard(Text: string): Promise<boolean> {
 
     execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "Set-Clipboard -Value $env:CLAUDIO_TEXT"], {
       windowsHide: true,
-      env: { ...process.env, CLAUDIO_TEXT: Text },
+      env: {
+        ...process.env,
+        CLAUDIO_TEXT: Text,
+      },
     }, (Error) => {
       Resolve(!Error);
     });
@@ -196,7 +209,11 @@ function RunClipboard(Mode: string, Marker?: string | null): Promise<string> {
     execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ClipboardPath], {
       windowsHide: true,
       maxBuffer: 32 * 1024 * 1024,
-      env: { ...process.env, CLAUDIO_CLIPBOARD_MODE: Mode, CLAUDIO_CLIPBOARD_MARKER: Marker || "" },
+      env: {
+        ...process.env,
+        CLAUDIO_CLIPBOARD_MODE: Mode,
+        CLAUDIO_CLIPBOARD_MARKER: Marker || "",
+      },
     }, (Error, Stdout) => {
       Resolve(Error ? "" : String(Stdout || "").trim());
     });
@@ -217,7 +234,10 @@ export async function ArmClipboard(Marker: string): Promise<string> {
   const [Outcome, Data] = (await RunClipboard("arm", Marker)).split(/\r?\n/);
 
   if (Outcome === "armed" && Data && Data.length >= 64) {
-    Armed = { Marker, Image: Picture(Data.trim()) };
+    Armed = {
+      Marker,
+      Image: Picture(Data.trim()),
+    };
   }
 
   return Outcome;
@@ -242,7 +262,10 @@ export function ReadClipboardImage(Marker?: string | null): Promise<ClipboardPic
     execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ClipboardPath], {
       windowsHide: true,
       maxBuffer: 32 * 1024 * 1024,
-      env: { ...process.env, CLAUDIO_CLIPBOARD_MODE: "read" },
+      env: {
+        ...process.env,
+        CLAUDIO_CLIPBOARD_MODE: "read",
+      },
     }, (Error, Stdout) => {
       const Data = String(Stdout || "").replace(/\s+/g, "");
 

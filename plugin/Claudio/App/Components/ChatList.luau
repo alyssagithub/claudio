@@ -107,14 +107,16 @@ const function GroupOf(Summary: Types.ConversationSummary): string
 	return if Summary.project ~= "" then Summary.project else "Other"
 end
 
-const function AnyHidden(): boolean
-	for _, Summary in Chat.Conversations() do
-		if Summary.hidden then
-			return true
+const function Any(Flag: "hidden" | "archived"): () -> boolean
+	return function()
+		for _, Summary in Chat.Conversations() do
+			if Summary[Flag] then
+				return true
+			end
 		end
-	end
 
-	return false
+		return false
+	end
 end
 
 const function Ordered(): {Types.ConversationSummary}
@@ -123,7 +125,7 @@ const function Ordered(): {Types.ConversationSummary}
 	const Sorted = {}
 
 	for _, Summary in Chat.Conversations() do
-		if Chat.ShowHidden() or not Summary.hidden then
+		if (Chat.ShowHidden() or not Summary.hidden) and (Chat.ShowArchived() or not Summary.archived) then
 			table.insert(Sorted, Summary)
 		end
 	end
@@ -176,9 +178,6 @@ const function Row(Summary: () -> Types.ConversationSummary, Index: number)
 		Text = "",
 		AutoButtonColor = true,
 		LayoutOrder = Index,
-		Visible = function()
-			return Chat.ShowArchived() or not Summary().archived
-		end,
 		Activated = function()
 			if Chat.MenuFor() or Chat.MenuFolder() then
 				Chat.MenuFor(nil)
@@ -484,11 +483,11 @@ return function()
 			return if Chat.ShowArchived() then "Hide archived chats" else "Show archived chats"
 		end, 1000000, function()
 			Chat.ShowArchived(not Chat.ShowArchived())
-		end),
+		end, Any("archived")),
 		Choice(function()
 			return if Chat.ShowHidden() then "Hide the folders you hid" else "Show the folders you hid"
 		end, 1000001, function()
 			Chat.ShowHidden(not Chat.ShowHidden())
-		end, AnyHidden),
+		end, Any("hidden")),
 	}
 end

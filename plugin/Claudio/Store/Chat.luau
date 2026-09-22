@@ -2315,11 +2315,11 @@ function Chat.WatchStudioJobs()
 			end
 
 			if Mounted then
-				(script.Parent.Parent :: Instance):SetAttribute("ClaudioMountSeen", os.clock())
+				(script.Parent.Parent :: Instance):SetAttribute("ClaudioMountSeen", DateTime.now().UnixTimestampMillis / 1000)
 			else
 				const Mount = game:GetService("ServerStorage"):FindFirstChild("ClaudioTesting")
 				const Seen = if Mount then Mount:GetAttribute("ClaudioMountSeen") else nil
-				const Yield = typeof(Seen) == "number" and os.clock() - Seen < 5
+				const Yield = typeof(Seen) == "number" and math.abs(DateTime.now().UnixTimestampMillis / 1000 - Seen) < 5
 
 				if Yield ~= Chat.Yielding then
 					Chat.Yielding = true

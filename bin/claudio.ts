@@ -55,7 +55,7 @@ if (Command === "setup") {
   RestartBridge(ChosenPort()).catch(Fail);
 } else if (Command === "stop") {
   StopBridge(ChosenPort());
-} else if (Command === undefined || Command === "start") {
+} else if (Command === undefined || Command === "start" || Command === "--port") {
   StartServer(ChosenPort());
 } else {
   console.error("Usage: claudio setup | claudio uninstall | claudio [start] [--port N] | claudio install [--local path/to/Claudio.rbxm] | claudio install-startup | claudio uninstall-startup | claudio restart | claudio stop | claudio version");

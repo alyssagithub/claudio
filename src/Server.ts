@@ -823,7 +823,7 @@ export function StartServer(Port: number) {
           const Commit = await InstallBridge(Version);
           const Installed = await InstallVersion(Version);
 
-          const Restarter = spawn(process.execPath, [process.argv[1], "restart"], {
+          const Restarter = spawn(process.execPath, [process.argv[1], "restart", "--port", String(Port)], {
             detached: true,
             stdio: "ignore",
             windowsHide: true,

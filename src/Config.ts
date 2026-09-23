@@ -33,6 +33,7 @@ export const AllowedTools = [
   "mcp__roblox-docs__*",
   "ToolSearch",
   "Skill",
+  "ScheduleWakeup",
   "Read",
   "Glob",
   "Grep",

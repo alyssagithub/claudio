@@ -17,6 +17,16 @@ type BuiltConversation = { id: string; title: string; project: string | null; so
 
 type Listing = { id: string; title: string; project: string; folder: string | null; source: string; starred: boolean; archived: boolean; hidden: boolean; createdAt: number; updatedAt: number };
 
+function Thousands(Tokens: number): string {
+  return Tokens >= 1000 ? `${Math.round(Tokens / 1000)}k` : String(Tokens);
+}
+
+export function CompactionNotice(Trigger: string, Before: number, After?: number | null): string {
+  const Said = Trigger === "auto" ? "Conversation compacted automatically" : "Conversation compacted";
+
+  return After ? `${Said} · ${Thousands(Before)} tokens down to ${Thousands(After)}` : `${Said} · ${Thousands(Before)} tokens`;
+}
+
 function FindFile(Id: string): string | null {
   if (!fs.existsSync(SessionsRoot)) {
     return null;
@@ -763,6 +773,26 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
   let PendingCost = 0;
 
   for (const Line of Lines) {
+    const Boundary = Line as TranscriptEntry & { subtype?: string; compactMetadata?: { trigger?: string; preTokens?: number; postTokens?: number } };
+
+    if (!Line.isSidechain && Boundary.type === "system" && Boundary.subtype === "compact_boundary") {
+      Messages.push({
+        role: "assistant",
+        text: "",
+        activity: [],
+        parts: [{
+          kind: "notice",
+          text: CompactionNotice(Boundary.compactMetadata?.trigger || "auto", Boundary.compactMetadata?.preTokens || 0, Boundary.compactMetadata?.postTokens),
+        }],
+        calls: [],
+        images: [],
+        at: TimeOf(Line),
+        notice: true,
+      });
+
+      continue;
+    }
+
     if (Line.isSidechain || !Line.message) {
       continue;
     }
@@ -921,7 +951,7 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
   let Reply = 0;
 
   for (const Message of Messages) {
-    if (Message.role !== "assistant") {
+    if (Message.role !== "assistant" || Message.notice) {
       continue;
     }
 
@@ -955,6 +985,42 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
 
 function ReadChapters(): Record<string, Chapter[]> {
   return ReadJson<Record<string, Chapter[]>>(ChaptersFile) || {};
+}
+
+export function GetSubagent(Id: string, ToolUseId: string): BuiltConversation | null {
+  const File = FindFile(Id);
+
+  if (!File) {
+    return null;
+  }
+
+  const Folder = path.join(File.slice(0, -".jsonl".length), "subagents");
+
+  for (const Name of fs.existsSync(Folder) ? fs.readdirSync(Folder) : []) {
+    if (!Name.endsWith(".meta.json")) {
+      continue;
+    }
+
+    let Meta: { toolUseId?: string; description?: string };
+
+    try {
+      Meta = JSON.parse(fs.readFileSync(path.join(Folder, Name), "utf8"));
+    } catch {
+      continue;
+    }
+
+    if (Meta.toolUseId !== ToolUseId) {
+      continue;
+    }
+
+    const Transcript = path.join(Folder, Name.replace(/\.meta\.json$/, ".jsonl"));
+    const Lines = ReadLines(Transcript);
+    const Built = Lines ? Assemble(Lines.map((Line) => ({...Line, isSidechain: false})), `${Id}/${ToolUseId}`, Transcript, false) : null;
+
+    return Built ? {...Built, title: Meta.description || Built.title} : null;
+  }
+
+  return null;
 }
 
 export function GetChapters(Id: string): Chapter[] {

@@ -4,7 +4,7 @@ import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, SubagentModels, Subagents, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory } from "./Config.js";
-import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession } from "./Conversations.js";
+import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession, CompactionNotice } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
@@ -845,8 +845,90 @@ function RecordStep(Turn: Turn, Message: SdkMessage & {parent_tool_use_id?: stri
   Publish(Turn, {Calls: Turn.Calls.slice()});
 }
 
+function OpenAutoTurn(Session: Session): Turn | null {
+  const Previous = Session.LastTurn;
+
+  if (!Previous || !Session.ConversationId) {
+    return null;
+  }
+
+  const Turn: Turn = {
+    ...Previous,
+    Id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+    ConversationId: Session.ConversationId,
+    Prompt: "",
+    Compacting: false,
+    Waiting: 0,
+    FallenFrom: null,
+    Tasks: [],
+    Status: "running",
+    CommittedText: "",
+    PendingText: "",
+    CommittedThinking: "",
+    PendingThinking: "",
+    Parts: [],
+    Flushed: false,
+    Streamed: 0,
+    OutputShown: 0,
+    Activity: [],
+    Calls: [],
+    Usage: {
+      Input: 0,
+      Output: 0,
+      Cached: 0,
+    },
+    StartedAt: Date.now(),
+    OpenedAt: Date.now(),
+    FirstTextAt: undefined,
+    Cold: false,
+    Milliseconds: 0,
+    Cost: 0,
+    Images: [],
+    Delivered: {},
+    Permissions: [],
+    PermissionCount: 0,
+    Question: null,
+    Error: null,
+    Version: 0,
+    Waiters: [],
+    Session,
+  };
+
+  Turns.set(Turn.Id, Turn);
+  Session.CurrentTurn = Turn;
+  console.log(`Turn ${Turn.Id}: the session carried on by itself, so a turn was opened for it`);
+
+  return Turn;
+}
+
 function RouteMessage(Session: Session, Message: any) {
-  const Turn = Session.CurrentTurn;
+  if (Message.type === "system" && Message.subtype === "background_tasks_changed") {
+    Session.Background = new Set(((Message.tasks || []) as {task_id: string, task_type: string, ambient?: boolean}[])
+      .filter((Task) => !Task.ambient && /agent/i.test(Task.task_type || ""))
+      .map((Task) => Task.task_id));
+
+    if (Session.CurrentTurn && Session.CurrentTurn.Waiting > 0) {
+      Session.CurrentTurn.Waiting = Session.Background.size;
+      Publish(Session.CurrentTurn, {});
+    }
+
+    return;
+  }
+
+  const Turn = Session.CurrentTurn || (Message.type === "system" && Message.subtype === "init" ? OpenAutoTurn(Session) : null);
+
+  if (Turn && Message.type === "system" && Message.subtype === "compact_boundary") {
+    const Metadata = Message.compact_metadata || {};
+
+    Publish(Turn, {
+      Parts: Turn.Parts.concat([{
+        kind: "notice",
+        text: CompactionNotice(Metadata.trigger, Metadata.pre_tokens || 0, Metadata.post_tokens),
+      }]),
+    });
+
+    return;
+  }
 
   if (Message.type === "system" && Message.subtype === "init") {
     RememberCommands(Message);
@@ -916,6 +998,7 @@ function RouteMessage(Session: Session, Message: any) {
         Status: "running",
         Background: Message.is_backgrounded === true,
         Depth: Message.spawn_depth || 1,
+        ToolUseId: Message.tool_use_id || null,
       }]),
     });
 
@@ -1186,7 +1269,7 @@ function RouteMessage(Session: Session, Message: any) {
   Turn.Milliseconds = Message.duration_ms || (Date.now() - Turn.StartedAt);
   const Spent = Message.total_cost_usd || 0;
 
-  Turn.Cost = Math.max(0, Spent - (Session.Spent || 0));
+  Turn.Cost += Math.max(0, Spent - (Session.Spent || 0));
   Session.Spent = Spent;
 
   if (Message.usage) {
@@ -1210,7 +1293,16 @@ function RouteMessage(Session: Session, Message: any) {
     }
   }
 
+  if (Session.Background.size > 0 && Turn.Status === "running" && !Message.is_error) {
+    Turn.Waiting = Session.Background.size;
+    Publish(Turn, {});
+
+    return;
+  }
+
+  Turn.Waiting = 0;
   Session.CurrentTurn = null;
+  Session.LastTurn = Turn;
   Session.LastUsedAt = Date.now();
   Session.HasSpoken = true;
 
@@ -1261,6 +1353,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
     Mode: PermissionModeFor(Mode, Bypass),
     UsingSubagents: UsingSubagents === true,
     GuardTools: false,
+    Background: new Set(),
     FilesBefore: new Map(),
     LineCounts: new Map(),
     CurrentTurn: null,
@@ -1638,6 +1731,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     Flushed: false,
     Streamed: 0,
     Compacting: false,
+    Waiting: 0,
     OutputStyle: LastStyle,
     StepDown: LastStepDown,
     FallenFrom: null,
@@ -1896,9 +1990,12 @@ export function DescribeTurn(Turn: Turn) {
       status: Task.Status,
       background: Task.Background,
       depth: Task.Depth,
+      toolUseId: Task.ToolUseId || null,
     })),
     planning: Turn.Planning === true,
     compacting: Turn.Compacting === true,
+    waiting: Turn.Waiting || 0,
+    automatic: Turn.Prompt === "",
     milliseconds: Turn.Milliseconds || (Turn.Status === "running" ? Date.now() - Turn.StartedAt : 0),
     tokens: {
       input: Turn.Usage.Input,

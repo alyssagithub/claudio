@@ -56,5 +56,6 @@ return {
 		Retry = "arrow-clockwise",
 		Send = "arrow-large-up",
 		Stop = "stop-small",
+		Back = "arrow-large-left",
 	},
 }

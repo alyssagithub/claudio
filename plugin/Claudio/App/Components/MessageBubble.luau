@@ -129,6 +129,18 @@ const function Describe(Entry: Types.ToolCall, Running: boolean): string
 	return `{Verb} {Server}: {Tool:gsub("_", " "):gsub("%f[%a]%l", string.upper)}`
 end
 
+const function Running(): {Types.Task}
+	const Found = {}
+
+	for _, Entry in Chat.Tasks() do
+		if Entry.status == "running" and Entry.kind ~= "task" then
+			table.insert(Found, Entry)
+		end
+	end
+
+	return Found
+end
+
 const function Busy(Entry: Types.ToolCall): boolean
 	return Entry.status == "preparing" or Entry.status == "running"
 end
@@ -152,6 +164,7 @@ end
 
 return function(Props: Props)
 	const Hovered = Vide.source(false)
+	const Counting = Vide.source(false)
 
 	const function IsUser(): boolean
 		return Props.Role() == "user"
@@ -240,6 +253,7 @@ return function(Props: Props)
 			and #(if Props.Attachments then Props.Attachments() else {}) == 0
 			and Broke() == ""
 			and #Written() == 0
+			and #(if Props.Parts then Props.Parts() or {} else {}) == 0
 	end
 
 	const Expanded = Vide.source(false)
@@ -649,7 +663,7 @@ return function(Props: Props)
 	end
 
 	type Block = {
-		Kind: "thinking" | "text" | "calls" | "user",
+		Kind: "thinking" | "text" | "calls" | "user" | "notice",
 		Text: string?,
 		Calls: {number}?,
 	}
@@ -708,8 +722,8 @@ return function(Props: Props)
 						Calls = {Piece.Call},
 					})
 				end
-			elseif Piece.Kind == "thinking" or Piece.Kind == "text" or Piece.Kind == "user" then
-				if Last and Last.Kind == Piece.Kind and Piece.Kind ~= "user" then
+			elseif Piece.Kind == "thinking" or Piece.Kind == "text" or Piece.Kind == "user" or Piece.Kind == "notice" then
+				if Last and Last.Kind == Piece.Kind and Piece.Kind ~= "user" and Piece.Kind ~= "notice" then
 					Last.Text = `{Last.Text or ""}{if Piece.Kind == "text" then "\n\n" else "\n"}{Piece.Text or ""}`
 				else
 					table.insert(Found, {
@@ -1005,6 +1019,29 @@ return function(Props: Props)
 							return Vector2.new(math.max(20, math.floor(Hug() * 0.85) - 20), math.huge)
 						end,
 					},
+				},
+			},
+			Create "TextLabel" {
+				Name = "Notice",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				TextColor3 = Theme.Colors.DimText,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				LayoutOrder = 3,
+				Visible = function()
+					return Kind() == "notice"
+				end,
+				Text = function()
+					return if Kind() == "notice" then Value().Text or "" else ""
+				end,
+
+				Create "UIPadding" {
+					PaddingTop = UDim.new(0, 4),
+					PaddingBottom = UDim.new(0, 4),
 				},
 			},
 			Create "TextButton" {
@@ -1557,6 +1594,50 @@ return function(Props: Props)
 			return Props.Model ~= nil and Props.Model() ~= nil
 		end),
 		Create "Frame" {
+			Name = "Subagents",
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			LayoutOrder = 4,
+			Visible = function()
+				return Props.Live == true and Chat.SubagentsOpen() and #Running() > 1
+			end,
+
+			Create "UIListLayout" {
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 2),
+			},
+			Vide.indexes(Running, function(Entry: () -> Types.Task, Order: number)
+				return Create "TextButton" {
+					Name = "Subagent",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundColor3 = Theme.Colors.Button,
+					TextColor3 = Theme.Colors.Text,
+					TextSize = Settings.SmallText,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					AutoButtonColor = true,
+					LayoutOrder = Order,
+					Text = function()
+						return Entry().description
+					end,
+					Activated = function()
+						Chat.ViewSubagent(Entry())
+					end,
+
+					Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+					Create "UIPadding" {
+						PaddingLeft = UDim.new(0, 8),
+						PaddingRight = UDim.new(0, 8),
+						PaddingTop = UDim.new(0, 4),
+						PaddingBottom = UDim.new(0, 4),
+					},
+				}
+			end),
+		},
+		Create "Frame" {
 			Name = "Actions",
 			Size = UDim2.new(1, 0, 0, 24),
 			BackgroundTransparency = 1,
@@ -1580,6 +1661,51 @@ return function(Props: Props)
 				Visible = function()
 					return not IsUser() and Props.Index ~= nil
 				end,
+			},
+			Create "TextButton" {
+				Name = "SubagentCount",
+				Size = UDim2.fromScale(0, 0),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundColor3 = Theme.Colors.Button,
+				BackgroundTransparency = function()
+					return if Counting() or Chat.SubagentsOpen() then 0 else 1
+				end,
+				TextColor3 = Theme.Colors.Text,
+				TextTransparency = function()
+					return if Counting() or Chat.SubagentsOpen() then 0 else 0.25
+				end,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+				AutoButtonColor = false,
+				LayoutOrder = 0,
+				Visible = function()
+					return Props.Live == true and #Running() > 0
+				end,
+				Text = function()
+					const Count = #Running()
+
+					return `{Count} subagent{if Count == 1 then "" else "s"} running`
+				end,
+				Activated = function()
+					const Found = Running()
+
+					if #Found == 1 then
+						Chat.ViewSubagent(Found[1])
+
+						return
+					end
+
+					Chat.SubagentsOpen(not Chat.SubagentsOpen())
+				end,
+
+				Vide.action(Covers.Hover(Counting)),
+				Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+				Create "UIPadding" {
+					PaddingLeft = UDim.new(0, 5),
+					PaddingRight = UDim.new(0, 5),
+					PaddingTop = UDim.new(0, 2),
+					PaddingBottom = UDim.new(0, 2),
+				},
 			},
 			Vide.show(function()
 				return Hovered() or (Props.Failed ~= nil and Props.Failed())

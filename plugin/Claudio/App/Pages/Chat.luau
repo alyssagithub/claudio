@@ -12,7 +12,7 @@ const UpdateBanner = require(script.Parent.Parent.Components.UpdateBanner)
 const MessageList = require(script.Parent.Parent.Components.MessageList)
 const InputBar = require(script.Parent.Parent.Components.InputBar)
 const ChatList = require(script.Parent.Parent.Components.ChatList)
-const TaskList = require(script.Parent.Parent.Components.TaskList)
+const SubagentView = require(script.Parent.Parent.Components.SubagentView)
 const PlanBar = require(script.Parent.Parent.Components.PlanBar)
 const QuestionCard = require(script.Parent.Parent.Components.QuestionCard)
 const GalleryBar = require(script.Parent.Parent.Components.GalleryBar)
@@ -115,10 +115,25 @@ return function()
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					HorizontalAlignment = Enum.HorizontalAlignment.Center,
 				},
+				Vide.action(function(Object: Frame)
+					Vide.cleanup(Chat.WatchIdle())
+
+					Vide.effect(function()
+						const Viewing = Chat.Viewing() ~= nil
+
+						for _, Name in {"MessageList", "InputBar"} do
+							const Found = Object:FindFirstChild(Name)
+
+							if Found and Found:IsA("GuiObject") then
+								Found.Visible = not Viewing
+							end
+						end
+					end)
+				end),
 				MessageList(),
+				SubagentView(),
 				GalleryBar(),
 				QuestionCard(),
-				TaskList(),
 				PlanBar(),
 				InputBar(),
 			},

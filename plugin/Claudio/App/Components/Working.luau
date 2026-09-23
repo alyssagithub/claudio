@@ -26,7 +26,11 @@ return function()
 
 	const function Phase(): string
 		if Chat.Compacting() then
-			return "Compacting session"
+			return "Compacting conversation"
+		end
+
+		if Chat.Waiting() > 0 then
+			return `Waiting on {Chat.Waiting()} subagent{if Chat.Waiting() == 1 then "" else "s"}`
 		end
 
 		if Running() then

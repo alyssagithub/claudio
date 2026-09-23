@@ -28,9 +28,21 @@ return function()
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 			Padding = UDim.new(0, 6),
 		},
+		IconButton {
+			Icon = Config.Icons.Back,
+			LayoutOrder = 1,
+			Tooltip = "Back to the chat",
+			Visible = function()
+				return Chat.Viewing() ~= nil and not Chat.ListOpen() and not Chat.SettingsOpen()
+			end,
+			OnClick = Chat.LeaveSubagent,
+		},
 		Button {
 			Text = function()
 				return if Chat.ListOpen() or Chat.SettingsOpen() then "Back" else "Chats"
+			end,
+			Visible = function()
+				return Chat.Viewing() == nil or Chat.ListOpen() or Chat.SettingsOpen()
 			end,
 			LayoutOrder = 1,
 			OnClick = function()
@@ -63,7 +75,13 @@ return function()
 					return "Settings"
 				end
 
-				return if Chat.ListOpen() then "Chats" else Chat.Title()
+				if Chat.ListOpen() then
+					return "Chats"
+				end
+
+				const Viewing = Chat.Viewing()
+
+				return if Viewing then Viewing.Title else Chat.Title()
 			end,
 
 			Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},

@@ -136,6 +136,7 @@ export type StoredMessage = {
   tokens?: Tokens | null;
   cost?: number;
   estimated?: boolean;
+  notice?: boolean;
 };
 
 export type Conversation = {
@@ -188,6 +189,7 @@ export type Task = {
   Background: boolean;
   Depth: number;
   Error?: string | null;
+  ToolUseId?: string | null;
 };
 
 export type Asked = {
@@ -292,6 +294,8 @@ export type Session = {
   PendingContext?: string | null;
   Breakdown?: Breakdown | null;
   CurrentTurn: Turn | null;
+  LastTurn?: Turn | null;
+  Background: Set<string>;
   FilesBefore: Map<string, string>;
   LineCounts: Map<string, LineCount>;
   Query: Query | null;
@@ -339,6 +343,7 @@ export type Turn = {
   CapResults: boolean;
   Planning: boolean;
   Compacting: boolean;
+  Waiting: number;
   OutputStyle: string;
   StepDown: boolean;
   FallenFrom: string | null;

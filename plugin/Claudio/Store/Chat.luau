@@ -54,6 +54,10 @@ const Chat = {
 	Restoring = Vide.source(false),
 	Calls = Vide.source({} :: {Types.ToolCall}),
 	Tasks = Vide.source({} :: {Types.Task}),
+	Waiting = Vide.source(0),
+	Viewing = Vide.source(nil :: {Parent: string, ToolUseId: string, Title: string}?),
+	Watched = Vide.source({} :: {Types.Message}),
+	SubagentsOpen = Vide.source(false),
 	Planning = Vide.source(false),
 	Compacting = Vide.source(false),
 	Tokens = Vide.source(nil :: Types.Tokens?),
@@ -2562,6 +2566,7 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		} else nil)
 		Chat.Limits(State.limits or Chat.Limits())
 		Chat.Tasks(State.tasks or {})
+		Chat.Waiting(State.waiting or 0)
 		Chat.Planning(State.planning == true)
 		Chat.Compacting(State.compacting == true)
 
@@ -2794,6 +2799,10 @@ Attach = function(ConversationId: string)
 	task.spawn(Chat.Flush)
 
 	for Index = #Chat.Messages(), 1, -1 do
+		if Turn.automatic then
+			break
+		end
+
 		if Chat.Messages()[Index].Role == "user" then
 			Chat.CurrentPrompt = Chat.Messages()[Index].Text
 			Chat.Messages(table.move(Chat.Messages(), 1, Index, 1, {}))
@@ -3190,6 +3199,65 @@ const function Loaded(Given: {any}): {Types.Message}
 	return Messages
 end
 
+function Chat.ViewSubagent(Task: Types.Task)
+	const Parent = Chat.ConversationId()
+
+	if not Parent or not Task.toolUseId then
+		return
+	end
+
+	const Mine = {
+		Parent = Parent,
+		ToolUseId = Task.toolUseId,
+		Title = Task.description,
+	}
+
+	const function Fetch()
+		const Ok, Result = Client.GetSubagent(Mine.Parent, Mine.ToolUseId)
+
+		if Chat.Viewing() ~= Mine or not Ok or typeof(Result) ~= "table" or typeof(Result.messages) ~= "table" then
+			return
+		end
+
+		Chat.Watched(Loaded(Result.messages))
+	end
+
+	Chat.SubagentsOpen(false)
+	Chat.Watched({})
+	Chat.Viewing(Mine)
+
+	task.spawn(function()
+		Fetch()
+
+		while task.wait(1.5) and Chat.Viewing() == Mine do
+			Fetch()
+		end
+	end)
+end
+
+function Chat.LeaveSubagent()
+	Chat.Viewing(nil)
+	Chat.Watched({})
+end
+
+function Chat.WatchIdle(): () -> ()
+	local Watching = true
+
+	task.spawn(function()
+		while task.wait(3) and Watching do
+			const Id = Chat.ConversationId()
+
+			if Id and not Chat.Sending() then
+				Attach(Id)
+			end
+		end
+	end)
+
+	return function()
+		Watching = false
+	end
+end
+
 const Allowance = 7000
 
 const function Weight(Message: Types.Message): number
@@ -3231,6 +3299,7 @@ function Chat.Fits(Messages: {Types.Message}, Upto: number): number
 end
 
 function Chat.Open(Id: string)
+	Chat.LeaveSubagent()
 	if Id == Gallery.Id then
 		Chat.Stop()
 		Reset()
@@ -3372,6 +3441,7 @@ function Chat.Resume()
 end
 
 function Chat.New()
+	Chat.LeaveSubagent()
 	Chat.Stop()
 	Reset()
 	Chat.Shown(40)

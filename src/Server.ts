@@ -13,7 +13,7 @@ import { StudioTools } from "./Tools.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
 import { StudioProcesses } from "./StudioPresence.js";
 import { ActiveTurnFor, AddToTurn, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
-import { ConversationExists, DeleteConversation, GetChapters, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
+import { ConversationExists, DeleteConversation, GetChapters, GetSubagent, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
 import { HandToken, IssuePlaytestKey, PlaytestKeyMatches, PlaytestLive, RevokePlaytestKey, TokenMatches } from "./Token.js";
@@ -218,6 +218,18 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
 
   if (Request.method === "GET" && Id && Segments[2] === "exists") {
     SendJson(Response, 200, {exists: ConversationExists(Id)});
+    return;
+  }
+
+  if (Request.method === "GET" && Id && Segments[2] === "subagents" && Segments[3]) {
+    const Found = /^[\w-]{1,100}$/.test(Segments[3]) ? GetSubagent(Id, Segments[3]) : null;
+
+    if (!Found) {
+      SendJson(Response, 404, {error: "That subagent has no transcript yet"});
+      return;
+    }
+
+    SendJson(Response, 200, Found);
     return;
   }
 

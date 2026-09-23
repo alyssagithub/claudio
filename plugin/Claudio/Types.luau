@@ -23,7 +23,7 @@ export type Limit = {
 }
 
 export type Piece = {
-	Kind: "thinking" | "text" | "call" | "user",
+	Kind: "thinking" | "text" | "call" | "user" | "notice",
 	Text: string?,
 	Call: number?,
 }
@@ -179,6 +179,8 @@ export type ConnectionStatus = "Disconnected" | "Connecting" | "Connected" | "Er
 
 export type Turn = {
 	requestId: string,
+	automatic: boolean?,
+	waiting: number?,
 	conversationId: string?,
 	sessionId: string?,
 	status: string,
@@ -258,6 +260,7 @@ export type Task = {
 	status: string,
 	background: boolean,
 	depth: number,
+	toolUseId: string?,
 }
 
 export type Reference = {

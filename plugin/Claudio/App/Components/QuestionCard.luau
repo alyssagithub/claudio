@@ -453,7 +453,11 @@ return function()
 			Visible = function()
 				return Chosen()[Other] == true and not Shut()
 			end,
-			Text = "",
+			Text = function()
+				const Held = Current()
+
+				return if Held then Written()[Held.question] or "" else ""
+			end,
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
 			Create "UIPadding" {

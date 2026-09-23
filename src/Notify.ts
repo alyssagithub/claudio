@@ -130,7 +130,7 @@ export function RestoreFlashing() {
   const Key = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced";
   const Command = Before === "-1"
     ? `Remove-ItemProperty -Path '${Key}' -Name TaskbarFlashing -ErrorAction SilentlyContinue`
-    : `Set-ItemProperty -Path '${Key}' -Name TaskbarFlashing -Value ${Number(Before) || 1} -Type DWord`;
+    : `Set-ItemProperty -Path '${Key}' -Name TaskbarFlashing -Value ${/^\d+$/.test(Before) ? Before : 1} -Type DWord`;
 
   execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", Command], {windowsHide: true}, () => {
     fs.rmSync(FlashingSaved, {force: true});

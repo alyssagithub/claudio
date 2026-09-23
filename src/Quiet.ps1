@@ -4,13 +4,12 @@ $Key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
 $Had = Get-ItemProperty -Path $Key -Name TaskbarFlashing -ErrorAction SilentlyContinue
 $Before = if ($Had) { [int]$Had.TaskbarFlashing } else { -1 }
 
-if ($Before -ne 0) {
-    Set-ItemProperty -Path $Key -Name TaskbarFlashing -Value 0 -Type DWord
-}
-
 $Saved = Join-Path $env:USERPROFILE ".claudio\flashing.txt"
 
-Set-Content -Path $Saved -Value $Before
+if ($Before -ne 0) {
+    Set-Content -Path $Saved -Value $Before
+    Set-ItemProperty -Path $Key -Name TaskbarFlashing -Value 0 -Type DWord
+}
 
 try {
     [Console]::Out.WriteLine("quiet")
@@ -36,7 +35,9 @@ try {
         Set-ItemProperty -Path $Key -Name TaskbarFlashing -Value $Before -Type DWord
     }
 
-    Remove-Item -Path $Saved -ErrorAction SilentlyContinue
+    if ($Before -ne 0) {
+        Remove-Item -Path $Saved -ErrorAction SilentlyContinue
+    }
 }
 
 [Console]::Out.WriteLine("restored")

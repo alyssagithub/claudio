@@ -67,6 +67,7 @@ const function Row(Command: () -> Types.Command, Index: number)
 			Position = UDim2.new(1, 0, 0.5, 0),
 			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundColor3 = Theme.Colors.Background,
+			BackgroundTransparency = 0,
 			TextColor3 = Theme.Colors.Text,
 			TextSize = Settings.SmallText,
 			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
@@ -82,7 +83,11 @@ const function Row(Command: () -> Types.Command, Index: number)
 
 			Create "UISizeConstraint" {MaxSize = Vector2.new(220, math.huge)},
 			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-			Create "UIStroke" {Color = Theme.Colors.Border},
+			Create "UIStroke" {
+				Color = Theme.Colors.DimText,
+				Transparency = 0.6,
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			},
 			Create "UIPadding" {
 				PaddingLeft = UDim.new(0, 6),
 				PaddingRight = UDim.new(0, 6),

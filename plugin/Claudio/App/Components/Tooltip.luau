@@ -13,6 +13,7 @@ return function()
 		Name = "Tooltip",
 		AutomaticSize = Enum.AutomaticSize.XY,
 		BackgroundColor3 = Theme.Colors.Background,
+		BackgroundTransparency = 0,
 		TextColor3 = Theme.Colors.Text,
 		TextSize = Settings.SmallText,
 		FontFace = Font.fromEnum(Enum.Font.BuilderSans),
@@ -59,7 +60,11 @@ return function()
 		end,
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-		Create "UIStroke" {Color = Theme.Colors.Border},
+		Create "UIStroke" {
+			Color = Theme.Colors.DimText,
+			Transparency = 0.6,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		},
 		Create "UISizeConstraint" {
 			MaxSize = function()
 				return Vector2.new(if Chat.Window then math.max(80, Chat.Window.AbsoluteSize.X - 12) else 300, math.huge)

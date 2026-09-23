@@ -473,6 +473,7 @@ function ModelPicker.Menu()
 				AnchorPoint = Vector2.new(0, 1),
 				Position = UDim2.new(0, 0, 0, -10),
 				BackgroundColor3 = Theme.Colors.Panel,
+				BackgroundTransparency = 0,
 				TextColor3 = Theme.Colors.DimText,
 				TextSize = Settings.SmallText,
 				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
@@ -485,7 +486,11 @@ function ModelPicker.Menu()
 				Text = Tip,
 
 				Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-				Create "UIStroke" {Color = Theme.Colors.Button},
+				Create "UIStroke" {
+					Color = Theme.Colors.DimText,
+					Transparency = 0.6,
+					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+				},
 				Create "UIPadding" {
 					PaddingLeft = UDim.new(0, 8),
 					PaddingRight = UDim.new(0, 8),
@@ -779,7 +784,10 @@ function ModelPicker.EffortHelp()
 		end,
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-		Create "UIStroke" {Color = Theme.Colors.Button},
+		Create "UIStroke" {
+			Color = Theme.Colors.DimText,
+			Transparency = 0.6,
+		},
 		Create "UIPadding" {
 			PaddingLeft = UDim.new(0, 10),
 			PaddingRight = UDim.new(0, 10),

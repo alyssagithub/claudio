@@ -19,6 +19,17 @@ return function()
 	const Written = Vide.source({} :: {[string]: string})
 	const Shut = Vide.source(false)
 
+	Vide.effect(function()
+		Chat.Question()
+
+		Vide.untrack(function()
+			Step(1)
+			Picked({})
+			Written({})
+			Shut(false)
+		end)
+	end)
+
 	const function Asked(): {Types.Question}
 		const Held = Chat.Question()
 
@@ -99,18 +110,10 @@ return function()
 			end
 		end
 
-		Step(1)
-		Picked({})
-		Written({})
-		Shut(false)
 		Chat.Reply(Answers)
 	end
 
 	const function Dismiss()
-		Step(1)
-		Picked({})
-		Written({})
-		Shut(false)
 		Chat.Reply(nil)
 	end
 

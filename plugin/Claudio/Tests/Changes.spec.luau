@@ -61,6 +61,12 @@ return function()
 			expect(Changes.Describe({Call("mcp__claudio__modify", "action: delete\npath: game.Workspace.Old")})[1].Text).to.equal("Deleted Workspace.Old")
 		end)
 
+		it("lists a file changed by any of the file editing tools", function()
+			for _, Name in {"Write", "Edit", "MultiEdit"} do
+				expect(Changes.Describe({Call(Name, "file_path: C:/Place/Main.luau")})[1].Text).to.equal("Wrote C:/Place/Main.luau")
+			end
+		end)
+
 		it("reads a loaded rbxm as an addition and a saved one as nothing", function()
 			expect(Changes.Describe({Call("mcp__claudio__rbxm", "file: C:/a.rbxm\npath: Workspace")})[1].Kind).to.equal("added")
 			expect(#Changes.Describe({Call("mcp__claudio__rbxm", "file: C:/a.rbxm\npaths: [\"Workspace.Part\"]")})).to.equal(0)

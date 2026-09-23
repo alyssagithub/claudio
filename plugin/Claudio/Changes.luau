@@ -118,7 +118,7 @@ const function Line(Call: Types.ToolCall): Types.Change?
 		}
 	end
 
-	if Name == "Write" or Name == "Edit" then
+	if Name == "Write" or Name == "Edit" or Name == "MultiEdit" then
 		return {
 			Kind = "changed",
 			Text = `Wrote {Format.Path(Field(Input, "file_path"))}`,

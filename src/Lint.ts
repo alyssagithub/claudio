@@ -169,7 +169,7 @@ async function Prepare(): Promise<string> {
 const StudioSettings = "https://clientsettingscdn.roblox.com/v2/settings/application/PCStudioApp";
 const Prefixes = ["FFlag", "DFFlag", "FInt", "DFInt", "SFFlag", "FString", "DFString"];
 
-let Tuned: string[] | null = null;
+let Tuned: Promise<string[]> | null = null;
 
 function Published(): string {
   return path.join(ToolsFolder, "studioflags.json");
@@ -210,35 +210,35 @@ async function Settings(): Promise<Record<string, unknown> | null> {
   return Values;
 }
 
-async function Flags(Analyzer: string): Promise<string[]> {
-  if (Tuned) {
-    return Tuned;
-  }
+function Flags(Analyzer: string): Promise<string[]> {
+  Tuned ??= (async () => {
+    const Found = process.env.CLAUDIO_NEW_SOLVER === "1" ? ["--flag:LuauSolverV2=True"] : [];
 
-  Tuned = process.env.CLAUDIO_NEW_SOLVER === "1" ? ["--flag:LuauSolverV2=True"] : [];
+    try {
+      const [Names, Values] = await Promise.all([ReadAnalyzerFlags(Analyzer), Settings()]);
 
-  try {
-    const [Names, Values] = await Promise.all([ReadAnalyzerFlags(Analyzer), Settings()]);
-
-    if (!Values) {
-      return Tuned;
-    }
-
-    for (const Name of Names) {
-      if (Name === "LuauSolverV2") {
-        continue;
+      if (!Values) {
+        return Found;
       }
 
-      for (const Prefix of Prefixes) {
-        if (Object.hasOwn(Values, Prefix + Name)) {
-          Tuned.push(`--flag:${Name}=${Values[Prefix + Name]}`);
-          break;
+      for (const Name of Names) {
+        if (Name === "LuauSolverV2") {
+          continue;
+        }
+
+        for (const Prefix of Prefixes) {
+          if (Object.hasOwn(Values, Prefix + Name)) {
+            Found.push(`--flag:${Name}=${Values[Prefix + Name]}`);
+            break;
+          }
         }
       }
+    } catch (Error) {
+      console.error(`Could not sync Studio flags: ${(Error as NodeJS.ErrnoException).message}`);
     }
-  } catch (Error) {
-    console.error(`Could not sync Studio flags: ${(Error as NodeJS.ErrnoException).message}`);
-  }
+
+    return Found;
+  })();
 
   return Tuned;
 }

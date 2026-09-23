@@ -31,11 +31,11 @@ let Releases: { At: number; List: ReleaseEntry[] } = {
 };
 
 export function LooksLikeVersion(Text: unknown): Text is string {
-  return typeof Text === "string" && /^v?\d+(\.\d+)*$/.test(Text.trim());
+  return typeof Text === "string" && /^v?\d+(\.\d+)*(-[\w.]+)?$/.test(Text.trim());
 }
 
 function Compare(Left: string, Right: string): number {
-  const Parts = (Text: string) => String(Text).trim().replace(/^v/, "").split(".").map((Piece) => Number(Piece) || 0);
+  const Parts = (Text: string) => String(Text).trim().replace(/^v/, "").replace(/-.*$/, "").split(".").map((Piece) => Number(Piece) || 0);
   const First = Parts(Left);
   const Second = Parts(Right);
 
@@ -43,6 +43,10 @@ function Compare(Left: string, Right: string): number {
     if ((First[At] || 0) !== (Second[At] || 0)) {
       return (First[At] || 0) > (Second[At] || 0) ? 1 : -1;
     }
+  }
+
+  if (Left.includes("-") !== Right.includes("-")) {
+    return Left.includes("-") ? -1 : 1;
   }
 
   return 0;

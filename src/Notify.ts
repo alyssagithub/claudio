@@ -1,7 +1,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
+import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import notifier from "node-notifier";
 
@@ -192,28 +194,57 @@ export function WriteClipboard(Text: string): Promise<boolean> {
   });
 }
 
-function RunClipboard(Mode: string, Marker?: string | null): Promise<string> {
-  return new Promise<string>((Resolve) => {
-    if (process.platform !== "win32") {
-      Resolve("");
-      return;
-    }
+let Helper: ChildProcess | null = null;
+const Replies: ((Line: string) => void)[] = [];
 
-    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ClipboardPath], {
+export function AskClipboard(Command: string, Marker = ""): Promise<string> {
+  if (process.platform !== "win32") {
+    return Promise.resolve("");
+  }
+
+  if (!Helper) {
+    const Started = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ClipboardPath], {
       windowsHide: true,
-      maxBuffer: 32 * 1024 * 1024,
-      env: {
-        ...process.env,
-        CLAUDIO_CLIPBOARD_MODE: Mode,
-        CLAUDIO_CLIPBOARD_MARKER: Marker || "",
-      },
-    }, (Error, Stdout) => {
-      Resolve(Error ? "" : String(Stdout || "").trim());
+      stdio: ["pipe", "pipe", "ignore"],
     });
+
+    readline.createInterface({input: Started.stdout!}).on("line", (Line) => {
+      const Reply = Replies.shift();
+
+      if (Reply) {
+        Reply(Line);
+      }
+    });
+    Started.on("exit", () => {
+      if (Helper === Started) {
+        Helper = null;
+      }
+
+      for (const Reply of Replies.splice(0)) {
+        Reply("");
+      }
+    });
+    Helper = Started;
+  }
+
+  const Asked = Helper;
+
+  return new Promise<string>((Resolve) => {
+    const Timer = setTimeout(() => {
+      Resolve("");
+      Asked.kill();
+    }, 15000);
+
+    Replies.push((Line) => {
+      clearTimeout(Timer);
+      Resolve(Line);
+    });
+    Asked.stdin!.write(`${Command}\t${Marker.replace(/[\t\r\n]/g, " ")}\n`);
   });
 }
 
 let Armed: { Marker: string; Image: ClipboardPicture } | null = null;
+let Watching: NodeJS.Timeout | null = null;
 
 function Picture(Data: string): ClipboardPicture {
   return {
@@ -223,51 +254,64 @@ function Picture(Data: string): ClipboardPicture {
   };
 }
 
-export async function ArmClipboard(Marker: string): Promise<string> {
-  const [Outcome, Data] = (await RunClipboard("arm", Marker)).split(/\r?\n/);
+function Remember(Marker: string, Answer: string) {
+  const [Outcome, Data] = Answer.split("\t");
 
   if (Outcome === "armed" && Data && Data.length >= 64) {
     Armed = {
       Marker,
-      Image: Picture(Data.trim()),
+      Image: Picture(Data),
     };
   }
 
   return Outcome;
 }
 
-export async function DisarmClipboard(Marker: string): Promise<string> {
-  return await RunClipboard("disarm", Marker);
+function StopWatching() {
+  if (Watching) {
+    clearInterval(Watching);
+  }
+
+  Watching = null;
 }
 
-export function ReadClipboardImage(Marker?: string | null): Promise<ClipboardPicture | null> {
-  return new Promise<ClipboardPicture | null>((Resolve) => {
-    if (Marker && Armed && Armed.Marker === Marker) {
-      Resolve(Armed.Image);
+export async function ArmClipboard(Marker: string): Promise<string> {
+  StopWatching();
+
+  const Outcome = Remember(Marker, await AskClipboard("arm", Marker));
+  const Began = Date.now();
+  let Busy = false;
+
+  Watching = setInterval(async () => {
+    if (Busy) {
       return;
     }
 
-    if (process.platform !== "win32") {
-      Resolve(null);
+    if (Date.now() - Began > 10 * 60 * 1000) {
+      StopWatching();
       return;
     }
 
-    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ClipboardPath], {
-      windowsHide: true,
-      maxBuffer: 32 * 1024 * 1024,
-      env: {
-        ...process.env,
-        CLAUDIO_CLIPBOARD_MODE: "read",
-      },
-    }, (Error, Stdout) => {
-      const Data = String(Stdout || "").replace(/\s+/g, "");
+    Busy = true;
+    Remember(Marker, await AskClipboard("check", Marker));
+    Busy = false;
+  }, 300);
 
-      if (Error || Data === "none" || Data.length < 64) {
-        Resolve(null);
-        return;
-      }
+  return Outcome;
+}
 
-      Resolve(Picture(Data));
-    });
-  });
+export async function DisarmClipboard(Marker: string): Promise<string> {
+  StopWatching();
+
+  return await AskClipboard("disarm", Marker);
+}
+
+export async function ReadClipboardImage(Marker?: string | null): Promise<ClipboardPicture | null> {
+  if (Marker && Armed && Armed.Marker === Marker) {
+    return Armed.Image;
+  }
+
+  const Data = (await AskClipboard("read")).trim();
+
+  return Data === "" || Data === "none" || Data === "failed" || Data.length < 64 ? null : Picture(Data);
 }

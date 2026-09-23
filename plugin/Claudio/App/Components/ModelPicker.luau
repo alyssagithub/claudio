@@ -211,7 +211,9 @@ const ModelPicker = {
 }
 
 const function Scaled(Width: number): number
-	return math.min(math.round(Width * Settings.TextSize() / Config.TextSize), if Chat.Window then Chat.Window.AbsoluteSize.X - 16 else math.huge)
+	const Room = Chat.WindowWidth()
+
+	return math.min(math.round(Width * Settings.TextSize() / Config.TextSize), if Room > 16 then Room - 16 else math.huge)
 end
 
 const MoreOpen = Vide.source(false)

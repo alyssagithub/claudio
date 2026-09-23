@@ -68,7 +68,7 @@ return function()
 		},
 		Create "UISizeConstraint" {
 			MaxSize = function()
-				return Vector2.new(if Chat.Window then math.max(80, Chat.Window.AbsoluteSize.X - 12) else 300, math.huge)
+				return Vector2.new(math.max(80, if Chat.WindowWidth() > 0 then Chat.WindowWidth() - 12 else 300), math.huge)
 			end,
 		},
 		Create "UIPadding" {

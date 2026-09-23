@@ -1,8 +1,8 @@
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public static class ClipboardSequence { [DllImport("user32.dll")] public static extern uint GetClipboardSequenceNumber(); }'
 
-$Mode = if ($env:CLAUDIO_CLIPBOARD_MODE) { $env:CLAUDIO_CLIPBOARD_MODE } else { "read" }
-$Marker = $env:CLAUDIO_CLIPBOARD_MARKER
+$Seen = [uint32]0
 
 function Set-PrivateClipboard {
     param($Bundle)
@@ -60,57 +60,83 @@ function Get-Png {
     return $Encoded
 }
 
-if ($Mode -eq "arm") {
+function Set-Armed {
+    param($Marker)
+
     $Picture = Get-ClipboardImage
 
     if (-not $Picture) {
-        "noimage"
-        exit
+        $script:Seen = [ClipboardSequence]::GetClipboardSequenceNumber()
+        return "noimage"
     }
 
     if ((Get-ClipboardText) -eq $Marker) {
         $Picture.Dispose()
-        "already"
-        exit
+        $script:Seen = [ClipboardSequence]::GetClipboardSequenceNumber()
+        return "already"
     }
 
     $Bundle = New-Object System.Windows.Forms.DataObject
     $Bundle.SetImage($Picture)
     $Bundle.SetText($Marker)
     Set-PrivateClipboard $Bundle
-    "armed"
-    Get-Png $Picture
+    $script:Seen = [ClipboardSequence]::GetClipboardSequenceNumber()
+    $Encoded = Get-Png $Picture
     $Picture.Dispose()
-    exit
+
+    return "armed`t$Encoded"
 }
 
-if ($Mode -eq "disarm") {
+function Set-Disarmed {
+    param($Marker)
+
     if ((Get-ClipboardText) -ne $Marker) {
-        "notours"
-        exit
+        return "notours"
     }
 
     $Picture = Get-ClipboardImage
 
     if (-not $Picture) {
-        "noimage"
-        exit
+        return "noimage"
     }
 
     $Bundle = New-Object System.Windows.Forms.DataObject
     $Bundle.SetImage($Picture)
     Set-PrivateClipboard $Bundle
     $Picture.Dispose()
-    "disarmed"
-    exit
+
+    return "disarmed"
 }
 
-$Picture = Get-ClipboardImage
+function Get-Read {
+    $Picture = Get-ClipboardImage
 
-if (-not $Picture) {
-    "none"
-    exit
+    if (-not $Picture) {
+        return "none"
+    }
+
+    $Encoded = Get-Png $Picture
+    $Picture.Dispose()
+
+    return $Encoded
 }
 
-Get-Png $Picture
-$Picture.Dispose()
+while ($null -ne ($Line = [Console]::In.ReadLine())) {
+    $Parts = $Line.Split("`t", 2)
+    $Marker = if ($Parts.Count -gt 1) { $Parts[1] } else { "" }
+
+    try {
+        $Answer = switch ($Parts[0]) {
+            "arm" { Set-Armed $Marker }
+            "check" { if ([ClipboardSequence]::GetClipboardSequenceNumber() -eq $Seen) { "same" } else { Set-Armed $Marker } }
+            "disarm" { Set-Disarmed $Marker }
+            "read" { Get-Read }
+            default { "ready" }
+        }
+    } catch {
+        $Answer = "failed"
+    }
+
+    [Console]::Out.WriteLine($Answer)
+    [Console]::Out.Flush()
+}

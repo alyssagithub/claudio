@@ -29,9 +29,14 @@ function App.New(CurrentPlugin: Plugin)
 		Window.Enabled = not Window.Enabled
 	end)
 	Chat.Window = Window
+	Chat.WindowWidth(Window.AbsoluteSize.X)
 
 	Button:SetActive(Window.Enabled)
 	Chat.ReplyListener = Attention.Notify
+
+	const SizeConnection = Window:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		Chat.WindowWidth(Window.AbsoluteSize.X)
+	end)
 
 	const EnabledConnection = Window:GetPropertyChangedSignal("Enabled"):Connect(function()
 		Button:SetActive(Window.Enabled)
@@ -159,6 +164,7 @@ function App.New(CurrentPlugin: Plugin)
 			DragLeft:Disconnect()
 			DragDropped:Disconnect()
 			EnabledConnection:Disconnect()
+			SizeConnection:Disconnect()
 			Unmount()
 
 			if RunService:IsRunning() then

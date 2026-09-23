@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { exec, execFile, spawn } from "node:child_process";
-import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, MaxLintBodyBytes, MostScriptsToCheck, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
+import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, MostScriptsToCheck, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { GetLimits, GetBreakdown, PollUsage, RefreshConversationContext } from "./ClaudeSession.js";
 import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving } from "./Studio.js";
@@ -19,7 +19,7 @@ import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
 import { HandToken, IssuePlaytestKey, PlaytestKeyMatches, PlaytestLive, RevokePlaytestKey, TokenMatches } from "./Token.js";
 import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
-import { ArmClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, RestoreFlashing, ShowToast, WriteClipboard } from "./Notify.js";
+import { ArmClipboard, AskClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, RestoreFlashing, ShowToast, WriteClipboard } from "./Notify.js";
 import { ForgetConversation, GetModels } from "./Models.js";
 import { Analyze, Warm } from "./Lint.js";
 import { DescribeReturn, StopWatchingReturn, WatchReturn } from "./Keys.js";
@@ -421,6 +421,7 @@ function WarmUsage() {
 export function StartServer(Port: number) {
   AskLogin().catch(() => {});
   RegisterToasts();
+  AskClipboard("ready");
   RestoreFlashing();
 
   process.on("uncaughtException", (Error) => {
@@ -556,7 +557,7 @@ export function StartServer(Port: number) {
 
         if ((ConversationId || typeof Body.requestId === "string") && (IsConversationBusy(ConversationId) || Body.now === true)) {
           const Pictures = Array.isArray(Body.images)
-            ? Body.images.filter((Image) => typeof Image.data === "string" && typeof Image.mediaType === "string").slice(0, 4)
+            ? Body.images.filter((Image) => typeof Image.data === "string" && typeof Image.mediaType === "string").slice(0, 20)
             : [];
           const Joined = Body.now === true ? AddToTurn(typeof Body.requestId === "string" ? Body.requestId : null, ConversationId, Body.text, Pictures) : null;
 
@@ -570,7 +571,7 @@ export function StartServer(Port: number) {
         }
 
         const Images = Array.isArray(Body.images)
-          ? Body.images.filter((Image) => typeof Image.data === "string" && typeof Image.mediaType === "string").slice(0, 4)
+          ? Body.images.filter((Image) => typeof Image.data === "string" && typeof Image.mediaType === "string").slice(0, 20)
           : [];
 
         SendJson(Response, 200, DescribeTurn(StartTurn({
@@ -617,7 +618,7 @@ export function StartServer(Port: number) {
       }
 
       if (Request.method === "POST" && Url.pathname === "/lint") {
-        const Body = await ReadBody(Request, MaxLintBodyBytes);
+        const Body = await ReadBody(Request);
         const Tree = (Array.isArray(Body.tree) ? Body.tree : []).filter((Entry: {path?: unknown, className?: unknown}) => Entry && typeof Entry.path === "string" && typeof Entry.className === "string").slice(0, 20000);
         const Sources = new Map<string, string>(Tree.filter((Entry: {source?: unknown}) => typeof Entry.source === "string").map((Entry: {path: string, source: string}) => [Entry.path, Entry.source]));
         const Wanted = (Array.isArray(Body.scripts) ? Body.scripts : [])

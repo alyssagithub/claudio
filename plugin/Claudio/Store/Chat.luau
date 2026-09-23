@@ -67,6 +67,7 @@ const Chat = {
 	ContextUsed = Vide.source(0),
 	ContextWindow = Vide.source(0),
 	ContextLoading = Vide.source(false),
+	WindowWidth = Vide.source(0),
 	ContextParts = Vide.source({} :: {Types.Part}),
 	Tip = Vide.source(nil :: {Text: string, Where: Vector2, Side: number, Below: boolean}?),
 	MenuFor = Vide.source(nil :: string?),
@@ -2973,8 +2974,8 @@ function Chat.CheckVersions()
 end
 
 const function Newer(Candidate: string, Than: string): boolean
-	const Left = string.split(Candidate, ".")
-	const Right = string.split(Than, ".")
+	const Left = string.split((Candidate:gsub("%-.*$", "")), ".")
+	const Right = string.split((Than:gsub("%-.*$", "")), ".")
 
 	for Index = 1, 3 do
 		const One = tonumber(Left[Index]) or 0
@@ -2985,7 +2986,7 @@ const function Newer(Candidate: string, Than: string): boolean
 		end
 	end
 
-	return false
+	return Than:find("-", 1, true) ~= nil and not Candidate:find("-", 1, true)
 end
 
 function Chat.Installed(): string

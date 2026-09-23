@@ -371,7 +371,8 @@ export function GetCommands(Folder?: string | null) {
   }
 
   const Project = Folder && path.isAbsolute(Folder) ? ProjectCommands(Folder) : new Map<string, string>();
-  const Names = [...new Set([...Commands.slashCommands, ...Project.keys()])];
+  const Everything = new Set([...Commands.slashCommands, ...Project.keys()]);
+  const Names = [...Everything].filter((Name) => !Name.includes(":") || !Everything.has(Name.slice(Name.indexOf(":") + 1)));
 
   return {
     ...Commands,

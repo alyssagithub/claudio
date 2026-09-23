@@ -472,13 +472,7 @@ return function()
 					HorizontalFlex = Enum.UIFlexAlignment.Fill,
 				},
 				Line(function()
-					const Named = Chat.ContextModel()
-
-					if Named == "" then
-						return "Context window"
-					end
-
-					return `Context window · {Format.Model(Named)}`
+					return "Context window"
 				end, function()
 					const Room = Chat.ContextWindow()
 

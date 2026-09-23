@@ -66,7 +66,6 @@ const Chat = {
 	Limits = Vide.source({} :: {Types.Limit}),
 	ContextUsed = Vide.source(0),
 	ContextWindow = Vide.source(0),
-	ContextModel = Vide.source(""),
 	ContextLoading = Vide.source(false),
 	ContextParts = Vide.source({} :: {Types.Part}),
 	Tip = Vide.source(nil :: {Text: string, Where: Vector2, Side: number, Below: boolean}?),
@@ -165,7 +164,6 @@ const function Reset()
 	Chat.ContextParts({})
 	Chat.ContextUsed(0)
 	Chat.ContextWindow(0)
-	Chat.ContextModel("")
 	Chat.ContextLoading(false)
 	Chat.Opened({})
 	table.clear(Chat.Anchors)
@@ -2578,7 +2576,6 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 
 		if State.contextWindow and State.contextWindow > 0 then
 			Chat.ContextWindow(State.contextWindow)
-			Chat.ContextModel(State.contextModel or "")
 		end
 
 		if State.context then
@@ -3076,7 +3073,6 @@ function Chat.RefreshUsage(Retries: number?)
 		Chat.ContextParts({})
 		Chat.ContextUsed(0)
 		Chat.ContextWindow(0)
-		Chat.ContextModel("")
 
 		return
 	end
@@ -3084,7 +3080,6 @@ function Chat.RefreshUsage(Retries: number?)
 	Chat.ContextParts(Result.context.categories)
 	Chat.ContextUsed(Result.context.total)
 	Chat.ContextWindow(Result.context.max)
-	Chat.ContextModel(Result.context.model or "")
 end
 
 function Chat.Refresh()

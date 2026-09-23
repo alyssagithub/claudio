@@ -1750,11 +1750,11 @@ export function ApplyStyleEverywhere(OutputStyle: string, StepDown: boolean) {
   }
 }
 
-function Choose({ Text, ConversationId, Images, Model, Effort, Escalate, Mode, Folder }: TurnRequest) {
+function Choose({ Text, ConversationId, Images, Model, Effort, Escalate, Mode, Folder }: TurnRequest, Record: boolean) {
   const Lean = Model === LeanMode.value;
   const Auto = Lean || !Model || Model === "auto";
 
-  if (Escalate && Auto) {
+  if (Escalate && Auto && Record) {
     RecordTurnOutcome(ConversationId || "", {
       Failed: true,
       Denied: false,
@@ -1767,7 +1767,7 @@ function Choose({ Text, ConversationId, Images, Model, Effort, Escalate, Mode, F
     Planning: Mode === "plan",
     Folder: UsableFolder(Folder) || WorkingDirectory,
     Chosen: Auto
-      ? ChooseModel(ConversationId || "", Text, Boolean(Images && Images.length) || Text.includes("<studio_context>"), AutoBias(Effort))
+      ? ChooseModel(ConversationId || "", Text, Boolean(Images && Images.length) || Text.includes("<studio_context>"), AutoBias(Effort), Record)
       : {
         model: Model,
         effort: Escalate ? NextEffort(Model, Effort) : (SupportsEffort(Model, Effort) ? Effort : null),
@@ -1792,7 +1792,7 @@ export function WarmConversation(Request: TurnRequest): Promise<void> {
   }
 
   if (!Warming.has(Id)) {
-    const { Lean, Planning, Folder, Chosen } = Choose(Request);
+    const { Lean, Planning, Folder, Chosen } = Choose(Request, false);
     const Session = OpenSession(Id, Folder, Chosen.model, Chosen.effort, Request.AskForTools !== false, Request.ExtraPrompt !== false, Request.FastMode === true, Planning, Lean, Request.Mode, Request.Bypass === true, Chosen.delegate || SubagentModels[0], Request.OutputStyle || LastStyle, Request.StepDown !== false);
 
     Session.LastUsedAt = Date.now();
@@ -1809,7 +1809,7 @@ export function StartTurn(Request: TurnRequest) {
   LastStyle = OutputStyle || "default";
   LastStepDown = StepDown !== false;
 
-  const { Lean, Auto, Planning, Folder, Chosen } = Choose(Request);
+  const { Lean, Auto, Planning, Folder, Chosen } = Choose(Request, true);
   const Turn: Turn = {
     Id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
     ConversationId,

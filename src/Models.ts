@@ -125,12 +125,12 @@ function Weight(Text: string, HasContext: boolean): number {
     + (Plain.includes("?") ? 0.05 : 0));
 }
 
-export function ChooseModel(ConversationId: string, Text: string, HasContext: boolean, Bias: number) {
+export function ChooseModel(ConversationId: string, Text: string, HasContext: boolean, Bias: number, Record: boolean) {
   const Complaining = Complaints.test(Text.slice(0, 200));
   const Previous = Trouble.get(ConversationId) || 0;
   const Escalation = Complaining ? Math.min(3, Previous + 1) : Math.max(0, Previous - 1);
 
-  if (ConversationId) {
+  if (ConversationId && Record) {
     Trouble.set(ConversationId, Escalation);
   }
 

@@ -174,6 +174,17 @@ return function()
 	end
 
 	const function Filled(): {Types.Part}
+		if Loading() and Chat.ContextUsed() > 0 then
+			return {
+				{
+					name = "Messages",
+					tokens = Chat.ContextUsed(),
+					colour = "",
+					deferred = false,
+				},
+			}
+		end
+
 		const Found = {}
 
 		for _, Part in Chat.ContextParts() do

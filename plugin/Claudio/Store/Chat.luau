@@ -3057,16 +3057,17 @@ function Chat.RefreshUsage(Retries: number?)
 		return
 	end
 
-	if not Ok then
-		Chat.ContextLoading(false)
+	const Found = Ok and Result.context ~= nil and #Result.context.categories > 0
+	const Missing = Ok and Result.context == nil
 
-		return
+	if Retries and Retries > 0 and not Found and not Missing then
+		task.delay(4, Chat.RefreshUsage, Retries - 1)
+	elseif Found or Retries then
+		Chat.ContextLoading(false)
 	end
 
-	if (Result.context and #Result.context.categories > 0) or Retries == 0 then
-		Chat.ContextLoading(false)
-	elseif Retries then
-		task.delay(4, Chat.RefreshUsage, Retries - 1)
+	if not Ok then
+		return
 	end
 
 	Chat.Limits(Result.limits or Chat.Limits())
@@ -3361,17 +3362,6 @@ function Chat.Open(Id: string)
 	task.spawn(function()
 		Chat.ContextLoading(true)
 		Chat.RefreshUsage()
-
-		if Chat.ConversationId() ~= Conversation.id then
-			return
-		end
-
-		if Chat.ContextWindow() == 0 then
-			Chat.ContextLoading(false)
-
-			return
-		end
-
 		Client.Warm(Conversation.id)
 		Chat.RefreshUsage(3)
 	end)

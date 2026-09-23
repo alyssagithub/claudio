@@ -10,7 +10,7 @@ process.env.USERPROFILE = Home;
 process.env.HOME = Home;
 process.env.APPDATA = path.join(Home, "Roaming");
 
-const { GetConversation, StripContext, ExtractContext } = await import("../src/Conversations.js");
+const { GetConversation, LatestContext, StripContext, ExtractContext } = await import("../src/Conversations.js");
 const { MostCallText } = await import("../src/Config.js");
 
 const Picture = {
@@ -318,4 +318,112 @@ test("StripContext and ExtractContext split a prompt into its halves", () => {
   assert.ok(ExtractContext(Text).includes("Moved Part"));
   assert.equal(StripContext("plain"), "plain");
   assert.equal(ExtractContext("plain"), "");
+});
+test("a stopped reply keeps its work and does not show the interruption as a message", () => {
+  WriteTranscript("stopped", [
+    Line("user", [{
+      type: "text",
+      text: "count the parts, then write an essay",
+    }]),
+    Line("assistant", [{
+      type: "thinking",
+      thinking: "I should count first",
+    }]),
+    Line("assistant", [{
+      type: "tool_use",
+      id: "t1",
+      name: "mcp__claudio__execute",
+      input: {
+        code: "return 4",
+      },
+    }]),
+    Line("user", [{
+      type: "text",
+      text: "[Request interrupted by user for tool use]",
+    }]),
+  ]);
+
+  const Built = GetConversation("stopped")!;
+
+  assert.equal(Built.messages.length, 2);
+  assert.equal(Built.messages[1].role, "assistant");
+  assert.deepEqual(Built.messages[1].parts!.map((Part) => Part.kind), ["thinking", "call"]);
+  assert.equal(Built.messages[1].calls![0].name, "mcp__claudio__execute");
+});
+
+test("a reply stopped before it produced anything reads as stopped", () => {
+  WriteTranscript("stopped-early", [
+    Line("user", [{
+      type: "text",
+      text: "hello",
+    }]),
+    Line("user", [{
+      type: "text",
+      text: "[Request interrupted by user]",
+    }]),
+    Line("user", [{
+      type: "text",
+      text: "try again",
+    }]),
+  ]);
+
+  const Built = GetConversation("stopped-early")!;
+
+  assert.deepEqual(Built.messages.map((Message) => `${Message.role}:${Message.text}`), ["user:hello", "assistant:Stopped.", "user:try again"]);
+});
+
+test("the saved context is the last reply's usage, or the size after a later compaction", () => {
+  const Reply = (Input: number) => JSON.stringify({
+    type: "assistant",
+    timestamp: "2026-09-13T10:00:00.000Z",
+    message: {
+      role: "assistant",
+      model: "claude-opus-5-5",
+      content: [{
+        type: "text",
+        text: "done",
+      }],
+      usage: {
+        input_tokens: Input,
+        cache_creation_input_tokens: 100,
+        cache_read_input_tokens: 1000,
+        output_tokens: 50,
+      },
+    },
+  });
+
+  WriteTranscript("context", [
+    Line("user", [{
+      type: "text",
+      text: "hi",
+    }]),
+    Reply(10),
+    Reply(20),
+  ]);
+
+  assert.deepEqual({...LatestContext("context"), at: 0}, {
+    total: 1170,
+    model: "claude-opus-5-5",
+    at: 0,
+  });
+
+  WriteTranscript("compacted", [
+    Line("user", [{
+      type: "text",
+      text: "hi",
+    }]),
+    Reply(90000),
+    JSON.stringify({
+      type: "system",
+      subtype: "compact_boundary",
+      compactMetadata: {
+        trigger: "manual",
+        preTokens: 91150,
+        postTokens: 3000,
+      },
+    }),
+  ]);
+
+  assert.equal(LatestContext("compacted")!.total, 3000);
+  assert.equal(LatestContext("compacted")!.model, "claude-opus-5-5");
 });

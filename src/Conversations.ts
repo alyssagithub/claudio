@@ -268,13 +268,18 @@ export function StripContext(Text: string): string {
     .trim();
 }
 
+function IsInterruption(Line: TranscriptEntry) {
+  return Line.type === "user" && Boolean(Line.message) && TextOf(Line.message!.content).trim().startsWith("[Request interrupted by user");
+}
+
 function IsPromptLine(Line: TranscriptEntry) {
   return Line.type === "user"
     && !Line.isMeta
     && !Line.isSidechain
     && Line.message
     && (typeof Line.message.content === "string" || (Line.message.content || []).some((Block) => Block.type === "text"))
-    && !StripContext(TextOf(Line.message.content)).startsWith("<");
+    && !StripContext(TextOf(Line.message.content)).startsWith("<")
+    && !IsInterruption(Line);
 }
 
 const Parsed = new Map<string, { Stamp: string; Lines: TranscriptEntry[]; Read: number }>();
@@ -771,6 +776,76 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
   let ImageIndex = 0;
   const Priced = new Set<string | undefined>();
   let PendingCost = 0;
+  let Replied: TranscriptEntry | null = null;
+
+  const Flush = (Text: string) => {
+    if (!Replied || (Text === "" && PendingParts.length === 0)) {
+      return;
+    }
+
+    const Last = Messages[Messages.length - 1];
+    const Used = PendingTokens;
+    const Opened = FirstTokens;
+    const Spent = PendingCost;
+
+    PendingCost = 0;
+    PendingTokens = null;
+    FirstTokens = null;
+
+    for (let At = Messages.length - 1; At >= 0 && Opened; At -= 1) {
+      if (Messages[At].role === "user") {
+        Messages[At].tokens = Opened;
+        break;
+      }
+    }
+
+    const Before = Last && Last.role === "assistant" ? Last.images.length : 0;
+    const Already = Last && Last.role === "assistant" ? (Last.calls || []).length : 0;
+    const Ordered = PendingParts.map((Part) => (Part.kind === "call" && Part.call ? {
+      ...Part,
+      call: Part.call + Already,
+    } : Part));
+    const Calls: StoredCall[] = PendingCalls.map((Call) => {
+      const Result = Results.get(Call.Id);
+
+      return {
+        name: Call.name,
+        input: Call.input,
+        output: Result ? Result.Output : "",
+        status: Result && Result.Failed ? "error" : "done",
+        milliseconds: 0,
+        image: Result && Result.Image ? Result.Image + Before : null,
+      };
+    });
+
+    if (Last && Last.role === "assistant" && !Last.notice) {
+      Last.text = Text === "" ? Last.text : Last.text === "" ? Text : `${Last.text}\n\n${Text}`;
+      Last.activity = Last.activity!.concat(PendingTools);
+      Last.calls = Last.calls!.concat(Calls);
+      Last.parts = (Last.parts || []).concat(Ordered);
+      Last.images = Last.images.concat(PendingImages);
+      Last.tokens = Plus(Last.tokens || null, Used) || Last.tokens;
+      Last.cost = (Last.cost || 0) + (Spent || 0);
+    } else {
+      Messages.push({
+        role: "assistant",
+        text: Text,
+        activity: PendingTools,
+        parts: Ordered,
+        calls: Calls,
+        images: PendingImages,
+        at: TimeOf(Replied),
+        tokens: Used,
+        cost: Spent,
+        estimated: true,
+      });
+    }
+
+    PendingTools = [];
+    PendingCalls = [];
+    PendingParts = [];
+    PendingImages = [];
+  };
 
   for (const Line of Lines) {
     const Boundary = Line as TranscriptEntry & { subtype?: string; compactMetadata?: { trigger?: string; preTokens?: number; postTokens?: number } };
@@ -797,7 +872,29 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
       continue;
     }
 
+    if (IsInterruption(Line)) {
+      Flush("");
+
+      const Last = Messages[Messages.length - 1];
+
+      if (Last && Last.role === "user") {
+        Messages.push({
+          role: "assistant",
+          text: "Stopped.",
+          activity: [],
+          parts: [],
+          calls: [],
+          images: [],
+          at: TimeOf(Line),
+        });
+      }
+
+      continue;
+    }
+
     if (IsPromptLine(Line)) {
+      Flush("");
+
       const Attached: number[] = [];
 
       for (const Image of ImagesInContent(Line.message.content)) {
@@ -878,74 +975,15 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
         input: InputOf(Block.input),
       })));
 
-      if (Text === "") {
-        continue;
+      Replied = Line;
+
+      if (Text !== "") {
+        Flush(Text);
       }
-
-      const Last = Messages[Messages.length - 1];
-      const Used = PendingTokens;
-      const Opened = FirstTokens;
-      const Spent = PendingCost;
-
-      PendingCost = 0;
-      PendingTokens = null;
-      FirstTokens = null;
-
-      for (let At = Messages.length - 1; At >= 0 && Opened; At -= 1) {
-        if (Messages[At].role === "user") {
-          Messages[At].tokens = Opened;
-          break;
-        }
-      }
-
-      const Before = Last && Last.role === "assistant" ? Last.images.length : 0;
-      const Already = Last && Last.role === "assistant" ? (Last.calls || []).length : 0;
-      const Ordered = PendingParts.map((Part) => (Part.kind === "call" && Part.call ? {
-        ...Part,
-        call: Part.call + Already,
-      } : Part));
-      const Calls: StoredCall[] = PendingCalls.map((Call) => {
-        const Result = Results.get(Call.Id);
-
-        return {
-          name: Call.name,
-          input: Call.input,
-          output: Result ? Result.Output : "",
-          status: Result && Result.Failed ? "error" : "done",
-          milliseconds: 0,
-          image: Result && Result.Image ? Result.Image + Before : null,
-        };
-      });
-
-      if (Last && Last.role === "assistant") {
-        Last.text = `${Last.text}\n\n${Text}`;
-        Last.activity = Last.activity!.concat(PendingTools);
-        Last.calls = Last.calls!.concat(Calls);
-        Last.parts = (Last.parts || []).concat(Ordered);
-        Last.images = Last.images.concat(PendingImages);
-        Last.tokens = Plus(Last.tokens || null, Used) || Last.tokens;
-        Last.cost = (Last.cost || 0) + (Spent || 0);
-      } else {
-        Messages.push({
-          role: "assistant",
-          text: Text,
-          activity: PendingTools,
-          parts: Ordered,
-          calls: Calls,
-          images: PendingImages,
-          at: TimeOf(Line),
-          tokens: Used,
-          cost: Spent,
-          estimated: true,
-        });
-      }
-
-      PendingTools = [];
-      PendingCalls = [];
-      PendingParts = [];
-      PendingImages = [];
     }
   }
+
+  Flush("");
 
   const Recorded = CostList(ReadCosts()[Id]);
   let Reply = 0;
@@ -1018,6 +1056,54 @@ export function GetSubagent(Id: string, ToolUseId: string): BuiltConversation | 
     const Built = Lines ? Assemble(Lines.map((Line) => ({...Line, isSidechain: false})), `${Id}/${ToolUseId}`, Transcript, false) : null;
 
     return Built ? {...Built, title: Meta.description || Built.title} : null;
+  }
+
+  return null;
+}
+
+export function LatestContext(Id: string): { total: number; model: string; at: number } | null {
+  const File = FindFile(Id);
+
+  if (!File) {
+    return null;
+  }
+
+  const At = fs.statSync(File).mtimeMs;
+
+  for (const Lines of [ReadWindow(File, Windows[0]), ReadLines(File)]) {
+    let Total: number | null = null;
+
+    for (let Index = (Lines || []).length - 1; Index >= 0; Index -= 1) {
+      const Line = (Lines as TranscriptEntry[])[Index] as TranscriptEntry & { subtype?: string; compactMetadata?: { postTokens?: number } };
+      const Model = Line.message && Line.message.model;
+
+      if (Line.isSidechain) {
+        continue;
+      }
+
+      if (Total === null && Line.type === "system" && Line.subtype === "compact_boundary") {
+        Total = Line.compactMetadata?.postTokens || 0;
+        continue;
+      }
+
+      if (Line.type !== "assistant" || !Model || Model === "<synthetic>") {
+        continue;
+      }
+
+      if (Total !== null) {
+        return { total: Total, model: Model, at: At };
+      }
+
+      const Usage = Line.message!.usage;
+
+      if (Usage) {
+        return {
+          total: (Usage.input_tokens || 0) + (Usage.cache_creation_input_tokens || 0) + (Usage.cache_read_input_tokens || 0) + (Usage.output_tokens || 0),
+          model: Model,
+          at: At,
+        };
+      }
+    }
   }
 
   return null;

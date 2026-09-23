@@ -65,6 +65,17 @@ export function WatchReturn() {
     }
   });
 
+  Started.on("error", (Error) => {
+    if (Watcher !== Started) {
+      return;
+    }
+
+    Watcher = null;
+    Ready = false;
+    Failed = `The key watcher could not start: ${Error.message}`;
+  });
+  Started.stdin!.on("error", () => {});
+
   Started.stderr!.on("data", (Chunk: Buffer) => {
     Failed = Chunk.toString("utf8").trim().slice(0, 300);
   });

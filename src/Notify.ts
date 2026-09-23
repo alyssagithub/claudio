@@ -215,7 +215,7 @@ export function AskClipboard(Command: string, Marker = ""): Promise<string> {
         Reply(Line);
       }
     });
-    Started.on("exit", () => {
+    const Stop = () => {
       if (Helper === Started) {
         Helper = null;
       }
@@ -223,7 +223,11 @@ export function AskClipboard(Command: string, Marker = ""): Promise<string> {
       for (const Reply of Replies.splice(0)) {
         Reply("");
       }
-    });
+    };
+
+    Started.on("exit", Stop);
+    Started.on("error", Stop);
+    Started.stdin!.on("error", Stop);
     Helper = Started;
   }
 
@@ -244,7 +248,9 @@ export function AskClipboard(Command: string, Marker = ""): Promise<string> {
 }
 
 let Armed: { Marker: string; Image: ClipboardPicture } | null = null;
-let Watching: NodeJS.Timeout | null = null;
+let Generation = 0;
+let Current = "";
+const Dropped: string[] = [];
 
 function Picture(Data: string): ClipboardPicture {
   return {
@@ -267,28 +273,31 @@ function Remember(Marker: string, Answer: string) {
   return Outcome;
 }
 
-function StopWatching() {
-  if (Watching) {
-    clearInterval(Watching);
+export async function ArmClipboard(Marker: string): Promise<string> {
+  if (Dropped.includes(Marker)) {
+    return "disarmed";
   }
 
-  Watching = null;
-}
+  Generation += 1;
+  Current = Marker;
 
-export async function ArmClipboard(Marker: string): Promise<string> {
-  StopWatching();
-
+  const Mine = Generation;
   const Outcome = Remember(Marker, await AskClipboard("arm", Marker));
+
+  if (Mine !== Generation || Dropped.includes(Marker)) {
+    return Outcome;
+  }
+
   const Began = Date.now();
   let Busy = false;
 
-  Watching = setInterval(async () => {
-    if (Busy) {
+  const Watch = setInterval(async () => {
+    if (Mine !== Generation || Dropped.includes(Marker) || Date.now() - Began > 10 * 60 * 1000) {
+      clearInterval(Watch);
       return;
     }
 
-    if (Date.now() - Began > 10 * 60 * 1000) {
-      StopWatching();
+    if (Busy) {
       return;
     }
 
@@ -301,7 +310,14 @@ export async function ArmClipboard(Marker: string): Promise<string> {
 }
 
 export async function DisarmClipboard(Marker: string): Promise<string> {
-  StopWatching();
+  Dropped.push(Marker);
+  Dropped.splice(0, Math.max(0, Dropped.length - 50));
+
+  if (Marker === Current) {
+    Generation += 1;
+    Current = "";
+    Armed = null;
+  }
 
   return await AskClipboard("disarm", Marker);
 }

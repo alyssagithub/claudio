@@ -3055,9 +3055,8 @@ function Chat.RefreshUsage(Retries: number?)
 	end
 
 	const Found = Ok and Result.context ~= nil and #Result.context.categories > 0
-	const Missing = Ok and Result.context == nil
 
-	if Retries and Retries > 0 and not Found and not Missing then
+	if Retries and Retries > 0 and not Found and not (Ok and Result.context == nil) then
 		task.delay(4, Chat.RefreshUsage, Retries - 1)
 	elseif Found or Retries then
 		Chat.ContextLoading(false)

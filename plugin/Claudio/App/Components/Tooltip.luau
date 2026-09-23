@@ -49,6 +49,7 @@ return function()
 			end
 
 			Vide.cleanup(Object:GetPropertyChangedSignal("AbsoluteSize"):Connect(Fit))
+			Vide.cleanup(Object:GetPropertyChangedSignal("AbsolutePosition"):Connect(Fit))
 			Vide.cleanup(Object:GetPropertyChangedSignal("Text"):Connect(function()
 				task.defer(Fit)
 			end))

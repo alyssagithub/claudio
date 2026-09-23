@@ -93,13 +93,12 @@ function WindowFor(Model: string, Used: number) {
   const Plain = Model.replace(/\[.*\]$/, "");
   const Known = Object.keys(ModelWindows).filter((Name) => Name.replace(/\[.*\]$/, "") === Plain).map((Name) => ModelWindows[Name]);
   const Extra = ExtraModels.find((Entry) => Entry.value === Plain);
-  const Listed = GetModels().find((Entry) => {
+  const Size = Known.length > 0 ? Math.max(...Known) : Extra ? Extra.contextWindow : GetModels().some((Entry) => {
     const Named = Entry.description.match(/^(\w+) (\d+)(?:\.(\d+))?/);
     const Full = Entry.value.startsWith("claude-") ? Entry.value.replace(/\[.*\]$/, "") : Named ? `claude-${Named[1]}-${Named[2]}${Named[3] ? `-${Named[3]}` : ""}`.toLowerCase() : "";
 
     return Full !== "" && Plain.startsWith(Full) && (/\[1m\]/i.test(Entry.value) || /1M context/i.test(Entry.description));
-  });
-  const Size = Known.length > 0 ? Math.max(...Known) : Extra ? Extra.contextWindow : Listed ? 1000000 : 200000;
+  }) ? 1000000 : 200000;
 
   return Used > Size ? 1000000 : Size;
 }
@@ -1352,7 +1351,6 @@ function RouteMessage(Session: Session, Message: any) {
     if (Usage.contextWindow && (Matches || Weight > Busiest)) {
       Busiest = Matches ? Infinity : Weight;
       Turn.ContextWindow = Usage.contextWindow;
-      Turn.ContextModel = Name;
     }
   }
 
@@ -1796,7 +1794,7 @@ export function WarmConversation(Request: TurnRequest): Promise<void> {
 }
 
 export function StartTurn(Request: TurnRequest) {
-  const { Text, ConversationId, Images, Effort, AskForTools, GuardTools, ExtraPrompt, FastMode, Mode, Bypass, Place, OutputStyle, StepDown } = Request;
+  const { Text, ConversationId, Images, AskForTools, GuardTools, ExtraPrompt, FastMode, Mode, Bypass, Place, OutputStyle, StepDown } = Request;
 
   LastStyle = OutputStyle || "default";
   LastStepDown = StepDown !== false;
@@ -1846,7 +1844,6 @@ export function StartTurn(Request: TurnRequest) {
     Milliseconds: 0,
     Cost: 0,
     ContextWindow: 0,
-    ContextModel: null,
     Images: [],
     Delivered: {},
     Permissions: [],
@@ -2105,7 +2102,6 @@ export function DescribeTurn(Turn: Turn) {
     limits: GetLimits(),
     context: (Turn.Session && Turn.Session.Breakdown) || null,
     contextWindow: Turn.ContextWindow || 0,
-    contextModel: Turn.ContextModel || null,
     cost: Turn.Cost,
     version: Turn.Version,
   };

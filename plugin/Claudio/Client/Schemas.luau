@@ -146,7 +146,6 @@ return {
 		cost = Typed.number(),
 		limits = Typed.optional(Typed.array(Limit)),
 		contextWindow = Typed.optional(Typed.number()),
-		contextModel = Typed.optional(Typed.string()),
 		context = Typed.optional(Breakdown),
 		imageCount = Typed.number(),
 		permission = Typed.optional(Permission),

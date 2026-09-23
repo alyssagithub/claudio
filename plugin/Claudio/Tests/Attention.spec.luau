@@ -13,10 +13,11 @@ return function()
 		end)
 
 		it("keeps whole closing sentences that fit in 200 characters", function()
-			const Filler = string.rep("word ", 40)
-			const Result = Attention.Closing(`{Filler}ends here. Then a second sentence. And the last one.`)
+			expect(Attention.Closing(`{string.rep("word ", 40)}ends here. Then a second sentence. And the last one.`)).to.equal("Then a second sentence. And the last one.")
+		end)
 
-			expect(Result).to.equal("Then a second sentence. And the last one.")
+		it("does not split a sentence at a dot inside a name", function()
+			expect(Attention.Closing(`{string.rep("word ", 40)}ends here. Fixed Chat.luau in v1.2 today.`)).to.equal("Fixed Chat.luau in v1.2 today.")
 		end)
 
 		it("cuts from the front when one sentence is too long", function()

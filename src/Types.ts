@@ -379,7 +379,6 @@ export type Turn = {
   Milliseconds: number;
   Cost: number;
   ContextWindow: number;
-  ContextModel: string | null;
   Images: SentImage[];
   Delivered: Record<number, boolean>;
   Permissions: Permission[];

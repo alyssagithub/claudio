@@ -22,7 +22,7 @@ function Attention.Closing(Text: string): string
 
 	const Sentences = {}
 
-	for Sentence in Last:gmatch("[^%.!?]+[%.!?]*") do
+	for Sentence in (`{(Last:gsub("([%.!?])%s+", "%1\n"))}\n`):gmatch("([^\n]+)\n") do
 		table.insert(Sentences, (Sentence:match("^%s*(.-)%s*$") :: string))
 	end
 

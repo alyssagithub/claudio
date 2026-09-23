@@ -189,7 +189,6 @@ export type Turn = {
 	parts: {{kind: string, text: string?, call: number?}}?,
 	limits: {Limit}?,
 	contextWindow: number?,
-	contextModel: string?,
 	context: Breakdown?,
 	activity: {string},
 	model: string?,

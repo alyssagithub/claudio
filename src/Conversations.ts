@@ -1068,7 +1068,8 @@ export function LatestContext(Id: string): { total: number; model: string; at: n
     return null;
   }
 
-  for (const Lines of [ReadWindow(File, Windows[0]), ReadLines(File)]) {
+  for (const Read of [() => ReadWindow(File, Windows[0]), () => ReadLines(File)]) {
+    const Lines = Read();
     let Total: number | null = null;
     let At = 0;
 

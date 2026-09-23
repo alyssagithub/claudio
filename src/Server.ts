@@ -145,6 +145,21 @@ function SendJson(Response: ServerResponse, StatusCode: number, Body: unknown) {
   Response.end(JSON.stringify(Body));
 }
 
+function SessionId(Value: unknown): string | null {
+  return typeof Value === "string" && /^[\w-]{1,64}$/.test(Value) ? Value : null;
+}
+
+function Within<T>(Work: Promise<T>, Milliseconds: number, Otherwise: T): Promise<T> {
+  let Timer: NodeJS.Timeout | undefined;
+
+  return Promise.race([
+    Work,
+    new Promise<T>((Resolve) => {
+      Timer = setTimeout(() => Resolve(Otherwise), Milliseconds);
+    }),
+  ]).finally(() => clearTimeout(Timer));
+}
+
 function TurnRequestFrom(Body: Record<string, any>, ConversationId: string | null): TurnRequest {
   return {
     Text: typeof Body.text === "string" ? Body.text : "",
@@ -521,12 +536,9 @@ export function StartServer(Port: number) {
 
       if (Request.method === "POST" && Url.pathname === "/warm") {
         const Body = await ReadBody(Request);
-        const ConversationId = typeof Body.conversationId === "string" ? Body.conversationId : null;
+        const ConversationId = SessionId(Body.conversationId);
 
-        await Promise.race([
-          WarmConversation(TurnRequestFrom(Body, ConversationId)).catch(() => {}),
-          new Promise((Resolve) => setTimeout(Resolve, 30000)),
-        ]);
+        await Within(WarmConversation(TurnRequestFrom(Body, ConversationId)).catch(() => {}), 30000, undefined);
 
         SendJson(Response, 200, {context: GetBreakdown(ConversationId)});
         return;
@@ -738,14 +750,13 @@ export function StartServer(Port: number) {
       }
 
       if (Request.method === "GET" && Url.pathname === "/usage") {
-        const For = Url.searchParams.get("conversationId");
-        const [Asked] = await Promise.all([
-          Promise.race([PollUsage(), new Promise<boolean>((Resolve) => setTimeout(() => Resolve(false), 1000))]),
-          Promise.race([RefreshConversationContext(For), new Promise((Resolve) => setTimeout(Resolve, 3000))]),
-        ]);
+        const For = SessionId(Url.searchParams.get("conversationId"));
 
         SendJson(Response, 200, {
-          asked: Asked,
+          asked: (await Promise.all([
+            Within(PollUsage(), 1000, false),
+            Within(RefreshConversationContext(For), 3000, undefined),
+          ]))[0],
           limits: GetLimits(),
           context: GetBreakdown(For),
         });

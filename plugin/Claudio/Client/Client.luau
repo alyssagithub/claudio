@@ -117,8 +117,8 @@ function Client.StartTurn(Text: string, ConversationId: string?, Images: {Types.
 	return Http.Request("POST", `{BaseUrl()}/chat`, TurnBody(Text, ConversationId, Images, Escalate))
 end
 
-function Client.Warm(ConversationId: string): (boolean, any)
-	return Http.Request("POST", `{BaseUrl()}/warm`, TurnBody("", ConversationId, {}))
+function Client.Warm(ConversationId: string)
+	Http.Request("POST", `{BaseUrl()}/warm`, TurnBody("", ConversationId, {}))
 end
 
 function Client.PollTurn(RequestId: string, Version: number): (boolean, any)

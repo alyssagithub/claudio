@@ -306,6 +306,7 @@ const function Row(Summary: () -> Types.ConversationSummary, Index: number)
 								return
 							end
 
+							Box.Text = Summary().title
 							Box:CaptureFocus()
 							Box.CursorPosition = #Box.Text + 1
 						end))

@@ -259,14 +259,13 @@ const function Titled(Model: Types.ModelInfo): string
 	return Version
 end
 
-const OverMore = Vide.source(false)
+local Visited = false
+local Leaving = 0
 
-const function CloseMoreLater()
-	task.delay(0.25, function()
-		if not OverMore() then
-			MoreOpen(false)
-		end
-	end)
+const function CloseMore()
+	Leaving += 1
+	Visited = false
+	MoreOpen(false)
 end
 
 const function Pick(Model: () -> Types.ModelInfo, LayoutOrder: number, Inside: boolean?)
@@ -279,27 +278,30 @@ const function Pick(Model: () -> Types.ModelInfo, LayoutOrder: number, Inside: b
 	end, function()
 		Settings.Set("Model", Model().value)
 		Settings.Set("Effort", "")
-		OverMore(false)
-		MoreOpen(false)
+		CloseMore()
 		Chat.PickerOpen(false)
 	end, LayoutOrder, nil, function(Entered: boolean)
-		if Inside then
-			OverMore(Entered)
+		if not Entered then
+			return
+		end
 
-			if not Entered then
-				CloseMoreLater()
-			end
+		if Inside then
+			Visited = true
 
 			return
 		end
 
-		if Entered then
-			MoreOpen(false)
-		end
+		CloseMore()
 	end)
 end
 
 function ModelPicker.Menu()
+	Vide.effect(function()
+		if not Chat.PickerOpen() then
+			Vide.untrack(CloseMore)
+		end
+	end)
+
 	return Create "Frame" {
 		Name = "ModelMenu",
 		Vide.action(Covers.Add),
@@ -338,7 +340,11 @@ function ModelPicker.Menu()
 			Settings.Set("Model", "auto")
 			Settings.Set("Effort", "")
 			Chat.PickerOpen(false)
-		end, 1),
+		end, 1, nil, function(Entered: boolean)
+			if Entered then
+				CloseMore()
+			end
+		end),
 		Vide.indexes(function()
 			return Listed(false)
 		end, function(Model: () -> Types.ModelInfo, Index: number)
@@ -356,13 +362,21 @@ function ModelPicker.Menu()
 		end, 9001, function()
 			return true
 		end, function(Entered: boolean)
+			Leaving += 1
+
 			if Entered then
 				MoreOpen(true)
 
 				return
 			end
 
-			CloseMoreLater()
+			const Token = Leaving
+
+			task.delay(0.4, function()
+				if Leaving == Token and not Visited then
+					MoreOpen(false)
+				end
+			end)
 		end),
 		Divider(9002),
 		Create "TextLabel" {

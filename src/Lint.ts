@@ -405,16 +405,18 @@ export function Analyze(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]) 
   return Run;
 }
 
-async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]) {
-  if (!Ready) {
-    Ready = Prepare().catch((Error) => {
-      console.error(`Could not prepare the Luau analyzer: ${Error.message}`);
-      Ready = null;
-      return null;
-    });
-  }
+function Prepared(): Promise<string | null> {
+  Ready ??= Prepare().catch((Error) => {
+    console.error(`Could not prepare the Luau analyzer: ${Error.message}`);
+    Ready = null;
+    return null;
+  });
 
-  const Analyzer = await Ready;
+  return Ready;
+}
+
+async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]) {
+  const Analyzer = await Prepared();
 
   if (!Analyzer) {
     return null;
@@ -512,11 +514,7 @@ async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]
 }
 
 export async function Warm(): Promise<void> {
-  if (!Ready) {
-    Ready = Prepare().catch(() => null);
-  }
-
-  const Analyzer = await Ready;
+  const Analyzer = await Prepared();
 
   if (Analyzer) {
     await Flags(Analyzer);

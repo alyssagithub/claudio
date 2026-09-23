@@ -313,6 +313,7 @@ return function()
 			Transparency = function()
 				return if Ready() then 1 else 0
 			end,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		},
 	}
 

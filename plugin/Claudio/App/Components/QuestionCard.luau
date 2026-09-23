@@ -234,6 +234,7 @@ return function()
 					Transparency = function()
 						return if Chosen()[Label()] then 1 else 0
 					end,
+					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 				},
 			},
 		}

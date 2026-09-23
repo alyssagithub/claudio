@@ -26,6 +26,7 @@ return function(Key: string)
 		Create "UIStroke" {
 			Color = Theme.Colors.Border,
 			Thickness = 1,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		},
 		Create "Frame" {
 			Name = "Knob",

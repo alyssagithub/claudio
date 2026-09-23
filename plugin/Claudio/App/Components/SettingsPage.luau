@@ -95,7 +95,10 @@ const function Number(Definition: Settings.Definition)
 		end,
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-		Create "UIStroke" {Color = Theme.Colors.Border},
+		Create "UIStroke" {
+			Color = Theme.Colors.Border,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		},
 		FocusLost = function()
 			const Value = tonumber(Box.Text)
 

@@ -934,7 +934,10 @@ function ModelPicker.EffortMenu()
 				end,
 
 				Create "UICorner" {CornerRadius = UDim.new(1, 0)},
-				Create "UIStroke" {Color = Theme.Colors.DimText},
+				Create "UIStroke" {
+					Color = Theme.Colors.DimText,
+					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+				},
 			},
 		},
 		Create "Frame" {

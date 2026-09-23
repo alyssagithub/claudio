@@ -121,7 +121,7 @@ end
 
 const function Ordered(): {Types.ConversationSummary}
 	const Folder = Settings.Get("WorkingFolder")()
-	const Here = Folder:match("[^\/]+$") or Folder
+	const Here = Folder:match("[^\\/]+$") or Folder
 	const Sorted = {}
 
 	for _, Summary in Chat.Conversations() do

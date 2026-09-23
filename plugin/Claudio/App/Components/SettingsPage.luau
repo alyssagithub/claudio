@@ -102,7 +102,7 @@ const function Number(Definition: Settings.Definition)
 		FocusLost = function()
 			const Value = tonumber(Box.Text)
 
-			if Value then
+			if Value and Value == Value then
 				Settings.Set(Definition.Key, math.clamp(math.round(Value), Definition.Minimum :: number, Definition.Maximum :: number))
 			end
 

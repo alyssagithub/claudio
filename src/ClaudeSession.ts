@@ -607,6 +607,14 @@ function TakeLines(Session: Session, Id: string) {
   return Lines;
 }
 
+function SaveQuietly(Where: string, Save: () => void) {
+  try {
+    Save();
+  } catch (Trouble) {
+    console.error(`${Where} could not save: ${(Trouble as Error).message}`);
+  }
+}
+
 function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
   if (Turn.Status !== "running" && Turn.Status !== "cancelling") {
     return;
@@ -630,10 +638,10 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
 
   if (Turn.ConversationId) {
     Ended.set(Turn.ConversationId, Date.now());
-    UpdateDesktopSession(Turn.ConversationId, (Session) => {
+    SaveQuietly("FinishTurn", () => UpdateDesktopSession(Turn.ConversationId!, (Session) => {
       Session.lastActivityAt = Date.now();
       Session.completedTurns = ((Session.completedTurns as number) || 0) + 1;
-    });
+    }));
   }
 
   for (const Permission of Turn.Permissions.splice(0)) {
@@ -1378,7 +1386,7 @@ function RouteMessage(Session: Session, Message: any) {
   Session.HasSpoken = true;
 
   if (Turn.ConversationId && Turn.Cost > 0 && JoinText(Turn.CommittedText, Turn.PendingText) !== "") {
-    RecordCost(Turn.ConversationId, Turn.Cost);
+    SaveQuietly("RouteMessage", () => RecordCost(Turn.ConversationId!, Turn.Cost));
   }
 
   RefreshUsage(Session);

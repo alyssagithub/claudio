@@ -43,6 +43,7 @@ const function Row(Command: () -> Types.Command, Index: number)
 		TextSize = Settings.TextSize,
 		FontFace = Font.fromEnum(Enum.Font.Code),
 		TextXAlignment = Enum.TextXAlignment.Left,
+		TextWrapped = true,
 		AutoButtonColor = true,
 		LayoutOrder = Index,
 		Text = function()

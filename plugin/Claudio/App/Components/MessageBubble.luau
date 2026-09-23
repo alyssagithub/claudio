@@ -1335,9 +1335,12 @@ return function(Props: Props)
 			},
 			Create "Frame" {
 				Name = "Heading",
-				Size = UDim2.new(1, 0, 0, 24),
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
 				LayoutOrder = 1,
+
+				Create "UISizeConstraint" {MinSize = Vector2.new(0, 24)},
 
 				Create "UIListLayout" {
 					FillDirection = Enum.FillDirection.Horizontal,

@@ -161,12 +161,13 @@ return function()
 			},
 			Create "Frame" {
 				Name = "Words",
-				Size = UDim2.fromScale(1, 0),
+				Size = function()
+					return UDim2.new(1, -(Settings.SmallText() + 10), 0, 0)
+				end,
 				AutomaticSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
 				LayoutOrder = 1,
 
-				Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
 				Create "UIListLayout" {SortOrder = Enum.SortOrder.LayoutOrder},
 				Create "TextLabel" {
 					Name = "Label",
@@ -200,7 +201,9 @@ return function()
 			},
 			Create "TextLabel" {
 				Name = "Mark",
-				Size = UDim2.fromOffset(16, 16),
+				Size = function()
+					return UDim2.fromOffset(Settings.SmallText() + 4, Settings.SmallText() + 4)
+				end,
 				BackgroundColor3 = Theme.Colors.Accent,
 				BackgroundTransparency = function()
 					return if Chosen()[Label()] then 0 else 1

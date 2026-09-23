@@ -381,6 +381,7 @@ return function()
 				VerticalAlignment = Enum.VerticalAlignment.Center,
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, 8),
+				Wraps = true,
 			},
 			IconButton {
 				Icon = Config.Icons.Add,

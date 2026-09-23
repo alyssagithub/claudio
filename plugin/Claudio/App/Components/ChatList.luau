@@ -348,8 +348,11 @@ const function Row(Summary: () -> Types.ConversationSummary, Index: number)
 		},
 		Create "Frame" {
 			Name = "Heading",
-			Size = UDim2.new(1, 0, 0, 22),
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
+
+			Create "UISizeConstraint" {MinSize = Vector2.new(0, 22)},
 			LayoutOrder = 1,
 			Visible = function()
 				const List = Ordered()
@@ -371,8 +374,8 @@ const function Row(Summary: () -> Types.ConversationSummary, Index: number)
 			},
 			Create "TextLabel" {
 				Name = "Label",
-				AutomaticSize = Enum.AutomaticSize.X,
-				Size = UDim2.fromOffset(0, 16),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				Size = UDim2.fromOffset(0, 0),
 				BackgroundTransparency = 1,
 				TextColor3 = Theme.Colors.DimText,
 				TextSize = Settings.SmallText,

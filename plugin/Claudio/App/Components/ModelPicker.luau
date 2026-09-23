@@ -198,7 +198,7 @@ const function Row(Name: () -> string, Detail: () -> string, Chosen: () -> boole
 			TextSize = Settings.SmallText,
 			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 			TextXAlignment = Enum.TextXAlignment.Left,
-			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextWrapped = true,
 			LayoutOrder = 2,
 			Visible = Described == true,
 			Text = Detail,
@@ -209,6 +209,12 @@ end
 const ModelPicker = {
 	BarHeight = Vide.source(0),
 }
+
+const function Scaled(Width: number): number
+	const Room = if Chat.Window then Chat.Window.AbsoluteSize.X - 16 else math.huge
+
+	return math.min(math.round(Width * Settings.TextSize() / Config.TextSize), Room)
+end
 
 const MoreOpen = Vide.source(false)
 
@@ -297,7 +303,9 @@ function ModelPicker.Menu()
 	return Create "Frame" {
 		Name = "ModelMenu",
 		Vide.action(Covers.Add),
-		Size = UDim2.fromOffset(182, 0),
+		Size = function()
+			return UDim2.fromOffset(Scaled(182), 0)
+		end,
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),
 		Position = function()
@@ -602,7 +610,9 @@ function ModelPicker.ModeMenu()
 	return Create "Frame" {
 		Name = "ModeMenu",
 		Vide.action(Covers.Add),
-		Size = UDim2.fromOffset(224, 0),
+		Size = function()
+			return UDim2.fromOffset(Scaled(224), 0)
+		end,
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),
 		Position = function()
@@ -754,7 +764,9 @@ function ModelPicker.EffortHelp()
 	return Create "Frame" {
 		Name = "Bubble",
 		Vide.action(Covers.Add),
-		Size = UDim2.fromOffset(168, 0),
+		Size = function()
+			return UDim2.fromOffset(Scaled(168), 0)
+		end,
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),
 		Position = function()
@@ -818,7 +830,9 @@ function ModelPicker.EffortMenu()
 	return Create "Frame" {
 		Name = "EffortMenu",
 		Vide.action(Covers.Add),
-		Size = UDim2.fromOffset(182, 0),
+		Size = function()
+			return UDim2.fromOffset(Scaled(182), 0)
+		end,
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),
 		Position = function()
@@ -894,7 +908,9 @@ function ModelPicker.EffortMenu()
 			},
 			Create "TextButton" {
 				Name = "Explain",
-				Size = UDim2.fromOffset(14, 14),
+				Size = function()
+					return UDim2.fromOffset(Settings.SmallText() + 2, Settings.SmallText() + 2)
+				end,
 				BackgroundTransparency = 1,
 				TextColor3 = Theme.Colors.DimText,
 				TextSize = Settings.SmallText,

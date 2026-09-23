@@ -37,6 +37,14 @@ return function()
 			expect(Pieces[1].Kind).to.equal("text")
 		end)
 
+		it("leaves triple backticks in the middle of a sentence as prose", function()
+			const Pieces = Markdown.Split("wrap it like ```x``` and carry on")
+
+			expect(#Pieces).to.equal(1)
+			expect(Pieces[1].Kind).to.equal("text")
+			expect(Pieces[1].Text).to.equal("wrap it like ```x``` and carry on")
+		end)
+
 		it("trims trailing blank lines off a fence but keeps indentation", function()
 			const Pieces = Markdown.Split("```\n\tindented\n\n\n```")
 

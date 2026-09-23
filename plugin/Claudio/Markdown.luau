@@ -237,12 +237,18 @@ end
 function Markdown.Split(Text: string): {Segment}
 	const Segments: {Segment} = {}
 	local Position = 1
+	local Search = 1
 
 	while true do
-		const FenceStart, FenceEnd, Language, Body = Text:find("```([%w_-]*)\n?(.-)```", Position)
+		const FenceStart, FenceEnd, Language, Body = Text:find("```([%w_-]*)\n?(.-)```", Search)
 
 		if not FenceStart or not FenceEnd or type(Body) ~= "string" or type(Language) ~= "string" then
 			break
+		end
+
+		if not Text:sub(1, FenceStart - 1):match("[^\n]*$"):match("^[ \t]*$") then
+			Search = FenceStart + 3
+			continue
 		end
 
 		Tables(Text:sub(Position, FenceStart - 1), Segments)
@@ -256,6 +262,7 @@ function Markdown.Split(Text: string): {Segment}
 
 		table.insert(Segments, Fenced)
 		Position = FenceEnd + 1
+		Search = Position
 	end
 
 	Tables(Text:sub(Position), Segments)

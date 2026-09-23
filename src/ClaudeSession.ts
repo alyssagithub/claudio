@@ -1279,29 +1279,27 @@ function RouteMessage(Session: Session, Message: any) {
   }
 
   if (Message.type === "user") {
-    const Decoded = ImagesInContent(Message.message && Message.message.content)
-      .map((Image) => DecodeImage(Image.mediaType, Image.data))
-      .filter(Boolean);
+    const Decoded: SentImage[] = [];
+    const Slots = new Map();
+
+    for (const Block of Blocks(Message)) {
+      const Pictures = ImagesInContent([Block]).map((Image) => DecodeImage(Image.mediaType, Image.data)).filter(Boolean) as SentImage[];
+
+      if (Block.type === "tool_result" && Pictures.length > 0) {
+        Slots.set(Block.tool_use_id, Turn.Images.length + Decoded.length + 1);
+      }
+
+      Decoded.push(...Pictures);
+    }
+
     const Results = Blocks(Message).filter((Block) => Block.type === "tool_result");
     const Changes: Partial<Turn> = {};
 
     if (Decoded.length > 0) {
-      Changes.Images = Turn.Images.concat(Decoded as SentImage[]);
+      Changes.Images = Turn.Images.concat(Decoded);
     }
 
     if (Results.length > 0) {
-      const Slots = new Map();
-      let Slot = Turn.Images.length;
-
-      for (const Result of Results) {
-        const Pictures = ImagesInContent([Result]).length;
-
-        if (Pictures > 0) {
-          Slots.set(Result.tool_use_id, Slot + 1);
-          Slot += Pictures;
-        }
-      }
-
       Changes.Calls = Turn.Calls.map((Call) => {
         const Result = Results.find((Block) => Block.tool_use_id === Call.Id);
 

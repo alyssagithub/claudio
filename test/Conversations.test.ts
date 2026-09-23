@@ -427,3 +427,21 @@ test("the saved context is the last reply's usage, or the size after a later com
   assert.equal(LatestContext("compacted")!.total, 3000);
   assert.equal(LatestContext("compacted")!.model, "claude-opus-5-5");
 });
+test("a chat renamed twice shows its latest name", () => {
+  WriteTranscript("renamed", [
+    Line("user", [{
+      type: "text",
+      text: "hello",
+    }]),
+    JSON.stringify({
+      type: "custom-title",
+      customTitle: "First name",
+    }),
+    JSON.stringify({
+      type: "custom-title",
+      customTitle: "Second name",
+    }),
+  ]);
+
+  assert.equal(GetConversation("renamed")!.title, "Second name");
+});

@@ -11,7 +11,7 @@ import { GetLimits, GetBreakdown, PollUsage, RefreshConversationContext } from "
 import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
-import type { TurnRequest } from "./Types.js";
+import type { Picture, TurnRequest } from "./Types.js";
 import { StudioProcesses } from "./StudioPresence.js";
 import { ActiveTurnFor, AddToTurn, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, WarmConversation, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetSubagent, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
@@ -158,6 +158,12 @@ function Within<T>(Work: Promise<T>, Milliseconds: number, Otherwise: T): Promis
       Timer = setTimeout(() => Resolve(Otherwise), Milliseconds);
     }),
   ]).finally(() => clearTimeout(Timer));
+}
+
+function PicturesFrom(Body: Record<string, any>): Picture[] {
+  return Array.isArray(Body.images)
+    ? Body.images.filter((Image) => Image && typeof Image.data === "string" && typeof Image.mediaType === "string").slice(0, 20)
+    : [];
 }
 
 function TurnRequestFrom(Body: Record<string, any>, ConversationId: string | null): TurnRequest {
@@ -556,10 +562,7 @@ export function StartServer(Port: number) {
         const ConversationId = typeof Body.conversationId === "string" ? Body.conversationId : null;
 
         if ((ConversationId || typeof Body.requestId === "string") && (IsConversationBusy(ConversationId) || Body.now === true)) {
-          const Pictures = Array.isArray(Body.images)
-            ? Body.images.filter((Image) => typeof Image.data === "string" && typeof Image.mediaType === "string").slice(0, 20)
-            : [];
-          const Joined = Body.now === true ? AddToTurn(typeof Body.requestId === "string" ? Body.requestId : null, ConversationId, Body.text, Pictures) : null;
+          const Joined = Body.now === true ? AddToTurn(typeof Body.requestId === "string" ? Body.requestId : null, ConversationId, Body.text, PicturesFrom(Body)) : null;
 
           if (!Joined) {
             SendJson(Response, 409, {error: "That chat is still answering. Stop it first."});
@@ -570,13 +573,9 @@ export function StartServer(Port: number) {
           return;
         }
 
-        const Images = Array.isArray(Body.images)
-          ? Body.images.filter((Image) => typeof Image.data === "string" && typeof Image.mediaType === "string").slice(0, 20)
-          : [];
-
         SendJson(Response, 200, DescribeTurn(StartTurn({
           ...TurnRequestFrom(Body, ConversationId),
-          Images,
+          Images: PicturesFrom(Body),
         })));
         return;
       }
@@ -813,14 +812,16 @@ export function StartServer(Port: number) {
       if (Request.method === "POST" && Url.pathname === "/versions") {
         const Body = await ReadBody(Request);
 
-        if (typeof Body.version !== "string" || !/^[0-9.]+$/.test(Body.version)) {
+        if (!LooksLikeVersion(Body.version)) {
           SendJson(Response, 400, {error: "A version looks like 1.0.0"});
           return;
         }
 
+        const Version = Body.version.trim().replace(/^v/, "");
+
         try {
-          const Commit = await InstallBridge(Body.version);
-          const Installed = await InstallVersion(Body.version);
+          const Commit = await InstallBridge(Version);
+          const Installed = await InstallVersion(Version);
 
           const Restarter = spawn(process.execPath, [process.argv[1], "restart"], {
             detached: true,

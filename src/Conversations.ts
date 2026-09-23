@@ -61,14 +61,14 @@ function ReadDesktopSessions(): Record<string, DesktopSession> {
   for (const Account of fs.readdirSync(DesktopSessionsRoot)) {
     const AccountFolder = path.join(DesktopSessionsRoot, Account);
 
-    if (!fs.statSync(AccountFolder).isDirectory()) {
+    if (!fs.statSync(AccountFolder, {throwIfNoEntry: false})?.isDirectory()) {
       continue;
     }
 
     for (const Organization of fs.readdirSync(AccountFolder)) {
       const Folder = path.join(AccountFolder, Organization);
 
-      if (!fs.statSync(Folder).isDirectory()) {
+      if (!fs.statSync(Folder, {throwIfNoEntry: false})?.isDirectory()) {
         continue;
       }
 
@@ -106,15 +106,15 @@ function DesktopSessionsFolder(): string | null {
   for (const Account of fs.readdirSync(DesktopSessionsRoot)) {
     const AccountFolder = path.join(DesktopSessionsRoot, Account);
 
-    if (!fs.statSync(AccountFolder).isDirectory()) {
+    if (!fs.statSync(AccountFolder, {throwIfNoEntry: false})?.isDirectory()) {
       continue;
     }
 
     for (const Organization of fs.readdirSync(AccountFolder)) {
       const Folder = path.join(AccountFolder, Organization);
-      const Stat = fs.statSync(Folder);
+      const Stat = fs.statSync(Folder, {throwIfNoEntry: false});
 
-      if (Stat.isDirectory() && (!Newest || Stat.mtimeMs > Newest.mtimeMs)) {
+      if (Stat && Stat.isDirectory() && (!Newest || Stat.mtimeMs > Newest.mtimeMs)) {
         Newest = {
           Folder,
           mtimeMs: Stat.mtimeMs,
@@ -171,14 +171,14 @@ function DesktopSessionFiles(): string[] {
   for (const Account of fs.readdirSync(DesktopSessionsRoot)) {
     const AccountFolder = path.join(DesktopSessionsRoot, Account);
 
-    if (!fs.statSync(AccountFolder).isDirectory()) {
+    if (!fs.statSync(AccountFolder, {throwIfNoEntry: false})?.isDirectory()) {
       continue;
     }
 
     for (const Organization of fs.readdirSync(AccountFolder)) {
       const Folder = path.join(AccountFolder, Organization);
 
-      if (!fs.statSync(Folder).isDirectory()) {
+      if (!fs.statSync(Folder, {throwIfNoEntry: false})?.isDirectory()) {
         continue;
       }
 
@@ -464,8 +464,8 @@ function ParseLines(File: string, MaxBytes?: number, From?: number): { Lines: Tr
 }
 
 function TitleOf(Lines: TranscriptEntry[], Desktop: DesktopSession | undefined, IsOwn: boolean): string {
-  const Named = Lines.find((Line) => Line.type === "custom-title" && Line.customTitle)
-    || Lines.find((Line) => Line.type === "ai-title" && Line.aiTitle)
+  const Named = Lines.findLast((Line) => Line.type === "custom-title" && Line.customTitle)
+    || Lines.findLast((Line) => Line.type === "ai-title" && Line.aiTitle)
     || Lines.find((Line) => Line.type === "summary" && Line.summary);
 
   if (Desktop && Desktop.title && !(IsOwn && Named)) {
@@ -492,7 +492,7 @@ function StartedAt(Lines: TranscriptEntry[], File: string): number {
     }
   }
 
-  return fs.statSync(File).birthtimeMs;
+  return fs.statSync(File, {throwIfNoEntry: false})?.birthtimeMs || 0;
 }
 
 function EndedAt(Lines: TranscriptEntry[], File: string): number {
@@ -502,7 +502,7 @@ function EndedAt(Lines: TranscriptEntry[], File: string): number {
     }
   }
 
-  return fs.statSync(File).mtimeMs;
+  return fs.statSync(File, {throwIfNoEntry: false})?.mtimeMs || 0;
 }
 
 function WorkingDirectoryOf(Lines: TranscriptEntry[]): string | null {
@@ -546,7 +546,7 @@ export function ListConversations(): Listing[] {
   for (const Project of fs.readdirSync(SessionsRoot)) {
     const Folder = path.join(SessionsRoot, Project);
 
-    if (!fs.statSync(Folder).isDirectory()) {
+    if (!fs.statSync(Folder, {throwIfNoEntry: false})?.isDirectory()) {
       continue;
     }
 

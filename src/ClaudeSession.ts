@@ -244,7 +244,10 @@ export function ReadMcpServers() {
 
     return Servers;
   } catch (Error) {
-    console.error(`Could not read MCP servers from ${DesktopConfigPath}: ${(Error as Error).message}`);
+    if ((Error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.error(`Could not read MCP servers from ${DesktopConfigPath}: ${(Error as Error).message}`);
+    }
+
     return {};
   }
 }

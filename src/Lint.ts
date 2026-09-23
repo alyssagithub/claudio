@@ -244,7 +244,6 @@ function Flags(Analyzer: string): Promise<string[]> {
 }
 
 const Canary = "__ClaudioCanary";
-const Vendored = /(^|[\/])Packages[\/]/;
 
 function Workspace(): string {
   return path.join(ToolsFolder, "workspace");
@@ -255,7 +254,11 @@ function SourceMap(): string {
 }
 
 function FileFor(Where: string): string {
-  return Where.split(".").map((Part) => Part.replace(/[\\/:*?"<>|]/g, "_").replace(/^\.+$/, "_")).join("/");
+  return Where.split(".").map((Part) => {
+    const Safe = Part.replace(/[^a-z0-9-]/gu, (Character) => /^[A-Z]$/.test(Character) ? `^${Character.toLowerCase()}` : `_${Character.codePointAt(0)!.toString(16)}_`);
+
+    return Safe === "" || /^(con|prn|aux|nul|com\d|lpt\d)$/.test(Safe) ? `${Safe}_` : Safe;
+  }).join("/");
 }
 
 function Node(Name: string, Class: string, Children: TreeNode[], Where: string | null): TreeNode {
@@ -443,12 +446,8 @@ async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]
   const Leaves: string[] = [];
 
   for (const Entry of Entries) {
-    if (FileFor(Entry.path).includes(Canary)) {
-      continue;
-    }
-
-    const Nested = path.join(Workspace(), `${FileFor(Entry.path)}/init.luau`);
-    const Leaf = fs.existsSync(Nested) ? `${FileFor(Entry.path)}/init.luau` : `${FileFor(Entry.path)}.luau`;
+    const File = FileFor(Entry.path);
+    const Leaf = fs.existsSync(path.join(Workspace(), `${File}/init.luau`)) ? `${File}/init.luau` : `${File}.luau`;
     const Full = path.join(Workspace(), Leaf);
 
     if (typeof Entry.source === "string" && Entry.source !== "") {
@@ -495,7 +494,15 @@ async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]
   const Report: { path: string; lines: string[] }[] = [];
 
   for (const [Where, Lines] of Found) {
-    if (Vendored.test(Where)) {
+    const Script = Where.replace(/\/init\.luau$/, "").replace(/\.luau$/, "").split("/").map((Part) => Part.replace(/\^([a-z])|_([0-9a-f]+)_|_$/g, (_, Capital, Code) => {
+      if (Capital) {
+        return Capital.toUpperCase();
+      }
+
+      return Code ? String.fromCodePoint(parseInt(Code, 16)) : "";
+    })).join(".");
+
+    if (/(^|\.)Packages\./.test(Script)) {
       continue;
     }
 
@@ -504,7 +511,7 @@ async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]
 
     if (Kept.length > 0) {
       Report.push({
-        path: Where.replace(/\/init\.luau$/, "").replace(/\.luau$/, "").split("/").join("."),
+        path: Script,
         lines: Kept.slice(0, 40),
       });
     }

@@ -1,6 +1,6 @@
 {
   "name": "claudio",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Local bridge between Roblox Studio and the Claude Code login on this machine",
   "type": "module",
   "files": [

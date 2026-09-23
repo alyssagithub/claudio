@@ -139,4 +139,6 @@ $Studio = Get-Process -Name RobloxStudioBeta, RobloxStudio -ErrorAction Silently
 
 $Owner = if ($Studio) { $Studio.Id } else { 0 }
 
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
+
 [ClaudioFolderPicker]::Pick("Pick the folder Claude should work in", $Owner)

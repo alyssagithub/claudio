@@ -22,8 +22,10 @@ function Folders(Parent: string): string[] {
 function Newest(Folder: string): number {
   let Latest = 0;
 
-  for (const Entry of fs.readdirSync(Folder, {withFileTypes: true, recursive: true})) {
-    Latest = Math.max(Latest, fs.statSync(path.join(Entry.parentPath, Entry.name)).mtimeMs);
+  for (const Entry of fs.readdirSync(Folder, {withFileTypes: true})) {
+    const Full = path.join(Folder, Entry.name);
+
+    Latest = Math.max(Latest, fs.statSync(Full).mtimeMs, Entry.isDirectory() ? Newest(Full) : 0);
   }
 
   return Latest;

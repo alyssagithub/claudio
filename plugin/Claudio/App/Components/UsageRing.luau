@@ -410,7 +410,7 @@ return function()
 				ZIndex = 20,
 				LayoutOrder = 2,
 				Text = function()
-					const Limit = Window()
+					const Limit = Window() or Chat.Limits()[1]
 					const Parts: {string} = {}
 
 					if Limit then

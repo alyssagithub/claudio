@@ -58,10 +58,16 @@ const function CurrentEffort(): string
 		return Chosen
 	end
 
-	return "low"
+	return if Auto() then "xhigh" else "low"
 end
 
-const function EffortName(Level: string): string
+const function EffortLabel(): string
+	if Settings.Get("Effort")() == "" and not Auto() then
+		return "Default"
+	end
+
+	const Level = CurrentEffort()
+
 	return EffortNames[Level] or `{Level:sub(1, 1):upper()}{Level:sub(2)}`
 end
 
@@ -449,8 +455,12 @@ function ModelPicker.Menu()
 				Name = "More",
 				Vide.action(Covers.Add),
 				AutomaticSize = Enum.AutomaticSize.Y,
-				Size = UDim2.fromOffset(128, 0),
-				Position = UDim2.fromOffset(186, 0),
+				Size = function()
+					return UDim2.fromOffset(Scaled(128), 0)
+				end,
+				Position = function()
+					return UDim2.fromOffset(Scaled(182) + 4, 0)
+				end,
 				BackgroundColor3 = Theme.Colors.Input,
 				ZIndex = 150,
 				Visible = MoreOpen,
@@ -767,7 +777,7 @@ function ModelPicker.EffortButton()
 			return #EffortLevels() > 0
 		end,
 		Text = function()
-			return EffortName(CurrentEffort())
+			return EffortLabel()
 		end,
 		Activated = function()
 			Chat.PickerOpen(false)
@@ -917,7 +927,7 @@ function ModelPicker.EffortMenu()
 				FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
 				LayoutOrder = 2,
 				Text = function()
-					return EffortName(CurrentEffort())
+					return EffortLabel()
 				end,
 			},
 			Create "Frame" {

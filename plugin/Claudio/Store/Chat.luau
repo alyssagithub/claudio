@@ -67,6 +67,7 @@ const Chat = {
 	ContextUsed = Vide.source(0),
 	ContextWindow = Vide.source(0),
 	ContextModel = Vide.source(""),
+	ContextLoading = Vide.source(false),
 	ContextParts = Vide.source({} :: {Types.Part}),
 	Tip = Vide.source(nil :: {Text: string, Where: Vector2, Side: number, Below: boolean}?),
 	MenuFor = Vide.source(nil :: string?),
@@ -165,6 +166,7 @@ const function Reset()
 	Chat.ContextUsed(0)
 	Chat.ContextWindow(0)
 	Chat.ContextModel("")
+	Chat.ContextLoading(false)
 	Chat.Opened({})
 	table.clear(Chat.Anchors)
 	Watcher.Reset()
@@ -3051,11 +3053,19 @@ function Chat.RefreshUsage(Retries: number?)
 	const Id = Chat.ConversationId()
 	const Ok, Result = Client.GetUsage(Id)
 
-	if not Ok or Chat.ConversationId() ~= Id then
+	if Chat.ConversationId() ~= Id then
 		return
 	end
 
-	if Retries and Retries > 0 and not (Result.context and #Result.context.categories > 0) then
+	if not Ok then
+		Chat.ContextLoading(false)
+
+		return
+	end
+
+	if (Result.context and #Result.context.categories > 0) or Retries == 0 then
+		Chat.ContextLoading(false)
+	elseif Retries then
 		task.delay(4, Chat.RefreshUsage, Retries - 1)
 	end
 
@@ -3349,7 +3359,19 @@ function Chat.Open(Id: string)
 	KnownEnded = Ended(Conversation.id) or 0
 	Attach(Conversation.id)
 	task.spawn(function()
+		Chat.ContextLoading(true)
 		Chat.RefreshUsage()
+
+		if Chat.ConversationId() ~= Conversation.id then
+			return
+		end
+
+		if Chat.ContextWindow() == 0 then
+			Chat.ContextLoading(false)
+
+			return
+		end
+
 		Client.Warm(Conversation.id)
 		Chat.RefreshUsage(3)
 	end)

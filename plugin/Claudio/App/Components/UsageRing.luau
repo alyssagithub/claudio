@@ -1,4 +1,6 @@
 --!strict
+const RunService = game:GetService("RunService")
+
 const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Format = require(script.Parent.Parent.Parent.Format)
@@ -18,6 +20,12 @@ const Kinds = {
 }
 
 return function()
+	const Pulse = Vide.source(0)
+
+	const function Loading(): boolean
+		return Chat.ContextLoading() and #Chat.ContextParts() == 0
+	end
+
 	const function Window(): Types.Limit?
 		const Chosen = Settings.Get("RingStat")()
 
@@ -77,6 +85,9 @@ return function()
 				Size = UDim2.fromOffset(Edge, Edge),
 				Position = UDim2.fromOffset(if Side == "Right" then -Edge / 2 else 0, 0),
 				BackgroundColor3 = Colour,
+				BackgroundTransparency = function()
+					return if Loading() and Settings.Get("RingStat")() == "Context" then 0.3 + 0.3 * math.sin(Pulse() * 4) else 0
+				end,
 				BorderSizePixel = 0,
 				Visible = function()
 					return Portion() > 0
@@ -295,6 +306,13 @@ return function()
 				Connection:Disconnect()
 			end)
 			task.defer(Follow, Object)
+			Vide.cleanup(RunService.Heartbeat:Connect(function()
+				if not Vide.untrack(Loading) then
+					return
+				end
+
+				Pulse(os.clock())
+			end))
 		end),
 		Create "UICorner" {CornerRadius = UDim.new(1, 0)},
 		Half("Right", 1),
@@ -362,7 +380,7 @@ return function()
 					const Room = Chat.ContextWindow()
 
 					if Room == 0 then
-						return "Context fills in after the first reply"
+						return if Chat.ContextLoading() then "Loading context" else "Context fills in after the first reply"
 					end
 
 					return `Context {Format.Large(Chat.ContextUsed())} / {Format.Large(Room)} ({math.round(Chat.ContextUsed() / Room * 100)}%)`
@@ -454,11 +472,27 @@ return function()
 					const Room = Chat.ContextWindow()
 
 					if Room == 0 then
-						return "0"
+						return if Chat.ContextLoading() then "" else "0"
 					end
 
 					return `{Format.Large(Chat.ContextUsed())} / {Format.Large(Room)} ({math.round(Chat.ContextUsed() / Room * 100)}%) `
 				end, true, 1, Expanded),
+			},
+			Create "TextLabel" {
+				Name = "Loading",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				TextColor3 = Theme.Colors.DimText,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextWrapped = true,
+				LayoutOrder = 3,
+				Visible = Loading,
+				Text = function()
+					return `Loading breakdown{string.rep(".", math.floor(Pulse() * 2.5) % 3 + 1)}`
+				end,
 			},
 			Create "Frame" {
 				Name = "Segments",
@@ -497,7 +531,7 @@ return function()
 					Size = UDim2.fromScale(1, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 					BackgroundTransparency = 1,
-					LayoutOrder = 2 + Index,
+					LayoutOrder = 3 + Index,
 
 					Create "UIListLayout" {
 						FillDirection = Enum.FillDirection.Horizontal,

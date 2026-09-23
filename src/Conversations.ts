@@ -1160,23 +1160,9 @@ export function SetConversationFlag(Id: string, Field: string, Value: unknown): 
 }
 
 function RemoveDesktopSession(Id: string) {
-  const Folder = DesktopSessionsFolder();
-
-  if (!Folder) {
-    return;
-  }
-
-  for (const Name of fs.readdirSync(Folder)) {
-    if (!Name.endsWith(".json")) {
-      continue;
-    }
-
-    const File = path.join(Folder, Name);
-    const Session = ReadJson<DesktopRecord>(File);
-
-    if (Session && Session.cliSessionId === Id) {
+  for (const File of DesktopSessionFiles()) {
+    if (ReadJson<DesktopRecord>(File)?.cliSessionId === Id) {
       fs.rmSync(File, {force: true});
-      return;
     }
   }
 }

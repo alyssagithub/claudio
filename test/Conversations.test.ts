@@ -10,7 +10,7 @@ process.env.USERPROFILE = Home;
 process.env.HOME = Home;
 process.env.APPDATA = path.join(Home, "Roaming");
 
-const { GetConversation, LatestContext, StripContext, ExtractContext } = await import("../src/Conversations.js");
+const { DeleteConversation, GetConversation, LatestContext, StripContext, ExtractContext } = await import("../src/Conversations.js");
 const { MostCallText } = await import("../src/Config.js");
 
 const Picture = {
@@ -444,4 +444,24 @@ test("a chat renamed twice shows its latest name", () => {
   ]);
 
   assert.equal(GetConversation("renamed")!.title, "Second name");
+});
+
+test("deleting a chat removes its desktop record from an older organization too", () => {
+  WriteTranscript("elsewhere", [Line("user", "hello")]);
+
+  const Account = path.join(Home, "Roaming", "Claude", "claude-code-sessions", "account");
+  const Older = path.join(Account, "older");
+  const Newer = path.join(Account, "newer");
+  const Record = path.join(Older, "local_elsewhere.json");
+
+  fs.mkdirSync(Older, {recursive: true});
+  fs.writeFileSync(Record, JSON.stringify({
+    sessionId: "local_elsewhere",
+    cliSessionId: "elsewhere",
+  }));
+  fs.utimesSync(Older, new Date(2020, 0, 1), new Date(2020, 0, 1));
+  fs.mkdirSync(Newer, {recursive: true});
+
+  assert.equal(DeleteConversation("elsewhere"), true);
+  assert.equal(fs.existsSync(Record), false);
 });

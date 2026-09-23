@@ -132,7 +132,26 @@ const function Item(Label: () -> string, LayoutOrder: number, Danger: boolean, O
 	}
 end
 
+const function Place(): (() -> UDim2, any)
+	const Measured = Vide.source(Vector2.zero)
+
+	return function()
+		const Where = Chat.MenuPosition()
+		const Room = if Chat.Window then Chat.Window.AbsoluteSize else Vector2.new(math.huge, math.huge)
+
+		return UDim2.fromOffset(math.max(0, math.min(Where.X, Room.X - Measured().X)), math.max(0, math.min(Where.Y, Room.Y - Measured().Y)))
+	end, Vide.action(function(Object: GuiObject)
+		Measured(Object.AbsoluteSize)
+		Vide.cleanup(Object:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			Measured(Object.AbsoluteSize)
+		end))
+	end)
+end
+
 return function()
+	const FolderPosition, FolderMeasure = Place()
+	const MenuPosition, MenuMeasure = Place()
+
 	return Create "Frame" {
 		Name = "ContextMenu",
 		Vide.action(Covers.Add),
@@ -171,10 +190,9 @@ return function()
 			Visible = function()
 				return Chat.MenuFolder() ~= nil
 			end,
-			Position = function()
-				return UDim2.fromOffset(Chat.MenuPosition().X, Chat.MenuPosition().Y)
-			end,
+			Position = FolderPosition,
 
+			FolderMeasure,
 			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
 			Create "UIStroke" {Color = Theme.Colors.Border},
 			Create "UIPadding" {
@@ -200,10 +218,9 @@ return function()
 			Visible = function()
 				return Chosen() ~= nil
 			end,
-			Position = function()
-				return UDim2.fromOffset(Chat.MenuPosition().X, Chat.MenuPosition().Y)
-			end,
+			Position = MenuPosition,
 
+			MenuMeasure,
 			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
 			Create "UIStroke" {Color = Theme.Colors.Border},
 			Create "UIPadding" {

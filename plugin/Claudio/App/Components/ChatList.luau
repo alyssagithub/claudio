@@ -195,10 +195,7 @@ const function Row(Summary: () -> Types.ConversationSummary, Index: number)
 				Chat.MenuFolder(nil)
 
 				if Chat.Window then
-					const Where = Chat.Window:GetRelativeMousePosition()
-					const Room = Chat.Window.AbsoluteSize
-
-					Chat.MenuPosition(Vector2.new(math.min(Where.X, math.max(0, Room.X - 160)), math.min(Where.Y, math.max(0, Room.Y - 120))))
+					Chat.MenuPosition(Chat.Window:GetRelativeMousePosition())
 				end
 
 				Chat.MenuFor(Summary().id)
@@ -401,10 +398,7 @@ const function Row(Summary: () -> Types.ConversationSummary, Index: number)
 						Chat.MenuFor(nil)
 
 						if Chat.Window then
-							const Where = Chat.Window:GetRelativeMousePosition()
-							const Room = Chat.Window.AbsoluteSize
-
-							Chat.MenuPosition(Vector2.new(math.min(Where.X, math.max(0, Room.X - 160)), math.min(Where.Y, math.max(0, Room.Y - 40))))
+							Chat.MenuPosition(Chat.Window:GetRelativeMousePosition())
 						end
 
 						Chat.MenuFolder(Mine.folder)

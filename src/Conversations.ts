@@ -594,24 +594,12 @@ export function ListConversations(): Listing[] {
 
 export function GetConversationImage(Id: string, Wanted: number) {
   const File = FindFile(Id);
-  const Lines = File ? ReadLines(File) : null;
-  let Index = 0;
+  const Found = (File ? ReadLines(File) || [] : [])
+    .filter((Line) => !Line.isSidechain && Line.type === "user" && Line.message)
+    .flatMap((Line) => ImagesInContent(Line.message!.content));
+  const Image = Number.isInteger(Wanted) && Wanted !== 0 ? Found.at(Wanted > 0 ? Wanted - 1 : Wanted) : null;
 
-  for (const Line of Lines || []) {
-    if (Line.isSidechain || Line.type !== "user" || !Line.message) {
-      continue;
-    }
-
-    for (const Image of ImagesInContent(Line.message!.content)) {
-      Index += 1;
-
-      if (Index === Wanted) {
-        return DecodeImage(Image.mediaType, Image.data);
-      }
-    }
-  }
-
-  return null;
+  return Image ? DecodeImage(Image.mediaType, Image.data) : null;
 }
 
 function ReadCosts(): CostStore {
@@ -1005,6 +993,12 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
 
   if (Trailing && Trailing.role === "assistant" && PendingImages.length > 0) {
     Trailing.images = Trailing.images.concat(PendingImages);
+  }
+
+  if (Partial) {
+    for (const Message of Messages) {
+      Message.images = Message.images.map((Index) => Index - ImageIndex - 1);
+    }
   }
 
   const Desktop = ReadDesktopSessions()[Id];

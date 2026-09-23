@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import zlib from "node:zlib";
 
 const Home = fs.mkdtempSync(path.join(os.tmpdir(), "claudio-test-"));
 
@@ -10,7 +11,7 @@ process.env.USERPROFILE = Home;
 process.env.HOME = Home;
 process.env.APPDATA = path.join(Home, "Roaming");
 
-const { DeleteConversation, GetConversation, LatestContext, StripContext, ExtractContext } = await import("../src/Conversations.js");
+const { DeleteConversation, GetConversation, GetConversationImage, LatestContext, StripContext, ExtractContext } = await import("../src/Conversations.js");
 const { MostCallText } = await import("../src/Config.js");
 
 const Picture = {
@@ -464,4 +465,67 @@ test("deleting a chat removes its desktop record from an older organization too"
 
   assert.equal(DeleteConversation("elsewhere"), true);
   assert.equal(fs.existsSync(Record), false);
+});
+
+function Square(Size: number) {
+  const Chunk = (Kind: string, Data: Buffer) => {
+    const Named = Buffer.concat([Buffer.from(Kind), Data]);
+    const Length = Buffer.alloc(4);
+    const Check = Buffer.alloc(4);
+
+    Length.writeUInt32BE(Data.length);
+    Check.writeUInt32BE(zlib.crc32(Named));
+
+    return Buffer.concat([Length, Named, Check]);
+  };
+  const Header = Buffer.alloc(13);
+
+  Header.writeUInt32BE(Size, 0);
+  Header.writeUInt32BE(Size, 4);
+  Header[8] = 8;
+  Header[9] = 6;
+
+  const Rows = Buffer.alloc(Size * (Size * 4 + 1), 255);
+
+  for (let Row = 0; Row < Size; Row += 1) {
+    Rows[Row * (Size * 4 + 1)] = 0;
+  }
+
+  return {
+    type: "image",
+    source: {
+      type: "base64",
+      media_type: "image/png",
+      data: Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), Chunk("IHDR", Header), Chunk("IDAT", zlib.deflateSync(Rows)), Chunk("IEND", Buffer.alloc(0))]).toString("base64"),
+    },
+  };
+}
+
+test("an image in the recent part of a long chat opens as itself, not an earlier one", () => {
+  const Lines = [Line("user", [Square(1), {
+    type: "text",
+    text: "first",
+  }])];
+
+  for (let Round = 0; Round < 4; Round += 1) {
+    Lines.push(Line("user", `question ${Round}`), Line("assistant", [{
+      type: "text",
+      text: "x".repeat(1100000),
+    }], {requestId: `round-${Round}`}));
+  }
+
+  Lines.push(Line("user", [Square(2), {
+    type: "text",
+    text: "last",
+  }]), Line("assistant", [{
+    type: "text",
+    text: "seen",
+  }], {requestId: "last"}));
+  WriteTranscript("pictured", Lines);
+
+  const Recent = GetConversation("pictured", 1)!;
+  const Last = Recent.messages.find((Message) => Message.text === "last")!;
+
+  assert.equal(Recent.partial, true);
+  assert.equal(GetConversationImage("pictured", Last.images[0])!.width, 2);
 });

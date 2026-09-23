@@ -3573,7 +3573,10 @@ end
 
 function Chat.Send(Text: string, Quiet: string?)
 	LintPasses = 0
-	Chat.Draft("")
+
+	if Text == Chat.Draft() then
+		Chat.Draft("")
+	end
 
 	if not Text:match("%S") then
 		return

@@ -924,12 +924,10 @@ export function StartServer(Port: number) {
   });
 
   Server.on("error", (Error) => {
-    if ((Error as NodeJS.ErrnoException).code === "EADDRINUSE") {
-      console.error(`Port ${Port} is already in use. Is another Claudio bridge running? Use --port to pick another.`);
-      process.exit(1);
-    }
-
-    throw Error;
+    console.error((Error as NodeJS.ErrnoException).code === "EADDRINUSE"
+      ? `Port ${Port} is already in use. Is another Claudio bridge running? Use --port to pick another.`
+      : `Could not listen on port ${Port}: ${Error.message}`);
+    process.exit(1);
   });
 
   Server.listen(Port, "127.0.0.1", () => {

@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, SubagentModels, Subagents, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory } from "./Config.js";
-import { AddDesktopSession, ExtractContext, GetConversation, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession, CompactionNotice } from "./Conversations.js";
+import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, SubagentModels, Subagents, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, ExtraModels, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory } from "./Config.js";
+import { AddDesktopSession, ExtractContext, GetConversation, LatestContext, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession, CompactionNotice } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
@@ -66,10 +66,65 @@ function StoreWindow(Into: Map<string, unknown>, Kind: string, Label: string, En
   });
 }
 
+const ModelWindows: Record<string, number> = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(WindowsFile, "utf8"));
+  } catch {
+    return {};
+  }
+})();
+
+function RememberWindow(Model: string, Size: number) {
+  if (ModelWindows[Model] === Size) {
+    return;
+  }
+
+  ModelWindows[Model] = Size;
+
+  try {
+    fs.mkdirSync(path.dirname(WindowsFile), {recursive: true});
+    fs.writeFileSync(WindowsFile, JSON.stringify(ModelWindows, null, 2));
+  } catch {
+    return;
+  }
+}
+
+function WindowFor(Model: string, Used: number) {
+  const Plain = Model.replace(/\[.*\]$/, "");
+  const Known = Object.keys(ModelWindows).filter((Name) => Name.replace(/\[.*\]$/, "") === Plain).map((Name) => ModelWindows[Name]);
+  const Extra = ExtraModels.find((Entry) => Entry.value === Plain);
+  const Listed = GetModels().find((Entry) => {
+    const Named = Entry.description.match(/^(\w+) (\d+)(?:\.(\d+))?/);
+    const Full = Entry.value.startsWith("claude-") ? Entry.value.replace(/\[.*\]$/, "") : Named ? `claude-${Named[1]}-${Named[2]}${Named[3] ? `-${Named[3]}` : ""}`.toLowerCase() : "";
+
+    return Full !== "" && Plain.startsWith(Full) && (/\[1m\]/i.test(Entry.value) || /1M context/i.test(Entry.description));
+  });
+  const Size = Known.length > 0 ? Math.max(...Known) : Extra ? Extra.contextWindow : Listed ? 1000000 : 200000;
+
+  return Used > Size ? 1000000 : Size;
+}
+
 export function GetBreakdown(ConversationId: string | null): Breakdown | null {
   const Session = ConversationId ? Sessions.get(ConversationId) : null;
+  const Saved = ConversationId ? LatestContext(ConversationId) : null;
 
-  return (Session && Session.Breakdown) || null;
+  if (Session && Session.Breakdown && (!Saved || (Session.BreakdownAt || 0) + 5000 >= Saved.at)) {
+    return Session.Breakdown;
+  }
+
+  if (!Saved) {
+    return (Session && Session.Breakdown) || null;
+  }
+
+  const Max = WindowFor(Saved.model, Saved.total);
+
+  return {
+    total: Saved.total,
+    max: Max,
+    percentage: Math.round(Saved.total / Max * 100),
+    model: Saved.model,
+    categories: [],
+  };
 }
 
 function Rank(Entry: {deferred: boolean, name: string}) {
@@ -92,6 +147,7 @@ export async function RefreshContext(Session: Session) {
       return;
     }
 
+    Session.BreakdownAt = Date.now();
     Session.Breakdown = {
       total: Usage.totalTokens || 0,
       max: Usage.maxTokens || 0,
@@ -1287,6 +1343,10 @@ function RouteMessage(Session: Session, Message: any) {
     const Weight = (Usage.inputTokens || 0) + (Usage.cacheReadInputTokens || 0);
     const Matches = Turn.Model && Name.includes(Turn.Model.replace(/\[.*\]$/, ""));
 
+    if (Usage.contextWindow) {
+      RememberWindow(Name, Usage.contextWindow);
+    }
+
     if (Usage.contextWindow && (Matches || Weight > Busiest)) {
       Busiest = Matches ? Infinity : Weight;
       Turn.ContextWindow = Usage.contextWindow;
@@ -1856,7 +1916,7 @@ export function CancelTurn(Turn: Turn) {
     return;
   }
 
-  Session.Query.interrupt().catch(() => {
+  Session.Query.interrupt().then(() => RefreshContext(Session)).catch(() => {
     Session.Close();
     FinishTurn(Turn, "cancelled");
   });

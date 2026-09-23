@@ -3048,9 +3048,10 @@ function Chat.LoadMcpServers()
 end
 
 function Chat.RefreshUsage()
-	const Ok, Result = Client.GetUsage(Chat.ConversationId())
+	const Id = Chat.ConversationId()
+	const Ok, Result = Client.GetUsage(Id)
 
-	if not Ok then
+	if not Ok or Chat.ConversationId() ~= Id then
 		return
 	end
 
@@ -3343,6 +3344,7 @@ function Chat.Open(Id: string)
 	Chat.ListOpen(false)
 	KnownEnded = Ended(Conversation.id) or 0
 	Attach(Conversation.id)
+	task.spawn(Chat.RefreshUsage)
 end
 
 function Chat.Sync()

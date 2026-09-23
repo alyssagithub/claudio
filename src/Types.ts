@@ -293,6 +293,7 @@ export type Session = {
   PendingPlace?: string | null;
   PendingContext?: string | null;
   Breakdown?: Breakdown | null;
+  BreakdownAt?: number;
   CurrentTurn: Turn | null;
   LastTurn?: Turn | null;
   Background: Set<string>;

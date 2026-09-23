@@ -213,6 +213,7 @@ export const KeepSessionsWarm = process.env.CLAUDIO_COLD !== "1";
 export const IdleSessionMilliseconds = 4 * 60 * 1000;
 export const MaxWarmSessions = 2;
 export const ModelsCacheFile = path.join(os.homedir(), ".claudio", "models.json");
+export const WindowsFile = path.join(os.homedir(), ".claudio", "windows.json");
 export const AutoTiers = [
   {
     model: "haiku",

@@ -86,10 +86,10 @@ function Client.SendNow(Text: string, ConversationId: string?, RequestId: string
 	})
 end
 
-function Client.StartTurn(Text: string, ConversationId: string?, Images: {Types.ImageUpload}, Escalate: boolean?): (boolean, any)
+const function TurnBody(Text: string, ConversationId: string?, Images: {Types.ImageUpload}, Escalate: boolean?): {[string]: any}
 	const Effort = Settings.Get("Effort")()
 
-	return Http.Request("POST", `{BaseUrl()}/chat`, {
+	return {
 		text = Text,
 		conversationId = ConversationId,
 		images = Images,
@@ -110,7 +110,15 @@ function Client.StartTurn(Text: string, ConversationId: string?, Images: {Types.
 			placeId = if game.PlaceId == 0 then nil else string.format("%d", game.PlaceId),
 			universeId = if game.GameId == 0 then nil else string.format("%d", game.GameId),
 		},
-	})
+	}
+end
+
+function Client.StartTurn(Text: string, ConversationId: string?, Images: {Types.ImageUpload}, Escalate: boolean?): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/chat`, TurnBody(Text, ConversationId, Images, Escalate))
+end
+
+function Client.Warm(ConversationId: string): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/warm`, TurnBody("", ConversationId, {}))
 end
 
 function Client.PollTurn(RequestId: string, Version: number): (boolean, any)

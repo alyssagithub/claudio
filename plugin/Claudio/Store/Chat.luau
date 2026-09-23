@@ -2706,7 +2706,7 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 	end
 
 	task.spawn(Chat.Refresh)
-	task.spawn(Chat.RefreshUsage)
+	task.spawn(Chat.RefreshUsage, 5)
 
 	if Chat.ReplyListener then
 		Chat.ReplyListener(Text)
@@ -3047,12 +3047,16 @@ function Chat.LoadMcpServers()
 	Chat.McpServers(Result.servers or {})
 end
 
-function Chat.RefreshUsage()
+function Chat.RefreshUsage(Retries: number?)
 	const Id = Chat.ConversationId()
 	const Ok, Result = Client.GetUsage(Id)
 
 	if not Ok or Chat.ConversationId() ~= Id then
 		return
+	end
+
+	if Retries and Retries > 0 and not (Result.context and #Result.context.categories > 0) then
+		task.delay(4, Chat.RefreshUsage, Retries - 1)
 	end
 
 	Chat.Limits(Result.limits or Chat.Limits())
@@ -3344,7 +3348,11 @@ function Chat.Open(Id: string)
 	Chat.ListOpen(false)
 	KnownEnded = Ended(Conversation.id) or 0
 	Attach(Conversation.id)
-	task.spawn(Chat.RefreshUsage)
+	task.spawn(function()
+		Chat.RefreshUsage()
+		Client.Warm(Conversation.id)
+		Chat.RefreshUsage(3)
+	end)
 end
 
 function Chat.Sync()

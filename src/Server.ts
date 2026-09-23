@@ -7,12 +7,13 @@ import { fileURLToPath } from "node:url";
 import { exec, execFile, spawn } from "node:child_process";
 import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, MaxLintBodyBytes, MostScriptsToCheck, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
-import { GetLimits, GetBreakdown, PollUsage } from "./ClaudeSession.js";
+import { GetLimits, GetBreakdown, PollUsage, RefreshConversationContext } from "./ClaudeSession.js";
 import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
+import type { TurnRequest } from "./Types.js";
 import { StudioProcesses } from "./StudioPresence.js";
-import { ActiveTurnFor, AddToTurn, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { ActiveTurnFor, AddToTurn, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, WarmConversation, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetSubagent, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
@@ -142,6 +143,27 @@ function StartLint(Wanted: {path: string, source: string}[], Raw: boolean, Tree:
 function SendJson(Response: ServerResponse, StatusCode: number, Body: unknown) {
   Response.writeHead(StatusCode, {"Content-Type": "application/json"});
   Response.end(JSON.stringify(Body));
+}
+
+function TurnRequestFrom(Body: Record<string, any>, ConversationId: string | null): TurnRequest {
+  return {
+    Text: typeof Body.text === "string" ? Body.text : "",
+    ConversationId,
+    Images: [],
+    Model: typeof Body.model === "string" ? Body.model : "default",
+    Effort: typeof Body.effort === "string" ? Body.effort : null,
+    AskForTools: Body.askForTools !== false,
+    GuardTools: Body.guardTools === true,
+    ExtraPrompt: Body.extraPrompt !== false,
+    FastMode: Body.fastMode === true,
+    Mode: typeof Body.mode === "string" ? Body.mode : DefaultMode,
+    Bypass: Body.bypass === true && !PlaytestLive(),
+    Escalate: Body.escalate === true,
+    Place: Body.place && typeof Body.place === "object" ? Body.place : null,
+    Folder: (ConversationId ? ListConversations().find((Entry) => Entry.id === ConversationId)?.folder : null) || (typeof Body.workingDirectory === "string" ? Body.workingDirectory : null),
+    OutputStyle: typeof Body.outputStyle === "string" ? Body.outputStyle : "default",
+    StepDown: Body.stepDown !== false,
+  };
 }
 
 function ReadBody(Request: IncomingMessage, Limit = MaxBodyBytes): Promise<Record<string, any>> {
@@ -371,7 +393,7 @@ function WarmUsage() {
   const Attempt = async () => {
     Tries += 1;
 
-    if (await PollUsage(null) || Tries >= 10) {
+    if (await PollUsage() || Tries >= 10) {
       return;
     }
 
@@ -497,6 +519,19 @@ export function StartServer(Port: number) {
         return;
       }
 
+      if (Request.method === "POST" && Url.pathname === "/warm") {
+        const Body = await ReadBody(Request);
+        const ConversationId = typeof Body.conversationId === "string" ? Body.conversationId : null;
+
+        await Promise.race([
+          WarmConversation(TurnRequestFrom(Body, ConversationId)).catch(() => {}),
+          new Promise((Resolve) => setTimeout(Resolve, 30000)),
+        ]);
+
+        SendJson(Response, 200, {context: GetBreakdown(ConversationId)});
+        return;
+      }
+
       if (Request.method === "POST" && Url.pathname === "/chat") {
         const Body = await ReadBody(Request);
 
@@ -527,22 +562,8 @@ export function StartServer(Port: number) {
           : [];
 
         SendJson(Response, 200, DescribeTurn(StartTurn({
-          Text: Body.text,
-          ConversationId,
+          ...TurnRequestFrom(Body, ConversationId),
           Images,
-          Model: typeof Body.model === "string" ? Body.model : "default",
-          Effort: typeof Body.effort === "string" ? Body.effort : null,
-          AskForTools: Body.askForTools !== false,
-          GuardTools: Body.guardTools === true,
-          ExtraPrompt: Body.extraPrompt !== false,
-          FastMode: Body.fastMode === true,
-          Mode: typeof Body.mode === "string" ? Body.mode : DefaultMode,
-          Bypass: Body.bypass === true && !PlaytestLive(),
-          Escalate: Body.escalate === true,
-          Place: Body.place && typeof Body.place === "object" ? Body.place : null,
-          Folder: (ConversationId ? ListConversations().find((Entry) => Entry.id === ConversationId)?.folder : null) || (typeof Body.workingDirectory === "string" ? Body.workingDirectory : null),
-          OutputStyle: typeof Body.outputStyle === "string" ? Body.outputStyle : "default",
-          StepDown: Body.stepDown !== false,
         })));
         return;
       }
@@ -718,7 +739,10 @@ export function StartServer(Port: number) {
 
       if (Request.method === "GET" && Url.pathname === "/usage") {
         const For = Url.searchParams.get("conversationId");
-        const Asked = await PollUsage(For);
+        const [Asked] = await Promise.all([
+          Promise.race([PollUsage(), new Promise<boolean>((Resolve) => setTimeout(() => Resolve(false), 1000))]),
+          Promise.race([RefreshConversationContext(For), new Promise((Resolve) => setTimeout(Resolve, 3000))]),
+        ]);
 
         SendJson(Response, 200, {
           asked: Asked,

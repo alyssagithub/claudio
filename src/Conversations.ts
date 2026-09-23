@@ -1068,10 +1068,9 @@ export function LatestContext(Id: string): { total: number; model: string; at: n
     return null;
   }
 
-  const At = fs.statSync(File).mtimeMs;
-
   for (const Lines of [ReadWindow(File, Windows[0]), ReadLines(File)]) {
     let Total: number | null = null;
+    let At = 0;
 
     for (let Index = (Lines || []).length - 1; Index >= 0; Index -= 1) {
       const Line = (Lines as TranscriptEntry[])[Index] as TranscriptEntry & { subtype?: string; compactMetadata?: { postTokens?: number } };
@@ -1083,6 +1082,7 @@ export function LatestContext(Id: string): { total: number; model: string; at: n
 
       if (Total === null && Line.type === "system" && Line.subtype === "compact_boundary") {
         Total = Line.compactMetadata?.postTokens || 0;
+        At = Date.parse(Line.timestamp || "") || 0;
         continue;
       }
 
@@ -1100,7 +1100,7 @@ export function LatestContext(Id: string): { total: number; model: string; at: n
         return {
           total: (Usage.input_tokens || 0) + (Usage.cache_creation_input_tokens || 0) + (Usage.cache_read_input_tokens || 0) + (Usage.output_tokens || 0),
           model: Model,
-          at: At,
+          at: Date.parse(Line.timestamp || "") || 0,
         };
       }
     }

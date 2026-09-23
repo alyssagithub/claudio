@@ -4,7 +4,7 @@ import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, SubagentModels, Subagents, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, ExtraModels, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory } from "./Config.js";
-import { AddDesktopSession, ExtractContext, GetConversation, LatestContext, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession, CompactionNotice } from "./Conversations.js";
+import { AddDesktopSession, ExtractContext, LatestContext, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession, CompactionNotice } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
@@ -167,7 +167,7 @@ export async function RefreshContext(Session: Session) {
   }
 }
 
-export async function PollUsage(ConversationId: string | null) {
+export async function PollUsage() {
   const Ready = [...Sessions.values()].find((Entry) => Entry.Query);
 
   if (!Ready) {
@@ -176,13 +176,15 @@ export async function PollUsage(ConversationId: string | null) {
 
   await RefreshUsage(Ready);
 
+  return true;
+}
+
+export async function RefreshConversationContext(ConversationId: string | null) {
   const Used = ConversationId ? Sessions.get(ConversationId) : null;
 
   if (Used && Used.Query && Used.HasSpoken) {
     await RefreshContext(Used);
   }
-
-  return true;
 }
 
 export async function RefreshUsage(Session: Session) {
@@ -1740,14 +1742,9 @@ export function ApplyStyleEverywhere(OutputStyle: string, StepDown: boolean) {
   }
 }
 
-export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForTools, GuardTools, Escalate, ExtraPrompt, FastMode, Mode, Bypass, Place, Folder, OutputStyle, StepDown }: TurnRequest) {
-  LastStyle = OutputStyle || "default";
-  LastStepDown = StepDown !== false;
-
-  const Existing = ConversationId ? GetConversation(ConversationId) : null;
+function Choose({ Text, ConversationId, Images, Model, Effort, Escalate, Mode, Folder }: TurnRequest) {
   const Lean = Model === LeanMode.value;
   const Auto = Lean || !Model || Model === "auto";
-  const Planning = Mode === "plan";
 
   if (Escalate && Auto) {
     RecordTurnOutcome(ConversationId || "", {
@@ -1756,13 +1753,55 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     });
   }
 
-  const Chosen = Auto
-    ? ChooseModel(ConversationId || "", Text, Boolean(Images && Images.length) || Text.includes("<studio_context>"), AutoBias(Effort))
-    : {
-      model: Model,
-      effort: Escalate ? NextEffort(Model, Effort) : (SupportsEffort(Model, Effort) ? Effort : null),
-      delegate: "",
-    };
+  return {
+    Lean,
+    Auto,
+    Planning: Mode === "plan",
+    Folder: UsableFolder(Folder) || WorkingDirectory,
+    Chosen: Auto
+      ? ChooseModel(ConversationId || "", Text, Boolean(Images && Images.length) || Text.includes("<studio_context>"), AutoBias(Effort))
+      : {
+        model: Model,
+        effort: Escalate ? NextEffort(Model, Effort) : (SupportsEffort(Model, Effort) ? Effort : null),
+        delegate: "",
+      },
+  };
+}
+
+const Warming = new Map<string, Promise<void>>();
+
+export function WarmConversation(Request: TurnRequest): Promise<void> {
+  const Id = Request.ConversationId;
+
+  if (!Id || !KeepSessionsWarm || !LatestContext(Id)) {
+    return Promise.resolve();
+  }
+
+  const Existing = Sessions.get(Id);
+
+  if (Existing && !Existing.Ended) {
+    return RefreshContext(Existing);
+  }
+
+  if (!Warming.has(Id)) {
+    const { Lean, Planning, Folder, Chosen } = Choose(Request);
+    const Session = OpenSession(Id, Folder, Chosen.model, Chosen.effort, Request.AskForTools !== false, Request.ExtraPrompt !== false, Request.FastMode === true, Planning, Lean, Request.Mode, Request.Bypass === true, Chosen.delegate || SubagentModels[0], Request.OutputStyle || LastStyle, Request.StepDown !== false);
+
+    Session.LastUsedAt = Date.now();
+    CloseIdleSessions();
+    Warming.set(Id, RefreshContext(Session).finally(() => Warming.delete(Id)));
+  }
+
+  return Warming.get(Id) as Promise<void>;
+}
+
+export function StartTurn(Request: TurnRequest) {
+  const { Text, ConversationId, Images, Effort, AskForTools, GuardTools, ExtraPrompt, FastMode, Mode, Bypass, Place, OutputStyle, StepDown } = Request;
+
+  LastStyle = OutputStyle || "default";
+  LastStepDown = StepDown !== false;
+
+  const { Lean, Auto, Planning, Folder, Chosen } = Choose(Request);
   const Turn: Turn = {
     Id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
     ConversationId,
@@ -1781,7 +1820,7 @@ export function StartTurn({ Text, ConversationId, Images, Model, Effort, AskForT
     FastMode: FastMode === true,
     Bypass: Bypass === true,
     Mode,
-    WorkingDirectory: (Existing && UsableFolder(Existing.workingDirectory)) || UsableFolder(Folder) || WorkingDirectory,
+    WorkingDirectory: Folder,
     SessionId: ConversationId,
     Status: "running",
     CommittedText: "",

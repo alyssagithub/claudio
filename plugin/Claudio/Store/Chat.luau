@@ -1517,23 +1517,37 @@ end
 
 const function Mark(Input: any): any
 	const Wanted = string.lower(tostring(Input.widget or ""))
-	const Titles = {}
+	const Open = {}
+	const Closed = {}
 	local Found: PluginGui?
+	local Hidden: PluginGui?
 
 	for _, Window in game:GetService("PluginGuiService"):GetChildren() do
 		if not Window:IsA("PluginGui") then
 			continue
 		end
 
-		table.insert(Titles, Window.Title)
+		const Matches = Wanted ~= "" and string.lower(Window.Title):find(Wanted, 1, true) ~= nil
 
-		if Window.Enabled and Wanted ~= "" and string.lower(Window.Title):find(Wanted, 1, true) then
-			Found = Window
+		if Window.Enabled then
+			table.insert(Open, Window.Title)
+			Found = if Matches then Window else Found
+		else
+			table.insert(Closed, Window.Title)
+			Hidden = if Matches then Window else Hidden
 		end
 	end
 
+	if Wanted == "" then
+		return {error = "Give part of the window's title in widget."}
+	end
+
+	if not Found and Hidden then
+		return {error = `"{Hidden.Title}" is closed right now, so there is nothing to capture. Open it first.`}
+	end
+
 	if not Found then
-		return {error = if Wanted == "" then "Give part of the window's title in widget." else `No open plugin window has "{Input.widget}" in its title. Open ones: {table.concat(Titles, ", ")}.`}
+		return {error = `No plugin window has "{Input.widget}" in its title. Open: {if #Open > 0 then table.concat(Open, ", ") else "none"}. Closed: {if #Closed > 0 then table.concat(Closed, ", ") else "none"}.`}
 	end
 
 	const Window = Found :: PluginGui

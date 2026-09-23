@@ -166,6 +166,8 @@ export async function RefreshContext(Session: Session) {
   }
 }
 
+let PolledAt = 0;
+
 export async function PollUsage() {
   const Ready = [...Sessions.values()].find((Entry) => Entry.Query);
 
@@ -173,6 +175,11 @@ export async function PollUsage() {
     return false;
   }
 
+  if (Date.now() - PolledAt < 20000) {
+    return true;
+  }
+
+  PolledAt = Date.now();
   await RefreshUsage(Ready);
 
   return true;

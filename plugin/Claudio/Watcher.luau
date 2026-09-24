@@ -246,6 +246,12 @@ const function AddListener(Object: Instance)
 			Paths[Object] = Object:GetFullName()
 		end
 
+		const Previous = Sources[Object]
+
+		if Field == "Source" then
+			Sources[Object] = (Object :: any).Source
+		end
+
 		if Paused or Noise[Field] or StudioOwns(Object, Field) then
 			return
 		end
@@ -273,10 +279,8 @@ const function AddListener(Object: Instance)
 		const Made = Where.Keys[`{Object:GetDebugId()}|Edited`]
 
 		if Made and Made.Before == nil then
-			Made.Before = Sources[Object] or ""
+			Made.Before = Previous or ""
 		end
-
-		Sources[Object] = (Object :: any).Source
 	end)
 
 	Attributes[Object] = Object.AttributeChanged:Connect(function(Name: string)

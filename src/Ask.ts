@@ -5,7 +5,6 @@ import type { JobAnswer, Question as AskedQuestion } from "./Types.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
 
 export const AskServerName = "claudio";
-const AskToolName = "mcp__claudio__ask";
 
 const Option = z.object({
   label: z.string().describe("The display text for this option. Concise, one to five words."),

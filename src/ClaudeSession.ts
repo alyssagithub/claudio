@@ -1516,10 +1516,28 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
           planModeInstructions: PlanInstructions,
           agents: Session.UsingSubagents ? AgentsOn(Session.Subagent) as Record<string, AgentDefinition> : undefined,
           skills: Session.UsingSubagents ? [] : undefined,
+          canUseTool: async (ToolName, Input) => {
+            if (ToolName !== "AskUserQuestion") {
+              return {behavior: "deny", message: "This session has no way to approve that tool."};
+            }
+
+            const Answers = await AskQuestion(Session, Input.questions as Question[]) as JobAnswer | null;
+
+            if (!Answers) {
+              return {behavior: "deny", message: "The user dismissed the question without answering. Stop and wait for their next message rather than guessing."};
+            }
+
+            return {behavior: "allow", updatedInput: {...Input, answers: Answers}};
+          },
           hooks: {
             PreToolUse: [{
               hooks: [async (HookInput, ToolUseId, Options) => {
                 const Asked = HookInput as {tool_name: string, tool_input: unknown};
+
+                if (Asked.tool_name === "AskUserQuestion") {
+                  return {};
+                }
+
                 const Edited = EditedFile(Asked.tool_name, Asked.tool_input);
 
                 if (Edited && ToolUseId) {

@@ -156,12 +156,6 @@ return function()
 				PaddingTop = UDim.new(0, 6),
 				PaddingBottom = UDim.new(0, 6),
 			},
-			Create "UIListLayout" {
-				FillDirection = Enum.FillDirection.Horizontal,
-				VerticalAlignment = Enum.VerticalAlignment.Top,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, 6),
-			},
 			Create "Frame" {
 				Name = "Words",
 				Size = function()
@@ -169,7 +163,6 @@ return function()
 				end,
 				AutomaticSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
-				LayoutOrder = 1,
 
 				Create "UIListLayout" {SortOrder = Enum.SortOrder.LayoutOrder},
 				Create "TextLabel" {
@@ -207,6 +200,8 @@ return function()
 				Size = function()
 					return UDim2.fromOffset(Settings.SmallText() + 4, Settings.SmallText() + 4)
 				end,
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.fromScale(1, 0),
 				BackgroundColor3 = Theme.Colors.Accent,
 				BackgroundTransparency = function()
 					return if Chosen()[Label()] then 0 else 1
@@ -220,7 +215,6 @@ return function()
 
 					return if Held and Held.multiSelect then Config.IconFont else Font.fromEnum(Enum.Font.BuilderSans)
 				end,
-				LayoutOrder = 2,
 				Text = function()
 					const Held = Current()
 

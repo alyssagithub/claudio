@@ -14,6 +14,7 @@ return function()
 	const Checking = Vide.source(false)
 
 	local Alive = true
+	local Box: TextBox?
 
 	Vide.cleanup(function()
 		Alive = false
@@ -54,6 +55,11 @@ return function()
 		end
 
 		Typing(Path)
+
+		if Box then
+			Box.Text = Path
+		end
+
 		Settings.Set("WorkingFolder", Path)
 		Settings.Set("FolderAsked", true)
 		task.spawn(Chat.Refresh)
@@ -142,7 +148,7 @@ return function()
 			ClearTextOnFocus = false,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			LayoutOrder = 3,
-			Text = "",
+			Text = Vide.untrack(Typing),
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
 			Create "UIPadding" {
@@ -151,6 +157,9 @@ return function()
 			},
 			Vide.changed("Text", function(Value: string)
 				Typing(Value)
+			end),
+			Vide.action(function(Object: TextBox)
+				Box = Object
 			end),
 		},
 		Create "TextLabel" {

@@ -231,6 +231,21 @@ return function()
 		return `{Format.Large(Chat.ContextUsed())} / {Format.Large(ContextSize)} ({math.round(Chat.ContextUsed() / ContextSize * 100)}%)`
 	end
 
+	const function GetRoomBeforeCompact(): number?
+		local Free: number?
+		local Buffered = false
+
+		for _, Part in Chat.ContextParts() do
+			if Part.name == "Free space" then
+				Free = Part.tokens
+			elseif Part.name == "Autocompact buffer" and Part.tokens > 0 then
+				Buffered = true
+			end
+		end
+
+		return if Buffered then Free else nil
+	end
+
 	const function Line(Left: () -> string, Right: () -> string, Strong: boolean, LayoutOrder: number, Arrow: (() -> boolean)?)
 		return Create "Frame" {
 			Name = "Line",
@@ -472,6 +487,23 @@ return function()
 
 					return `{GetContextText()} `
 				end, true, 1, Expanded),
+			},
+			Create "TextLabel" {
+				Name = "UntilCompact",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				TextColor3 = Theme.Colors.Text,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				LayoutOrder = 3,
+				Visible = function()
+					return not Loading() and GetRoomBeforeCompact() ~= nil
+				end,
+				Text = function()
+					return `{Format.Large(GetRoomBeforeCompact() or 0)} until auto-compact`
+				end,
 			},
 			Create "TextLabel" {
 				Name = "Loading",

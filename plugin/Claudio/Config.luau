@@ -1,7 +1,7 @@
 --!strict
 return {
 	Name = "Claudio",
-	Version = "1.5.1-beta",
+	Version = "1.6.0",
 	AskTool = "mcp__claudio__ask",
 	ProtocolVersion = 1,
 	DefaultPort = 47225,

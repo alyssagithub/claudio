@@ -3238,7 +3238,15 @@ function Chat.ViewSubagent(Task: Types.Task)
 	}
 
 	const function Fetch()
-		const Ok, Result = Client.GetSubagent(Mine.Parent, Mine.ToolUseId)
+		local Running = false
+
+		for _, Entry in Chat.Tasks() do
+			if Entry.toolUseId == Mine.ToolUseId and Entry.status == "running" then
+				Running = true
+			end
+		end
+
+		const Ok, Result = Client.GetSubagent(Mine.Parent, Mine.ToolUseId, Running)
 
 		if Chat.Viewing() ~= Mine or not Ok or typeof(Result) ~= "table" or typeof(Result.messages) ~= "table" then
 			return

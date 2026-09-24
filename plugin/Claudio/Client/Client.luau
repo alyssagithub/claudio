@@ -339,8 +339,8 @@ function Client.ConversationExists(Id: string): boolean
 	return not Ok or Result.exists ~= false
 end
 
-function Client.GetSubagent(Id: string, ToolUseId: string): (boolean, any)
-	return Http.Request("GET", `{BaseUrl()}/conversations/{Id}/subagents/{ToolUseId}`)
+function Client.GetSubagent(Id: string, ToolUseId: string, Running: boolean): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/conversations/{Id}/subagents/{ToolUseId}{if Running then "/live" else ""}`)
 end
 
 function Client.GetConversationImage(Id: string, Index: number): (boolean, any)

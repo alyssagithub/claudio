@@ -25,6 +25,20 @@ return function()
 			return Chat.Viewing() ~= nil
 		end,
 
+		Vide.action(function(List: ScrollingFrame)
+			local NearBottom = true
+
+			Vide.cleanup(List:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+				NearBottom = List.AbsoluteCanvasSize.Y - (List.CanvasPosition.Y + List.AbsoluteWindowSize.Y) < 40
+			end))
+			Vide.cleanup(List:GetPropertyChangedSignal("AbsoluteCanvasSize"):Connect(function()
+				if not NearBottom then
+					return
+				end
+
+				List.CanvasPosition = Vector2.new(0, List.AbsoluteCanvasSize.Y)
+			end))
+		end),
 		Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
 		Create "UIPadding" {
 			PaddingLeft = UDim.new(0, 8),

@@ -751,7 +751,7 @@ export function GetConversation(Id: string, Least?: number): BuiltConversation |
   return Whole;
 }
 
-function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: boolean): BuiltConversation | null {
+function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: boolean, Running = false): BuiltConversation | null {
 
   const Messages: StoredMessage[] = [];
   let PendingTools: string[] = [];
@@ -800,7 +800,7 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
         name: Call.name,
         input: Call.input,
         output: Result ? Result.Output : "",
-        status: Result && Result.Failed ? "error" : "done",
+        status: Result ? (Result.Failed ? "error" : "done") : (Running ? "running" : "done"),
         milliseconds: 0,
         image: Result && Result.Image ? Result.Image + Before : null,
       };
@@ -1019,7 +1019,7 @@ function ReadChapters(): Record<string, Chapter[]> {
   return ReadJson<Record<string, Chapter[]>>(ChaptersFile) || {};
 }
 
-export function GetSubagent(Id: string, ToolUseId: string): BuiltConversation | null {
+export function GetSubagent(Id: string, ToolUseId: string, Running: boolean): BuiltConversation | null {
   const File = FindFile(Id);
 
   if (!File) {
@@ -1047,7 +1047,7 @@ export function GetSubagent(Id: string, ToolUseId: string): BuiltConversation | 
 
     const Transcript = path.join(Folder, Name.replace(/\.meta\.json$/, ".jsonl"));
     const Lines = ReadLines(Transcript);
-    const Built = Lines ? Assemble(Lines.map((Line) => ({...Line, isSidechain: false})), `${Id}/${ToolUseId}`, Transcript, false) : null;
+    const Built = Lines ? Assemble(Lines.map((Line) => ({...Line, isSidechain: false})), `${Id}/${ToolUseId}`, Transcript, false, Running) : null;
 
     return Built ? {...Built, title: Meta.description || Built.title} : null;
   }

@@ -265,7 +265,7 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
   }
 
   if (Request.method === "GET" && Id && Segments[2] === "subagents" && Segments[3]) {
-    const Found = /^[\w-]{1,100}$/.test(Segments[3]) ? GetSubagent(Id, Segments[3]) : null;
+    const Found = /^[\w-]{1,100}$/.test(Segments[3]) ? GetSubagent(Id, Segments[3], Segments[4] === "live") : null;
 
     if (!Found) {
       SendJson(Response, 404, {error: "That subagent has no transcript yet"});

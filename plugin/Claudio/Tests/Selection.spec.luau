@@ -6,6 +6,7 @@ return function()
 
 	const Selection = require(script.Parent.Parent.Store.Selection)
 	const Covers = require(script.Parent.Parent.App.Covers)
+	const Vide = require(script.Parent.Parent.Packages.vide)
 	const Keys = require(script.Parent.Parent.Store.Keys)
 
 	local Screen: ScreenGui
@@ -85,7 +86,9 @@ return function()
 			const Cover = Frame(50, 50, 100, 100)
 			const Inside = Frame(10, 10, 20, 20, Cover)
 
-			Covers.Add(Cover)
+			Vide.root(function()
+				Covers.Add(Cover)
+			end)
 			task.wait()
 
 			expect(Covers.Over(Behind, 60, 60)).to.equal(true)
@@ -97,7 +100,9 @@ return function()
 			const Behind = Frame(0, 0, 300, 300)
 			const Cover = Frame(50, 50, 100, 100)
 
-			Covers.Add(Cover)
+			Vide.root(function()
+				Covers.Add(Cover)
+			end)
 			Cover.Visible = false
 			task.wait()
 

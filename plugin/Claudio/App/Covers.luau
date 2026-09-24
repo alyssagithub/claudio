@@ -1,4 +1,5 @@
 --!strict
+const Vide = require(script.Parent.Parent.Packages.vide)
 const Bounds = require(script.Parent.Parent.Bounds)
 
 const Covers = {}
@@ -8,7 +9,7 @@ const Shown: {GuiObject} = {}
 function Covers.Add(Object: GuiObject)
 	table.insert(Shown, Object)
 
-	Object.Destroying:Once(function()
+	Vide.cleanup(function()
 		const Index = table.find(Shown, Object)
 
 		if not Index then
@@ -55,11 +56,11 @@ function Covers.Hover(Hovered: (boolean?) -> boolean): (GuiObject) -> ()
 			Hovered(Wanted)
 		end
 
-		Object.MouseEnter:Connect(Check)
-		Object.MouseMoved:Connect(Check)
-		Object.MouseLeave:Connect(function()
+		Vide.cleanup(Object.MouseEnter:Connect(Check))
+		Vide.cleanup(Object.MouseMoved:Connect(Check))
+		Vide.cleanup(Object.MouseLeave:Connect(function()
 			Hovered(false)
-		end)
+		end))
 	end
 end
 

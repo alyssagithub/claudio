@@ -119,48 +119,7 @@ const function Any(Flag: "hidden" | "archived"): () -> boolean
 	end
 end
 
-const function Ordered(): {Types.ConversationSummary}
-	const Folder = Settings.Get("WorkingFolder")()
-	const Here = Folder:match("[^\\/]+$") or Folder
-	const Sorted = {}
-
-	for _, Summary in Chat.Conversations() do
-		if (Chat.ShowHidden() or not Summary.hidden) and (Chat.ShowArchived() or not Summary.archived) then
-			table.insert(Sorted, Summary)
-		end
-	end
-
-	table.sort(Sorted, function(Left, Right)
-		if Left.id == Gallery.Id or Right.id == Gallery.Id then
-			return Left.id == Gallery.Id
-		end
-
-		const LeftGroup = GroupOf(Left)
-		const RightGroup = GroupOf(Right)
-
-		if LeftGroup ~= RightGroup then
-			if LeftGroup == Here or RightGroup == Here then
-				return LeftGroup == Here
-			end
-
-			if LeftGroup == "Other" or RightGroup == "Other" then
-				return RightGroup == "Other"
-			end
-
-			return LeftGroup < RightGroup
-		end
-
-		if Left.starred ~= Right.starred then
-			return Left.starred == true
-		end
-
-		return Left.updatedAt > Right.updatedAt
-	end)
-
-	return Sorted
-end
-
-const function Row(Summary: () -> Types.ConversationSummary, Index: number)
+const function Row(Summary: () -> Types.ConversationSummary, Index: number, Ordered: () -> {Types.ConversationSummary})
 	const function IsCurrent(): boolean
 		return Chat.ConversationId() == Summary().id
 	end
@@ -433,6 +392,47 @@ const function Row(Summary: () -> Types.ConversationSummary, Index: number)
 end
 
 return function()
+	const Ordered = Vide.derive(function(): {Types.ConversationSummary}
+		const Folder = Settings.Get("WorkingFolder")()
+		const Here = Folder:match("[^\\/]+$") or Folder
+		const Sorted = {}
+
+		for _, Summary in Chat.Conversations() do
+			if (Chat.ShowHidden() or not Summary.hidden) and (Chat.ShowArchived() or not Summary.archived) then
+				table.insert(Sorted, Summary)
+			end
+		end
+
+		table.sort(Sorted, function(Left, Right)
+			if Left.id == Gallery.Id or Right.id == Gallery.Id then
+				return Left.id == Gallery.Id
+			end
+
+			const LeftGroup = GroupOf(Left)
+			const RightGroup = GroupOf(Right)
+
+			if LeftGroup ~= RightGroup then
+				if LeftGroup == Here or RightGroup == Here then
+					return LeftGroup == Here
+				end
+
+				if LeftGroup == "Other" or RightGroup == "Other" then
+					return RightGroup == "Other"
+				end
+
+				return LeftGroup < RightGroup
+			end
+
+			if Left.starred ~= Right.starred then
+				return Left.starred == true
+			end
+
+			return Left.updatedAt > Right.updatedAt
+		end)
+
+		return Sorted
+	end)
+
 	return Create "ScrollingFrame" {
 		Name = "ChatList",
 		Size = UDim2.fromScale(1, 0),
@@ -476,7 +476,9 @@ return function()
 				return #Chat.Conversations() == 0
 			end,
 		},
-		Vide.indexes(Ordered, Row),
+		Vide.indexes(Ordered, function(Summary: () -> Types.ConversationSummary, Index: number)
+			return Row(Summary, Index, Ordered)
+		end),
 		Choice(function()
 			return if Chat.ShowArchived() then "Hide archived chats" else "Show archived chats"
 		end, 1000000, function()

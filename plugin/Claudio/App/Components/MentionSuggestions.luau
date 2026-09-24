@@ -10,6 +10,8 @@ const Theme = require(script.Parent.Parent.Theme)
 
 const Create = Vide.create
 
+type Entry = {Object: Instance, Name: string}
+
 const Places = {
 	workspace,
 	game:GetService("ReplicatedStorage"),
@@ -20,8 +22,8 @@ const Places = {
 	game:GetService("Lighting"),
 }
 
-local Named: {{Object: Instance, Name: string}}?
-local Narrowed: {{Object: Instance, Name: string}} = {}
+local Named: {Entry}?
+local Narrowed: {Entry} = {}
 local LastWanted = ""
 
 const function Matches(): {Instance}
@@ -34,7 +36,7 @@ const function Matches(): {Instance}
 	end
 
 	if not Named then
-		const Listed = {}
+		const Listed: {Entry} = {}
 
 		for _, Place in Places do
 			for _, Object in Place:GetDescendants() do
@@ -55,8 +57,8 @@ const function Matches(): {Instance}
 	end
 
 	const Wanted = Word:lower()
-	const Searched = if Wanted:sub(1, #LastWanted) == LastWanted then Narrowed else Named :: {{Object: Instance, Name: string}}
-	const Matching = {}
+	const Searched: {Entry} = if Wanted:sub(1, #LastWanted) == LastWanted then Narrowed else Named or {}
+	const Matching: {Entry} = {}
 
 	for _, Entry in Searched do
 		if Entry.Name:sub(1, #Wanted) == Wanted then

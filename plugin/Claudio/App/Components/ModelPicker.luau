@@ -31,12 +31,12 @@ const function CurrentModel(): Types.ModelInfo?
 	return nil
 end
 
-const function Auto(): boolean
+const function IsAuto(): boolean
 	return Settings.Get("Model")() == "auto"
 end
 
 const function EffortLevels(): {string}
-	if Auto() then
+	if IsAuto() then
 		return {
 			"low",
 			"medium",
@@ -58,11 +58,11 @@ const function CurrentEffort(): string
 		return Chosen
 	end
 
-	return if Auto() then "xhigh" else "low"
+	return if IsAuto() then "xhigh" else "low"
 end
 
 const function EffortLabel(): string
-	if Settings.Get("Effort")() == "" and not Auto() then
+	if Settings.Get("Effort")() == "" and not IsAuto() then
 		return "Default"
 	end
 
@@ -75,7 +75,7 @@ const Tip = Vide.source("")
 const Explaining = Vide.source(false)
 const MenuHeight = Vide.source(0)
 
-const function Row(Name: () -> string, Detail: () -> string, Chosen: () -> boolean, OnClick: () -> (), LayoutOrder: number, Arrow: (() -> boolean)?, Hover: ((boolean) -> ())?, Described: boolean?, Badge: (() -> boolean)?)
+const function Row(Name: () -> string, Detail: () -> string, Chosen: () -> boolean, OnClick: () -> (), LayoutOrder: number, Arrow: (() -> boolean)?, OnHover: ((boolean) -> ())?, Described: boolean?, Badge: (() -> boolean)?)
 	const Hovered = Vide.source(false)
 
 	return Create "TextButton" {
@@ -97,11 +97,11 @@ const function Row(Name: () -> string, Detail: () -> string, Chosen: () -> boole
 				Tip(Detail())
 			end
 
-			if not Hover then
+			if not OnHover then
 				return
 			end
 
-			Hover(true)
+			OnHover(true)
 		end,
 		MouseLeave = function()
 			Hovered(false)
@@ -110,11 +110,11 @@ const function Row(Name: () -> string, Detail: () -> string, Chosen: () -> boole
 				Tip("")
 			end
 
-			if not Hover then
+			if not OnHover then
 				return
 			end
 
-			Hover(false)
+			OnHover(false)
 		end,
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
@@ -218,7 +218,7 @@ end
 
 const ModelPicker = {BarHeight = Vide.source(0)}
 
-const function Scaled(Width: number): number
+const function ScaleWidth(Width: number): number
 	const Room = Chat.WindowWidth()
 
 	return math.min(math.round(Width * Settings.TextSize() / Config.TextSize), if Room > 16 then Room - 16 else math.huge)
@@ -226,7 +226,7 @@ end
 
 const MoreOpen = Vide.source(false)
 
-const function Listed(Extra: boolean): {Types.ModelInfo}
+const function GetModels(Extra: boolean): {Types.ModelInfo}
 	const Found = {}
 
 	for _, Model in Chat.Models() do
@@ -253,7 +253,7 @@ const function Divider(LayoutOrder: number)
 	}
 end
 
-const function Titled(Model: Types.ModelInfo): string
+const function GetTitle(Model: Types.ModelInfo): string
 	const Version = Model.description:match("^(%a[%a ]-%s[%d%.]+)")
 
 	if Model.value == "default" then
@@ -278,7 +278,7 @@ end
 
 const function Pick(Model: () -> Types.ModelInfo, LayoutOrder: number, Inside: boolean?)
 	return Row(function()
-		return Titled(Model())
+		return GetTitle(Model())
 	end, function()
 		return Model().description
 	end, function()
@@ -314,7 +314,7 @@ function ModelPicker.Menu()
 		Name = "ModelMenu",
 		Vide.action(Covers.Add),
 		Size = function()
-			return UDim2.fromOffset(Scaled(182), 0)
+			return UDim2.fromOffset(ScaleWidth(182), 0)
 		end,
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),
@@ -342,7 +342,7 @@ function ModelPicker.Menu()
 			return "Auto"
 		end, function()
 			return "Picks a model and effort for each message from the effort slider below. Lower spends fewer tokens, higher answers more carefully"
-		end, Auto, function()
+		end, IsAuto, function()
 			Settings.Set("Model", "auto")
 			Settings.Set("Effort", "")
 			Chat.PickerOpen(false)
@@ -352,7 +352,7 @@ function ModelPicker.Menu()
 			end
 		end),
 		Vide.indexes(function()
-			return Listed(false)
+			return GetModels(false)
 		end, function(Model: () -> Types.ModelInfo, Index: number)
 			return Pick(Model, Index + 1)
 		end),
@@ -456,10 +456,10 @@ function ModelPicker.Menu()
 				Vide.action(Covers.Add),
 				AutomaticSize = Enum.AutomaticSize.Y,
 				Size = function()
-					return UDim2.fromOffset(Scaled(128), 0)
+					return UDim2.fromOffset(ScaleWidth(128), 0)
 				end,
 				Position = function()
-					return UDim2.fromOffset(Scaled(182) + 4, 0)
+					return UDim2.fromOffset(ScaleWidth(182) + 4, 0)
 				end,
 				BackgroundColor3 = Theme.Colors.Input,
 				ZIndex = 150,
@@ -478,7 +478,7 @@ function ModelPicker.Menu()
 					HorizontalFlex = Enum.UIFlexAlignment.Fill,
 				},
 				Vide.indexes(function()
-					return Listed(true)
+					return GetModels(true)
 				end, function(Model: () -> Types.ModelInfo, Index: number)
 					return Pick(Model, Index, true)
 				end),
@@ -526,7 +526,7 @@ function ModelPicker.Menu()
 	}
 end
 
-const function Pill(Open: () -> boolean): (() -> boolean, {any})
+const function CreatePillStyle(Open: () -> boolean): (() -> boolean, {any})
 	const Hovered = Vide.source(false)
 
 	return function()
@@ -544,7 +544,7 @@ const function Pill(Open: () -> boolean): (() -> boolean, {any})
 end
 
 function ModelPicker.Button()
-	const Lit, Dressing = Pill(Chat.PickerOpen)
+	const Highlighted, PillChildren = CreatePillStyle(Chat.PickerOpen)
 
 	return Create "TextButton" {
 		Name = "ModelButton",
@@ -552,7 +552,7 @@ function ModelPicker.Button()
 		Size = UDim2.fromScale(0, 0),
 		BackgroundColor3 = Theme.Colors.Button,
 		BackgroundTransparency = function()
-			return if Lit() then 0 else 1
+			return if Highlighted() then 0 else 1
 		end,
 		Text = "",
 		AutoButtonColor = false,
@@ -572,14 +572,14 @@ function ModelPicker.Button()
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 			Padding = UDim.new(0, 2),
 		},
-		Dressing,
+		PillChildren,
 		Create "TextLabel" {
 			Name = "Label",
 			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
 			TextColor3 = Theme.Colors.Text,
 			TextTransparency = function()
-				return if Lit() then 0 else 0.25
+				return if Highlighted() then 0 else 0.25
 			end,
 			TextSize = Settings.SmallText,
 			FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
@@ -587,7 +587,7 @@ function ModelPicker.Button()
 			Text = function()
 				const Model = CurrentModel()
 
-				return if Model then (Titled(Model):gsub(" %(Experimental%)", "")) else "Auto"
+				return if Model then (GetTitle(Model):gsub(" %(Experimental%)", "")) else "Auto"
 			end,
 		},
 		Icon {
@@ -595,7 +595,7 @@ function ModelPicker.Button()
 			Size = Settings.SmallText,
 			LayoutOrder = 2,
 			Colour = function()
-				return if Lit() then Theme.Colors.Text() else Theme.Colors.DimText()
+				return if Highlighted() then Theme.Colors.Text() else Theme.Colors.DimText()
 			end,
 		},
 	}
@@ -636,7 +636,7 @@ function ModelPicker.ModeMenu()
 		Name = "ModeMenu",
 		Vide.action(Covers.Add),
 		Size = function()
-			return UDim2.fromOffset(Scaled(224), 0)
+			return UDim2.fromOffset(ScaleWidth(224), 0)
 		end,
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),
@@ -751,7 +751,7 @@ function ModelPicker.ModeMenu()
 end
 
 function ModelPicker.EffortButton()
-	const Lit, Dressing = Pill(Chat.EffortOpen)
+	const Highlighted, PillChildren = CreatePillStyle(Chat.EffortOpen)
 
 	return Create "TextButton" {
 		Name = "EffortButton",
@@ -759,11 +759,11 @@ function ModelPicker.EffortButton()
 		Size = UDim2.fromScale(0, 0),
 		BackgroundColor3 = Theme.Colors.Button,
 		BackgroundTransparency = function()
-			return if Lit() then 0 else 1
+			return if Highlighted() then 0 else 1
 		end,
 		TextColor3 = Theme.Colors.Text,
 		TextTransparency = function()
-			return if Lit() then 0 else 0.25
+			return if Highlighted() then 0 else 0.25
 		end,
 		TextSize = Settings.SmallText,
 		FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
@@ -781,7 +781,7 @@ function ModelPicker.EffortButton()
 			Chat.EffortOpen(not Chat.EffortOpen())
 		end,
 
-		Dressing,
+		PillChildren,
 	}
 end
 
@@ -790,7 +790,7 @@ function ModelPicker.EffortHelp()
 		Name = "Bubble",
 		Vide.action(Covers.Add),
 		Size = function()
-			return UDim2.fromOffset(Scaled(168), 0)
+			return UDim2.fromOffset(ScaleWidth(168), 0)
 		end,
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),
@@ -844,7 +844,7 @@ function ModelPicker.EffortHelp()
 			ZIndex = 200,
 			LayoutOrder = 2,
 			Text = function()
-				if Auto() then
+				if IsAuto() then
 					return "Lower picks cheaper models and less thinking, so each message uses fewer tokens. Higher picks better models and more thinking, so answers are more accurate but use your limits faster."
 				end
 
@@ -859,7 +859,7 @@ function ModelPicker.EffortMenu()
 		Name = "EffortMenu",
 		Vide.action(Covers.Add),
 		Size = function()
-			return UDim2.fromOffset(Scaled(182), 0)
+			return UDim2.fromOffset(ScaleWidth(182), 0)
 		end,
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),
@@ -976,7 +976,7 @@ function ModelPicker.EffortMenu()
 				TextSize = Settings.SmallText,
 				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 				Text = function()
-					return if Auto() then "Fewer tokens" else "Faster"
+					return if IsAuto() then "Fewer tokens" else "Faster"
 				end,
 			},
 			Create "TextLabel" {
@@ -989,7 +989,7 @@ function ModelPicker.EffortMenu()
 				TextSize = Settings.SmallText,
 				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 				Text = function()
-					return if Auto() then "More accurate" else "Smarter"
+					return if IsAuto() then "More accurate" else "Smarter"
 				end,
 			},
 		},

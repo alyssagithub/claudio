@@ -27,7 +27,7 @@ return function()
 		return Chat.ContextLoading() and #Chat.ContextParts() == 0
 	end
 
-	const function Window(): Types.Limit?
+	const function GetChosenLimit(): Types.Limit?
 		const Chosen = Settings.Get("RingStat")()
 
 		for _, Limit in Chat.Limits() do
@@ -43,20 +43,20 @@ return function()
 		return nil
 	end
 
-	const function Share(): number
+	const function GetUsedShare(): number
 		if Settings.Get("RingStat")() == "Context" then
 			const Total = Chat.ContextWindow()
 
 			return if Total > 0 then math.clamp(Chat.ContextUsed() / Total, 0, 1) else 0
 		end
 
-		const Limit = Window()
+		const Limit = GetChosenLimit()
 
 		return if Limit and Limit.utilization then math.clamp(Limit.utilization, 0, 1) else 0
 	end
 
 	const function Colour(): Color3
-		const Used = Share()
+		const Used = GetUsedShare()
 
 		if Used >= 0.85 then
 			return Theme.Colors.Error()
@@ -71,7 +71,7 @@ return function()
 
 	const function Half(Side: string, Order: number)
 		const function Portion(): number
-			return math.clamp((Share() - (Order - 1) * 0.5) / 0.5, 0, 1)
+			return math.clamp((GetUsedShare() - (Order - 1) * 0.5) / 0.5, 0, 1)
 		end
 
 		return Create "Frame" {
@@ -119,7 +119,7 @@ return function()
 	const Waited = Vide.source(false)
 	local Waiting = 0
 
-	const function Follow(Object: GuiObject)
+	const function UpdatePosition(Object: GuiObject)
 		const Row = Object.Parent :: GuiObject
 
 		if not Row then
@@ -139,7 +139,7 @@ return function()
 		Below(Bar.AbsolutePosition.Y + Bar.AbsoluteSize.Y - Object.AbsolutePosition.Y)
 	end
 
-	const function Wait(Over: boolean)
+	const function OnHover(Over: boolean)
 		if Over == Vide.untrack(Hovered) then
 			return
 		end
@@ -176,11 +176,11 @@ return function()
 		["Autocompact buffer"] = Color3.fromRGB(96, 100, 118),
 	}
 
-	const function Shade(Part: Types.Part): Color3
+	const function GetPartColour(Part: Types.Part): Color3
 		return Shades[Part.name] or Color3.fromRGB(70, 74, 90)
 	end
 
-	const function Filled(): {Types.Part}
+	const function GetFilledParts(): {Types.Part}
 		if Loading() and Chat.ContextUsed() > 0 then
 			return {
 				{
@@ -203,7 +203,7 @@ return function()
 		return Found
 	end
 
-	const function Spent(): (number, boolean, boolean)
+	const function GetChatCost(): (number, boolean, boolean)
 		local Total = 0
 		local Guessed = false
 		local Known = false
@@ -290,17 +290,17 @@ return function()
 			Shown(not Shown())
 		end,
 		MouseEnter = function()
-			Wait(true)
+			OnHover(true)
 		end,
 		MouseLeave = function()
-			Wait(false)
+			OnHover(false)
 		end,
 
 		Vide.action(function(Object: GuiObject)
 			Vide.cleanup(Object:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
-				Follow(Object)
+				UpdatePosition(Object)
 			end))
-			task.defer(Follow, Object)
+			task.defer(UpdatePosition, Object)
 			Vide.cleanup(RunService.Heartbeat:Connect(function()
 				if not Vide.untrack(Loading) then
 					return
@@ -394,7 +394,7 @@ return function()
 				ZIndex = 20,
 				LayoutOrder = 2,
 				Text = function()
-					const Limit = Window() or Chat.Limits()[1]
+					const Limit = GetChosenLimit() or Chat.Limits()[1]
 					const Parts: {string} = {}
 
 					if Limit then
@@ -496,7 +496,7 @@ return function()
 					FillDirection = Enum.FillDirection.Horizontal,
 					SortOrder = Enum.SortOrder.LayoutOrder,
 				},
-				Vide.indexes(Filled, function(Part: () -> Types.Part, Index: number)
+				Vide.indexes(GetFilledParts, function(Part: () -> Types.Part, Index: number)
 					return Create "Frame" {
 						Name = "Segment",
 						Size = function()
@@ -505,7 +505,7 @@ return function()
 							return UDim2.fromScale(if Room == 0 then 0 else Part().tokens / Room, 1)
 						end,
 						BackgroundColor3 = function()
-							return Shade(Part())
+							return GetPartColour(Part())
 						end,
 						BorderSizePixel = 0,
 						LayoutOrder = Index,
@@ -532,7 +532,7 @@ return function()
 						Name = "Swatch",
 						Size = UDim2.fromOffset(8, 8),
 						BackgroundColor3 = function()
-							return Shade(Part())
+							return GetPartColour(Part())
 						end,
 						BorderSizePixel = 0,
 						LayoutOrder = 1,
@@ -636,13 +636,13 @@ return function()
 				BorderSizePixel = 0,
 				LayoutOrder = 200,
 				Visible = function()
-					return select(1, Spent()) > 0
+					return select(1, GetChatCost()) > 0
 				end,
 			},
 			Line(function()
 				return "Cost of this chat"
 			end, function()
-				const Total, Guessed = Spent()
+				const Total, Guessed = GetChatCost()
 
 				if Total < 1 then
 					return `{if Guessed then "~" else ""}${string.format("%.3f", Total)}`
@@ -651,7 +651,7 @@ return function()
 				return `{if Guessed then "~" else ""}${string.format("%.2f", Total)}`
 			end, true, 201),
 			Line(function()
-				const Total, Guessed, Known = Spent()
+				const Total, Guessed, Known = GetChatCost()
 
 				if Total == 0 then
 					return ""

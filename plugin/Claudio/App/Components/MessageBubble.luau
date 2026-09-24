@@ -54,11 +54,11 @@ const function IsCommand(Name: string): boolean
 	return Name == "Bash" or Name == "PowerShell"
 end
 
-const function Counted(Added: number, Removed: number): string
+const function FormatLineCounts(Added: number, Removed: number): string
 	return ` <font color="#{Theme.Colors.AddedText():ToHex()}">+{Added}</font> <font color="#{Theme.Colors.Error():ToHex()}">-{Removed}</font>`
 end
 
-const function FileWork(Entry: Types.ToolCall, Running: boolean): string?
+const function DescribeFileCall(Entry: Types.ToolCall, Running: boolean): string?
 	if Entry.name:match("__source$") then
 		const Doing = Changes.Field(Entry.input, "action")
 
@@ -66,7 +66,7 @@ const function FileWork(Entry: Types.ToolCall, Running: boolean): string?
 			return nil
 		end
 
-		return `{if Running then "Editing" else "Edited"} <b>{(Changes.Field(Entry.input, "path") or ""):match("[^%.]+$") or "a script"}</b>{if Entry.lines then Counted(Entry.lines.added, Entry.lines.removed) else ""}`
+		return `{if Running then "Editing" else "Edited"} <b>{(Changes.Field(Entry.input, "path") or ""):match("[^%.]+$") or "a script"}</b>{if Entry.lines then FormatLineCounts(Entry.lines.added, Entry.lines.removed) else ""}`
 	end
 
 	if Entry.name ~= "Write" and Entry.name ~= "Edit" and Entry.name ~= "MultiEdit" and Entry.name ~= "Read" then
@@ -84,11 +84,11 @@ const function FileWork(Entry: Types.ToolCall, Running: boolean): string?
 		elseif Lines and Lines.removed == 0 then (if Running then "Creating" else "Created")
 		else (if Running then "Rewriting" else "Rewrote")
 
-	return `{Verb} {File}{if Lines then Counted(Lines.added, Lines.removed) else ""}`
+	return `{Verb} {File}{if Lines then FormatLineCounts(Lines.added, Lines.removed) else ""}`
 end
 
 const function Describe(Entry: Types.ToolCall, Running: boolean): string
-	const Wrote = FileWork(Entry, Running)
+	const Wrote = DescribeFileCall(Entry, Running)
 
 	if Wrote then
 		return Wrote
@@ -124,7 +124,7 @@ const function Describe(Entry: Types.ToolCall, Running: boolean): string
 	return `{Verb} {Server}: {Tool:gsub("_", " "):gsub("%f[%a]%l", string.upper)}`
 end
 
-const function Running(): {Types.Task}
+const function GetRunningSubagents(): {Types.Task}
 	const Found = {}
 
 	for _, Entry in Chat.Tasks() do
@@ -136,7 +136,7 @@ const function Running(): {Types.Task}
 	return Found
 end
 
-const function Busy(Entry: Types.ToolCall): boolean
+const function IsBusy(Entry: Types.ToolCall): boolean
 	return Entry.status == "preparing" or Entry.status == "running"
 end
 
@@ -165,7 +165,7 @@ return function(Props: Props)
 		return Props.Role() == "user"
 	end
 
-	const function Hug(): number
+	const function GetBubbleWidth(): number
 		if not IsUser() or (Props.Images ~= nil and #Props.Images() > 0) then
 			return math.huge
 		end
@@ -202,7 +202,7 @@ return function(Props: Props)
 		}
 	end
 
-	const function Spend(): string
+	const function GetUsageText(): string
 		const At = if Props.At then Props.At() else nil
 		const Tokens = if Props.Tokens then Props.Tokens() else nil
 		const Cost = if Props.Cost then Props.Cost() else nil
@@ -227,7 +227,7 @@ return function(Props: Props)
 		return table.concat(Parts, " · ")
 	end
 
-	const function Written(): {Types.Change}
+	const function GetChanges(): {Types.Change}
 		return Changes.For({
 			Edits = if Props.Edits then Props.Edits() else nil,
 			Calls = if Props.Calls then Props.Calls() else nil,
@@ -236,7 +236,7 @@ return function(Props: Props)
 
 	const Shown = Vide.source(false)
 
-	const function Broke(): string
+	const function GetError(): string
 		return if Props.Error then Props.Error() or "" else ""
 	end
 
@@ -246,15 +246,15 @@ return function(Props: Props)
 			and #(if Props.Calls then Props.Calls() else {}) == 0
 			and #(if Props.Images then Props.Images() else {}) == 0
 			and #(if Props.Attachments then Props.Attachments() else {}) == 0
-			and Broke() == ""
-			and #Written() == 0
+			and GetError() == ""
+			and #GetChanges() == 0
 			and #(if Props.Parts then Props.Parts() or {} else {}) == 0
 	end
 
 	const Expanded = Vide.source(false)
 
-	const function Trimmed(): {Types.Change}
-		const All = Written()
+	const function GetShownChanges(): {Types.Change}
+		const All = GetChanges()
 
 		if Expanded() or #All <= 5 then
 			return All
@@ -269,7 +269,7 @@ return function(Props: Props)
 		return Some
 	end
 
-	const function Asked(Entry: Types.ToolCall): {{Question: string, Given: string}}
+	const function GetAnswers(Entry: Types.ToolCall): {{Question: string, Given: string}}
 		const Pairs = {}
 
 		if Entry.name ~= Config.AskTool then
@@ -286,7 +286,7 @@ return function(Props: Props)
 		return Pairs
 	end
 
-	const function Shortened(Text: string): string
+	const function Shorten(Text: string): string
 		const Lines = string.split(Text, "\n")
 
 		if #Lines <= 40 then
@@ -331,18 +331,18 @@ return function(Props: Props)
 	}
 
 	const function Call(Value: () -> Types.ToolCall, Index: number)
-		const Open = Vide.source(Busy(Value()))
+		const Open = Vide.source(IsBusy(Value()))
 		const Shimmer = Vide.source(0)
-		const Turned = Vide.source(if Busy(Value()) then 1 else 0)
+		const Turned = Vide.source(if IsBusy(Value()) then 1 else 0)
 
-		local WasBusy = Busy(Value())
+		local WasBusy = IsBusy(Value())
 
 		Vide.effect(function()
-			const Now = Busy(Value())
+			const IsBusyNow = IsBusy(Value())
 
-			if Now ~= WasBusy then
-				WasBusy = Now
-				Open(Now)
+			if IsBusyNow ~= WasBusy then
+				WasBusy = IsBusyNow
+				Open(IsBusyNow)
 			end
 		end)
 
@@ -355,7 +355,7 @@ return function(Props: Props)
 
 			Vide.action(function()
 				Vide.cleanup(RunService.Heartbeat:Connect(function(Step: number)
-					if Busy(Vide.untrack(Value)) then
+					if IsBusy(Vide.untrack(Value)) then
 						Shimmer((os.clock() * 0.6) % 1.6 - 0.8)
 					end
 
@@ -380,7 +380,7 @@ return function(Props: Props)
 				BackgroundColor3 = Theme.Colors.Panel,
 				LayoutOrder = 0,
 				Visible = function()
-					return #Asked(Value()) > 0
+					return #GetAnswers(Value()) > 0
 				end,
 
 				Create "UICorner" {CornerRadius = UDim.new(0, 6)},
@@ -396,7 +396,7 @@ return function(Props: Props)
 					Padding = UDim.new(0, 8),
 				},
 				Vide.indexes(function()
-					return Asked(Value())
+					return GetAnswers(Value())
 				end, function(Pair: () -> {Question: string, Given: string}, Order: number)
 					return Create "Frame" {
 						Name = "Line",
@@ -446,7 +446,7 @@ return function(Props: Props)
 				BackgroundColor3 = Theme.Colors.Background,
 				LayoutOrder = 1,
 				Visible = function()
-					return #Asked(Value()) == 0
+					return #GetAnswers(Value()) == 0
 				end,
 
 				Create "UICorner" {CornerRadius = UDim.new(0, 8)},
@@ -495,7 +495,7 @@ return function(Props: Props)
 						Text = function()
 							const Entry = Value()
 
-							if Busy(Entry) then
+							if IsBusy(Entry) then
 								return Describe(Entry, true)
 							end
 
@@ -523,7 +523,7 @@ return function(Props: Props)
 								return Vector2.new(Shimmer(), 0)
 							end,
 							Enabled = function()
-								return Busy(Value())
+								return IsBusy(Value())
 							end,
 						},
 					},
@@ -595,7 +595,7 @@ return function(Props: Props)
 									return ""
 								end
 
-								return Syntax.Highlight(Shortened(Pair().Value), if Pair().Key ~= "command" then nil elseif Value().name == "PowerShell" then "powershell" else "sh")
+								return Syntax.Highlight(Shorten(Pair().Value), if Pair().Key ~= "command" then nil elseif Value().name == "PowerShell" then "powershell" else "sh")
 							end,
 						},
 					}
@@ -615,7 +615,7 @@ return function(Props: Props)
 						return Value().output
 					end,
 					Rich = function()
-						return if Open() then (Shortened(Value().output):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")) else ""
+						return if Open() then (Shorten(Value().output):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")) else ""
 					end,
 				},
 				Vide.show(function()
@@ -751,7 +751,7 @@ return function(Props: Props)
 				continue
 			end
 
-			if Busy(Entry) then
+			if IsBusy(Entry) then
 				return Describe(Entry, true)
 			end
 
@@ -765,7 +765,7 @@ return function(Props: Props)
 				Commands += 1
 			end
 
-			const Wrote = FileWork(Entry, false)
+			const Wrote = DescribeFileCall(Entry, false)
 
 			if Wrote and Entry.status ~= "error" then
 				if Entry.name == "Read" then
@@ -810,7 +810,7 @@ return function(Props: Props)
 
 		const Line = table.concat(Parts, ", ")
 
-		return `{Line:sub(1, 1):upper()}{Line:sub(2)}{if #Files > 0 and Measured then Counted(Added, Removed) else ""}`
+		return `{Line:sub(1, 1):upper()}{Line:sub(2)}{if #Files > 0 and Measured then FormatLineCounts(Added, Removed) else ""}`
 	end
 
 	const Blank: Types.ToolCall = {
@@ -841,7 +841,7 @@ return function(Props: Props)
 			const Chosen: {number} = Value().Calls or {}
 
 			for _, Index in Chosen do
-				if Calls[Index] and Busy(Calls[Index]) then
+				if Calls[Index] and IsBusy(Calls[Index]) then
 					return true
 				end
 			end
@@ -852,13 +852,13 @@ return function(Props: Props)
 		local WasWorking = false
 
 		Vide.effect(function()
-			const Now = Working()
+			const IsWorkingNow = Working()
 
-			if Now and not WasWorking then
+			if IsWorkingNow and not WasWorking then
 				Listed(true)
 			end
 
-			WasWorking = Now
+			WasWorking = IsWorkingNow
 		end)
 
 		return Create "Frame" {
@@ -981,7 +981,7 @@ return function(Props: Props)
 				Create "UIStroke" {Color = Theme.Colors.Border},
 				Create "UISizeConstraint" {
 					MaxSize = function()
-						return Vector2.new(math.max(40, math.floor(Hug() * 0.85)), math.huge)
+						return Vector2.new(math.max(40, math.floor(GetBubbleWidth() * 0.85)), math.huge)
 					end,
 				},
 				Create "UIPadding" {
@@ -1006,7 +1006,7 @@ return function(Props: Props)
 
 					Create "UISizeConstraint" {
 						MaxSize = function()
-							return Vector2.new(math.max(20, math.floor(Hug() * 0.85) - 20), math.huge)
+							return Vector2.new(math.max(20, math.floor(GetBubbleWidth() * 0.85) - 20), math.huge)
 						end,
 					},
 				},
@@ -1153,7 +1153,7 @@ return function(Props: Props)
 			Create "UICorner" {CornerRadius = UDim.new(0, 8)},
 			Create "UISizeConstraint" {
 				MaxSize = function()
-					return Vector2.new(Hug(), math.huge)
+					return Vector2.new(GetBubbleWidth(), math.huge)
 				end,
 			},
 			Create "UIPadding" {
@@ -1177,7 +1177,7 @@ return function(Props: Props)
 				AutoButtonColor = false,
 				LayoutOrder = 1000004,
 				Visible = function()
-					return Broke() ~= ""
+					return GetError() ~= ""
 				end,
 				Activated = function()
 					Shown(not Shown())
@@ -1216,7 +1216,7 @@ return function(Props: Props)
 						TextXAlignment = Enum.TextXAlignment.Left,
 						LayoutOrder = 2,
 						Text = function()
-							return if Format.IsLimit(Broke()) then "Session limit reached" else "Claude hit an error"
+							return if Format.IsLimit(GetError()) then "Session limit reached" else "Claude hit an error"
 						end,
 					},
 					Icon {
@@ -1242,7 +1242,7 @@ return function(Props: Props)
 					TextYAlignment = Enum.TextYAlignment.Top,
 					LayoutOrder = 2,
 					Visible = Shown,
-					Text = Broke,
+					Text = GetError,
 
 					Create "UICorner" {CornerRadius = UDim.new(0, 4)},
 					Create "UIPadding" {
@@ -1254,9 +1254,9 @@ return function(Props: Props)
 				},
 			},
 			Vide.show(function()
-				return Format.IsLimit(Broke())
+				return Format.IsLimit(GetError())
 			end, function()
-				return Limits.Card(Broke, function()
+				return Limits.Card(GetError, function()
 					task.spawn(Chat.Continue, if Props.Prompt then Props.Prompt() else nil)
 				end, 1000005)
 			end),
@@ -1307,7 +1307,7 @@ return function(Props: Props)
 			BackgroundColor3 = Theme.Colors.Panel,
 			LayoutOrder = 2,
 			Visible = function()
-				return not Props.Live and #Written() > 0
+				return not Props.Live and #GetChanges() > 0
 			end,
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 8)},
@@ -1353,7 +1353,7 @@ return function(Props: Props)
 						local Made = 0
 						local Gone = 0
 
-						for _, Change in Written() do
+						for _, Change in GetChanges() do
 							Total += 1
 
 							if Change.Added or Change.Removed then
@@ -1396,10 +1396,10 @@ return function(Props: Props)
 					end,
 				},
 			},
-			Vide.indexes(Trimmed, function(Entry: () -> Types.Change, Index: number)
+			Vide.indexes(GetShownChanges, function(Entry: () -> Types.Change, Index: number)
 				const Hovered = Vide.source(false)
 
-				const function Counted(): boolean
+				const function HasLineCounts(): boolean
 					return Entry().Added ~= nil or Entry().Removed ~= nil
 				end
 
@@ -1472,7 +1472,7 @@ return function(Props: Props)
 								return Config.Icons.File
 							end
 
-							return if Counted() then Config.Icons.Script else Config.Icons.Instance
+							return if HasLineCounts() then Config.Icons.Script else Config.Icons.Instance
 						end,
 						Size = Settings.SmallText,
 						Colour = function()
@@ -1511,7 +1511,7 @@ return function(Props: Props)
 						TextXAlignment = Enum.TextXAlignment.Left,
 						LayoutOrder = 3,
 						Visible = function()
-							return Entry().Path ~= nil and not Counted()
+							return Entry().Path ~= nil and not HasLineCounts()
 						end,
 						Text = function()
 							return (Entry().Text:match("^(%a+)") or ""):lower()
@@ -1538,7 +1538,7 @@ return function(Props: Props)
 						RichText = true,
 						TextXAlignment = Enum.TextXAlignment.Right,
 						LayoutOrder = 5,
-						Visible = Counted,
+						Visible = HasLineCounts,
 						Text = function()
 							const function Hex(Colour: Color3): string
 								return `#{Colour:ToHex()}`
@@ -1569,10 +1569,10 @@ return function(Props: Props)
 				AutoButtonColor = false,
 				LayoutOrder = 1000000,
 				Visible = function()
-					return #Written() > 5
+					return #GetChanges() > 5
 				end,
 				Text = function()
-					return if Expanded() then "Show fewer" else `Show {#Written() - 5} more`
+					return if Expanded() then "Show fewer" else `Show {#GetChanges() - 5} more`
 				end,
 				Activated = function()
 					Expanded(not Expanded())
@@ -1593,14 +1593,14 @@ return function(Props: Props)
 			BackgroundTransparency = 1,
 			LayoutOrder = 4,
 			Visible = function()
-				return Props.Live == true and Chat.SubagentsOpen() and #Running() > 1
+				return Props.Live == true and Chat.SubagentsOpen() and #GetRunningSubagents() > 1
 			end,
 
 			Create "UIListLayout" {
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, 2),
 			},
-			Vide.indexes(Running, function(Entry: () -> Types.Task, Order: number)
+			Vide.indexes(GetRunningSubagents, function(Entry: () -> Types.Task, Order: number)
 				return Create "TextButton" {
 					Name = "Subagent",
 					Size = UDim2.fromScale(1, 0),
@@ -1672,15 +1672,15 @@ return function(Props: Props)
 				AutoButtonColor = false,
 				LayoutOrder = 0,
 				Visible = function()
-					return Props.Live == true and #Running() > 0
+					return Props.Live == true and #GetRunningSubagents() > 0
 				end,
 				Text = function()
-					const Count = #Running()
+					const Count = #GetRunningSubagents()
 
 					return `{Count} subagent{if Count == 1 then "" else "s"} running`
 				end,
 				Activated = function()
-					const Found = Running()
+					const Found = GetRunningSubagents()
 
 					if #Found == 1 then
 						Chat.ViewSubagent(Found[1])
@@ -1722,7 +1722,7 @@ return function(Props: Props)
 						Text = "Continue",
 						LayoutOrder = 1,
 						Visible = function()
-							return Props.Failed ~= nil and Props.Failed() and not Format.IsLimit(Broke()) and Props.Prompt ~= nil and Props.Prompt() ~= nil
+							return Props.Failed ~= nil and Props.Failed() and not Format.IsLimit(GetError()) and Props.Prompt ~= nil and Props.Prompt() ~= nil
 						end,
 						OnClick = function()
 							task.spawn(Chat.Continue, if Props.Prompt then Props.Prompt() else nil)
@@ -1814,10 +1814,10 @@ return function(Props: Props)
 						FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 						LayoutOrder = 7,
 						Visible = function()
-							return Hovered() and Spend() ~= ""
+							return Hovered() and GetUsageText() ~= ""
 						end,
 						Text = function()
-							return Spend()
+							return GetUsageText()
 						end,
 
 						Create "UIPadding" {PaddingLeft = UDim.new(0, 4)},

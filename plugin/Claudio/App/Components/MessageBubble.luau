@@ -35,7 +35,6 @@ type Props = {
 	Calls: (() -> {Types.ToolCall})?,
 	Edits: (() -> {Types.Change}?)?,
 	Tokens: (() -> Types.Tokens?)?,
-	Milliseconds: (() -> number?)?,
 	Failed: (() -> boolean)?,
 	Error: (() -> string?)?,
 	Cost: (() -> number?)?,
@@ -67,9 +66,7 @@ const function FileWork(Entry: Types.ToolCall, Running: boolean): string?
 			return nil
 		end
 
-		const Named = (Changes.Field(Entry.input, "path") or ""):match("[^%.]+$") or "a script"
-
-		return `{if Running then "Editing" else "Edited"} <b>{Named}</b>{if Entry.lines then Counted(Entry.lines.added, Entry.lines.removed) else ""}`
+		return `{if Running then "Editing" else "Edited"} <b>{(Changes.Field(Entry.input, "path") or ""):match("[^%.]+$") or "a script"}</b>{if Entry.lines then Counted(Entry.lines.added, Entry.lines.removed) else ""}`
 	end
 
 	if Entry.name ~= "Write" and Entry.name ~= "Edit" and Entry.name ~= "MultiEdit" and Entry.name ~= "Read" then
@@ -114,9 +111,7 @@ const function Describe(Entry: Types.ToolCall, Running: boolean): string
 	end
 
 	if Name == "TaskNotification" then
-		const Summary = (Changes.Field(Entry.input, "summary") or ""):gsub('^Background command "(.-)".*$', "%1")
-
-		return `Background command {Changes.Field(Entry.input, "status") or "finished"} · {Summary}`
+		return `Background command {Changes.Field(Entry.input, "status") or "finished"} · {((Changes.Field(Entry.input, "summary") or ""):gsub('^Background command "(.-)".*$', "%1"))}`
 	end
 
 	const Server, Tool = Name:match("^mcp__(.-)__(.+)$")
@@ -291,10 +286,6 @@ return function(Props: Props)
 		return Pairs
 	end
 
-	const function Headline(Entry: Types.ToolCall, Running: boolean): string
-		return Describe(Entry, Running)
-	end
-
 	const function Shortened(Text: string): string
 		const Lines = string.split(Text, "\n")
 
@@ -321,13 +312,12 @@ return function(Props: Props)
 					Value = Value,
 				})
 			elseif #Found > 0 then
-				Found[#Found].Value ..= `\n{Line}`
+				Found[#Found].Value = `{Found[#Found].Value}\n{Line}`
 			end
 		end
 
 		return Found
 	end
-
 
 	const CodeFields: {[string]: boolean} = {
 		code = true,
@@ -506,21 +496,21 @@ return function(Props: Props)
 							const Entry = Value()
 
 							if Busy(Entry) then
-								return Headline(Entry, true)
+								return Describe(Entry, true)
 							end
 
 							if Entry.status == "error" and IsCommand(Entry.name) then
-								return `<font color="#{Theme.Colors.Error():ToHex()}">Failed to run</font> {Headline(Entry, false)}`
+								return `<font color="#{Theme.Colors.Error():ToHex()}">Failed to run</font> {Describe(Entry, false)}`
 							end
 
 							if Entry.name == "TaskNotification" then
-								const Line = Headline(Entry, false)
+								const Line = Describe(Entry, false)
 								const Cut = Line:find(" · ", 1, true) or #Line + 1
 
 								return `<font color="#{(if Entry.status == "error" then Theme.Colors.Error() else Theme.Colors.Text()):ToHex()}">{Line:sub(1, Cut - 1)}</font>{Line:sub(Cut)}`
 							end
 
-							return Headline(Entry, false)
+							return Describe(Entry, false)
 						end,
 
 						Create "UIGradient" {
@@ -762,7 +752,7 @@ return function(Props: Props)
 			end
 
 			if Busy(Entry) then
-				return Headline(Entry, true)
+				return Describe(Entry, true)
 			end
 
 			if Entry.delegate then

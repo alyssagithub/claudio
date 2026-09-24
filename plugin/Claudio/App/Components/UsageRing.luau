@@ -146,15 +146,12 @@ return function()
 		const Token = Waiting
 
 		task.delay(1, function()
-			if Waiting == Token then
-				Waited(true)
+			if Waiting ~= Token then
+				return
 			end
-		end)
-	end
 
-	const function Forget()
-		Waiting += 1
-		Waited(false)
+			Waited(true)
+		end)
 	end
 
 	const Expanded = Vide.source(false)
@@ -202,40 +199,20 @@ return function()
 		local Known = false
 
 		for _, Message in Chat.Messages() do
-			if Message.Cost then
-				Total += Message.Cost
+			if not Message.Cost then
+				continue
+			end
 
-				if Message.Estimated then
-					Guessed = true
-				else
-					Known = true
-				end
+			Total += Message.Cost
+
+			if Message.Estimated then
+				Guessed = true
+			else
+				Known = true
 			end
 		end
 
 		return Total, Guessed, Known
-	end
-
-	const function Meter(Share: () -> number, Colour: () -> Color3, LayoutOrder: number)
-		return Create "Frame" {
-			Name = "Meter",
-			Size = UDim2.new(1, 0, 0, 4),
-			BackgroundColor3 = Theme.Colors.Input,
-			BorderSizePixel = 0,
-			LayoutOrder = LayoutOrder,
-
-			Create "UICorner" {CornerRadius = UDim.new(1, 0)},
-			Create "Frame" {
-				Name = "Fill",
-				Size = function()
-					return UDim2.fromScale(math.clamp(Share(), 0, 1), 1)
-				end,
-				BackgroundColor3 = Colour,
-				BorderSizePixel = 0,
-
-				Create "UICorner" {CornerRadius = UDim.new(1, 0)},
-			},
-		}
 	end
 
 	const function Line(Left: () -> string, Right: () -> string, Strong: boolean, LayoutOrder: number, Arrow: (() -> boolean)?)
@@ -298,7 +275,8 @@ return function()
 		AutoButtonColor = false,
 		LayoutOrder = 6,
 		Activated = function()
-			Forget()
+			Waiting += 1
+			Waited(false)
 			Shown(not Shown())
 		end,
 		MouseEnter = function()
@@ -309,13 +287,9 @@ return function()
 		end,
 
 		Vide.action(function(Object: GuiObject)
-			const Connection = Object:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+			Vide.cleanup(Object:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
 				Follow(Object)
-			end)
-
-			Vide.cleanup(function()
-				Connection:Disconnect()
-			end)
+			end))
 			task.defer(Follow, Object)
 			Vide.cleanup(RunService.Heartbeat:Connect(function()
 				if not Vide.untrack(Loading) then
@@ -420,7 +394,7 @@ return function()
 					end
 
 					if Limit and Limit.resetsAt then
-						table.insert(Parts, (Format.Until(Limit.resetsAt):gsub("^Resets", "Resets")))
+						table.insert(Parts, Format.Until(Limit.resetsAt))
 					end
 
 					return if #Parts == 0 then "No limit reported yet" else table.concat(Parts, " · ")
@@ -584,9 +558,8 @@ return function()
 						LayoutOrder = 3,
 						Text = function()
 							const Room = Chat.ContextWindow()
-							const Share = if Room == 0 or Part().deferred then "" else `   {string.format("%.1f", Part().tokens / Room * 100)}%`
 
-							return `{Format.Large(Part().tokens)}{Share}`
+							return `{Format.Large(Part().tokens)}{if Room == 0 or Part().deferred then "" else `   {string.format("%.1f", Part().tokens / Room * 100)}%`}`
 						end,
 					},
 				}
@@ -621,14 +594,28 @@ return function()
 						return ((Limit().label or Limit().kind):gsub(" %- ", " · "))
 					end, function()
 						const Entry = Limit()
-						const Reset = if Entry.resetsAt then `{Format.Until(Entry.resetsAt)}` else ""
-						const Share = if Entry.utilization then `   {math.floor(Entry.utilization * 100)}%` else ""
 
-						return `{Reset}{Share}`
+						return `{if Entry.resetsAt then Format.Until(Entry.resetsAt) else ""}{if Entry.utilization then `   {math.floor(Entry.utilization * 100)}%` else ""}`
 					end, true, 1),
-					Meter(function()
-						return Limit().utilization or 0
-					end, Theme.Colors.Accent, 2),
+					Create "Frame" {
+						Name = "Meter",
+						Size = UDim2.new(1, 0, 0, 4),
+						BackgroundColor3 = Theme.Colors.Input,
+						BorderSizePixel = 0,
+						LayoutOrder = 2,
+
+						Create "UICorner" {CornerRadius = UDim.new(1, 0)},
+						Create "Frame" {
+							Name = "Fill",
+							Size = function()
+								return UDim2.fromScale(math.clamp(Limit().utilization or 0, 0, 1), 1)
+							end,
+							BackgroundColor3 = Theme.Colors.Accent,
+							BorderSizePixel = 0,
+
+							Create "UICorner" {CornerRadius = UDim.new(1, 0)},
+						},
+					},
 				}
 			end),
 			Create "Frame" {

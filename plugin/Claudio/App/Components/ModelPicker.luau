@@ -97,9 +97,11 @@ const function Row(Name: () -> string, Detail: () -> string, Chosen: () -> boole
 				Tip(Detail())
 			end
 
-			if Hover then
-				Hover(true)
+			if not Hover then
+				return
 			end
+
+			Hover(true)
 		end,
 		MouseLeave = function()
 			Hovered(false)
@@ -108,9 +110,11 @@ const function Row(Name: () -> string, Detail: () -> string, Chosen: () -> boole
 				Tip("")
 			end
 
-			if Hover then
-				Hover(false)
+			if not Hover then
+				return
 			end
+
+			Hover(false)
 		end,
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
@@ -212,9 +216,7 @@ const function Row(Name: () -> string, Detail: () -> string, Chosen: () -> boole
 	}
 end
 
-const ModelPicker = {
-	BarHeight = Vide.source(0),
-}
+const ModelPicker = {BarHeight = Vide.source(0)}
 
 const function Scaled(Width: number): number
 	const Room = Chat.WindowWidth()
@@ -340,9 +342,7 @@ function ModelPicker.Menu()
 			return "Auto"
 		end, function()
 			return "Picks a model and effort for each message from the effort slider below. Lower spends fewer tokens, higher answers more carefully"
-		end, function()
-			return Settings.Get("Model")() == "auto"
-		end, function()
+		end, Auto, function()
 			Settings.Set("Model", "auto")
 			Settings.Set("Effort", "")
 			Chat.PickerOpen(false)
@@ -601,16 +601,6 @@ function ModelPicker.Button()
 	}
 end
 
-const function CurrentMode(): Types.Mode
-	for _, Mode in Config.Modes do
-		if Mode.value == Settings.Get("Mode")() then
-			return Mode
-		end
-	end
-
-	return Config.Modes[1]
-end
-
 function ModelPicker.ModeButton()
 	return Create "TextButton" {
 		Name = "ModeButton",
@@ -625,7 +615,13 @@ function ModelPicker.ModeButton()
 		AutoButtonColor = false,
 		LayoutOrder = 1,
 		Text = function()
-			return CurrentMode().label
+			for _, Mode in Config.Modes do
+				if Mode.value == Settings.Get("Mode")() then
+					return Mode.label
+				end
+			end
+
+			return Config.Modes[1].label
 		end,
 		Activated = function()
 			Chat.PickerOpen(false)

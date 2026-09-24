@@ -506,9 +506,6 @@ return function()
 				Tokens = function()
 					return Message.Tokens
 				end,
-				Milliseconds = function()
-					return Message.Milliseconds
-				end,
 				Failed = function()
 					return Message.Failed == true
 				end,

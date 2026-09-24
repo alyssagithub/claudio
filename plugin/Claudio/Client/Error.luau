@@ -2,9 +2,9 @@
 const Descriptions = {
 	HttpDenied = "Studio blocked HTTP requests for Claudio. Allow them in Plugin Management, then retry.",
 	Unreachable = "The bridge is not running. Run `claudio` in a terminal, then retry.",
-	Timeout = "The bridge did not answer in time.",
+	Timeout = "The bridge didn't answer in time. Check it's still running, then retry.",
 	VersionMismatch = "The bridge and the plugin do not match. Run `claudio install` again.",
-	Unknown = "Something went wrong talking to the bridge.",
+	Unknown = "Couldn't talk to the bridge. Check it's running, then retry.",
 }
 
 const Error = {}
@@ -27,8 +27,12 @@ function Error.Classify(Message: string): string
 	return "Unknown"
 end
 
-function Error.Describe(Kind: string): string
-	return Descriptions[Kind] or Descriptions.Unknown
+function Error.Describe(Kind: string, Reason: string?): string
+	if Descriptions[Kind] and Kind ~= "Unknown" then
+		return Descriptions[Kind]
+	end
+
+	return if Reason and Reason ~= "" then `Couldn't talk to the bridge: {Reason}. Check it's running, then retry.` else Descriptions.Unknown
 end
 
 return Error

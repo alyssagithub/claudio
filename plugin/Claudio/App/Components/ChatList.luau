@@ -470,7 +470,7 @@ return function()
 					return Chat.Notice() :: string
 				end
 
-				return if Chat.Listed() then "No chats yet. Press New to start one, or open one in the Claude desktop app." else "Loading your chats"
+				return if Chat.Listed() then "No chats yet. Press New to start one, or open one in the Claude desktop app." else "Loading your chats…"
 			end,
 			Visible = function()
 				return #Chat.Conversations() == 0
@@ -485,7 +485,7 @@ return function()
 			Chat.ShowArchived(not Chat.ShowArchived())
 		end, Any("archived")),
 		Choice(function()
-			return if Chat.ShowHidden() then "Hide the folders you hid" else "Show the folders you hid"
+			return if Chat.ShowHidden() then "Hide hidden folders" else "Show hidden folders"
 		end, 1000001, function()
 			Chat.ShowHidden(not Chat.ShowHidden())
 		end, Any("hidden")),

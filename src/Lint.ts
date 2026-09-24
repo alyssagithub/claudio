@@ -101,7 +101,7 @@ async function Install(): Promise<void> {
   fs.rmSync(Archive, {force: true});
 
   if (!fs.existsSync(Binary())) {
-    throw new Error(`extract produced no binary: ${Extracted.slice(0, 200)}`);
+    throw new Error(`Unpacking the Luau analyzer didn't produce a program: ${Extracted.slice(0, 200)}`);
   }
 
   if (process.platform !== "win32") {
@@ -485,7 +485,7 @@ async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]
   const Found = Parse(Text);
 
   if (!Found.has(`${Canary}.luau`)) {
-    console.error("The Luau analyzer reported nothing for its canary, so its output cannot be trusted");
+    console.error("The Luau analyzer failed its self-check, so script warnings are turned off for now");
     return null;
   }
 

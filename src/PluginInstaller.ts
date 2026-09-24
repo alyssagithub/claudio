@@ -183,7 +183,7 @@ export async function InstallBridge(Version: string): Promise<string> {
 
 export async function InstallVersion(Version: string): Promise<string> {
   if (!LooksLikeVersion(Version)) {
-    throw new Error("A version looks like 1.0.0");
+    throw new Error("That isn't a version number. Use one like 1.0.0.");
   }
 
   const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/releases/tags/v${Version}`, {

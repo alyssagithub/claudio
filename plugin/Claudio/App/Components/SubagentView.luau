@@ -65,7 +65,7 @@ return function()
 			Visible = function()
 				return #Chat.Watched() == 0
 			end,
-			Text = "Waiting for this subagent to write anything",
+			Text = "Nothing from this subagent yet",
 		},
 		Vide.indexes(Chat.Watched, function(Message: () -> Types.Message, Index: number)
 			return MessageBubble {

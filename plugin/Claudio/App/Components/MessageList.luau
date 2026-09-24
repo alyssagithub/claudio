@@ -433,7 +433,7 @@ return function()
 			TextSize = Settings.TextSize,
 			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 			TextWrapped = true,
-			Text = "Describe a task or ask a question to Claude",
+			Text = "Describe a task or ask Claude a question",
 			Visible = function()
 				return #Chat.Messages() == 0
 			end,

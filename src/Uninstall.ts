@@ -55,7 +55,7 @@ export async function RunUninstall() {
   const Cleared = ForgetPluginSettings();
 
   if (Cleared > 0) {
-    Removed.push(`${Cleared} Claudio settings from Studio's plugin settings, the bridge token among them`);
+    Removed.push(`${Cleared} Claudio settings from Studio, including the bridge key`);
   }
 
   try {

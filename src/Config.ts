@@ -147,12 +147,12 @@ export const DefinitionsUrl = "https://raw.githubusercontent.com/JohnnyMorganz/l
 export const LeanMode = {
   value: "token-saver",
   displayName: "Token Saver (Experimental)",
-  description: "Auto tiering, delegated bulk reading, and oversized tool results truncated",
+  description: "Picks cheaper models where it can, hands big reads to a helper, and trims very long tool results",
 };
 export const Modes = [
   {
     value: "auto",
-    label: "Auto",
+    label: "Auto approve",
     detail: "Claude handles permission decisions",
   },
   {

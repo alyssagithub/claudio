@@ -66,7 +66,7 @@ function Context.AddSelection(): string?
 	end
 
 	if #Chosen > 25 then
-		Context.Notice(`{#Chosen} things are selected, which is more than Claudio will attach one by one.`)
+		Context.Notice(`Attached all {#Chosen} selected objects as one group.`)
 
 		return Add({
 			Kind = "selection",

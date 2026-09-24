@@ -449,7 +449,7 @@ function Testing.Mount(CurrentPlugin: Plugin): string
 
 	Import(Copy.Store.Chat).New()
 
-	return `Mounted {Copy:GetFullName()}{if State().Snapshotted then "" else " — the bridge did not answer, so test chats will not be cleaned up automatically"}`
+	return `Mounted {Copy:GetFullName()}{if State().Snapshotted then "" else ". The bridge did not answer, so test chats won't be cleaned up automatically."}`
 end
 
 function Testing.Paint(Name: string?): string

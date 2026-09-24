@@ -37,7 +37,7 @@ function Client.Connect(): boolean
 	const Ok, Result = Checked(Fetched, Response, Schemas.Health)
 
 	if not Ok then
-		Connection.Fail(Error.Classify(Result))
+		Connection.Fail(Error.Classify(Result), Result)
 
 		return false
 	end

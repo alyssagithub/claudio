@@ -472,7 +472,7 @@ return function()
 					IconButton {
 						Icon = Config.Icons.Copy,
 						Size = Settings.SmallText,
-						Tooltip = "Copy the prompt",
+						Tooltip = "Copy instructions",
 						OnClick = function()
 							task.spawn(Chat.Copy, PromptText())
 						end,

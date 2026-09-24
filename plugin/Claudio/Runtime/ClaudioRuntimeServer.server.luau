@@ -206,7 +206,7 @@ task.spawn(function()
 						return {text = `Players went from {Before} to {#game:GetService("Players"):GetPlayers()}.`}
 					end
 
-					return {error = `The runtime agent does not know the playtest action "{tostring(Job.input.action)}".`}
+					return {error = `Claudio does not know the playtest action "{tostring(Job.input.action)}".`}
 				end
 
 				if Job.kind == "logs" then
@@ -309,7 +309,7 @@ task.spawn(function()
 				end
 
 				if Job.kind ~= "execute" and Job.kind ~= "input" then
-					return {error = `The runtime agent does not handle "{tostring(Job.kind)}".`}
+					return {error = `Claudio does not handle "{tostring(Job.kind)}" in a playtest.`}
 				end
 
 				if Job.kind == "input" or Job.input.target == "client" then

@@ -58,6 +58,17 @@ if (Command === "setup") {
 } else if (Command === undefined || Command === "start" || Command === "--port") {
   StartServer(ChosenPort());
 } else {
-  console.error("Usage: claudio setup | claudio uninstall | claudio [start] [--port N] | claudio install [--local path/to/Claudio.rbxm] | claudio install-startup | claudio uninstall-startup | claudio restart | claudio stop | claudio version");
+  console.error([
+    "Usage:",
+    "  claudio setup               Install everything and sign in",
+    "  claudio [start] [--port N]  Run the bridge",
+    "  claudio install [--local F] Install or update the Studio plugin",
+    "  claudio install-startup     Start the bridge when you log in",
+    "  claudio uninstall-startup   Stop starting it at login",
+    "  claudio restart             Restart the running bridge",
+    "  claudio stop                Stop the running bridge",
+    "  claudio version             Show the installed version",
+    "  claudio uninstall           Remove Claudio",
+  ].join("\n"));
   process.exit(1);
 }

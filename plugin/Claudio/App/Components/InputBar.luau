@@ -157,7 +157,7 @@ return function()
 		TextColor3 = Theme.Colors.Text,
 		PlaceholderColor3 = Theme.Colors.DimText,
 		PlaceholderText = function()
-			return "/cmd, @obj, or drag objects from the Explorer"
+			return "Type / for commands, @ for objects"
 		end,
 		TextSize = Settings.TextSize,
 		FontFace = Font.fromEnum(Enum.Font.BuilderSans),

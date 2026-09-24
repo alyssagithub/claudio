@@ -29,7 +29,7 @@ return function()
 			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 			TextWrapped = true,
 			Text = function()
-				return Error.Describe(Connection.ErrorKind() or "Unknown")
+				return Error.Describe(Connection.ErrorKind() or "Unknown", Connection.ErrorReason())
 			end,
 		},
 		Button {

@@ -210,7 +210,7 @@ function ReadBody(Request: IncomingMessage, Limit = MaxBodyBytes): Promise<Recor
       try {
         Resolve(Raw ? JSON.parse(Raw) : {});
       } catch {
-        Reject(new Error("Body is not valid JSON"));
+        Reject(new Error("The plugin sent a request the bridge couldn't read."));
       }
     });
     Request.on("error", Reject);
@@ -235,7 +235,7 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     const Folder = typeof Body.folder === "string" ? Body.folder.trim() : "";
 
     if (Folder === "") {
-      SendJson(Response, 400, {error: "A folder is needed"});
+      SendJson(Response, 400, {error: "Pick a folder first."});
       return;
     }
 
@@ -557,7 +557,7 @@ export function StartServer(Port: number) {
         const Body = await ReadBody(Request);
 
         if (typeof Body.text !== "string" || Body.text.trim() === "") {
-          SendJson(Response, 400, {error: "text is required"});
+          SendJson(Response, 400, {error: "The message is empty."});
           return;
         }
 
@@ -645,7 +645,7 @@ export function StartServer(Port: number) {
         const Run = LintRuns.get(Segments[1]);
 
         if (!Run) {
-          SendJson(Response, 404, {error: "No such lint"});
+          SendJson(Response, 404, {error: "That analyzer run has finished or expired."});
           return;
         }
 
@@ -696,7 +696,7 @@ export function StartServer(Port: number) {
         const Body = await ReadBody(Request);
 
         if (typeof Body.text !== "string" || Body.text === "") {
-          SendJson(Response, 400, {error: "text is required"});
+          SendJson(Response, 400, {error: "The message is empty."});
           return;
         }
 
@@ -815,7 +815,7 @@ export function StartServer(Port: number) {
         const Body = await ReadBody(Request);
 
         if (!LooksLikeVersion(Body.version)) {
-          SendJson(Response, 400, {error: "A version looks like 1.0.0"});
+          SendJson(Response, 400, {error: "That isn't a version number. Use one like 1.0.0."});
           return;
         }
 
@@ -873,7 +873,7 @@ export function StartServer(Port: number) {
         const Turn = GetTurn(Segments[1]);
 
         if (!Turn) {
-          SendJson(Response, 404, {error: "No such turn"});
+          SendJson(Response, 404, {error: "That reply is no longer running."});
           return;
         }
 

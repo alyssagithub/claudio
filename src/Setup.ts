@@ -25,7 +25,7 @@ async function EnsureClaude(Manual: string[]): Promise<boolean> {
   if (Found.Ok) {
     console.log(`Found Claude Code ${Found.Output.split("\n")[0].replace(" (Claude Code)", "")}.`);
   } else {
-    console.log("No Claude Code, installing it. Takes a minute.");
+    console.log("Claude Code isn't installed. Installing it now, this takes a minute.");
 
     const Installed = await Run("npm install -g @anthropic-ai/claude-code");
 
@@ -40,7 +40,7 @@ async function EnsureClaude(Manual: string[]): Promise<boolean> {
   const Status = await Run("claude auth status");
 
   if (Status.Ok && !/not logged in|logged out/i.test(Status.Output) && /"?loggedIn"?\s*[:=]\s*true|logged in/i.test(Status.Output)) {
-    console.log("Logged in already.");
+    console.log("Already logged in.");
     return false;
   }
 
@@ -96,7 +96,7 @@ export async function RunSetup(LocalPath?: string | null): Promise<void> {
     Manual.unshift("Log in to Claude Code: run `claude auth login` and follow the browser prompt. Claudio uses that login, so there is no API key to paste.");
   }
 
-  console.log("\nLeft for you:\n");
+  console.log("\nStill to do:\n");
 
   for (const [Index, Step] of Manual.entries()) {
     console.log(`  ${Index + 1}. ${Step}`);

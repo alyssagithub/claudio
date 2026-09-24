@@ -87,7 +87,7 @@ function Limits.Card(Error: () -> string, Retry: () -> (), LayoutOrder: number)
 				const Clock = When()
 
 				if Auto() then
-					return if Clock then `Auto-resuming at {Clock}` else "Auto-resuming when the limit resets"
+					return if Clock then `Continuing at {Clock}` else "Continuing when the limit resets"
 				end
 
 				return if Clock then `Buy credits to keep working. Your session limit resets at {Clock}.` else "Buy credits to keep working, or wait for the limit to reset."
@@ -140,7 +140,7 @@ function Limits.Card(Error: () -> string, Retry: () -> (), LayoutOrder: number)
 				FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
 				TextXAlignment = Enum.TextXAlignment.Left,
 				LayoutOrder = 2,
-				Text = "Auto-continue when limits reset",
+				Text = "Continue when the limit resets",
 			},
 		},
 		Create "TextLabel" {

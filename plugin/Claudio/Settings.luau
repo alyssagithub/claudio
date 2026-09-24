@@ -110,7 +110,7 @@ const Definitions: {Definition} = {
 	{
 		Key = "WatchChanges",
 		Label = "Track what changes in Studio",
-		Detail = "Lists the instances a reply actually created, deleted or edited",
+		Detail = "Lists the objects a reply created, deleted or edited",
 		Group = "Chat",
 		Default = true,
 	},
@@ -131,7 +131,7 @@ const Definitions: {Definition} = {
 	{
 		Key = "GuardTools",
 		Label = "Confirm risky tools",
-		Detail = "Asks before deleting instances or rewriting a whole script",
+		Detail = "Asks before deleting objects or rewriting a whole script",
 		Group = "Chat",
 		Default = false,
 	},
@@ -192,7 +192,7 @@ const Definitions: {Definition} = {
 	{
 		Key = "ExtraPrompt",
 		Label = "Send Claudio's instructions",
-		Detail = "The extra prompt Claude gets about Studio. Shown below",
+		Detail = "Instructions Claude gets about Studio. Shown below",
 		Group = "Connection",
 		Default = true,
 	},

@@ -15,7 +15,7 @@ const ExecuteDescription = [
 ].join(" ");
 
 const InputDescription = [
-  "Send input to the running experience: press, type, key, hover, scroll or drag.",
+  "Send input to the running playtest: press, type, key, hover, scroll or drag.",
   "Interface actions name an instance path instead of guessing screen coordinates.",
   "press clicks the middle of a GuiObject, type sends text to whatever has keyboard focus, key presses and releases a KeyCode by name.",
   "hover moves the pointer onto a GuiObject, scroll turns the wheel over one, and drag holds the button from a GuiObject to another path or by an x and y offset.",
@@ -193,7 +193,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
     },
     {
       Name: "capture",
-      Description: "Take a picture of Studio. of picks what: viewport is the rendered 3D view and the default; window is the whole Studio window as the user sees it, at true colours. To look at a plugin's own interface use of window with widget set to part of that panel's title, and the picture is cropped to exactly that panel wherever it is docked. Give around with an instance path to crop the viewport tightly to a part, model or on screen GuiObject, path to point the camera at something first, or x, y, width and height to crop by hand. The camera is always put back where it was.",
+      Description: "Take a picture of Studio. `of` picks what to capture: `viewport` is the rendered 3D view and the default; `window` is the whole Studio window as the user sees it, at true colours. To look at a plugin's own interface use `of: window` with `widget` set to part of that panel's title, and the picture is cropped to exactly that panel wherever it is docked. Give `around` an instance path to crop the viewport tightly to a part, model or on screen GuiObject, `path` to point the camera at something first, or `x`, `y`, `width` and `height` to crop by hand. The camera is always put back where it was.",
       Schema: {
         of: z.enum(["viewport", "window"]).optional().describe("What to capture. viewport by default."),
         window: z.string().optional().describe("Part of a Studio window title to capture instead of the main one, for a panel floated out of Studio. Only for of window."),

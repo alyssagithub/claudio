@@ -60,7 +60,7 @@ async function Send<Found>(Role: string | undefined, Kind: string, Input: unknow
     });
 
     if (Answer.Status < 200 || Answer.Status >= 300) {
-      return {error: `The Claudio bridge answered ${Answer.Status}. Is it running?`} as Found;
+      return {error: `The Claudio bridge returned HTTP ${Answer.Status}. Try \`claudio restart\`.`} as Found;
     }
 
     return JSON.parse(Answer.Text) as Found;

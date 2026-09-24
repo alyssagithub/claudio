@@ -109,7 +109,7 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
         wait: false,
       }, (Failure: Error | null) => {
         if (Failure) {
-          console.error(`Toast failed: ${String(Failure).slice(0, 200)}`);
+          console.error(`Desktop notification failed: ${String(Failure).slice(0, 200)}`);
         }
       });
     });

@@ -351,7 +351,7 @@ function ModelPicker.Menu()
 		Row(function()
 			return "Auto"
 		end, function()
-			return "Picks a model and effort for each message from the effort slider below. Lower spends fewer tokens, higher answers more carefully"
+			return "Picks a model for each message based on the effort slider"
 		end, IsAuto, function()
 			Settings.Set("Model", "auto")
 			Settings.Set("Effort", "")
@@ -832,7 +832,7 @@ function ModelPicker.EffortHelp()
 			LayoutOrder = 2,
 			Text = function()
 				if IsAuto() then
-					return "Lower picks cheaper models and less thinking, so each message uses fewer tokens. Higher picks better models and more thinking, so answers are more accurate but use your limits faster."
+					return "Lower uses cheaper models and less thinking. Higher uses stronger models and more thinking, which is more accurate but uses your limits faster."
 				end
 
 				return "Higher effort means more thorough responses, but takes longer and uses your limits faster."
@@ -940,7 +940,7 @@ function ModelPicker.EffortMenu()
 				TextSize = Settings.SmallText,
 				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 				Text = function()
-					return if IsAuto() then "Fewer tokens" else "Faster"
+					return if IsAuto() then "Cheaper" else "Faster"
 				end,
 			},
 			Create "TextLabel" {

@@ -26,7 +26,7 @@ return function()
 			TextSize = Settings.TextSize,
 			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 			TextWrapped = true,
-			Text = "Not connected to the bridge.",
+			Text = "Not connected to the bridge. Run `claudio` in a terminal, then press Connect.",
 		},
 		Button {
 			Text = "Connect",

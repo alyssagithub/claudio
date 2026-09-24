@@ -30,7 +30,7 @@ function WriteLauncher(Port?: number | null) {
 
 export async function InstallStartup(Port?: number | null): Promise<void> {
   if (process.platform !== "win32") {
-    throw new Error("Startup install is only written for Windows so far.");
+    throw new Error("Starting the bridge at login only works on Windows for now.");
   }
 
   WriteLauncher(Port);

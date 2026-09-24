@@ -742,7 +742,7 @@ const function Playtest(Input: any): any
 			return {text = "No playtest is running."}
 		end
 
-		return {text = `A {if Held and Held.Mode then Held.Mode else "unknown"} playtest is running. Anything that changes it, including stopping it, has to come from the session itself, so it needs the runtime agent connected.`}
+		return {text = `A {if Held and Held.Mode then Held.Mode else "unknown"} playtest is running. Anything that changes it, including stopping it, has to come from the session itself, so the play session has to be reachable.`}
 	end
 
 	if Action == "start" then
@@ -2472,7 +2472,7 @@ function Chat.WatchStudioJobs()
 
 				if not Ok then
 					if Connection.Status() == "Connected" then
-						Connection.Fail(Error.Classify(tostring(Result)))
+						Connection.Fail(Error.Classify(tostring(Result)), tostring(Result))
 					end
 
 					return false
@@ -2569,7 +2569,7 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		end
 
 		if not Polled then
-			return "error", `Lost the bridge while waiting: {State}`, nil
+			return "error", `Lost contact with the bridge: {State}. Check it's running, then send again.`, nil
 		end
 
 		Version = State.version
@@ -2836,7 +2836,7 @@ Attach = function(ConversationId: string)
 		if Ok then
 			Finish(Status, Reply, State)
 		else
-			Finish("error", `The plugin hit an error: {Status}`, nil)
+			Finish("error", `Claudio hit a bug: {Status}. Try again, and report it if it keeps happening.`, nil)
 		end
 	end)
 end
@@ -2901,7 +2901,7 @@ Start = function(Entry: Types.QueuedMessage)
 		if Ok then
 			Finish(Status, Reply, State)
 		else
-			Finish("error", `The plugin hit an error: {Status}`, nil)
+			Finish("error", `Claudio hit a bug: {Status}. Try again, and report it if it keeps happening.`, nil)
 		end
 	end)
 end

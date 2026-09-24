@@ -134,7 +134,7 @@ return function()
 			TextWrapped = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			LayoutOrder = 2,
-			Text = "Claude runs in this folder, so a CLAUDE.md there applies and it can read files next to it. Your Studio place is reached through the Roblox tools either way, so you can also go without one. You can change this later in settings.",
+			Text = "Claude works from this folder, so it can read files there and follow any CLAUDE.md in it. It can still edit your place without one. You can change this later in settings.",
 		},
 		Create "TextBox" {
 			Name = "Path",

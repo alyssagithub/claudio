@@ -20,14 +20,53 @@ const Places = {
 	game:GetService("Lighting"),
 }
 
+local Named: {{Object: Instance, Name: string}}?
+local Narrowed: {{Object: Instance, Name: string}} = {}
+local LastWanted = ""
+
 const function Matches(): {Instance}
 	const Word = Chat.Draft():match("@([%w_%.]*)$")
 
 	if not Word then
+		Named = nil
+
 		return {}
 	end
 
+	if not Named then
+		const Listed = {}
+
+		for _, Place in Places do
+			for _, Object in Place:GetDescendants() do
+				if #Listed == 20000 then
+					break
+				end
+
+				table.insert(Listed, {
+					Object = Object,
+					Name = Object.Name:lower(),
+				})
+			end
+		end
+
+		Named = Listed
+		Narrowed = Listed
+		LastWanted = ""
+	end
+
 	const Wanted = Word:lower()
+	const Searched = if Wanted:sub(1, #LastWanted) == LastWanted then Narrowed else Named :: {{Object: Instance, Name: string}}
+	const Matching = {}
+
+	for _, Entry in Searched do
+		if Entry.Name:sub(1, #Wanted) == Wanted then
+			table.insert(Matching, Entry)
+		end
+	end
+
+	Narrowed = Matching
+	LastWanted = Wanted
+
 	const Found = {}
 	const Active = StudioService.ActiveScript
 
@@ -35,19 +74,13 @@ const function Matches(): {Instance}
 		table.insert(Found, Active)
 	end
 
-	local Scanned = 0
+	for _, Entry in Matching do
+		if #Found == 8 then
+			break
+		end
 
-	for _, Place in Places do
-		for _, Object in Place:GetDescendants() do
-			Scanned += 1
-
-			if #Found == 8 or Scanned > 20000 then
-				return Found
-			end
-
-			if Object ~= Active and Object.Name:lower():sub(1, #Wanted) == Wanted then
-				table.insert(Found, Object)
-			end
+		if Entry.Object ~= Active and Entry.Object.Parent then
+			table.insert(Found, Entry.Object)
 		end
 	end
 

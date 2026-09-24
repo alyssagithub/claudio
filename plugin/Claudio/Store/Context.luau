@@ -135,15 +135,10 @@ function Context.AddImage(Name: string, Data: string, MediaType: string, Token: 
 
 	task.spawn(function()
 		const Ok, Decoded = Client.DecodeImage(Data, MediaType)
+		local Built, Picture = false, nil
 
-		if not Ok or not Find(Added) then
-			return
-		end
-
-		const Built, Picture = pcall(Pictures.Build, Decoded.width, Decoded.height, Decoded.pixels)
-
-		if not Built then
-			return
+		if Ok and Find(Added) then
+			Built, Picture = pcall(Pictures.Build, Decoded.width, Decoded.height, Decoded.pixels)
 		end
 
 		const Chips = table.clone(Context.Chips() :: {Types.Chip})
@@ -152,7 +147,12 @@ function Context.AddImage(Name: string, Data: string, MediaType: string, Token: 
 			if Existing.Token == Added then
 				const Updated = table.clone(Existing)
 
-				Updated.Preview = Picture
+				if Built then
+					Updated.Preview = Picture
+				else
+					Updated.Unreadable = true
+				end
+
 				Chips[Index] = Updated
 				Context.Chips(Chips)
 
@@ -160,7 +160,9 @@ function Context.AddImage(Name: string, Data: string, MediaType: string, Token: 
 			end
 		end
 
-		Picture:Destroy()
+		if Built and Picture then
+			Picture:Destroy()
+		end
 	end)
 
 	return Added

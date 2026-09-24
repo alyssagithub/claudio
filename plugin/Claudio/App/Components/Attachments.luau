@@ -51,7 +51,9 @@ const function Card(Chip: () -> Types.Chip, Index: number, Remove: (string) -> (
 			TextColor3 = Theme.Colors.DimText,
 			TextSize = Settings.SmallText,
 			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-			Text = "…",
+			Text = function()
+				return if Chip().Unreadable then ((Chip().MediaType or "image"):match("[^/]+$") or "image"):upper() else "…"
+			end,
 			Visible = function()
 				return Chip().Preview == nil
 			end,

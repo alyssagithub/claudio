@@ -60,6 +60,7 @@ export type Chip = {
 	Instance: Instance?,
 	Objects: {Instance}?,
 	Preview: EditableImage?,
+	Unreadable: boolean?,
 	Description: string?,
 	Data: string?,
 	MediaType: string?,

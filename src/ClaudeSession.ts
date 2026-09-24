@@ -1638,7 +1638,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
           },
           mcpServers: {
             ...ReadMcpServers(),
-            [AskServerName]: AskServerFor((Questions) => AskQuestion(Session, Questions) as Promise<JobAnswer | null>, ((Kind, Input, Timeout) => RequestStudio(Kind, Input, JobLimit(Kind, Timeout))) as Reacher, ((Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, JobLimit(Kind, Timeout), Role)) as ReacherIn),
+            [AskServerName]: AskServerFor(((Kind, Input, Timeout) => RequestStudio(Kind, Input, JobLimit(Kind, Timeout))) as Reacher, ((Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, JobLimit(Kind, Timeout), Role)) as ReacherIn),
           },
           systemPrompt: {
             type: "preset",

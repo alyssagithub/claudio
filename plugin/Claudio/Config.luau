@@ -2,7 +2,10 @@
 return {
 	Name = "Claudio",
 	Version = "1.6.0",
-	AskTool = "mcp__claudio__ask",
+	AskTools = {
+		AskUserQuestion = true,
+		mcp__claudio__ask = true,
+	},
 	ProtocolVersion = 1,
 	DefaultPort = 47225,
 	WidgetId = "ClaudioChat",

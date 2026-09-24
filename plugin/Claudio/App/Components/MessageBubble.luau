@@ -272,7 +272,7 @@ return function(Props: Props)
 	const function GetAnswers(Entry: Types.ToolCall): {{Question: string, Given: string}}
 		const Pairs = {}
 
-		if Entry.name ~= Config.AskTool then
+		if not Config.AskTools[Entry.name] then
 			return Pairs
 		end
 
@@ -769,7 +769,7 @@ return function(Props: Props)
 				continue
 			end
 
-			if Entry.name == Config.AskTool then
+			if Config.AskTools[Entry.name] then
 				Questions += 1
 
 				continue

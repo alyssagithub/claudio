@@ -18,7 +18,7 @@ function Runtime.Fill(Script: Instance, Key: string)
 	const Values = {
 		Port = tostring(Settings.Get("Port")()),
 		Token = Key,
-		Secret = Settings.Get("RelayToken")(),
+		BuildKey = Settings.Get("BuildKey")(),
 	}
 
 	(Script :: any).Source = ((Script :: any).Source :: string):gsub("{{(%a+)}}", Values)
@@ -70,6 +70,7 @@ end
 
 function Runtime.Install()
 	Runtime.Remove()
+	Settings.Set("BuildKey", HttpService:GenerateGUID(false))
 
 	const Server = (script :: any).ClaudioRuntimeServer:Clone()
 

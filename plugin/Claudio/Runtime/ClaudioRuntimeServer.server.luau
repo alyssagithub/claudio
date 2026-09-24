@@ -10,7 +10,7 @@ if not RunService:IsRunning() then
 end
 
 const Token = "{{Token}}"
-const Secret = "{{Secret}}"
+const BuildKey = "{{BuildKey}}"
 const Base = `http://127.0.0.1:{tonumber("{{Port}}") or 47225}`
 
 const Remote = Instance.new("RemoteEvent")
@@ -131,7 +131,7 @@ const function Run(Code: string): any
 		return Finish({error = "Claudio's plugin is not running inside this play session, so there is nothing to build the code with. Stop the playtest and start it again, and if that does not help, reinstall the plugin."})
 	end
 
-	const Payload = Making:Invoke(Secret, `return function()\n{Code}\nend`)
+	const Payload = Making:Invoke(BuildKey, `return function()\n{Code}\nend`)
 
 	if not Payload then
 		return Finish({error = "Claudio could not turn that code into a module to run it."})

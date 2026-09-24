@@ -22,9 +22,9 @@ function Builder.Serve()
 	Bindable.Name = Name
 
 	Bindable.OnInvoke = function(Given: any, Source: any): any
-		const Secret = Settings.Get("RelayToken")()
+		const Key = Settings.Get("BuildKey")()
 
-		if Secret == "" or Given ~= Secret or typeof(Source) ~= "string" then
+		if Key == "" or Given ~= Key or typeof(Source) ~= "string" then
 			return nil
 		end
 

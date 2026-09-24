@@ -63,8 +63,14 @@ function Relay.Serve()
 			return false, "That request was already made"
 		end
 
-		if typeof(Url) ~= "string" or not Url:match("^http://127%.0%.0%.1:%d+/") then
+		const Bridge = `http://127.0.0.1:{Settings.Get("Port")()}/`
+
+		if typeof(Url) ~= "string" or Url:sub(1, #Bridge) ~= Bridge then
 			return false, "That address is not the local bridge"
+		end
+
+		if Url:match("^http://[^/]+/versions") then
+			return false, "Installing a version is not allowed during a playtest"
 		end
 
 		const Verb = Methods[Method]

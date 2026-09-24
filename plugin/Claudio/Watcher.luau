@@ -525,6 +525,9 @@ function Watcher.Start()
 
 	Skipped = Total > 60000
 
+	table.insert(Connections, game.DescendantAdded:Connect(OnDescendantAdded))
+	table.insert(Connections, game.DescendantRemoving:Connect(OnDescendantRemoving))
+
 	if not Skipped then
 		for Name in Roots do
 			const Service = game:FindFirstChild(Name)
@@ -539,9 +542,6 @@ function Watcher.Start()
 			end
 		end
 	end
-
-	table.insert(Connections, game.DescendantAdded:Connect(OnDescendantAdded))
-	table.insert(Connections, game.DescendantRemoving:Connect(OnDescendantRemoving))
 end
 
 function Watcher.Stop()

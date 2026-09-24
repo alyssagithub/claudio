@@ -246,7 +246,7 @@ function Markdown.Split(Text: string): {Segment}
 			break
 		end
 
-		if not Text:sub(1, FenceStart - 1):match("[^\n]*$"):match("^[ \t]*$") then
+		if not (Text:sub(1, FenceStart - 1):match("[^\n]*$") or ""):match("^[ \t]*$") then
 			Search = FenceStart + 3
 			continue
 		end

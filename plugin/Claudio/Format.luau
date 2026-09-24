@@ -48,7 +48,7 @@ function Format.Model(Name: string): string
 	const Family, Major, Minor = Name:match("^claude%-(%a+)%-(%d+)%-?(%d*)")
 
 	if Family and Major then
-		return `{Family:sub(1, 1):upper()}{Family:sub(2)} {Major}{if Minor ~= "" and #Minor <= 2 then `.{Minor}` else ""}`
+		return `{Family:sub(1, 1):upper()}{Family:sub(2)} {Major}{if Minor and Minor ~= "" and #Minor <= 2 then `.{Minor}` else ""}`
 	end
 
 	const Base, Suffix = Name:match("^(%a+)%[(%w+)%]$")

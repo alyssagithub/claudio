@@ -599,8 +599,11 @@ function Testing.With(Values: {[string]: any}, Run: () -> ())
 	const Settings = Import((Folder :: any).Settings)
 	const Before = {}
 
-	for Key, Value in Values do
+	for Key in Values do
 		Before[Key] = Settings.Get(Key)()
+	end
+
+	for Key, Value in Values do
 		Settings.Set(Key, Value)
 	end
 

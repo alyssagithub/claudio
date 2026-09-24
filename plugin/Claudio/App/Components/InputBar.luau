@@ -157,7 +157,7 @@ return function()
 		TextColor3 = Theme.Colors.Text,
 		PlaceholderColor3 = Theme.Colors.DimText,
 		PlaceholderText = function()
-			return "Type / for commands, @ for objects"
+			return if Chat.WindowWidth() < 300 then "/ for commands, @ for objects" else "Type / for commands, @ for objects"
 		end,
 		TextSize = Settings.TextSize,
 		FontFace = Font.fromEnum(Enum.Font.BuilderSans),

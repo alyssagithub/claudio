@@ -3753,6 +3753,8 @@ function Chat.Restore(Position: number)
 		end
 	end)
 
+	task.wait()
+
 	if not Undone then
 		Watcher.Pause(false)
 		Chat.Restoring(false)

@@ -1,5 +1,6 @@
 --!strict
 const Theme = require(script.Parent.App.Theme)
+const Format = require(script.Parent.Format)
 const Highlighter = require(script.Parent.Packages.highlighter)
 
 type Grammar = {
@@ -204,16 +205,12 @@ for Language, Names in ({
 	end
 end
 
-const function Escape(Text: string): string
-	return (Text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
-end
-
 const function Paint(Text: string, Colour: Color3): string
 	if Text == "" then
 		return ""
 	end
 
-	return `<font color="#{Colour:ToHex()}">{Escape(Text)}</font>`
+	return `<font color="#{Colour:ToHex()}">{Format.Escape(Text)}</font>`
 end
 
 local Tinted = ""
@@ -395,7 +392,7 @@ const function Tokens(Code: string, Rules: Grammar): string
 	end
 
 	const function Tint(Piece: string, Colour: Color3?)
-		Push(Piece, if Colour then Paint(Piece, Colour) else Escape(Piece))
+		Push(Piece, if Colour then Paint(Piece, Colour) else Format.Escape(Piece))
 	end
 
 	const function Fresh(): boolean
@@ -626,7 +623,7 @@ const function Markup(Code: string): string
 				elseif Character == "<" then
 					break
 				else
-					table.insert(Out, Escape(Character))
+					table.insert(Out, Format.Escape(Character))
 					At += 1
 				end
 			end
@@ -645,7 +642,7 @@ const function Markup(Code: string): string
 
 		const Text = Code:match("^[^<&]+", At) or Code:sub(At, At)
 
-		table.insert(Out, Escape(Text))
+		table.insert(Out, Format.Escape(Text))
 		At += #Text
 	end
 
@@ -663,7 +660,7 @@ const function Diff(Code: string): string
 			elseif Line:sub(1, 1) == "-" then Colours.Removed
 			else nil
 
-		table.insert(Lines, if Colour then Paint(Line, Colour) else Escape(Line))
+		table.insert(Lines, if Colour then Paint(Line, Colour) else Format.Escape(Line))
 	end
 
 	return table.concat(Lines, "\n")
@@ -759,7 +756,7 @@ function Syntax.Highlight(Code: string, Language: string?): string
 		elseif Chosen == "diff" then Diff(Code)
 		elseif Chosen == "html" then Markup(Code)
 		elseif Grammars[Chosen] then Tokens(Code, Grammars[Chosen])
-		else Escape(Code)
+		else Format.Escape(Code)
 
 	if Held > 200 then
 		table.clear(Cached)

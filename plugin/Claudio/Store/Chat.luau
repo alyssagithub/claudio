@@ -811,7 +811,7 @@ const function Playtest(Input: any): any
 			return {error = `Studio did not start a {Mode} playtest{if Held.Value and Held.Value ~= "nil" then `: {Held.Value}` else "."}`}
 		end
 
-		const Started = if Mode == "multiplayer" then `Multiplayer playtest started with {Players} players.` else `{Mode:sub(1, 1):upper()}{Mode:sub(2)} mode playtest started.`
+		const Started = if Mode == "multiplayer" then `Multiplayer playtest started with {Players} players.` else `{Format.Capitalize(Mode)} mode playtest started.`
 
 		return {text = if Warning then `{Started} {Warning}` else Started}
 	end

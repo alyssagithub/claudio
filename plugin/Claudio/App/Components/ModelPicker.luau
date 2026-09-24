@@ -5,6 +5,7 @@ const Settings = require(script.Parent.Parent.Parent.Settings)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Covers = require(script.Parent.Parent.Covers)
+const Format = require(script.Parent.Parent.Parent.Format)
 const Theme = require(script.Parent.Parent.Theme)
 const Icon = require(script.Parent.Icon)
 const Slider = require(script.Parent.Slider)
@@ -68,7 +69,7 @@ const function EffortLabel(): string
 
 	const Level = CurrentEffort()
 
-	return EffortNames[Level] or `{Level:sub(1, 1):upper()}{Level:sub(2)}`
+	return EffortNames[Level] or Format.Capitalize(Level)
 end
 
 const Tip = Vide.source("")
@@ -303,18 +304,12 @@ const function Pick(Model: () -> Types.ModelInfo, LayoutOrder: number, Inside: b
 	end)
 end
 
-function ModelPicker.Menu()
-	Vide.effect(function()
-		if not Chat.PickerOpen() then
-			Vide.untrack(CloseMore)
-		end
-	end)
-
-	return Create "Frame" {
-		Name = "ModelMenu",
+const function CreatePopup(Name: string, Width: number, Visible: () -> boolean, Across: number, Down: number, Children: {any})
+	const Properties: {any} = {
+		Name = Name,
 		Vide.action(Covers.Add),
 		Size = function()
-			return UDim2.fromOffset(ScaleWidth(182), 0)
+			return UDim2.fromOffset(ScaleWidth(Width), 0)
 		end,
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(0, 1),
@@ -324,16 +319,31 @@ function ModelPicker.Menu()
 		ZIndex = 40,
 		BackgroundColor3 = Theme.Colors.Input,
 		LayoutOrder = 1,
-		Visible = Chat.PickerOpen,
+		Visible = Visible,
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 6)},
 		Create "UIStroke" {Color = Theme.Colors.Button},
 		Create "UIPadding" {
-			PaddingLeft = UDim.new(0, 4),
-			PaddingRight = UDim.new(0, 4),
-			PaddingTop = UDim.new(0, 4),
-			PaddingBottom = UDim.new(0, 4),
+			PaddingLeft = UDim.new(0, Across),
+			PaddingRight = UDim.new(0, Across),
+			PaddingTop = UDim.new(0, Down),
+			PaddingBottom = UDim.new(0, Down),
 		},
+	}
+
+	table.move(Children, 1, #Children, #Properties + 1, Properties)
+
+	return Create "Frame" (Properties)
+end
+
+function ModelPicker.Menu()
+	Vide.effect(function()
+		if not Chat.PickerOpen() then
+			Vide.untrack(CloseMore)
+		end
+	end)
+
+	return CreatePopup("ModelMenu", 182, Chat.PickerOpen, 4, 4, {
 		Create "UIListLayout" {
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			HorizontalFlex = Enum.UIFlexAlignment.Fill,
@@ -523,7 +533,7 @@ function ModelPicker.Menu()
 				},
 			},
 		},
-	}
+	})
 end
 
 const function CreatePillStyle(Open: () -> boolean): (() -> boolean, {any})
@@ -632,30 +642,7 @@ function ModelPicker.ModeButton()
 end
 
 function ModelPicker.ModeMenu()
-	return Create "Frame" {
-		Name = "ModeMenu",
-		Vide.action(Covers.Add),
-		Size = function()
-			return UDim2.fromOffset(ScaleWidth(224), 0)
-		end,
-		AutomaticSize = Enum.AutomaticSize.Y,
-		AnchorPoint = Vector2.new(0, 1),
-		Position = function()
-			return UDim2.new(0, 8, 1, -ModelPicker.BarHeight() - 6)
-		end,
-		ZIndex = 40,
-		BackgroundColor3 = Theme.Colors.Input,
-		LayoutOrder = 1,
-		Visible = Chat.ModeOpen,
-
-		Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-		Create "UIStroke" {Color = Theme.Colors.Button},
-		Create "UIPadding" {
-			PaddingLeft = UDim.new(0, 8),
-			PaddingRight = UDim.new(0, 8),
-			PaddingTop = UDim.new(0, 8),
-			PaddingBottom = UDim.new(0, 8),
-		},
+	return CreatePopup("ModeMenu", 224, Chat.ModeOpen, 8, 8, {
 		Create "UIListLayout" {
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			HorizontalFlex = Enum.UIFlexAlignment.Fill,
@@ -747,7 +734,7 @@ function ModelPicker.ModeMenu()
 				end,
 			},
 		},
-	}
+	})
 end
 
 function ModelPicker.EffortButton()
@@ -855,38 +842,15 @@ function ModelPicker.EffortHelp()
 end
 
 function ModelPicker.EffortMenu()
-	return Create "Frame" {
-		Name = "EffortMenu",
-		Vide.action(Covers.Add),
-		Size = function()
-			return UDim2.fromOffset(ScaleWidth(182), 0)
-		end,
-		AutomaticSize = Enum.AutomaticSize.Y,
-		AnchorPoint = Vector2.new(0, 1),
-		Position = function()
-			return UDim2.new(0, 8, 1, -ModelPicker.BarHeight() - 6)
-		end,
-		ZIndex = 40,
-		BackgroundColor3 = Theme.Colors.Input,
-		LayoutOrder = 1,
-		Visible = function()
-			return Chat.EffortOpen() and #EffortLevels() > 0
-		end,
-
+	return CreatePopup("EffortMenu", 182, function()
+		return Chat.EffortOpen() and #EffortLevels() > 0
+	end, 10, 8, {
 		Vide.action(function(Menu: Frame)
 			MenuHeight(Menu.AbsoluteSize.Y)
 			Vide.cleanup(Menu:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 				MenuHeight(Menu.AbsoluteSize.Y)
 			end))
 		end),
-		Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-		Create "UIStroke" {Color = Theme.Colors.Button},
-		Create "UIPadding" {
-			PaddingLeft = UDim.new(0, 10),
-			PaddingRight = UDim.new(0, 10),
-			PaddingTop = UDim.new(0, 8),
-			PaddingBottom = UDim.new(0, 8),
-		},
 		Create "UIListLayout" {
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			HorizontalFlex = Enum.UIFlexAlignment.Fill,
@@ -1001,7 +965,7 @@ function ModelPicker.EffortMenu()
 			end,
 			LayoutOrder = 3,
 		},
-	}
+	})
 end
 
 return ModelPicker

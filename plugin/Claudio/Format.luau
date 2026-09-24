@@ -1,6 +1,18 @@
 --!strict
 const Format = {}
 
+function Format.Escape(Text: string): string
+	return (Text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
+end
+
+function Format.Capitalize(Text: string): string
+	return `{Text:sub(1, 1):upper()}{Text:sub(2)}`
+end
+
+function Format.Cost(Total: number, Estimated: boolean?): string
+	return `{if Estimated then "~" else ""}${string.format(if Total < 1 then "%.3f" else "%.2f", Total)}`
+end
+
 function Format.Path(Path: string?): string
 	if not Path then
 		return "something"
@@ -48,16 +60,16 @@ function Format.Model(Name: string): string
 	const Family, Major, Minor = Name:match("^claude%-(%a+)%-(%d+)%-?(%d*)")
 
 	if Family and Major then
-		return `{Family:sub(1, 1):upper()}{Family:sub(2)} {Major}{if Minor and Minor ~= "" and #Minor <= 2 then `.{Minor}` else ""}`
+		return `{Format.Capitalize(Family)} {Major}{if Minor and Minor ~= "" and #Minor <= 2 then `.{Minor}` else ""}`
 	end
 
 	const Base, Suffix = Name:match("^(%a+)%[(%w+)%]$")
 
 	if Base and Suffix then
-		return `{Base:sub(1, 1):upper()}{Base:sub(2)} {Suffix:upper()}`
+		return `{Format.Capitalize(Base)} {Suffix:upper()}`
 	end
 
-	return `{Name:sub(1, 1):upper()}{Name:sub(2)}`
+	return Format.Capitalize(Name)
 end
 
 function Format.Large(Value: number): string

@@ -225,6 +225,12 @@ return function()
 		return Total, Guessed, Known
 	end
 
+	const function GetContextText(): string
+		const ContextSize = Chat.ContextWindow()
+
+		return `{Format.Large(Chat.ContextUsed())} / {Format.Large(ContextSize)} ({math.round(Chat.ContextUsed() / ContextSize * 100)}%)`
+	end
+
 	const function Line(Left: () -> string, Right: () -> string, Strong: boolean, LayoutOrder: number, Arrow: (() -> boolean)?)
 		return Create "Frame" {
 			Name = "Line",
@@ -372,13 +378,13 @@ return function()
 				ZIndex = 20,
 				LayoutOrder = 1,
 				Text = function()
-					const Room = Chat.ContextWindow()
+					const ContextSize = Chat.ContextWindow()
 
-					if Room == 0 then
+					if ContextSize == 0 then
 						return if Chat.ContextLoading() then "Loading context" else "Context fills in after the first reply"
 					end
 
-					return `Context {Format.Large(Chat.ContextUsed())} / {Format.Large(Room)} ({math.round(Chat.ContextUsed() / Room * 100)}%)`
+					return `Context {GetContextText()}`
 				end,
 			},
 			Create "TextLabel" {
@@ -458,13 +464,13 @@ return function()
 				Line(function()
 					return "Context window"
 				end, function()
-					const Room = Chat.ContextWindow()
+					const ContextSize = Chat.ContextWindow()
 
-					if Room == 0 then
+					if ContextSize == 0 then
 						return if Chat.ContextLoading() then "" else "0"
 					end
 
-					return `{Format.Large(Chat.ContextUsed())} / {Format.Large(Room)} ({math.round(Chat.ContextUsed() / Room * 100)}%) `
+					return `{GetContextText()} `
 				end, true, 1, Expanded),
 			},
 			Create "TextLabel" {
@@ -500,9 +506,9 @@ return function()
 					return Create "Frame" {
 						Name = "Segment",
 						Size = function()
-							const Room = Chat.ContextWindow()
+							const ContextSize = Chat.ContextWindow()
 
-							return UDim2.fromScale(if Room == 0 then 0 else Part().tokens / Room, 1)
+							return UDim2.fromScale(if ContextSize == 0 then 0 else Part().tokens / ContextSize, 1)
 						end,
 						BackgroundColor3 = function()
 							return GetPartColour(Part())
@@ -567,9 +573,9 @@ return function()
 						TextXAlignment = Enum.TextXAlignment.Right,
 						LayoutOrder = 3,
 						Text = function()
-							const Room = Chat.ContextWindow()
+							const ContextSize = Chat.ContextWindow()
 
-							return `{Format.Large(Part().tokens)}{if Room == 0 or Part().deferred then "" else `   {string.format("%.1f", Part().tokens / Room * 100)}%`}`
+							return `{Format.Large(Part().tokens)}{if ContextSize == 0 or Part().deferred then "" else `   {string.format("%.1f", Part().tokens / ContextSize * 100)}%`}`
 						end,
 					},
 				}
@@ -644,11 +650,7 @@ return function()
 			end, function()
 				const Total, Guessed = GetChatCost()
 
-				if Total < 1 then
-					return `{if Guessed then "~" else ""}${string.format("%.3f", Total)}`
-				end
-
-				return `{if Guessed then "~" else ""}${string.format("%.2f", Total)}`
+				return Format.Cost(Total, Guessed)
 			end, true, 201),
 			Line(function()
 				const Total, Guessed, Known = GetChatCost()

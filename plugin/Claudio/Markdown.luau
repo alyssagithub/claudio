@@ -1,4 +1,6 @@
 --!strict
+const Format = require(script.Parent.Format)
+
 export type Segment = {
 	Kind: "text" | "code" | "table",
 	Text: string,
@@ -102,10 +104,9 @@ function Markdown.Tokens(Text: string, Accent: string, Fade: boolean): string
 end
 
 function Markdown.Build(Text: string, Size: number?, Accent: string?): string
-	const Safe = Text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
 	const Lines: {string} = {}
 
-	for _, Line in string.split(Safe, "\n") do
+	for _, Line in string.split(Format.Escape(Text), "\n") do
 		if Line:match("^%s*[-*_][-*_%s]*$") and #Line:gsub("%s", "") >= 3 then
 			table.insert(Lines, "────────────")
 
@@ -161,7 +162,7 @@ function Markdown.Coded(Text: string): string
 end
 
 function Markdown.Cell(Text: string): string
-	return Markdown.Coded((Text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")))
+	return Markdown.Coded(Format.Escape(Text))
 end
 
 const function IsTableRow(Line: string): boolean

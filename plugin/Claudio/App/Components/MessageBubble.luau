@@ -55,7 +55,7 @@ const function IsCommand(Name: string): boolean
 end
 
 const function FormatLineCounts(Added: number, Removed: number): string
-	return ` <font color="#{Theme.Colors.AddedText():ToHex()}">+{Added}</font> <font color="#{Theme.Colors.Error():ToHex()}">-{Removed}</font>`
+	return `<font color="#{Theme.Colors.AddedText():ToHex()}">+{Added}</font> <font color="#{Theme.Colors.Error():ToHex()}">-{Removed}</font>`
 end
 
 const function DescribeFileCall(Entry: Types.ToolCall, Running: boolean): string?
@@ -66,7 +66,7 @@ const function DescribeFileCall(Entry: Types.ToolCall, Running: boolean): string
 			return nil
 		end
 
-		return `{if Running then "Editing" else "Edited"} <b>{(Changes.Field(Entry.input, "path") or ""):match("[^%.]+$") or "a script"}</b>{if Entry.lines then FormatLineCounts(Entry.lines.added, Entry.lines.removed) else ""}`
+		return `{if Running then "Editing" else "Edited"} <b>{(Changes.Field(Entry.input, "path") or ""):match("[^%.]+$") or "a script"}</b>{if Entry.lines then ` {FormatLineCounts(Entry.lines.added, Entry.lines.removed)}` else ""}`
 	end
 
 	if Entry.name ~= "Write" and Entry.name ~= "Edit" and Entry.name ~= "MultiEdit" and Entry.name ~= "Read" then
@@ -84,7 +84,7 @@ const function DescribeFileCall(Entry: Types.ToolCall, Running: boolean): string
 		elseif Lines and Lines.removed == 0 then (if Running then "Creating" else "Created")
 		else (if Running then "Rewriting" else "Rewrote")
 
-	return `{Verb} {File}{if Lines then FormatLineCounts(Lines.added, Lines.removed) else ""}`
+	return `{Verb} {File}{if Lines then ` {FormatLineCounts(Lines.added, Lines.removed)}` else ""}`
 end
 
 const function Describe(Entry: Types.ToolCall, Running: boolean): string
@@ -221,7 +221,7 @@ return function(Props: Props)
 		end
 
 		if Cost and Cost > 0 then
-			table.insert(Parts, `{if Props.Estimated and Props.Estimated() then "~" else ""}${string.format("%.3f", Cost)}`)
+			table.insert(Parts, Format.Cost(Cost, Props.Estimated and Props.Estimated()))
 		end
 
 		return table.concat(Parts, " · ")
@@ -330,10 +330,63 @@ return function(Props: Props)
 		prompt = true,
 	}
 
+	const function CreateShimmer(IsWorking: () -> boolean, IsOpen: () -> boolean): (() -> number, Instance)
+		const Shimmer = Vide.source(0)
+		const Turned = Vide.source(if Vide.untrack(IsOpen) then 1 else 0)
+		local Connection: RBXScriptConnection?
+
+		Vide.effect(function()
+			IsWorking()
+			IsOpen()
+
+			if Connection then
+				return
+			end
+
+			Connection = RunService.Heartbeat:Connect(function(Step: number)
+				const Working = Vide.untrack(IsWorking)
+				const Wanted = if Vide.untrack(IsOpen) then 1 else 0
+				const Current = Vide.untrack(Turned)
+
+				if Working then
+					Shimmer((os.clock() * 0.6) % 1.6 - 0.8)
+				end
+
+				if Current ~= Wanted then
+					Turned(if math.abs(Wanted - Current) < 0.02 then Wanted else Current + (Wanted - Current) * math.min(1, Step * 14))
+				elseif not Working and Connection then
+					Connection:Disconnect()
+					Connection = nil
+				end
+			end)
+		end)
+
+		Vide.cleanup(function()
+			if not Connection then
+				return
+			end
+
+			Connection:Disconnect()
+		end)
+
+		return Turned, Create "UIGradient" {
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, Color3.new(0.55, 0.55, 0.55)),
+				ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)),
+				ColorSequenceKeypoint.new(1, Color3.new(0.55, 0.55, 0.55)),
+			}),
+			Offset = function()
+				return Vector2.new(Shimmer(), 0)
+			end,
+			Enabled = IsWorking,
+		}
+	end
+
 	const function Call(Value: () -> Types.ToolCall, Index: number)
 		const Open = Vide.source(IsBusy(Value()))
-		const Shimmer = Vide.source(0)
-		const Turned = Vide.source(if IsBusy(Value()) then 1 else 0)
+		const Turned, Gradient = CreateShimmer(function()
+			return IsBusy(Value())
+		end, Open)
 
 		local WasBusy = IsBusy(Value())
 
@@ -352,21 +405,6 @@ return function(Props: Props)
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = Index,
-
-			Vide.action(function()
-				Vide.cleanup(RunService.Heartbeat:Connect(function(Step: number)
-					if IsBusy(Vide.untrack(Value)) then
-						Shimmer((os.clock() * 0.6) % 1.6 - 0.8)
-					end
-
-					const Wanted = if Vide.untrack(Open) then 1 else 0
-					const Current = Vide.untrack(Turned)
-
-					if Current ~= Wanted then
-						Turned(if math.abs(Wanted - Current) < 0.02 then Wanted else Current + (Wanted - Current) * math.min(1, Step * 14))
-					end
-				end))
-			end),
 
 			Create "UIListLayout" {
 				SortOrder = Enum.SortOrder.LayoutOrder,
@@ -513,19 +551,7 @@ return function(Props: Props)
 							return Describe(Entry, false)
 						end,
 
-						Create "UIGradient" {
-							Color = ColorSequence.new({
-								ColorSequenceKeypoint.new(0, Color3.new(0.55, 0.55, 0.55)),
-								ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)),
-								ColorSequenceKeypoint.new(1, Color3.new(0.55, 0.55, 0.55)),
-							}),
-							Offset = function()
-								return Vector2.new(Shimmer(), 0)
-							end,
-							Enabled = function()
-								return IsBusy(Value())
-							end,
-						},
+						Gradient,
 					},
 					Chevron {
 						Angle = function()
@@ -577,9 +603,7 @@ return function(Props: Props)
 							TextXAlignment = Enum.TextXAlignment.Left,
 							LayoutOrder = 1,
 							Text = function()
-								const Shown = if IsCode() then "" else ` {Pair().Value:gsub("&", "&amp;"):gsub("<", "&lt;")}`
-
-								return `<font color="#{Theme.Colors.DimText():ToHex()}">{Pair().Key}:</font>{Shown}`
+								return `<font color="#{Theme.Colors.DimText():ToHex()}">{Pair().Key}:</font>{if IsCode() then "" else ` {Format.Escape(Pair().Value)}`}`
 							end,
 						},
 						CodeBox {
@@ -615,7 +639,7 @@ return function(Props: Props)
 						return Value().output
 					end,
 					Rich = function()
-						return if Open() then (Shorten(Value().output):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")) else ""
+						return if Open() then Format.Escape(Shorten(Value().output)) else ""
 					end,
 				},
 				Vide.show(function()
@@ -810,7 +834,7 @@ return function(Props: Props)
 
 		const Line = table.concat(Parts, ", ")
 
-		return `{Line:sub(1, 1):upper()}{Line:sub(2)}{if #Files > 0 and Measured then FormatLineCounts(Added, Removed) else ""}`
+		return `{Format.Capitalize(Line)}{if #Files > 0 and Measured then ` {FormatLineCounts(Added, Removed)}` else ""}`
 	end
 
 	const Blank: Types.ToolCall = {
@@ -823,8 +847,6 @@ return function(Props: Props)
 
 	const function Group(Value: () -> Block, Index: number)
 		const Listed = Vide.source(false)
-		const Shimmer = Vide.source(0)
-		const Turned = Vide.source(0)
 
 		const function Kind(): string
 			return Value().Kind
@@ -849,6 +871,7 @@ return function(Props: Props)
 			return false
 		end
 
+		const Turned, Gradient = CreateShimmer(Working, Listed)
 		local WasWorking = false
 
 		Vide.effect(function()
@@ -863,7 +886,7 @@ return function(Props: Props)
 
 		return Create "Frame" {
 			Name = function()
-				return `{Kind():sub(1, 1):upper()}{Kind():sub(2)}`
+				return Format.Capitalize(Kind())
 			end,
 			Size = UDim2.fromScale(1, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
@@ -873,20 +896,6 @@ return function(Props: Props)
 				return Kind() ~= "thinking" or Chat.Thinking()
 			end,
 
-			Vide.action(function()
-				Vide.cleanup(RunService.Heartbeat:Connect(function(Step: number)
-					if Vide.untrack(Working) then
-						Shimmer((os.clock() * 0.6) % 1.6 - 0.8)
-					end
-
-					const Wanted = if Vide.untrack(Listed) then 1 else 0
-					const Current = Vide.untrack(Turned)
-
-					if Current ~= Wanted then
-						Turned(if math.abs(Wanted - Current) < 0.02 then Wanted else Current + (Wanted - Current) * math.min(1, Step * 14))
-					end
-				end))
-			end),
 			Create "UIListLayout" {
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				HorizontalFlex = function()
@@ -1069,17 +1078,7 @@ return function(Props: Props)
 						return if Kind() == "calls" then Summarize(Value().Calls or {}) else ""
 					end,
 
-					Create "UIGradient" {
-						Color = ColorSequence.new({
-							ColorSequenceKeypoint.new(0, Color3.new(0.55, 0.55, 0.55)),
-							ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)),
-							ColorSequenceKeypoint.new(1, Color3.new(0.55, 0.55, 0.55)),
-						}),
-						Offset = function()
-							return Vector2.new(Shimmer(), 0)
-						end,
-						Enabled = Working,
-					},
+					Gradient,
 				},
 				Chevron {
 					Angle = function()
@@ -1540,11 +1539,7 @@ return function(Props: Props)
 						LayoutOrder = 5,
 						Visible = HasLineCounts,
 						Text = function()
-							const function Hex(Colour: Color3): string
-								return `#{Colour:ToHex()}`
-							end
-
-							return `<font color="{Hex(Theme.Colors.AddedText())}">+{Entry().Added or 0}</font> <font color="{Hex(Theme.Colors.Error())}">-{Entry().Removed or 0}</font>`
+							return FormatLineCounts(Entry().Added or 0, Entry().Removed or 0)
 						end,
 					},
 					Icon {

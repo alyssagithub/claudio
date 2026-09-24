@@ -6,6 +6,7 @@ const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Context = require(script.Parent.Parent.Parent.Store.Context)
 const Client = require(script.Parent.Parent.Parent.Client.Client)
 const Markdown = require(script.Parent.Parent.Parent.Markdown)
+const Format = require(script.Parent.Parent.Parent.Format)
 const Keys = require(script.Parent.Parent.Parent.Store.Keys)
 const Theme = require(script.Parent.Parent.Theme)
 const IconButton = require(script.Parent.IconButton)
@@ -273,9 +274,7 @@ return function()
 			TextYAlignment = Enum.TextYAlignment.Top,
 			ZIndex = 2,
 			Text = function()
-				const Safe = Chat.Draft():gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
-
-				return Markdown.Tokens(Safe, Theme.Colors.Accent():ToHex(), true)
+				return Markdown.Tokens(Format.Escape(Chat.Draft()), Theme.Colors.Accent():ToHex(), true)
 			end,
 		},
 	}

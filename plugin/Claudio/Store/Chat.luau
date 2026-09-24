@@ -167,6 +167,7 @@ const function Reset()
 	Chat.ContextWindow(0)
 	Chat.ContextLoading(false)
 	Chat.Opened({})
+	Chat.Rewinding(nil)
 	table.clear(Chat.Anchors)
 	Watcher.Reset()
 end

@@ -222,6 +222,8 @@ task.spawn(function()
 					const Needle = if typeof(Job.input.contains) == "string" and Job.input.contains ~= "" then Job.input.contains:lower() else nil
 					const Kept = {}
 
+					local Skipped = 0
+
 					for Index = #History, 1, -1 do
 						const Entry = History[Index]
 						const Kind = Named[Entry.messageType] or "print"
@@ -241,7 +243,9 @@ task.spawn(function()
 						end
 
 						if #Kept >= Limit then
-							break
+							Skipped += 1
+
+							continue
 						end
 
 						table.insert(Kept, `{Kind}: {if #Message > 400 then `{Message:sub(1, 400)} [cut]` else Message}`)
@@ -256,7 +260,7 @@ task.spawn(function()
 					return {
 						lines = Lines,
 						scanned = #History,
-						skipped = 0,
+						skipped = Skipped,
 					}
 				end
 

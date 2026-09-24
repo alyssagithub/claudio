@@ -2122,8 +2122,8 @@ export function DescribeTurn(Turn: Turn) {
   };
 }
 
-export async function ForkConversation(ConversationId: string) {
-  const Result = await forkSession(ConversationId) as {sessionId?: string};
+export async function ForkConversation(ConversationId: string, UpTo: string | null) {
+  const Result = await forkSession(ConversationId, UpTo ? {upToMessageId: UpTo} : undefined) as {sessionId?: string};
 
   return Result.sessionId;
 }

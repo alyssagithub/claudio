@@ -372,8 +372,8 @@ function Client.SetChapters(Id: string, Chapters: {Types.Chapter}): (boolean, an
 	return Http.Request("POST", `{BaseUrl()}/conversations/{Id}/chapters`, {chapters = Chapters})
 end
 
-function Client.ForkConversation(Id: string): (boolean, any)
-	return Http.Request("POST", `{BaseUrl()}/conversations/{Id}/fork`)
+function Client.ForkConversation(Id: string, UpTo: string?): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/conversations/{Id}/fork`, {upTo = UpTo})
 end
 
 function Client.DeleteConversation(Id: string): (boolean, any)

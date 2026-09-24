@@ -49,6 +49,8 @@ export type Message = {
 	Error: string?,
 	Cost: number?,
 	Estimated: boolean?,
+	Uuid: string?,
+	Parent: string?,
 	Prompt: string?,
 	At: number?,
 }

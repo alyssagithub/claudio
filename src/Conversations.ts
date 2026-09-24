@@ -895,6 +895,8 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
         text: StripContext(TextOf(Line.message.content)),
         images: Attached,
         at: TimeOf(Line),
+        uuid: Line.uuid,
+        parent: Line.parentUuid,
       });
       PendingTools = [];
       PendingCalls = [];

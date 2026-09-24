@@ -3218,6 +3218,8 @@ const function Loaded(Given: {any}): {Types.Message}
 			Tokens = Message.tokens,
 			Cost = Message.cost,
 			Estimated = Message.estimated,
+			Uuid = Message.uuid,
+			Parent = Message.parent,
 		})
 	end
 
@@ -3549,10 +3551,10 @@ function Chat.SetFolderHidden(Folder: string, Value: boolean)
 	Chat.Refresh()
 end
 
-function Chat.Fork(Id: string)
+function Chat.Fork(Id: string, UpTo: string?)
 	Chat.MenuFor(nil)
 
-	const Ok, Result = Client.ForkConversation(Id)
+	const Ok, Result = Client.ForkConversation(Id, UpTo)
 
 	if not Ok then
 		Chat.Say(`Could not fork that chat: {Result}`)
@@ -3877,11 +3879,28 @@ function Chat.Copy(Text: string)
 	Chat.Say(if Ok then "Copied to the clipboard." else "Could not reach the bridge to copy that.")
 end
 
-function Chat.ForkHere()
+function Chat.ForkHere(Index: number?)
 	const Id = Chat.ConversationId()
 
 	if not Id then
 		return
+	end
+
+	const Messages = Chat.Messages()
+	const Message = if Index then Messages[Index] else nil
+
+	if not Index or not Message or Message.Role == "user" then
+		Chat.Fork(Id, if Message then Message.Uuid else nil)
+
+		return
+	end
+
+	for Later = Index + 1, #Messages do
+		if Messages[Later].Role == "user" then
+			Chat.Fork(Id, Messages[Later].Parent)
+
+			return
+		end
 	end
 
 	Chat.Fork(Id)

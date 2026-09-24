@@ -356,7 +356,9 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
 
   if (Request.method === "POST" && Id && Segments[2] === "fork") {
     try {
-      SendJson(Response, 200, {id: await ForkConversation(Id)});
+      const Body = await ReadBody(Request);
+
+      SendJson(Response, 200, {id: await ForkConversation(Id, SessionId(Body.upTo))});
     } catch (Error) {
       SendJson(Response, 500, {error: `Could not fork this chat: ${(Error as Error).message}`});
     }

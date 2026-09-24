@@ -45,6 +45,8 @@ export type SdkUsage = {
 
 export type TranscriptLine = {
   type?: string;
+  uuid?: string;
+  parentUuid?: string | null;
   isMeta?: boolean;
   isSidechain?: boolean;
   timestamp?: string;
@@ -137,6 +139,8 @@ export type StoredMessage = {
   cost?: number;
   estimated?: boolean;
   notice?: boolean;
+  uuid?: string;
+  parent?: string | null;
 };
 
 export type Conversation = {

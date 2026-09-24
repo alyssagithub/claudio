@@ -1754,7 +1754,7 @@ return function(Props: Props)
 						Visible = Hovered,
 						Tooltip = "Fork from here",
 						OnClick = function()
-							task.spawn(Chat.ForkHere)
+							task.spawn(Chat.ForkHere, if Props.Index then Props.Index() else nil)
 						end,
 					},
 					IconButton {

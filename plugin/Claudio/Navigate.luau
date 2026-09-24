@@ -46,34 +46,41 @@ function Navigate.Resolve(Path: string): (Instance?, string?)
 end
 
 local LastText = ""
-local LastFound: {Types.Reference} = {}
+local LastMentioned: {{Path: string, Line: string}} = {}
 
 function Navigate.FindReferences(Text: string): {Types.Reference}
-	if Text == LastText then
-		return LastFound
+	if Text ~= LastText then
+		const Mentioned = {}
+
+		for _, RootName in RootNames do
+			for Path, Line in Text:gmatch(`%f[%w_]({RootName}%.[%w_%.]+):?(%d*)`) do
+				table.insert(Mentioned, {
+					Path = (Path:gsub("%.+$", "")),
+					Line = Line,
+				})
+			end
+		end
+
+		LastText = Text
+		LastMentioned = Mentioned
 	end
 
 	const Found = {}
 	const Seen = {}
 
-	for _, RootName in RootNames do
-		for Path, Line in Text:gmatch(`%f[%w_]({RootName}%.[%w_%.]+):?(%d*)`) do
-			const Object, Resolved = Navigate.Resolve((Path:gsub("%.+$", "")))
+	for _, Mention in LastMentioned do
+		const Object, Resolved = Navigate.Resolve(Mention.Path)
 
-			if not Object or not Resolved or Seen[Resolved] or Object:IsA("ServiceProvider") or Object.Parent == game then
-				continue
-			end
-
-			Seen[Resolved] = true
-			table.insert(Found, {
-				Path = Resolved,
-				Line = if Object:IsA("LuaSourceContainer") then tonumber(Line) else nil,
-			})
+		if not Object or not Resolved or Seen[Resolved] or Object:IsA("ServiceProvider") or Object.Parent == game then
+			continue
 		end
-	end
 
-	LastText = Text
-	LastFound = Found
+		Seen[Resolved] = true
+		table.insert(Found, {
+			Path = Resolved,
+			Line = if Object:IsA("LuaSourceContainer") then tonumber(Mention.Line) else nil,
+		})
+	end
 
 	return Found
 end

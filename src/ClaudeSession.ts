@@ -1087,7 +1087,6 @@ function RouteMessage(Session: Session, Message: any) {
         ? {
           ...Task,
           Status: (Message.patch && Message.patch.status) || Task.Status,
-          Description: (Message.patch && Message.patch.description) || Task.Description,
           Background: Message.patch && Message.patch.is_backgrounded !== undefined ? Message.patch.is_backgrounded : Task.Background,
           Error: (Message.patch && Message.patch.error) || Task.Error,
         }

@@ -3253,6 +3253,13 @@ function Chat.ViewSubagent(Task: Types.Task)
 		end
 
 		Chat.Watched(Loaded(Result.messages))
+
+		if typeof(Result.description) ~= "string" or Result.description == "" or Result.description == Mine.Title then
+			return
+		end
+
+		Mine.Title = Result.description
+		Chat.Viewing(Mine)
 	end
 
 	Chat.SubagentsOpen(false)

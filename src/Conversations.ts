@@ -1019,7 +1019,7 @@ function ReadChapters(): Record<string, Chapter[]> {
   return ReadJson<Record<string, Chapter[]>>(ChaptersFile) || {};
 }
 
-export function GetSubagent(Id: string, ToolUseId: string, Running: boolean): BuiltConversation | null {
+export function GetSubagent(Id: string, ToolUseId: string, Running: boolean): (BuiltConversation & { description: string | null }) | null {
   const File = FindFile(Id);
 
   if (!File) {
@@ -1049,7 +1049,7 @@ export function GetSubagent(Id: string, ToolUseId: string, Running: boolean): Bu
     const Lines = ReadLines(Transcript);
     const Built = Lines ? Assemble(Lines.map((Line) => ({...Line, isSidechain: false})), `${Id}/${ToolUseId}`, Transcript, false, Running) : null;
 
-    return Built ? {...Built, title: Meta.description || Built.title} : null;
+    return Built ? {...Built, title: Meta.description || Built.title, description: Meta.description || null} : null;
   }
 
   return null;

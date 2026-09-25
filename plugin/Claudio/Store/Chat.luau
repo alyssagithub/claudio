@@ -2608,7 +2608,12 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		Chat.Tokens(State.tokens)
 		Chat.Elapsed(State.milliseconds or 0)
 		Chat.Permission(State.permission)
-		Chat.Question(State.question)
+
+		const Shown = Chat.Question()
+
+		if not Shown or not State.question or Shown.id ~= State.question.id then
+			Chat.Question(State.question)
+		end
 
 		if State.conversationId and Chat.ConversationId() ~= State.conversationId then
 			Chat.ConversationId(State.conversationId)

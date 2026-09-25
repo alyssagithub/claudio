@@ -297,20 +297,6 @@ return function(Props: Props)
 		return Pairs
 	end
 
-	const function Shorten(Text: string): string
-		const Lines = string.split(Text, "\n")
-
-		if #Lines <= 40 then
-			return Text
-		end
-
-		const Kept = table.move(Lines, 1, 40, 1, {})
-
-		table.insert(Kept, `… {#Lines - 40} more lines`)
-
-		return table.concat(Kept, "\n")
-	end
-
 	const function Fields(Input: string): {{Key: string, Value: string}}
 		const Found = {}
 
@@ -634,7 +620,7 @@ return function(Props: Props)
 									return ""
 								end
 
-								return Syntax.Highlight(Shorten(Pair().Value), if Pair().Key ~= "command" then nil elseif Value().name == "PowerShell" then "powershell" else "sh")
+								return Syntax.Highlight(Pair().Value, if Pair().Key ~= "command" then nil elseif Value().name == "PowerShell" then "powershell" else "sh")
 							end,
 						},
 					}
@@ -654,7 +640,7 @@ return function(Props: Props)
 						return Value().output
 					end,
 					Rich = function()
-						return if Open() then Format.Escape(Shorten(Value().output)) else ""
+						return if Open() then Format.Escape(Value().output) else ""
 					end,
 				},
 				Vide.show(function()

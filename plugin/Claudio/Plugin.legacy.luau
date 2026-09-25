@@ -1,7 +1,7 @@
 --!strict
 const RunService = game:GetService("RunService")
 
-const Playing = RunService:IsRunning()
+const Playing = not RunService:IsEdit()
 
 if not plugin then
 	return

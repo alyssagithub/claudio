@@ -28,12 +28,12 @@ const PlaytestDescription = [
   "Always stop what you started.",
   "Check status first rather than assuming.",
   "This runs without a player character, so LocalPlayer and PlayerGui are not available.",
-  "A multiplayer test opens one more Studio process per player, each as heavy as the editor itself, so the tool measures free memory against that before starting one or adding players and refuses when the machine cannot carry it. Pass force to go ahead anyway.",
+  "A multiplayer test opens a server and one client per player, each its own Studio process at roughly half the editor's memory, so the tool checks that the machine can hold them, counting the page file, before starting one or adding players. It refuses only when they would not fit at all; when they only fit by paging, the test runs but slowly. Pass force to go ahead anyway.",
 ].join(" ");
 
-function StudioBytes(): Promise<number> {
+function StudioMemory(): Promise<{Editor: number, Room: number}> {
   const [Program, Arguments, Scale] = process.platform === "win32"
-    ? ["powershell", ["-NoProfile", "-Command", "(Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Sort-Object WorkingSet64 -Descending | Select-Object -First 1).WorkingSet64"], 1]
+    ? ["powershell", ["-NoProfile", "-Command", "\"$((Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Sort-Object PrivateMemorySize64 -Descending | Select-Object -First 1).PrivateMemorySize64) $((Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory * 1024)\""], 1]
     : ["sh", ["-c", "ps -axo rss,comm | grep -i RobloxStudio | sort -rn | head -1 | awk '{print $1}'"], 1024];
 
   return new Promise((Resolve) => {
@@ -42,22 +42,27 @@ function StudioBytes(): Promise<number> {
       timeout: 8000,
       windowsHide: true,
     }, (Trouble, Said) => {
-      Resolve(Trouble ? 0 : (Number(String(Said).trim()) || 0) * (Scale as number));
+      const [Editor, Room] = String(Said || "").trim().split(/\s+/).map(Number);
+
+      Resolve({
+        Editor: Trouble ? 0 : (Editor || 0) * (Scale as number),
+        Room: Trouble || !Room ? os.freemem() : Room,
+      });
     });
   });
 }
 
-async function Headroom(Players: number): Promise<string | null> {
-  const Free = os.freemem();
-  const Each = Math.max(await StudioBytes(), 512 * 1024 * 1024);
-  const Needed = Players * Each + 1536 * 1024 * 1024;
+async function Headroom(Clients: number, Starting: boolean): Promise<string | null> {
+  const Measured = await StudioMemory();
+  const Editor = Math.max(Measured.Editor, 2 * 1024 * 1024 * 1024);
+  const Needed = (Starting ? Editor * 0.6 : 0) + Clients * Editor * 0.45;
   const Gigabytes = (Bytes: number) => (Bytes / (1024 * 1024 * 1024)).toFixed(1);
 
-  if (Free >= Needed) {
+  if (Measured.Room >= Needed) {
     return null;
   }
 
-  return `Not starting that: ${Players} more player${Players === 1 ? "" : "s"} means ${Players} more Studio process${Players === 1 ? "" : "es"} at about ${Gigabytes(Each)} GB each, and this machine has ${Gigabytes(Free)} GB free of ${Gigabytes(os.totalmem())} GB. It needs about ${Gigabytes(Needed)} GB free to do it without starving everything else. Close things, use fewer players, or pass force to try anyway.`;
+  return `Not starting that: ${Starting ? "a server and " : ""}${Clients} client${Clients === 1 ? "" : "s"} need about ${Gigabytes(Needed)} GB, and this machine only has ${Gigabytes(Measured.Room)} GB left even counting the page file, so Studio would run out of memory. Close things, use fewer players, or pass force to try anyway.`;
 }
 
 const LintDescription = [
@@ -443,7 +448,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       Run: async (Input: { action: "start" | "stop" | "status" | "players"; mode?: "play" | "run" | "multiplayer"; players?: number; force?: boolean }) => {
         const Reachable = await RuntimeLive();
         const Adding = Input.action === "players" ? Math.max(1, Math.floor(Input.players || 1)) : (Input.action === "start" && Input.mode === "multiplayer" ? Math.max(2, Math.floor(Input.players || 2)) : 0);
-        const Refused = Adding > 0 && Input.force !== true ? await Headroom(Adding) : null;
+        const Refused = Adding > 0 && Input.force !== true ? await Headroom(Adding, Input.action === "start") : null;
 
         if (Refused) {
           return {content: [{

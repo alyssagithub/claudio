@@ -4078,7 +4078,6 @@ function Chat.Stop()
 		return
 	end
 
-	Chat.Sending(false)
 	task.spawn(Client.CancelTurn, RequestId)
 end
 

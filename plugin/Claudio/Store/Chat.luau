@@ -2416,9 +2416,24 @@ function Chat.WatchStudioJobs()
 	const Mounted = script:IsDescendantOf(game)
 	local Asked = 0
 	local Checked = 0
+	local SavedDraft = Settings.Fresh("Draft")
+
+	if Chat.Draft() == "" then
+		Chat.Draft(SavedDraft)
+	end
 
 	task.spawn(function()
 		while Watching and task.wait(1) do
+			const Typed = Chat.Draft()
+
+			if Typed ~= SavedDraft then
+				SavedDraft = Typed
+				Settings.Set("Draft", Typed)
+			elseif Settings.Fresh("Draft") ~= SavedDraft then
+				SavedDraft = Settings.Get("Draft")()
+				Chat.Draft(SavedDraft)
+			end
+
 			if Connection.Status() == "Connected" and os.clock() - Asked > 60 then
 				Asked = os.clock()
 				task.spawn(Chat.RefreshUsage)

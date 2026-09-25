@@ -235,6 +235,7 @@ const Hidden: {[string]: string | boolean} = {
 	Bypass = false,
 	WidgetOpen = true,
 	AutoContinue = false,
+	Draft = "",
 }
 
 const Settings = {
@@ -291,6 +292,16 @@ end
 
 function Settings.Get(Key: string): any
 	return assert(Sources[Key], `No setting named {Key}`)
+end
+
+function Settings.Fresh(Key: string): any
+	const Stored = Read(Key, true)
+
+	if Stored ~= nil then
+		Sources[Key](Stored)
+	end
+
+	return Sources[Key]()
 end
 
 function Settings.Set(Key: string, Value: any)

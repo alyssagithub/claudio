@@ -1529,6 +1529,26 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
 
             return {behavior: "allow", updatedInput: {...Input, answers: Answers}};
           },
+          supportedDialogKinds: ["refusal_fallback_prompt"],
+          onUserDialog: async (Request) => {
+            if (Request.dialogKind !== "refusal_fallback_prompt") {
+              return {behavior: "cancelled"};
+            }
+
+            const Offered = Request.payload as {originalModel?: string, fallbackModel?: string};
+            const Asked = `${Offered.originalModel || "The model"}'s safeguards stopped this reply. Retry it on ${Offered.fallbackModel || "the fallback model"}?`;
+            const Answers = await AskQuestion(Session, [{
+              question: Asked,
+              header: "Model switch",
+              multiSelect: false,
+              options: [
+                {label: `Retry on ${Offered.fallbackModel || "the fallback model"}`, description: "Sends the same message again on the fallback model and carries on from there."},
+                {label: "Stop here", description: "Ends this reply without switching models."},
+              ],
+            }]) as JobAnswer | null;
+
+            return {behavior: "completed", result: Answers && String(Answers[Asked] || "").startsWith("Retry") ? "retry_fallback" : "cancelled"};
+          },
           hooks: {
             PreToolUse: [{
               hooks: [async (HookInput, ToolUseId, Options) => {

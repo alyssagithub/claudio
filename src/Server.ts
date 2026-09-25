@@ -940,7 +940,7 @@ export function StartServer(Port: number) {
       Reach: (async () => ({})) as Reacher,
       ReachIn: (async () => ({})) as ReacherIn,
       Presence: async () => "",
-      RuntimeLive: async () => false,
+      LiveSession: async () => null,
     }).length + 1;
 
     Serving(Version, Root, Tools);

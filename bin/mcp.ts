@@ -82,10 +82,10 @@ for (const Entry of StudioTools({
 
     return Found ? DescribePresence(Found) : "The Claudio bridge is not running, so nothing can be reached. Start it with \"claudio\".";
   },
-  RuntimeLive: async () => {
-    const Found = await Get<{ runtimeSeen?: number }>("/studio/presence");
+  LiveSession: async () => {
+    const Found = await Get<{ runtimeSeen?: number, clients?: number | null }>("/studio/presence");
 
-    return Boolean(Found && Found.runtimeSeen && Date.now() - Found.runtimeSeen < 6000);
+    return Found && Found.runtimeSeen && Date.now() - Found.runtimeSeen < 6000 ? {Players: typeof Found.clients === "number" ? Found.clients : null} : null;
   },
 })) {
   Server.tool(Entry.Name, Entry.Description, Entry.Schema, Entry.Run);

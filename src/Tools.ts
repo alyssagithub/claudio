@@ -79,7 +79,7 @@ export type Dependencies = {
   Reach: Reacher;
   ReachIn: ReacherIn;
   Presence: () => Promise<string>;
-  RuntimeLive: () => Promise<boolean>;
+  LiveSession: () => Promise<{Players: number | null} | null>;
 };
 
 export type ToolContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
@@ -108,10 +108,10 @@ function Said(Found: SaidAnswer, Missing: string): string {
 }
 
 export function StudioTools(Deps: Dependencies): StudioTool[] {
-  const { Reach, ReachIn, Presence, RuntimeLive } = Deps;
+  const { Reach, ReachIn, Presence, LiveSession } = Deps;
 
   async function NeedsSession(What: string): Promise<string | null> {
-    return (await RuntimeLive()) ? null : What;
+    return (await LiveSession()) ? null : What;
   }
 
   return [
@@ -440,13 +440,13 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       Name: "playtest",
       Description: PlaytestDescription,
       Schema: {
-        action: z.enum(["start", "stop", "status", "players"]).describe("What to do. Use status to find out what is happening before changing it."),
+        action: z.enum(["start", "stop", "status", "players"]).describe("What to do. Use status to find out what is happening before changing it; during a multiplayer test it also says how many players are in. The players action adds players, so never use it just to count them."),
         mode: z.enum(["play", "run", "multiplayer"]).optional().describe("How to start it. play gives a character, run simulates without one, multiplayer starts a server with several clients. Defaults to play."),
         players: z.number().optional().describe("How many players, for multiplayer starts and for the players action."),
         force: z.boolean().optional().describe("Start a multiplayer test or add players even when the memory check says the machine cannot carry it."),
       },
       Run: async (Input: { action: "start" | "stop" | "status" | "players"; mode?: "play" | "run" | "multiplayer"; players?: number; force?: boolean }) => {
-        const Reachable = await RuntimeLive();
+        const Reachable = await LiveSession();
         const Adding = Input.action === "players" ? Math.max(1, Math.floor(Input.players || 1)) : (Input.action === "start" && Input.mode === "multiplayer" ? Math.max(2, Math.floor(Input.players || 2)) : 0);
         const Refused = Adding > 0 && Input.force !== true ? await Headroom(Adding, Input.action === "start") : null;
 
@@ -482,7 +482,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         if (Reachable && Input.action === "status") {
           return {content: [{
             type: "text",
-            text: "A playtest is running, so stop and players are available.",
+            text: `A playtest is running${Reachable.Players === null ? "" : ` with ${Reachable.Players} player${Reachable.Players === 1 ? "" : "s"} in it`}, so stop and players are available.`,
           }]};
         }
 

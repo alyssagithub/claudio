@@ -259,10 +259,11 @@ export function AskServerFor(Reach: Reacher, ReachIn: ReacherIn) {
         processes: await StudioProcesses(),
       });
     },
-    RuntimeLive: async () => {
-      const { RuntimeLive } = await import("./Studio.js");
+    LiveSession: async () => {
+      const { RuntimeLive, Presence } = await import("./Studio.js");
+      const Clients = Presence().clients;
 
-      return RuntimeLive();
+      return RuntimeLive() ? {Players: typeof Clients === "number" ? Clients : null} : null;
     },
   });
 

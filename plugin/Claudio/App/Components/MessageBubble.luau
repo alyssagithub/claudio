@@ -589,6 +589,10 @@ return function(Props: Props)
 						BackgroundTransparency = 1,
 						LayoutOrder = 2 + Order,
 						Visible = function()
+							if Value().name == "Compaction" then
+								return false
+							end
+
 							if not IsCommand(Value().name) then
 								return true
 							end
@@ -644,7 +648,7 @@ return function(Props: Props)
 						return if Value().status == "error" then Theme.Colors.Error() else Theme.Colors.DimText()
 					end,
 					Visible = function()
-						return Open() and Value().output ~= ""
+						return Open() and Value().output ~= "" and Value().name ~= "Compaction"
 					end,
 					Text = function()
 						return Value().output
@@ -653,6 +657,13 @@ return function(Props: Props)
 						return if Open() then Format.Escape(Shorten(Value().output)) else ""
 					end,
 				},
+				Vide.show(function()
+					return Open() and Value().name == "Compaction" and Value().output ~= ""
+				end, function()
+					return Paragraph(function()
+						return Value().output
+					end, 1000)
+				end),
 				Vide.show(function()
 					const Slot = Value().image
 

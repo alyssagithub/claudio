@@ -1307,6 +1307,15 @@ function RouteMessage(Session: Session, Message: any) {
     return;
   }
 
+  const Summarized = Message.type === "user" ? Turn.Calls.find((Call) => Call.Name === "Compaction" && Call.Output === "") : undefined;
+  const Summary = Summarized ? TextOf(Message.message && Message.message.content) : "";
+
+  if (Summarized && Summary.startsWith("This session is being continued from a previous conversation")) {
+    Publish(Turn, {Calls: Turn.Calls.map((Call) => (Call === Summarized ? {...Call, Output: Summary} : Call))});
+
+    return;
+  }
+
   if (Message.type === "user") {
     const Decoded: SentImage[] = [];
     const Slots = new Map();

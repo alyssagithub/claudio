@@ -863,6 +863,16 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
       continue;
     }
 
+    if (Line.isCompactSummary) {
+      const Compacted = [...Messages].reverse().flatMap((Message) => Message.calls || []).find((Call) => Call.name === "Compaction");
+
+      if (Compacted) {
+        Compacted.output = TextOf(Line.message.content);
+      }
+
+      continue;
+    }
+
     if (IsInterruption(Line)) {
       Flush("");
 

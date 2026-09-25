@@ -48,6 +48,7 @@ export type TranscriptLine = {
   uuid?: string;
   parentUuid?: string | null;
   isMeta?: boolean;
+  isCompactSummary?: boolean;
   isSidechain?: boolean;
   timestamp?: string;
   requestId?: string;

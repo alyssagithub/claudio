@@ -4,7 +4,7 @@ import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, SubagentModels, Subagents, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, ExtraModels, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory } from "./Config.js";
-import { AddDesktopSession, ExtractContext, LatestContext, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession, CompactionNotice } from "./Conversations.js";
+import { AddDesktopSession, ExtractContext, LatestContext, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
@@ -508,6 +508,19 @@ function TaskNotice(Text: string): Call | null {
   };
 }
 
+function CompactionCall(): Call {
+  return {
+    Id: `compact-${Date.now()}-${Turns.size}`,
+    Name: "Compaction",
+    Input: "",
+    Output: "",
+    Status: "running",
+    StartedAt: Date.now(),
+    Milliseconds: 0,
+    Subagent: null,
+  };
+}
+
 function Describe(Value: unknown): string {
   if (typeof Value === "string") {
     return Value.slice(0, MostCallText);
@@ -995,11 +1008,18 @@ function RouteMessage(Session: Session, Message: any) {
 
   if (Turn && Message.type === "system" && Message.subtype === "compact_boundary") {
     const Metadata = Message.compact_metadata || {};
+    const Running = Turn.Calls.find((Call) => Call.Name === "Compaction" && Call.Status === "running");
+    const Done: Call = {
+      ...(Running || CompactionCall()),
+      Input: CompactionInput(Metadata.trigger || "auto", Metadata.pre_tokens || 0, Metadata.post_tokens),
+      Status: "done",
+    };
 
     Publish(Turn, {
-      Parts: Turn.Parts.concat([{
-        kind: "notice",
-        text: CompactionNotice(Metadata.trigger, Metadata.pre_tokens || 0, Metadata.post_tokens),
+      Calls: Running ? Turn.Calls.map((Call) => (Call === Running ? Done : Call)) : Turn.Calls.concat([Done]),
+      Parts: Running ? Turn.Parts : Turn.Parts.concat([{
+        kind: "call",
+        id: Done.Id,
       }]),
     });
 
@@ -1054,13 +1074,23 @@ function RouteMessage(Session: Session, Message: any) {
   }
 
   if (Turn && Message.type === "system" && Message.subtype === "status") {
+    const Starting = Message.status === "compacting" && !Turn.Compacting;
+
     Turn.Compacting = Message.status === "compacting";
 
     if (Message.compact_error) {
       console.error(`Turn ${Turn.Id}: compacting failed, ${Message.compact_error}`);
     }
 
-    Publish(Turn, {});
+    const Started = Starting ? CompactionCall() : null;
+
+    Publish(Turn, Started ? {
+      Calls: Turn.Calls.concat([Started]),
+      Parts: Turn.Parts.concat([{
+        kind: "call",
+        id: Started.Id,
+      }]),
+    } : {});
 
     return;
   }

@@ -110,6 +110,17 @@ const function Describe(Entry: Types.ToolCall, Running: boolean): string
 		return if Running then "Loading tools" else "Loaded tools"
 	end
 
+	if Name == "Compaction" then
+		const Before = tonumber(Changes.Field(Entry.input, "before"))
+		const After = tonumber(Changes.Field(Entry.input, "after"))
+
+		if Running or not Before then
+			return "Compacting session"
+		end
+
+		return if After then `Compacted session · saved {Format.Large(Before - After)} tokens` else `Compacted session · {Format.Large(Before)} tokens before`
+	end
+
 	if Name == "TaskNotification" then
 		return `Background command {Changes.Field(Entry.input, "status") or "finished"} · {((Changes.Field(Entry.input, "summary") or ""):gsub('^Background command "(.-)".*$', "%1"))}`
 	end

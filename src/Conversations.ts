@@ -17,14 +17,10 @@ type BuiltConversation = { id: string; title: string; project: string | null; so
 
 type Listing = { id: string; title: string; project: string; folder: string | null; source: string; starred: boolean; archived: boolean; hidden: boolean; createdAt: number; updatedAt: number };
 
-function Thousands(Tokens: number): string {
-  return Tokens >= 1000 ? `${Math.round(Tokens / 1000)}k` : String(Tokens);
-}
-
-export function CompactionNotice(Trigger: string, Before: number, After?: number | null): string {
-  const Said = Trigger === "auto" ? "Conversation compacted automatically" : "Conversation compacted";
-
-  return After ? `${Said} · ${Thousands(Before)} tokens down to ${Thousands(After)}` : `${Said} · ${Thousands(Before)} tokens`;
+export function CompactionInput(Trigger: string, Before: number, After?: number | null): string {
+  return `trigger: ${Trigger}
+before: ${Before}${After ? `
+after: ${After}` : ""}`;
 }
 
 function FindFile(Id: string): string | null {
@@ -844,10 +840,17 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
         text: "",
         activity: [],
         parts: [{
-          kind: "notice",
-          text: CompactionNotice(Boundary.compactMetadata?.trigger || "auto", Boundary.compactMetadata?.preTokens || 0, Boundary.compactMetadata?.postTokens),
+          kind: "call",
+          call: 1,
         }],
-        calls: [],
+        calls: [{
+          name: "Compaction",
+          input: CompactionInput(Boundary.compactMetadata?.trigger || "auto", Boundary.compactMetadata?.preTokens || 0, Boundary.compactMetadata?.postTokens),
+          output: "",
+          status: "done",
+          milliseconds: 0,
+          image: null,
+        }],
         images: [],
         at: TimeOf(Line),
         notice: true,

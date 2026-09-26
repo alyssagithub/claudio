@@ -677,6 +677,7 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
     Error: Error || null,
     CommittedText: Text,
     PendingText: "",
+    Calls: Turn.Calls.map((Call) => (Call.Status === "running" || Call.Status === "preparing" ? {...Call, Status: "error" as CallStatus} : Call)),
   });
   setTimeout(() => Turns.delete(Turn.Id), FinishedTurnLifetimeMilliseconds);
 }

@@ -91,7 +91,7 @@ export type StudioTool = {
   Name: string;
   Description: string;
   Schema: z.ZodRawShape;
-  Run(Input: Record<string, unknown>): Promise<ToolAnswer>;
+  Run(Input: Record<string, unknown>, Extra?: unknown): Promise<ToolAnswer>;
 };
 
 type SaidAnswer = { error?: string; text?: string } | null | undefined;
@@ -115,10 +115,14 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
     return (await LiveSession()) ? null : What;
   }
 
-  async function WaitUntilLoaded(Clients: number): Promise<string> {
+  async function WaitUntilLoaded(Clients: number, Signal?: AbortSignal): Promise<string> {
     const Began = Date.now();
 
     while (Date.now() - Began < 180000) {
+      if (Signal && Signal.aborted) {
+        return " Stopped waiting for it to load because the call was cancelled.";
+      }
+
       const Session = await LiveSession();
 
       if (Session && Session.Able && Session.Ready >= Clients) {
@@ -476,7 +480,8 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         players: z.number().optional().describe("How many players, for multiplayer starts and for the players action."),
         force: z.boolean().optional().describe("Start a multiplayer test or add players even when the memory check says the machine cannot carry it."),
       },
-      Run: async (Input: { action: "start" | "stop" | "status" | "players"; mode?: "play" | "run" | "multiplayer"; players?: number; force?: boolean }) => {
+      Run: async (Input: { action: "start" | "stop" | "status" | "players"; mode?: "play" | "run" | "multiplayer"; players?: number; force?: boolean }, Extra?: unknown) => {
+        const Signal = (Extra as {signal?: AbortSignal} | undefined)?.signal;
         const Reachable = await LiveSession();
         const Adding = Input.action === "players" ? Math.max(1, Math.floor(Input.players || 1)) : (Input.action === "start" && Input.mode === "multiplayer" ? Math.max(2, Math.floor(Input.players || 2)) : 0);
         const Refused = Adding > 0 && Input.force !== true ? await Headroom(Adding, Input.action === "start") : null;
@@ -499,7 +504,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
 
           return {content: [{
             type: "text",
-            text: Input.action === "players" && Answer.startsWith("Players went") ? Answer + await WaitUntilLoaded((Reachable.Players || 0) + Adding) : Answer,
+            text: Input.action === "players" && Answer.startsWith("Players went") ? Answer + await WaitUntilLoaded((Reachable.Players || 0) + Adding, Signal) : Answer,
           }]};
         }
 
@@ -549,7 +554,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
 
         return {content: [{
           type: "text",
-          text: Input.action === "start" && Found && !Found.error ? Answer + await WaitUntilLoaded(Input.mode === "run" ? 0 : Math.max(1, Adding)) : Answer,
+          text: Input.action === "start" && Found && !Found.error ? Answer + await WaitUntilLoaded(Input.mode === "run" ? 0 : Math.max(1, Adding), Signal) : Answer,
         }]};
       },
     },

@@ -49,19 +49,38 @@ export function HandToken() {
   return WritePluginSetting("BridgeToken", EnsureToken());
 }
 
-const PlaytestKeys = new Map<string, number>();
+const PlaytestKeyFile = path.join(path.dirname(TokenFile), "playtest-keys.json");
+
+const PlaytestKeys = new Map<string, number>((() => {
+  try {
+    const Saved = JSON.parse(fs.readFileSync(PlaytestKeyFile, "utf8")) as Record<string, unknown>;
+
+    return Object.entries(Saved).filter((Entry): Entry is [string, number] => typeof Entry[1] === "number" && Entry[1] > Date.now());
+  } catch {
+    return [];
+  }
+})());
+
+function SavePlaytestKeys() {
+  try {
+    fs.writeFileSync(PlaytestKeyFile, JSON.stringify(Object.fromEntries(PlaytestKeys)), {mode: 0o600});
+  } catch (Error) {
+    console.error(`Could not save the playtest keys, so a running playtest will lose the bridge if it restarts: ${(Error as NodeJS.ErrnoException).message}`);
+  }
+}
 
 export function IssuePlaytestKey(): string {
   const Key = crypto.randomBytes(24).toString("hex");
 
   PlaytestKeys.set(Key, Date.now() + 6 * 60 * 60 * 1000);
+  SavePlaytestKeys();
 
   return Key;
 }
 
 export function RevokePlaytestKey(Key: unknown) {
-  if (typeof Key === "string") {
-    PlaytestKeys.delete(Key);
+  if (typeof Key === "string" && PlaytestKeys.delete(Key)) {
+    SavePlaytestKeys();
   }
 }
 

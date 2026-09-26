@@ -427,6 +427,9 @@ function WarmUsage() {
   setTimeout(Attempt, 1500);
 }
 
+let LastNotice = "";
+let LastNoticeAt = 0;
+
 type PluginNode = { name: string; class: string; source?: string; children: PluginNode[] };
 
 function PluginTree(Folder: string, Name: string): PluginNode {
@@ -524,8 +527,20 @@ export function StartServer(Port: number) {
 
       if (Request.method === "POST" && Url.pathname === "/notify") {
         const Body = await ReadBody(Request);
+        const Title = typeof Body.title === "string" ? Body.title : "Claudio";
+        const Text = typeof Body.body === "string" ? Body.body.slice(0, 200) : "";
 
-        const Shown = ShowToast(typeof Body.title === "string" ? Body.title : "Claudio", typeof Body.body === "string" ? Body.body.slice(0, 200) : "", {
+        if (`${Title}
+${Text}` === LastNotice && Date.now() - LastNoticeAt < 10000) {
+          SendJson(Response, 200, {shown: false, repeated: true});
+          return;
+        }
+
+        LastNotice = `${Title}
+${Text}`;
+        LastNoticeAt = Date.now();
+
+        const Shown = ShowToast(Title, Text, {
           Flash: Body.flash !== false,
           Toast: Body.toast !== false,
           Banner: Body.banner !== false,

@@ -55,18 +55,12 @@ return function()
 		return if Limit and Limit.utilization then math.clamp(Limit.utilization, 0, 1) else 0
 	end
 
-	const function Colour(): Color3
-		const Used = GetUsedShare()
-
-		if Used >= 0.85 then
-			return Theme.Colors.Error()
+	const function GetShareColour(Used: number): Color3
+		if Used <= 0.5 then
+			return Theme.Colors.Accent()
 		end
 
-		if Used >= 0.6 then
-			return Color3.fromRGB(214, 158, 46)
-		end
-
-		return Theme.Colors.Accent()
+		return Color3.fromRGB(214, 158, 46):Lerp(Theme.Colors.Error(), math.clamp((Used - 0.5) / 0.45, 0, 1))
 	end
 
 	const function Half(Side: string, Order: number)
@@ -85,7 +79,9 @@ return function()
 				Name = "Wedge",
 				Size = UDim2.fromOffset(Edge, Edge),
 				Position = UDim2.fromOffset(if Side == "Right" then -Edge / 2 else 0, 0),
-				BackgroundColor3 = Colour,
+				BackgroundColor3 = function()
+					return GetShareColour(GetUsedShare())
+				end,
 				BackgroundTransparency = function()
 					return if Loading() and Settings.Get("RingStat")() == "Context" then 0.3 + 0.3 * math.sin(Pulse() * 4) else 0
 				end,
@@ -658,7 +654,9 @@ return function()
 							Size = function()
 								return UDim2.fromScale(math.clamp(Limit().utilization or 0, 0, 1), 1)
 							end,
-							BackgroundColor3 = Theme.Colors.Accent,
+							BackgroundColor3 = function()
+								return GetShareColour(Limit().utilization or 0)
+							end,
 							BorderSizePixel = 0,
 
 							Create "UICorner" {CornerRadius = UDim.new(1, 0)},

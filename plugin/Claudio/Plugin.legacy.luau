@@ -14,6 +14,7 @@ if Playing and RunService:IsServer() then
 	require(script.Parent.Client.Relay).Serve()
 	Builder.Serve()
 	require(script.Parent.Runtime).Start(plugin)
+	require(script.Parent.Picker).Start(plugin)
 
 	return
 end
@@ -40,6 +41,10 @@ if not Playing then
 end
 
 const Running = App.New(plugin)
+
+if Playing then
+	task.spawn(require(script.Parent.Picker).Start, plugin)
+end
 
 plugin.Unloading:Connect(function()
 	Running.Destroy()

@@ -765,9 +765,7 @@ const function Playtest(Input: any): any
 
 			Settings.Set("BuildKey", HttpService:GenerateGUID(false))
 
-			if Settings.Get("PlaytestPicker")() then
-				require(script.Parent.Parent.Picker).Install()
-			end
+			require(script.Parent.Parent.Picker).Remove()
 
 			if not Reachable then
 				Warning = Why

@@ -7,7 +7,22 @@ const UserInputService = game:GetService("UserInputService")
 
 const Player = Players.LocalPlayer
 const Screen = script:FindFirstAncestorOfClass("PlayerGui") :: PlayerGui
-const Link = ReplicatedStorage.ClaudioPicker :: RemoteEvent
+
+script.Parent = nil
+
+const LinkDeadline = os.clock() + 120
+
+local Found = ReplicatedStorage:FindFirstChild("ClaudioPicker")
+
+while not Found and os.clock() < LinkDeadline and task.wait(0.25) do
+	Found = ReplicatedStorage:FindFirstChild("ClaudioPicker")
+end
+
+if not Found then
+	return
+end
+
+const Link = Found :: RemoteEvent
 
 const Colours = script:GetAttributes() :: {[string]: Color3}
 

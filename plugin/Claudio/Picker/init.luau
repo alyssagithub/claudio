@@ -1,6 +1,7 @@
 --!strict
 const ServerScriptService = game:GetService("ServerScriptService")
-const HttpService = game:GetService("HttpService")
+const Players = game:GetService("Players")
+const RunService = game:GetService("RunService")
 
 const Vide = require(script.Parent.Packages.vide)
 const Settings = require(script.Parent.Settings)
@@ -13,20 +14,47 @@ const Picker = {
 }
 
 local Watching = 0
-local Switched = false
 
 function Picker.Installed(): boolean
 	return ServerScriptService:FindFirstChild("ClaudioPickerServer") ~= nil
 end
 
-function Picker.Install()
-	const Existing = ServerScriptService:FindFirstChild("ClaudioPickerServer")
-
-	if Existing then
-		Existing:Destroy()
+function Picker.Start(CurrentPlugin: Plugin)
+	if not Settings.Get("PlaytestPicker")() then
+		return
 	end
 
-	const Copy = script.ClaudioPickerServer:Clone()
+	if RunService:IsServer() then
+		const Key = Client.PlaytestKey() or ""
+		const Copy = script.ClaudioPickerServer:Clone()
+
+		Runtime.Fill(Copy, Key)
+		Copy.Disabled = false
+		Copy.Parent = ServerScriptService
+
+		if Key ~= "" then
+			CurrentPlugin.Unloading:Connect(function()
+				Client.RevokePlaytestKey(Key)
+			end)
+		end
+
+		return
+	end
+
+	const Player = Players.LocalPlayer
+	const Deadline = os.clock() + 120
+
+	local Gui = if Player then Player:FindFirstChildOfClass("PlayerGui") else nil
+
+	while not Gui and os.clock() < Deadline and task.wait(0.25) do
+		Gui = if Player then Player:FindFirstChildOfClass("PlayerGui") else nil
+	end
+
+	if not Gui then
+		return
+	end
+
+	const Copy = script.ClaudioPickerServer.ClaudioPickerClient:Clone()
 
 	for _, Name in {
 		"Background",
@@ -40,18 +68,11 @@ function Picker.Install()
 		"Border",
 		"Error",
 	} do
-		Copy.ClaudioPickerClient:SetAttribute(Name, Theme.Colors[Name]())
+		Copy:SetAttribute(Name, Theme.Colors[Name]())
 	end
 
-	Runtime.Fill(Copy, Client.PlaytestKey() or "")
 	Copy.Disabled = false
-	Copy.Parent = ServerScriptService
-
-	if not HttpService.HttpEnabled then
-		Switched = pcall(function()
-			HttpService.HttpEnabled = true
-		end) and HttpService.HttpEnabled
-	end
+	Copy.Parent = Gui
 end
 
 function Picker.Remove()
@@ -60,11 +81,6 @@ function Picker.Remove()
 	if Existing then
 		Runtime.Revoke(Existing)
 		Existing:Destroy()
-	end
-
-	if Switched then
-		Switched = false
-		HttpService.HttpEnabled = false
 	end
 end
 

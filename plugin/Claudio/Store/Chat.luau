@@ -2628,6 +2628,10 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 
 		if not Shown or not State.question or Shown.id ~= State.question.id then
 			Chat.Question(State.question)
+
+			if State.question and #State.question.questions > 0 and Chat.ReplyListener then
+				Chat.ReplyListener(`Claude is waiting on your answer: {State.question.questions[1].question}`)
+			end
 		end
 
 		if State.conversationId and Chat.ConversationId() ~= State.conversationId then

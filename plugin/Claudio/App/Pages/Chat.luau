@@ -28,6 +28,7 @@ const RewindDialog = require(script.Parent.Parent.Components.RewindDialog)
 const Create = Vide.create
 
 return function()
+	Chat.ShowSaved()
 	task.spawn(Chat.Resume)
 	task.spawn(Chat.Refresh)
 	task.spawn(Chat.RefreshUsage)

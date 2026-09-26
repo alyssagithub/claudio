@@ -13,6 +13,7 @@ if Playing and RunService:IsServer() then
 	require(script.Parent.Settings).Load(plugin)
 	require(script.Parent.Client.Relay).Serve()
 	Builder.Serve()
+	require(script.Parent.Runtime).Start(plugin)
 
 	return
 end
@@ -25,6 +26,7 @@ Settings.Load(plugin)
 
 if Playing then
 	Builder.Serve()
+	require(script.Parent.Runtime).Start(plugin)
 end
 
 if not Playing then

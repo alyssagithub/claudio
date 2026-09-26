@@ -1,6 +1,7 @@
 --!strict
 const ChangeHistoryService = game:GetService("ChangeHistoryService")
 const RunService = game:GetService("RunService")
+const HttpService = game:GetService("HttpService")
 
 const Vide = require(script.Parent.Parent.Packages.vide)
 const Types = require(script.Parent.Parent.Types)
@@ -757,9 +758,12 @@ const function Playtest(Input: any): any
 
 		pcall(function()
 			const Runtime = require(script.Parent.Parent.Runtime)
+
+			Runtime.Remove()
+
 			const Reachable, Why = Runtime.Reachable()
 
-			Runtime.Install()
+			Settings.Set("BuildKey", HttpService:GenerateGUID(false))
 
 			if Settings.Get("PlaytestPicker")() then
 				require(script.Parent.Parent.Picker).Install()
@@ -2279,7 +2283,7 @@ const function Execute(Input: any): any
 		end
 	elseif Result ~= nil then
 		if typeof(Result) == "table" then
-			const Encoded, Text = pcall(game:GetService("HttpService").JSONEncode, game:GetService("HttpService"), Result)
+			const Encoded, Text = pcall(HttpService.JSONEncode, HttpService, Result)
 
 			Answer.result = if Encoded then Text else tostring(Result)
 		else
@@ -3388,6 +3392,31 @@ function Chat.Open(Id: string)
 	table.clear(Requested)
 	Settings.Set("LastChat", Id)
 
+	const Trimmed = {
+		id = Conversation.id,
+		title = Conversation.title,
+		first = Conversation.first,
+		partial = Conversation.partial,
+		messages = {},
+	}
+
+	for _, Message in Conversation.messages do
+		table.insert(Trimmed.messages, {
+			role = Message.role,
+			text = Message.text,
+			at = Message.at,
+			tokens = Message.tokens,
+			cost = Message.cost,
+			estimated = Message.estimated,
+			uuid = Message.uuid,
+			parent = Message.parent,
+		})
+	end
+
+	const Encoded, Copy = pcall(HttpService.JSONEncode, HttpService, Trimmed)
+
+	Settings.Set("LastChatCopy", if Encoded and #Copy < 300000 then Copy else "")
+
 	const Messages = Loaded(Conversation.messages)
 
 	Chat.Partial(Conversation.partial == true)
@@ -3488,16 +3517,50 @@ function Chat.LoadEarlier()
 	Chat.Shown(Chat.Shown() + #Conversation.messages)
 end
 
+function Chat.ShowSaved()
+	const Last = Settings.Get("LastChat")()
+	const Saved = Settings.Fresh("LastChatCopy")
+
+	if Last == "" or Saved == "" or Chat.ConversationId() then
+		return
+	end
+
+	const Read, Conversation = pcall(HttpService.JSONDecode, HttpService, Saved)
+
+	if not Read or typeof(Conversation) ~= "table" or Conversation.id ~= Last or typeof(Conversation.messages) ~= "table" then
+		return
+	end
+
+	const Messages = Loaded(Conversation.messages)
+
+	Chat.Partial(Conversation.partial == true)
+	Chat.Earlier((Conversation.first or 1) - 1)
+	Chat.Shown(Chat.Fits(Messages, #Messages))
+	Chat.Messages(Messages)
+	Chat.ConversationId(Conversation.id)
+	Chat.Title(Conversation.title)
+end
+
 function Chat.Resume()
 	const Last = Settings.Get("LastChat")()
+	const Showing = Chat.ConversationId()
 
-	if Last == "" or Chat.ConversationId() then
+	if Last == "" or (Showing and Showing ~= Last) then
 		return
 	end
 
 	if not Client.ConversationExists(Last) then
 		Settings.Set("LastChat", "")
+		Settings.Set("LastChatCopy", "")
 
+		if Showing then
+			Chat.New()
+		end
+
+		return
+	end
+
+	if Chat.ConversationId() ~= Showing or Chat.Sending() then
 		return
 	end
 

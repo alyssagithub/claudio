@@ -2,6 +2,7 @@
 const ServerScriptService = game:GetService("ServerScriptService")
 const ReplicatedStorage = game:GetService("ReplicatedStorage")
 const HttpService = game:GetService("HttpService")
+const RunService = game:GetService("RunService")
 
 const Settings = require(script.Parent.Settings)
 const Client = require(script.Parent.Client.Client)
@@ -68,31 +69,32 @@ function Runtime.Reachable(): (boolean, string?)
 	return false, `The play session cannot reach Claudio because HTTP requests are off for this place, and turning them on from here was refused: {if Ok then "the setting did not take" else tostring(Trouble)}. Turn on Allow HTTP Requests in Game Settings, then start the playtest again.`
 end
 
-function Runtime.Install()
-	Runtime.Remove()
-	Settings.Set("BuildKey", HttpService:GenerateGUID(false))
+function Runtime.Start(CurrentPlugin: Plugin)
+	const OnServer = RunService:IsServer()
 
-	const Server = (script :: any).ClaudioRuntimeServer:Clone()
+	if Settings.Get("BuildKey")() == "" then
+		Settings.Set("BuildKey", HttpService:GenerateGUID(false))
+	end
 
-	Runtime.Fill(Server, Client.PlaytestKey() or "")
-	Server.Disabled = false
+	if OnServer then
+		pcall(function()
+			HttpService.HttpEnabled = true
+		end)
+	end
 
-	pcall(function()
-		Server.RunContext = Enum.RunContext.Server
-	end)
+	const Key = if OnServer then Client.PlaytestKey() or "" else ""
+	const Copy = (if OnServer then (script :: any).ClaudioRuntimeServer else (script :: any).ClaudioRuntimeClient):Clone()
 
-	Server.Parent = ServerScriptService
+	Runtime.Fill(Copy, Key)
+	Copy.RunContext = if OnServer then Enum.RunContext.Server else Enum.RunContext.Client
+	Copy.Disabled = false
+	Copy.Parent = if OnServer then ServerScriptService else ReplicatedStorage
 
-	const Relay = (script :: any).ClaudioRuntimeClient:Clone()
-
-	Runtime.Fill(Relay, "")
-	Relay.Disabled = false
-
-	pcall(function()
-		Relay.RunContext = Enum.RunContext.Client
-	end)
-
-	Relay.Parent = ReplicatedStorage
+	if Key ~= "" then
+		CurrentPlugin.Unloading:Connect(function()
+			Client.RevokePlaytestKey(Key)
+		end)
+	end
 end
 
 return Runtime

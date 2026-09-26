@@ -15,6 +15,8 @@ if Token:sub(1, 2) == "{{" then
 	return
 end
 
+script.Parent = nil
+
 const BuildKey = "{{BuildKey}}"
 const Base = `http://127.0.0.1:{tonumber("{{Port}}") or 47225}`
 

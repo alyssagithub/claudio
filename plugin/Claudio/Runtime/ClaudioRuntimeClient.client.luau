@@ -3,6 +3,8 @@ const ReplicatedStorage = game:GetService("ReplicatedStorage")
 const HttpService = game:GetService("HttpService")
 const LogService = game:GetService("LogService")
 
+script.Parent = nil
+
 local Remote = ReplicatedStorage:FindFirstChild("ClaudioRuntime")
 
 const Deadline = os.clock() + 120

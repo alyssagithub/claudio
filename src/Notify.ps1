@@ -34,20 +34,6 @@ public struct WINCOMPATTRDATA { public int Attribute; public IntPtr Data; public
 [DllImport("dwmapi.dll")] public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 '@
 
-if ($env:CLAUDIO_SOUND -eq "1") {
-    try {
-        $Chime = Join-Path $env:WINDIR "Media\Windows Notify System Generic.wav"
-
-        if (Test-Path $Chime) {
-            (New-Object Media.SoundPlayer $Chime).Play()
-        } else {
-            [System.Media.SystemSounds]::Asterisk.Play()
-        }
-    } catch {
-        try { [System.Media.SystemSounds]::Asterisk.Play() } catch {}
-    }
-}
-
 $Studio = Get-Process -Name RobloxStudioBeta, RobloxStudio -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
 $Foreground = [Claudio.Window]::GetForegroundWindow()
 

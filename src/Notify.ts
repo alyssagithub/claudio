@@ -62,6 +62,11 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
   const Detail = Clean(Body, 160);
 
   LastShownAt = Date.now();
+
+  if (Wanted.Sound) {
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "$Chime = Join-Path $env:WINDIR 'Media\\Windows Notify System Generic.wav'; if (Test-Path $Chime) { (New-Object Media.SoundPlayer $Chime).PlaySync() } else { [System.Media.SystemSounds]::Asterisk.Play(); Start-Sleep -Milliseconds 1000 }"], {windowsHide: true}, () => {});
+  }
+
   execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ScriptPath], {
     windowsHide: true,
     env: {
@@ -73,7 +78,6 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
       CLAUDIO_BANNER: Wanted.Banner ? "1" : "0",
       CLAUDIO_ANYWHERE: Wanted.Anywhere ? "1" : "0",
       CLAUDIO_ICON: IconFile,
-      CLAUDIO_SOUND: Wanted.Sound ? "1" : "0",
     },
   }, (Error, Stdout, Stderr) => {
     if (Error) {

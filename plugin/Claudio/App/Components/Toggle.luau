@@ -5,7 +5,7 @@ const Theme = require(script.Parent.Parent.Theme)
 
 const Create = Vide.create
 
-return function(Key: string)
+return function(Key: string, OnSet: ((boolean) -> ())?)
 	const function On(): boolean
 		return Settings.Get(Key)() == true
 	end
@@ -19,7 +19,13 @@ return function(Key: string)
 		Text = "",
 		AutoButtonColor = false,
 		Activated = function()
-			Settings.Set(Key, not On())
+			const Wanted = not On()
+
+			Settings.Set(Key, Wanted)
+
+			if OnSet then
+				task.spawn(OnSet, Wanted)
+			end
 		end,
 
 		Create "UICorner" {CornerRadius = UDim.new(1, 0)},

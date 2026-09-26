@@ -11,6 +11,7 @@ export type Definition = {
 	Minimum: number?,
 	Maximum: number?,
 	Options: {string}?,
+	Studio: boolean?,
 }
 
 const Definitions: {Definition} = {
@@ -181,6 +182,14 @@ const Definitions: {Definition} = {
 		},
 	},
 	{
+		Key = "LoadBuiltInPlugins",
+		Label = "Keep Claudio docked in playtests",
+		Detail = "Turns on Studio's Load All Built-In Plugins in Test Mode, which also makes playtests start a little slower",
+		Group = "Appearance",
+		Default = false,
+		Studio = true,
+	},
+	{
 		Key = "TextSize",
 		Label = "Text size",
 		Detail = "",
@@ -241,12 +250,20 @@ const Hidden: {[string]: string | boolean} = {
 const Settings = {
 	Definitions = Definitions,
 	Hidden = Hidden,
+	StudioStarted = {} :: {[string]: Vide.Source<any>},
 }
 
 function Settings.Load(PluginObject: Plugin)
 	CurrentPlugin = PluginObject
 
 	for _, Definition in Definitions do
+		if Definition.Studio then
+			Sources[Definition.Key] = Vide.source(Definition.Default)
+			Settings.StudioStarted[Definition.Key] = Vide.source(nil)
+
+			continue
+		end
+
 		const Quiet = Prefix ~= "Claudio_" and Definition.Group == "Notifications"
 		const Stored = Read(Definition.Key, Quiet)
 
@@ -306,12 +323,27 @@ end
 
 function Settings.Set(Key: string, Value: any)
 	Sources[Key](Value)
+
+	if Settings.StudioStarted[Key] then
+		return
+	end
+
 	CurrentPlugin:SetSetting(`{Prefix}{Key}`, Value)
+end
+
+function Settings.Mirror(Key: string, Value: any)
+	Sources[Key](Value)
+
+	if Settings.StudioStarted[Key]() == nil then
+		Settings.StudioStarted[Key](Value)
+	end
 end
 
 function Settings.Reset()
 	for _, Definition in Definitions do
-		Settings.Set(Definition.Key, Definition.Default)
+		if not Definition.Studio then
+			Settings.Set(Definition.Key, Definition.Default)
+		end
 	end
 end
 

@@ -13,7 +13,7 @@ import { StudioTools } from "./Tools.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
 import type { Picture, TurnRequest } from "./Types.js";
 import { StudioProcesses } from "./StudioPresence.js";
-import { KeepBuiltInPluginsLoaded } from "./StudioSettings.js";
+import { ReadBuiltInPlugins, SetBuiltInPlugins } from "./StudioSettings.js";
 import { ActiveTurnFor, AddToTurn, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, WarmConversation, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetSubagent, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
@@ -627,6 +627,22 @@ export function StartServer(Port: number) {
         return;
       }
 
+      if (Url.pathname === "/studio/builtin-plugins") {
+        if (Request.method === "POST") {
+          const Body = await ReadBody(Request);
+
+          try {
+            SetBuiltInPlugins(Body.on === true);
+          } catch (Error) {
+            SendJson(Response, 500, {error: (Error as Error).message});
+            return;
+          }
+        }
+
+        SendJson(Response, 200, {on: ReadBuiltInPlugins()});
+        return;
+      }
+
       if (Request.method === "GET" && Url.pathname === "/studio/presence") {
         SendJson(Response, 200, {
           ...StudioPresence(),
@@ -1005,7 +1021,6 @@ export function StartServer(Port: number) {
     DiscoverCommands(LastUsedFolder());
     KeepSpareWarm();
     WarmUsage();
-    KeepBuiltInPluginsLoaded();
   });
 
   return Server;

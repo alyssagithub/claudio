@@ -51,7 +51,27 @@ function Client.Connect(): boolean
 	Connection.Health(Result)
 	Connection.Status("Connected")
 
+	task.spawn(function()
+		const Read, State = Http.Request("GET", `{BaseUrl()}/studio/builtin-plugins`)
+
+		if Read and typeof(State) == "table" and typeof(State.on) == "boolean" then
+			Settings.Mirror("LoadBuiltInPlugins", State.on)
+		end
+	end)
+
 	return true
+end
+
+function Client.SetBuiltInPlugins(On: boolean)
+	const Saved, State = Http.Request("POST", `{BaseUrl()}/studio/builtin-plugins`, {on = On})
+
+	if Saved and typeof(State) == "table" and typeof(State.on) == "boolean" then
+		Settings.Mirror("LoadBuiltInPlugins", State.on)
+
+		return
+	end
+
+	Settings.Mirror("LoadBuiltInPlugins", not On)
 end
 
 local PlaceName: string?

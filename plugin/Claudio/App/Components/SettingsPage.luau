@@ -5,6 +5,7 @@ const Theme = require(script.Parent.Parent.Theme)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Connection = require(script.Parent.Parent.Parent.Store.Connection)
+const Client = require(script.Parent.Parent.Parent.Client.Client)
 const Toggle = require(script.Parent.Toggle)
 const Button = require(script.Parent.Button)
 const Config = require(script.Parent.Parent.Parent.Config)
@@ -120,6 +121,9 @@ const function Row(Definition: Settings.Definition, LayoutOrder: number)
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		LayoutOrder = LayoutOrder,
+		Visible = if Definition.Studio then function()
+			return Settings.StudioStarted[Definition.Key]() ~= nil
+		end else nil,
 
 		Create "UIListLayout" {
 			FillDirection = if Definition.Options and #Definition.Options > 2 then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal,
@@ -169,8 +173,26 @@ const function Row(Definition: Settings.Definition, LayoutOrder: number)
 				Visible = Definition.Detail ~= "",
 				Text = Definition.Detail,
 			},
+			if Definition.Studio then Create "TextLabel" {
+				Name = "Restart",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				TextColor3 = Theme.Colors.Accent,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextWrapped = true,
+				LayoutOrder = 3,
+				Visible = function()
+					const Started = Settings.StudioStarted[Definition.Key]()
+
+					return Started ~= nil and Settings.Get(Definition.Key)() ~= Started
+				end,
+				Text = "Restart Studio for this to take effect",
+			} else nil,
 		},
-		if Definition.Options then Choice(Definition) elseif Definition.Minimum then Number(Definition) else Toggle(Definition.Key),
+		if Definition.Options then Choice(Definition) elseif Definition.Minimum then Number(Definition) else Toggle(Definition.Key, if Definition.Studio then Client.SetBuiltInPlugins else nil),
 	}
 end
 

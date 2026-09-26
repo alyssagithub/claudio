@@ -386,13 +386,36 @@ return function(Props: Props)
 		end, Open)
 
 		local WasBusy = IsBusy(Value())
+		const Ran = Vide.source(0)
+		local Ticker: RBXScriptConnection?
 
+		const function Time(Busy: boolean)
+			if Busy and not Ticker then
+				Ticker = RunService.Heartbeat:Connect(function()
+					const Started = Vide.untrack(Value).startedAt
+					const Seconds = if Started then math.max(0, (DateTime.now().UnixTimestampMillis - Started) // 1000) else 0
+
+					if Seconds ~= Vide.untrack(Ran) then
+						Ran(Seconds)
+					end
+				end)
+			elseif not Busy and Ticker then
+				Ticker:Disconnect()
+				Ticker = nil
+			end
+		end
+
+		Time(WasBusy)
+		Vide.cleanup(function()
+			Time(false)
+		end)
 		Vide.effect(function()
 			const IsBusyNow = IsBusy(Value())
 
 			if IsBusyNow ~= WasBusy then
 				WasBusy = IsBusyNow
 				Open(IsBusyNow)
+				Time(IsBusyNow)
 			end
 		end)
 
@@ -531,7 +554,7 @@ return function(Props: Props)
 							const Entry = Value()
 
 							if IsBusy(Entry) then
-								return Describe(Entry, true)
+								return if Ran() > 0 then `{Describe(Entry, true)} · {Format.Clock(Ran())}` else Describe(Entry, true)
 							end
 
 							if Entry.status == "error" and IsCommand(Entry.name) then

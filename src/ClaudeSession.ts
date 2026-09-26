@@ -2168,6 +2168,7 @@ export function DescribeTurn(Turn: Turn) {
       status: Call.Status,
       steps: Call.Steps || [],
       milliseconds: Call.Milliseconds,
+      startedAt: Call.StartedAt,
       delegate: Call.Subagent || null,
       lines: Call.Lines || null,
       image: Call.Image || null,

@@ -132,6 +132,7 @@ export type ToolCall = {
 	output: string,
 	status: "preparing" | "running" | "done" | "error",
 	milliseconds: number,
+	startedAt: number?,
 	steps: {string}?,
 	delegate: {name: string, model: string}?,
 	lines: {added: number, removed: number}?,

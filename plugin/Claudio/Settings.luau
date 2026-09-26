@@ -70,7 +70,7 @@ const Definitions: {Definition} = {
 		Label = "Pick objects in playtests",
 		Detail = "Adds a picker to playtests. Puts a helper script in ServerScriptService while on",
 		Group = "Chat",
-		Default = false,
+		Default = true,
 	},
 	{
 		Key = "ClipboardPaste",
@@ -161,7 +161,7 @@ const Definitions: {Definition} = {
 		Label = "Transcript view",
 		Detail = "Thinking also shows Claude's reasoning. Normal shows just the tool calls",
 		Group = "Appearance",
-		Default = "Normal",
+		Default = "Thinking",
 		Options = {
 			"Thinking",
 			"Normal",
@@ -172,7 +172,7 @@ const Definitions: {Definition} = {
 		Label = "Usage ring shows",
 		Detail = "Which number the ring in the corner fills up",
 		Group = "Appearance",
-		Default = "5-hour usage",
+		Default = "Context",
 		Options = {
 			"Context",
 			"5-hour usage",
@@ -312,12 +312,6 @@ end
 function Settings.Reset()
 	for _, Definition in Definitions do
 		Settings.Set(Definition.Key, Definition.Default)
-	end
-
-	for Key, Default in Settings.Hidden do
-		if Key ~= "RelayToken" then
-			Settings.Set(Key, Default)
-		end
 	end
 end
 

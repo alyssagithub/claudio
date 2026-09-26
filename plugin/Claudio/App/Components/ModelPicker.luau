@@ -285,8 +285,11 @@ const function Pick(Model: () -> Types.ModelInfo, LayoutOrder: number, Inside: b
 	end, function()
 		return Settings.Get("Model")() == Model().value
 	end, function()
+		const Kept = Settings.Get("Effort")()
+		const Levels = if Model().supportsEffort then Model().supportedEffortLevels else {}
+
 		Settings.Set("Model", Model().value)
-		Settings.Set("Effort", "")
+		Settings.Set("Effort", if Kept ~= "" and table.find(Levels, Kept) then Kept elseif table.find(Levels, "medium") then "medium" else "")
 		CloseMore()
 		Chat.PickerOpen(false)
 	end, LayoutOrder, nil, function(Entered: boolean)

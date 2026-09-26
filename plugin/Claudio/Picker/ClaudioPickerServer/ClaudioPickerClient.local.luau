@@ -9,9 +9,7 @@ const Player = Players.LocalPlayer
 const Screen = script:FindFirstAncestorOfClass("PlayerGui") :: PlayerGui
 const Link = ReplicatedStorage.ClaudioPicker :: RemoteEvent
 
-const Accent = Color3.fromRGB(90, 160, 255)
-const Idle = Color3.fromRGB(32, 32, 34)
-const Warm = Color3.fromRGB(58, 58, 62)
+const Colours = script:GetAttributes() :: {[string]: Color3}
 
 script.Overlay.Enabled = false
 
@@ -74,6 +72,8 @@ const function Highlight(Object: Instance?)
 		const Glow = script.Glow:Clone()
 
 		Glow.Adornee = Object
+		Glow.FillColor = Colours.Accent
+		Glow.OutlineColor = Colours.Accent
 		Glow.Parent = Overlay
 		Marker = Glow
 
@@ -86,6 +86,8 @@ const function Highlight(Object: Instance?)
 
 	const Box = script.Box:Clone()
 
+	Box.BackgroundColor3 = Colours.Accent
+	Box.UIStroke.Color = Colours.Accent
 	Box.Position = UDim2.fromOffset(Object.AbsolutePosition.X, Object.AbsolutePosition.Y)
 	Box.Size = UDim2.fromOffset(Object.AbsoluteSize.X, Object.AbsoluteSize.Y)
 	Box.Parent = Overlay
@@ -131,21 +133,25 @@ Toolbar.Parent = Screen
 const Panel = Toolbar.Panel
 const Row = Panel.Row
 
+Panel.BackgroundColor3 = Colours.Background
+Panel.UIStroke.Color = Colours.Border
+Panel.Title.TextColor3 = Colours.DimText
+
 const Buttons: {[string]: TextButton} = {}
 
 const function Paint()
 	for Name, Button in Buttons do
 		const On = Mode == Name
 
-		Button.BackgroundColor3 = if On then Accent elseif Hovered == Name then Warm else Idle
-		Button.TextColor3 = if On then Color3.new(1, 1, 1) elseif Hovered == Name then Color3.new(1, 1, 1) else Color3.fromRGB(190, 190, 195)
-		Button.Text = if On then `● {Name:upper()}` else Name:upper()
+		Button.BackgroundColor3 = if On then Colours.Accent elseif Hovered == Name then Colours.Button:Lerp(Colours.Text, 0.12) else Colours.Button
+		Button.TextColor3 = if On then Colours.AccentText else Colours.ButtonText
 	end
 end
 
 const function Announce(Ok: boolean, Text: string)
-	Message.Text = if Ok then `  Sent {Text} to Claudio  ` else `  Could not send that. {Text}  `
-	Message.BackgroundColor3 = if Ok then Color3.fromRGB(40, 110, 60) else Color3.fromRGB(130, 45, 45)
+	Message.Text = if Ok then `Sent {Text} to Claudio` else `Could not send that. {Text}`
+	Message.BackgroundColor3 = if Ok then Colours.Accent else Colours.Error
+	Message.TextColor3 = Colours.AccentText
 	Message.Visible = true
 	Shown += 1
 
@@ -191,7 +197,10 @@ const function Start(Wanted: string)
 
 	Sheet.Catcher:Destroy()
 
-	Sheet.Hint.Text = if Wanted == "ui" then "  Click a UI element to send it to Claudio, X to cancel  " else "  Click a part to send it to Claudio, X to cancel  "
+	Sheet.Hint.Text = if Wanted == "ui" then "Click a UI element to send it to Claudio, X to cancel" else "Click a part to send it to Claudio, X to cancel"
+	Sheet.Hint.BackgroundColor3 = Colours.Panel
+	Sheet.Hint.TextColor3 = Colours.Text
+	Sheet.Hint.UIStroke.Color = Colours.Border
 
 	Paint()
 end
@@ -255,6 +264,7 @@ for Index, Name in {
 	const Button = script.Button:Clone()
 
 	Button.Name = Name
+	Button.Text = if Name == "ui" then "UI" else "Parts"
 	Button.LayoutOrder = Index + 1
 	Button.Parent = Row
 

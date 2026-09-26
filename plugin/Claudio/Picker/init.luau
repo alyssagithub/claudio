@@ -6,6 +6,7 @@ const Vide = require(script.Parent.Packages.vide)
 const Settings = require(script.Parent.Settings)
 const Client = require(script.Parent.Client.Client)
 const Runtime = require(script.Parent.Runtime)
+const Theme = require(script.Parent.App.Theme)
 
 const Picker = {
 	Active = Vide.source(false),
@@ -26,6 +27,21 @@ function Picker.Install()
 	end
 
 	const Copy = script.ClaudioPickerServer:Clone()
+
+	for _, Name in {
+		"Background",
+		"Panel",
+		"Text",
+		"DimText",
+		"Button",
+		"ButtonText",
+		"Accent",
+		"AccentText",
+		"Border",
+		"Error",
+	} do
+		Copy.ClaudioPickerClient:SetAttribute(Name, Theme.Colors[Name]())
+	end
 
 	Runtime.Fill(Copy, Client.PlaytestKey() or "")
 	Copy.Disabled = false

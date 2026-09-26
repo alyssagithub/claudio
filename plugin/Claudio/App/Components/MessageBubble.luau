@@ -118,7 +118,7 @@ const function Describe(Entry: Types.ToolCall, Running: boolean): string
 			return "Compacting session"
 		end
 
-		return if After then `Compacted session · saved {Format.Large(Before - After)} tokens` else `Compacted session · {Format.Large(Before)} tokens before`
+		return if After then `Compacted session, saved {Format.Large(Before - After)} tokens` else `Compacted session, {Format.Large(Before)} tokens before`
 	end
 
 	if Name == "TaskNotification" then

@@ -415,7 +415,7 @@ return function()
 					const Parts: {string} = {}
 
 					if Limit then
-						const Name = (Limit.label or "5-hour limit"):gsub(" %- ", " · ")
+						const Name = (Limit.label or "5-hour limit"):gsub(" %- ", ", ")
 
 						table.insert(Parts, if Limit.utilization then `{math.round(Limit.utilization * 100)}% of {Name:lower()}` else Name)
 					end
@@ -424,7 +424,7 @@ return function()
 						table.insert(Parts, Format.Until(Limit.resetsAt))
 					end
 
-					return if #Parts == 0 then "No limit reported yet" else table.concat(Parts, " · ")
+					return if #Parts == 0 then "No limit reported yet" else table.concat(Parts, ", ")
 				end,
 			},
 		},
@@ -635,7 +635,7 @@ return function()
 						Padding = UDim.new(0, 3),
 					},
 					Line(function()
-						return ((Limit().label or Limit().kind):gsub(" %- ", " · "))
+						return ((Limit().label or Limit().kind):gsub(" %- ", ", "))
 					end, function()
 						const Entry = Limit()
 

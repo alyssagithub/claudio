@@ -2413,7 +2413,7 @@ function Chat.WatchStudioJobs()
 
 	Watching = true
 
-	const Mounted = script:IsDescendantOf(game)
+	const Mounted = (script.Parent.Parent :: Instance).Name:match("Testing$") ~= nil
 	local Asked = 0
 	local Checked = 0
 	local SavedDraft = Settings.Fresh("Draft")
@@ -2444,21 +2444,12 @@ function Chat.WatchStudioJobs()
 				task.spawn(Chat.Sync)
 			end
 
-			if not Mounted or script:IsDescendantOf(game) then
-				task.spawn(Chat.ResumeAfterLimit)
-			end
-
-			if Mounted and not script:IsDescendantOf(game) then
-				Watching = false
-
-				break
-			end
+			task.spawn(Chat.ResumeAfterLimit)
 
 			if Mounted then
-				(script.Parent.Parent :: Instance):SetAttribute("ClaudioMountSeen", DateTime.now().UnixTimestampMillis / 1000)
+				_G.ClaudioMountSeen = DateTime.now().UnixTimestampMillis / 1000
 			else
-				const Mount = game:GetService("ServerStorage"):FindFirstChild("ClaudioTesting")
-				const Seen = if Mount then Mount:GetAttribute("ClaudioMountSeen") else nil
+				const Seen = _G.ClaudioMountSeen
 				const Yield = typeof(Seen) == "number" and math.abs(DateTime.now().UnixTimestampMillis / 1000 - Seen) < 5
 
 				if Yield ~= Chat.Yielding then

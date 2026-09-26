@@ -426,6 +426,39 @@ function WarmUsage() {
   setTimeout(Attempt, 1500);
 }
 
+type PluginNode = { name: string; class: string; source?: string; children: PluginNode[] };
+
+function PluginTree(Folder: string, Name: string): PluginNode {
+  const Node: PluginNode = {name: Name, class: "Folder", children: []};
+
+  for (const Entry of fs.readdirSync(Folder, {withFileTypes: true}).sort((Left, Right) => Left.name.localeCompare(Right.name))) {
+    const Full = path.join(Folder, Entry.name);
+
+    if (Entry.isDirectory()) {
+      Node.children.push(PluginTree(Full, Entry.name));
+      continue;
+    }
+
+    const Kind = Entry.name.match(/^(.+?)(\.server|\.client|\.local|\.legacy)?\.luau$/);
+
+    if (!Kind) {
+      continue;
+    }
+
+    const Class = Kind[2] === ".local" ? "LocalScript" : Kind[2] ? "Script" : "ModuleScript";
+    const Source = fs.readFileSync(Full, "utf8").replace(/\r\n/g, "\n");
+
+    if (Kind[1] === "init") {
+      Node.class = Class;
+      Node.source = Source;
+    } else {
+      Node.children.push({name: Kind[1], class: Class, source: Source, children: []});
+    }
+  }
+
+  return Node;
+}
+
 export function StartServer(Port: number) {
   AskLogin().catch(() => {});
   RegisterToasts();
@@ -579,6 +612,11 @@ export function StartServer(Port: number) {
           ...TurnRequestFrom(Body, ConversationId),
           Images: PicturesFrom(Body),
         })));
+        return;
+      }
+
+      if (Request.method === "GET" && Url.pathname === "/testing/tree") {
+        SendJson(Response, 200, PluginTree(path.join(path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url)))), "plugin", "Claudio"), "Claudio"));
         return;
       }
 

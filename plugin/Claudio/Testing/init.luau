@@ -7,6 +7,7 @@ export type Progress = {
 	Made: {[string]: boolean},
 	Snapshotted: boolean,
 	Mount: Instance?,
+	Source: Instance?,
 }
 
 const function Import(Target: Instance): any
@@ -34,13 +35,7 @@ const function State(): Progress
 end
 
 const function Beside(): Instance?
-	const Mounted = State().Mount
-
-	if Mounted == nil or not (Mounted :: Instance):IsDescendantOf(game) then
-		return nil
-	end
-
-	return Mounted
+	return State().Mount
 end
 
 const Shielded = {"Obsidian Vault"}
@@ -360,12 +355,12 @@ function Testing.Unmount(): string
 		require(script.ToolbarStub).Retire()
 	end)
 
-	const Source = script.Parent :: Instance
-	const Siblings: {Instance} = if Source.Parent then Source.Parent:GetChildren() else {}
+	const Source = script.Parent
+	const Siblings: {Instance} = if Source and Source.Parent then Source.Parent:GetChildren() else {}
 	local Stale = 0
 
 	for _, Sibling in Siblings do
-		if Sibling.Name == `{Source.Name}Testing` and Sibling ~= Folder then
+		if (Sibling.Name == "ClaudioTesting" or Sibling.Name == `{(Source :: Instance).Name}Testing`) and Sibling ~= Folder then
 			Sibling:Destroy()
 			Stale += 1
 		end
@@ -386,6 +381,9 @@ function Testing.Unmount(): string
 
 	Folder:Destroy()
 	State().Mount = nil
+	State().Source = nil
+	_G.ClaudioMountSeen = nil
+	_G.ClaudioTesting = nil
 
 	return `Unmounted {Where}, deleted {#Removed} test chat{if #Removed == 1 then "" else "s"}`
 end
@@ -394,12 +392,6 @@ function Testing.Mount(CurrentPlugin: Plugin): string
 	Testing.Unmount()
 
 	const Source = script.Parent :: Instance
-	const Home = Source.Parent
-
-	if not Home then
-		return "Claudio needs a parent folder so the test copy can sit beside it"
-	end
-
 	const Copy = Source:Clone() :: any
 	const Session = math.random(10000000, 99999999)
 
@@ -429,8 +421,9 @@ function Testing.Mount(CurrentPlugin: Plugin): string
 		Stub.Parent = Copy.App
 	end
 
-	Copy.Parent = Home
 	State().Mount = Copy
+	State().Source = Source
+	_G.ClaudioTesting = Testing
 
 	Import(Copy.Settings).Load(CurrentPlugin)
 	Import(Copy.Watcher).Start()
@@ -449,7 +442,7 @@ function Testing.Mount(CurrentPlugin: Plugin): string
 
 	Import(Copy.Store.Chat).New()
 
-	return `Mounted {Copy:GetFullName()}{if State().Snapshotted then "" else ". The bridge did not answer, so test chats won't be cleaned up automatically."}`
+	return `Mounted a test copy outside the place{if State().Snapshotted then "" else ". The bridge did not answer, so test chats won't be cleaned up automatically."}`
 end
 
 function Testing.Paint(Name: string?): string

@@ -1,4 +1,6 @@
 const HttpService = game:GetService("HttpService")
+const EncodingService = game:GetService("EncodingService")
+const SerializationService = game:GetService("SerializationService")
 
 const Answer = HttpService:RequestAsync({
 	Url = `http://127.0.0.1:{plugin:GetSetting("Claudio_Port") or 47225}/testing/tree`,
@@ -28,4 +30,44 @@ const function Build(Node: any, Parent: Instance?): Instance
 	return Made
 end
 
-return require((Build(HttpService:JSONDecode(Answer.Body), nil) :: any).Testing).Mount(plugin)
+const function Descend(From: Instance, Path: string): Instance?
+	local At: Instance? = From
+
+	for _, Segment in string.split(Path, "/") do
+		if not At then
+			return nil
+		end
+
+		At = At:FindFirstChild(Segment)
+	end
+
+	return At
+end
+
+const Tree = HttpService:JSONDecode(Answer.Body)
+const Root = Build(Tree, nil)
+
+if Tree.templates then
+	const Bytes = EncodingService:Base64Decode(buffer.fromstring(Tree.templates))
+	const Ok, Result = pcall(function()
+		return SerializationService:DeserializeInstancesAsync(Bytes)
+	end)
+
+	if Ok then
+		for _, Folder in Result do
+			const Target = Descend(Root, Folder.Name)
+
+			if Target then
+				for _, Child in Folder:GetChildren() do
+					Child.Parent = Target
+				end
+			end
+
+			Folder:Destroy()
+		end
+	else
+		warn(`Claudio test mount could not deserialize templates: {Result}`)
+	end
+end
+
+return require((Root :: any).Testing).Mount(plugin)

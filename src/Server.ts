@@ -616,7 +616,13 @@ export function StartServer(Port: number) {
       }
 
       if (Request.method === "GET" && Url.pathname === "/testing/tree") {
-        SendJson(Response, 200, PluginTree(path.join(path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url)))), "plugin", "Claudio"), "Claudio"));
+        const Folder = path.join(path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url)))), "plugin");
+        const Templates = path.join(Folder, "Templates.rbxm");
+
+        SendJson(Response, 200, {
+          ...PluginTree(path.join(Folder, "Claudio"), "Claudio"),
+          templates: fs.existsSync(Templates) ? fs.readFileSync(Templates).toString("base64") : null,
+        });
         return;
       }
 

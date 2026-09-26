@@ -65,6 +65,7 @@ const StartedAt = Date.now();
 
 let CanRun: boolean | null = null;
 let Clients: number | null = null;
+let Ready: number | null = null;
 let PluginVersion: string | null = null;
 let BridgeVersion: string | null = null;
 let BridgeRoot: string | null = null;
@@ -76,7 +77,7 @@ export function Serving(Version: string, Root: string, Tools: number): void {
   ToolCount = Tools;
 }
 
-export function Seen(Role?: string | null, Able?: boolean, Attached?: number, Plugin?: string): void {
+export function Seen(Role?: string | null, Able?: boolean, Attached?: number, Plugin?: string, Loaded?: number): void {
   if (Role && !/^(edit|server|client(-\d+)?)$/.test(Role)) {
     return;
   }
@@ -91,15 +92,19 @@ export function Seen(Role?: string | null, Able?: boolean, Attached?: number, Pl
     Clients = Attached;
   }
 
+  if (Loaded !== undefined) {
+    Ready = Loaded;
+  }
+
   if (Plugin !== undefined) {
     PluginVersion = Plugin;
   }
 }
 
-export function Take(Role?: string | null, Able?: boolean, Attached?: number, Plugin?: string) {
+export function Take(Role?: string | null, Able?: boolean, Attached?: number, Plugin?: string, Loaded?: number) {
   const Wanted = Role || "edit";
 
-  Seen(Wanted, Able, Attached, Plugin);
+  Seen(Wanted, Able, Attached, Plugin, Loaded);
 
   const At = Pending.findIndex((Job) => Job.Role === Wanted);
 
@@ -122,6 +127,7 @@ export function Presence() {
     runtimeSeen: Heard.get("server") || 0,
     canRun: CanRun,
     clients: Clients,
+    ready: Ready,
     plugin: PluginVersion,
     bridge: BridgeVersion,
     from: BridgeRoot,

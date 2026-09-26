@@ -650,8 +650,9 @@ export function StartServer(Port: number) {
           const Able = Url.searchParams.get("canRun");
           const Attached = Url.searchParams.get("clients");
           const Plugin = Url.searchParams.get("plugin");
+          const Loaded = Url.searchParams.get("ready");
 
-          SendJson(Response, 200, {job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true", Attached === null ? undefined : Number(Attached), Plugin || undefined)});
+          SendJson(Response, 200, {job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true", Attached === null ? undefined : Number(Attached), Plugin || undefined, Loaded === null ? undefined : Number(Loaded))});
           return;
         }
 

@@ -315,3 +315,13 @@ Remote.OnClientEvent:Connect(function(Id: string, Kind: string, Body: string)
 
 	Remote:FireServer(Id, if Ok then Result else {error = tostring(Result)})
 end)
+
+const LoadDeadline = os.clock() + 180
+
+while not (game:IsLoaded() and Builder()) and os.clock() < LoadDeadline do
+	task.wait(0.5)
+end
+
+if game:IsLoaded() and Builder() then
+	Remote:FireServer("ready")
+end

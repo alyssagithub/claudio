@@ -10,6 +10,11 @@ if not RunService:IsRunning() then
 end
 
 const Token = "{{Token}}"
+
+if Token:sub(1, 2) == "{{" then
+	return
+end
+
 const BuildKey = "{{BuildKey}}"
 const Base = `http://127.0.0.1:{tonumber("{{Port}}") or 47225}`
 
@@ -20,8 +25,19 @@ Remote.Parent = ReplicatedStorage
 
 const Asked: {[string]: Player} = {}
 const Replies = {}
+const Loaded: {[Player]: boolean} = {}
+
+game:GetService("Players").PlayerRemoving:Connect(function(Player: Player)
+	Loaded[Player] = nil
+end)
 
 Remote.OnServerEvent:Connect(function(Sender: Player, Id: any, Result: any)
+	if Id == "ready" then
+		Loaded[Sender] = true
+
+		return
+	end
+
 	if typeof(Id) ~= "string" or Asked[Id] ~= Sender then
 		return
 	end
@@ -168,7 +184,13 @@ end
 
 task.spawn(function()
 	while RunService:IsRunning() and task.wait(1) do
-		const Ok, Reply = Call("GET", `/studio/job?role=server&canRun={Builder() ~= nil}&clients={#game:GetService("Players"):GetPlayers()}`, nil)
+		local Ready = 0
+
+		for _ in Loaded do
+			Ready += 1
+		end
+
+		const Ok, Reply = Call("GET", `/studio/job?role=server&canRun={Builder() ~= nil}&clients={#game:GetService("Players"):GetPlayers()}&ready={Ready}`, nil)
 
 		if Ok and Reply and Reply.job then
 			const Job = Reply.job

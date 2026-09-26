@@ -27,6 +27,7 @@ const PlaytestDescription = [
   "Start, stop or inspect a playtest of the open place.",
   "Always stop what you started.",
   "Check status first rather than assuming.",
+  "start and players wait until the server and every client have loaded and can run code, up to three minutes, so the session is usable as soon as the call returns.",
   "This runs without a player character, so LocalPlayer and PlayerGui are not available.",
   "A multiplayer test opens a server and one client per player, each its own Studio process at roughly half the editor's memory, so the tool checks that the machine can hold them, counting the page file, before starting one or adding players. It refuses only when they would not fit at all; when they only fit by paging, the test runs but slowly. Pass force to go ahead anyway.",
 ].join(" ");
@@ -79,7 +80,7 @@ export type Dependencies = {
   Reach: Reacher;
   ReachIn: ReacherIn;
   Presence: () => Promise<string>;
-  LiveSession: () => Promise<{Players: number | null} | null>;
+  LiveSession: () => Promise<{Players: number | null, Ready: number, Able: boolean} | null>;
 };
 
 export type ToolContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
@@ -112,6 +113,32 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
 
   async function NeedsSession(What: string): Promise<string | null> {
     return (await LiveSession()) ? null : What;
+  }
+
+  async function WaitUntilLoaded(Clients: number): Promise<string> {
+    const Began = Date.now();
+
+    while (Date.now() - Began < 180000) {
+      const Session = await LiveSession();
+
+      if (Session && Session.Able && Session.Ready >= Clients) {
+        return ` Everything loaded ${Math.round((Date.now() - Began) / 1000)}s later: the server${Clients === 0 ? "" : Clients === 1 ? " and the client" : ` and all ${Clients} clients`} can run code now.`;
+      }
+
+      await new Promise((Resolve) => setTimeout(Resolve, 1000));
+    }
+
+    const Session = await LiveSession();
+
+    if (!Session) {
+      return " The session never became reachable within three minutes, so nothing can run in it yet. It needs Allow HTTP Requests turned on in Game Settings.";
+    }
+
+    if (!Session.Able) {
+      return " After three minutes the server is up but Claudio's plugin is not running inside it, so code cannot run there yet.";
+    }
+
+    return ` After three minutes only ${Session.Ready} of ${Clients} clients had finished loading. Check the place before relying on the rest.`;
   }
 
   return [
@@ -468,7 +495,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
 
           return {content: [{
             type: "text",
-            text: Answer,
+            text: Input.action === "players" && Answer.startsWith("Players went") ? Answer + await WaitUntilLoaded((Reachable.Players || 0) + Adding) : Answer,
           }]};
         }
 
@@ -514,9 +541,11 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
           }]};
         }
 
+        const Answer = Said(Found, "Studio did not say what happened.");
+
         return {content: [{
           type: "text",
-          text: Said(Found, "Studio did not say what happened."),
+          text: Input.action === "start" && Found && !Found.error ? Answer + await WaitUntilLoaded(Input.mode === "run" ? 0 : Math.max(1, Adding)) : Answer,
         }]};
       },
     },

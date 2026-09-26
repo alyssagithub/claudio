@@ -368,8 +368,9 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         readOnly: z.boolean().optional().describe("Set when the script only reads, so no undo step is recorded. Only meaningful in edit."),
         undoName: z.string().optional().describe("What the undo step should be called, such as \"Rename the doors\"."),
         timeout: z.number().optional().describe("How long to wait, in seconds, when the code is expected to take a while. Five minutes by default, thirty at most."),
+        player: z.string().optional().describe("Which client to run on when target is client: a player's name, or their number in join order starting at 1. Defaults to the first player."),
       },
-      Run: async (Input: { code: string; target?: "edit" | "server" | "client"; readOnly?: boolean; undoName?: string; timeout?: number }) => {
+      Run: async (Input: { code: string; target?: "edit" | "server" | "client"; readOnly?: boolean; undoName?: string; timeout?: number; player?: string }) => {
         const Where = Input.target || "edit";
 
         if (Where !== "edit") {
@@ -388,6 +389,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
           target: Where,
           readOnly: Input.readOnly === true,
           undoName: Input.undoName,
+          player: Input.player,
         };
         const Found: ExecuteAnswer = await ReachIn(Where === "edit" ? "edit" : "server", "execute", Sent, Input.timeout);
 
@@ -409,8 +411,9 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         to: z.string().optional().describe("Full instance path to drag onto, for drag."),
         x: z.number().optional().describe("Pixels to drag sideways when there is no to path."),
         y: z.number().optional().describe("Pixels to drag down when there is no to path."),
+        player: z.string().optional().describe("Which client to send it to: a player's name, or their number in join order starting at 1. Defaults to the first player."),
       },
-      Run: async (Input: { action: "press" | "type" | "key" | "hover" | "scroll" | "drag"; path?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number }) => {
+      Run: async (Input: { action: "press" | "type" | "key" | "hover" | "scroll" | "drag"; path?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number; player?: string }) => {
         if (Input.action === "type" && !Input.text) {
           return {content: [{
             type: "text",
@@ -459,6 +462,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
             to: Input.to,
             x: Input.x,
             y: Input.y,
+            player: Input.player,
           }), "Studio did not say what happened."),
         }]};
       },

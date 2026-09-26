@@ -352,10 +352,33 @@ task.spawn(function()
 				end
 
 				if Job.kind == "input" or Job.input.target == "client" then
-					const Player = game:GetService("Players"):GetPlayers()[1]
+					const Everyone = game:GetService("Players"):GetPlayers()
+					const Wanted = Job.input.player
+
+					if #Everyone == 0 then
+						return {error = "Nobody is in the session, so there is no client to run on."}
+					end
+
+					local Player: Player? = Everyone[1]
+
+					if typeof(Wanted) == "string" and Wanted ~= "" then
+						Player = Everyone[tonumber(Wanted) or 0]
+
+						for _, Someone in Everyone do
+							if Someone.Name:lower() == Wanted:lower() then
+								Player = Someone
+							end
+						end
+					end
 
 					if not Player then
-						return {error = "Nobody is in the session, so there is no client to run on."}
+						const Names = {}
+
+						for Index, Someone in Everyone do
+							table.insert(Names, `{Index} {Someone.Name}`)
+						end
+
+						return {error = `No player matches "{Wanted}". In the session: {table.concat(Names, ", ")}.`}
 					end
 
 					return AskClient(Player, if Job.kind == "input" then "input" else "execute", if Job.kind == "input" then HttpService:JSONEncode(Job.input) else Job.input.code)

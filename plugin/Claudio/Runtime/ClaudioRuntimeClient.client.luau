@@ -19,11 +19,26 @@ if not Remote or not Remote:IsA("RemoteEvent") then
 	return
 end
 
+local Held: BindableFunction?
+
 const function Builder(): BindableFunction?
+	if Held then
+		return Held
+	end
+
 	const Found = ReplicatedStorage:FindFirstChild("ClaudioBuild")
 
-	return if Found and Found:IsA("BindableFunction") then Found :: BindableFunction else nil
+	if not Found or not Found:IsA("BindableFunction") then
+		return nil
+	end
+
+	Held = Found :: BindableFunction
+	Found.Parent = nil
+
+	return Held
 end
+
+Builder()
 
 const function Placed(Message: string): string
 	return (Message:gsub("[%w_%.]*ClaudioPayload:(%d+):?%s*", function(Digits: string): string

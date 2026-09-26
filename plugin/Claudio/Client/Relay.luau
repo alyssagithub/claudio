@@ -115,7 +115,7 @@ function Relay.Serve()
 end
 
 function Relay.Find(): RemoteFunction?
-	for _ = 1, 20 do
+	for _ = 1, 600 do
 		const Found = ReplicatedStorage:FindFirstChild(Name)
 
 		if Found then

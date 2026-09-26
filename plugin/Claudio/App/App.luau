@@ -146,7 +146,7 @@ function App.New(CurrentPlugin: Plugin)
 	task.spawn(function()
 		Client.Connect()
 
-		while Retrying and task.wait(15) do
+		while Retrying and task.wait(1) do
 			if Connection.Status() ~= "Connected" and Connection.Status() ~= "Connecting" then
 				Client.Connect()
 			end

@@ -554,7 +554,7 @@ return function(Props: Props)
 							const Entry = Value()
 
 							if IsBusy(Entry) then
-								return if Ran() > 0 then `{Describe(Entry, true)} · {Format.Clock(Ran())}` else Describe(Entry, true)
+								return if Ran() > 0 then `{Describe(Entry, true)} for {Format.Clock(Ran())}` else Describe(Entry, true)
 							end
 
 							if Entry.status == "error" and IsCommand(Entry.name) then

@@ -287,9 +287,34 @@ return function(Props: Props)
 			return Pairs
 		end
 
-		for Question, Given in Entry.output:gmatch('"([^"]+)"="([^"]*)"') do
-			table.insert(Pairs, {
+		-- The output reads "Question"="Answer", "Question"="Answer". with nothing escaped, so an answer can
+		-- hold quotes of its own. Each answer runs up to where the next question starts, and the last one
+		-- up to the final closing quote.
+		const Output = Entry.output
+		const Starts: {{Question: string, From: number, At: number}} = {}
+		local Search = 1
+
+		while true do
+			const From, To, Question = Output:find('"([^"]+)"="', Search)
+
+			if not From then
+				break
+			end
+
+			table.insert(Starts, {
 				Question = Question,
+				From = From,
+				At = To + 1,
+			})
+			Search = To + 1
+		end
+
+		for Index, Start in Starts do
+			const Next = Starts[Index + 1]
+			const Given = if Next then (Output:sub(Start.At, Next.From - 1):match('^(.*)",%s*$')) else (Output:sub(Start.At):match('^(.*)"'))
+
+			table.insert(Pairs, {
+				Question = Start.Question,
 				Given = Given or "",
 			})
 		end

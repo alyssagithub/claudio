@@ -286,7 +286,7 @@ const function Run(Code: string): any
 		return Finish({error = "Claudio's plugin is not running inside this play session, so there is nothing to build the code with. Stop the playtest and start it again, and if that does not help, reinstall the plugin."})
 	end
 
-	const Payload = Making:Invoke("{{BuildKey}}", `return function()\n{Code}\nend`)
+	const Payload = Making:Invoke("{{BuildKey}}", `return function(breathe)\n{Code}\nend`)
 
 	if not Payload then
 		return Finish({error = "Claudio could not turn that code into a module to run it."})
@@ -300,7 +300,15 @@ const function Run(Code: string): any
 		return Finish({error = Explain(tostring(Body), Said)})
 	end
 
-	const Ok, Result = pcall(Body)
+	local LastYield = os.clock()
+	const Ok, Result = pcall(Body, function()
+		if os.clock() - LastYield < 0.008 then
+			return
+		end
+
+		task.wait()
+		LastYield = os.clock()
+	end)
 
 	if not Ok then
 		return Finish({error = Placed(tostring(Result))})

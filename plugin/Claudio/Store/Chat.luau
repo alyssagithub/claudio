@@ -2262,7 +2262,7 @@ const function Execute(Input: any): any
 	const Holder = Instance.new("ModuleScript")
 
 	Holder.Name = "ClaudioExecute"
-	Holder.Source = `return function(plugin)\n{Code}\nend`
+	Holder.Source = `return function(plugin, breathe)\n{Code}\nend`
 
 	const function Finish(): ()
 		task.wait(0.15)
@@ -2300,7 +2300,7 @@ const function Execute(Input: any): any
 		return Failed
 	end
 
-	const Ok, Result = xpcall(Made :: any, Trouble, Settings.Plugin())
+	const Ok, Result = xpcall(Made :: any, Trouble, Settings.Plugin(), Breathe)
 
 	Finish()
 

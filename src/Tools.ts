@@ -15,6 +15,8 @@ const ExecuteDescription = [
   "Changes are recorded as one undo step; pass readOnly when you only want to look.",
   "Set timeout in seconds when the code is expected to take a while, up to thirty minutes; it defaults to five minutes.",
   "In edit, plugin is Claudio's own Plugin object, so plugin APIs and plugin-development harnesses work. Call _G.ClaudioFresh(module) to require past the cache.",
+  "Code runs on Studio's main thread and cannot be interrupted, so a loop that never yields freezes all of Studio, stalls every other call, and makes Studio offer to kill the plugin. Call breathe() inside any loop over many instances, scripts or lines; it yields only when the frame's time is used up, so calling it every iteration costs almost nothing.",
+  "Never run patterns that start or end with a greedy class, such as [^\\n]*word[^\\n]*, over a whole script's source: their cost grows with the square of the line length. Split the source into lines with gmatch(\"[^\\n]+\") and test each with find(word, 1, true).",
 ].join(" ");
 
 const InputDescription = [

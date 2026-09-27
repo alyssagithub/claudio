@@ -10,38 +10,126 @@ const Format = require(script.Parent.Parent.Parent.Format)
 
 const Create = Vide.create
 
-const function Running(): boolean
-	for _, Call in Chat.Calls() do
-		if Call.status == "preparing" or Call.status == "running" then
-			return true
+-- The wording and timing below follow the Claude desktop app's working line.
+const Waits: {[string]: string} = {
+	sending = "Sending",
+	starting = "Starting session",
+	preparing = "Preparing",
+	model = "Waiting for Claude",
+	tools = "Running tools",
+}
+
+const HoldThinking = 2
+const ShowThought = 2
+const SettleLabel = 0.15
+
+const function ThinkingLabel(Elapsed: number): string
+	if Elapsed >= 60 then
+		return "Almost done thinking"
+	elseif Elapsed >= 45 then
+		return "Thinking some more"
+	elseif Elapsed >= 30 then
+		return "Thinking more"
+	elseif Elapsed >= 15 then
+		return "Still thinking"
+	end
+
+	return "Thinking"
+end
+
+const function ShortError(Retry: {error: string, status: number?}): string
+	if Retry.error == "overloaded" then
+		return "Service is busy"
+	elseif Retry.error == "server_error" then
+		return "Server error"
+	elseif Retry.status == nil then
+		return "Connection problem"
+	end
+
+	return "Something went wrong"
+end
+
+const function TasksLabel(): string?
+	local Running = 0
+	local Finished = 0
+
+	for _, Task in Chat.Tasks() do
+		if Task.status == "running" then
+			Running += 1
+		else
+			Finished += 1
 		end
 	end
 
-	return false
+	if Running > 0 then
+		return `{Running} running task{if Running == 1 then "" else "s"}`
+	elseif Finished > 0 then
+		return `{Finished} task{if Finished == 1 then "" else "s"} finished`
+	end
+
+	return nil
 end
 
 return function()
 	const Dots = Vide.source(1)
 	const Seconds = Vide.source(0)
+	const Thought = Vide.source(nil :: string?)
+	const Waiting = Vide.source(nil :: string?)
 
-	const function Phase(): string
+	local ThinkingSince = 0
+	local HeldUntil = 0
+	local ThoughtFor = 0
+	local WasThinking = false
+	local Settling: string? = nil
+	local SettlingSince = 0
+	local WasWorking = false
+
+	const function Dotted(Text: string): string
+		return `{Text}{string.rep(".", Dots())}`
+	end
+
+	const function Line(): string
+		const Tasks = TasksLabel()
+		const Working = Chat.Waiting() == 0
+
+		if Chat.Stopping() then
+			return if Tasks then `{Dotted("Stopping")} · {Tasks}` else Dotted("Stopping")
+		end
+
+		if not Working and Tasks then
+			return Tasks
+		end
+
+		const Clock = Format.Clock(Seconds())
+		const Retry = Chat.ApiRetry()
+
+		if Retry then
+			return `{ShortError(Retry)} · Retrying ({Retry.attempt}/{Retry.maxRetries}) · {Clock}`
+		end
+
 		if Chat.Compacting() then
-			return "Compacting conversation"
+			return `{Dotted("Compacting session")} · {Clock}`
 		end
 
-		if not Chat.Received() then
-			return "Sending"
+		const Parts = {Clock}
+		const Tokens = Chat.Tokens()
+		const Counted = if Tokens then Tokens.output else 0
+
+		if Counted > 0 then
+			table.insert(Parts, `{Format.Amount(Counted)} tokens`)
 		end
 
-		if Chat.Waiting() > 0 then
-			return `Waiting on {Chat.Waiting()} subagent{if Chat.Waiting() == 1 then "" else "s"}`
+		if Tasks then
+			table.insert(Parts, Tasks)
 		end
 
-		if Running() then
-			return "Running tools"
+		const Label = Thought() or Waiting()
+
+		if Label then
+			table.insert(Parts, if Label:sub(1, 11) == "Thought for" then Label else Dotted(Label))
 		end
 
-		return if Chat.StreamingText() ~= "" then "Writing" else "Thinking"
+		return table.concat(Parts, " · ")
 	end
 
 	return Create "TextButton" {
@@ -61,13 +149,65 @@ return function()
 				const Started = Chat.Began()
 
 				if Started == 0 then
+					WasThinking = false
+					WasWorking = false
+					HeldUntil = 0
+					ThoughtFor = 0
+					Settling = nil
+
 					return
 				end
 
-				const Elapsed = os.clock() - Started
+				const Now = os.clock()
+				const Elapsed = Now - Started
+				const InBlock = Chat.ThinkingBlock()
 
+				if InBlock and not WasThinking then
+					ThinkingSince = Now
+					ThoughtFor = 0
+				elseif WasThinking and not InBlock then
+					ThoughtFor = Now - ThinkingSince
+					HeldUntil = Now + math.max(0, HoldThinking - ThoughtFor)
+				end
+
+				WasThinking = InBlock
 				Dots(math.floor(Elapsed * 2.5) % 3 + 1)
 				Seconds(math.floor(Elapsed))
+
+				local Thinking: string? = nil
+
+				if InBlock or Now < HeldUntil then
+					Thinking = ThinkingLabel(Elapsed)
+				elseif ThoughtFor > 0 and Now < HeldUntil + ShowThought then
+					Thinking = `Thought for {math.max(1, math.floor(ThoughtFor + 0.5))}s`
+				end
+
+				if Thinking ~= Vide.untrack(Thought) then
+					Thought(Thinking)
+				end
+
+				const Stage = Chat.Stage()
+				const Wanted = if Stage then Waits[Stage] else nil
+				const Tokens = Vide.untrack(Chat.Tokens)
+				const Counted = Elapsed >= 2 and Tokens ~= nil and Tokens.output > 0
+				const Shown = Vide.untrack(Waiting)
+				const Target = if Wanted == nil and not Counted and Thinking == nil then Shown else Wanted
+				const Fresh = not WasWorking
+
+				WasWorking = true
+
+				if Target == Shown then
+					Settling = nil
+				elseif Fresh or Target == nil or Shown == nil then
+					Settling = nil
+					Waiting(Target)
+				elseif Settling ~= Target then
+					Settling = Target
+					SettlingSince = Now
+				elseif Now - SettlingSince >= SettleLabel then
+					Settling = nil
+					Waiting(Target)
+				end
 			end))
 		end),
 		Create "UIListLayout" {
@@ -91,19 +231,7 @@ return function()
 			TextSize = Settings.TextSize,
 			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 			LayoutOrder = 2,
-			Text = function()
-				const Tokens = Chat.Tokens()
-				const Counted = if Tokens then Tokens.output else 0
-				const Parts = {Format.Clock(Seconds())}
-
-				if Counted > 0 then
-					table.insert(Parts, `{Format.Amount(Counted)} tokens`)
-				end
-
-				table.insert(Parts, `{Phase()}{string.rep(".", Dots())}`)
-
-				return table.concat(Parts, " · ")
-			end,
+			Text = Line,
 		},
 	}
 end

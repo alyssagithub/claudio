@@ -186,19 +186,36 @@ return function()
 
 		Vide.changed("Text", function(Text: string)
 			const Previous = Chat.Draft()
-			local Where = 0
+			const Cursor = if Box then Box.CursorPosition else -1
 
-			if #Text == #Previous + 1 then
-				for Index = 1, #Text do
-					if Text:sub(Index, Index) ~= Previous:sub(Index, Index) then
-						Where = Index
+			-- Enter also types a carriage return after the newline; drop it so the draft only holds \n.
+			if Text:find("\r", 1, true) then
+				const Kept = if Cursor > 0 then (Text:sub(1, Cursor - 1):gsub("\r", "")) else ""
+				const Clean = Text:gsub("\r", "")
 
-						break
-					end
+				Chat.Draft(Clean)
+
+				if Box and Box.Text ~= Clean then
+					Box.Text = Clean
 				end
+
+				task.defer(function()
+					if Box.Text == Clean and Cursor > 0 then
+						Box.CursorPosition = #Kept + 1
+					end
+
+					Follow()
+				end)
+
+				return
 			end
 
-			if Where > 0 and Text:sub(Where, Where) == "\n" and Settings.Get("SendWithEnter")() then
+			-- The box already knows where the newline went; searching for the first changed character
+			-- would land at the end of a run of blank lines instead.
+			const Where = Cursor - 1
+			const Added = #Text == #Previous + 1 and Where >= 1 and Text:sub(Where, Where) == "\n" and Text:sub(1, Where - 1) .. Text:sub(Where + 1) == Previous
+
+			if Added and Settings.Get("SendWithEnter")() then
 				Chat.Draft(Text)
 				task.defer(function()
 					if Box.Text == Text then
@@ -208,7 +225,7 @@ return function()
 					Follow()
 				end)
 				task.spawn(function()
-					if Keys.ShiftedReturn() or Box.Text ~= Text then
+					if Keys.Shifted() or Box.Text ~= Text then
 						return
 					end
 

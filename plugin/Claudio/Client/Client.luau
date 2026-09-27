@@ -363,8 +363,8 @@ function Client.WatchKeys(On: boolean): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/keys/watch`, {on = On})
 end
 
-function Client.LastReturn(): (boolean, any)
-	return Http.Request("GET", `{BaseUrl()}/keys/return`)
+function Client.LastReturn(After: number?): (boolean, any)
+	return Http.Request("GET", if After then `{BaseUrl()}/keys/return?after={string.format("%d", After)}` else `{BaseUrl()}/keys/return`)
 end
 
 function Client.ConversationExists(Id: string): boolean
@@ -421,7 +421,6 @@ function Client.Notify(Title: string, Body: string, Options: {[string]: any}): (
 		sound = Options.sound,
 		flash = Options.flash,
 		toast = Options.toast,
-		banner = Options.banner,
 		anywhere = Options.anywhere,
 		seconds = Options.seconds,
 	})

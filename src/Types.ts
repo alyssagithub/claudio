@@ -344,6 +344,11 @@ export type Turn = {
   Id: string;
   PromptId?: string;
   Received?: boolean;
+  Stage?: "sending" | "starting" | "preparing" | "model" | "tools" | null;
+  PendingTools?: Set<string>;
+  StreamDriven?: boolean;
+  Thinking?: boolean;
+  Retry?: {attempt: number, maxRetries: number, error: string, status: number | null} | null;
   ConversationId: string | null;
   SessionId: string | null;
   Prompt: string;

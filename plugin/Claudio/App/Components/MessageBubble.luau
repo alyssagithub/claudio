@@ -1773,7 +1773,9 @@ return function(Props: Props)
 						Icon = Config.Icons.Copy,
 						LayoutOrder = 2,
 						Size = Settings.SmallText,
-						Visible = Hovered,
+						Visible = function()
+							return Hovered() and not Props.Live
+						end,
 						Tooltip = "Copy",
 						OnClick = function()
 							task.spawn(Chat.Copy, Props.Text())
@@ -1783,8 +1785,12 @@ return function(Props: Props)
 						Icon = Config.Icons.Fork,
 						LayoutOrder = 3,
 						Size = Settings.SmallText,
-						Visible = Hovered,
+						Visible = function()
+							return Hovered() and not Props.Live
+						end,
+						Disabled = Chat.Sending,
 						Tooltip = "Fork from here",
+						DisabledTooltip = "Cannot fork while Claude is working",
 						OnClick = function()
 							task.spawn(Chat.ForkHere, if Props.Index then Props.Index() else nil)
 						end,

@@ -8,6 +8,7 @@ const WatchPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..",
 type ReturnPress = { at: number; shift: boolean };
 
 let LastReturn: ReturnPress | null = null;
+const Waiters = new Set<() => void>();
 let LastCopy = 0;
 let Watcher: ChildProcess | null = null;
 let Ready = false;
@@ -58,6 +59,10 @@ export function WatchReturn() {
             at: Parsed.at,
             shift: Parsed.shift,
           };
+
+          for (const Wake of [...Waiters]) {
+            Wake();
+          }
         }
       } catch {
         continue;
@@ -128,6 +133,25 @@ export function DescribeReturn() {
     copyAt: LastCopy,
     now: Date.now(),
   };
+}
+
+// Answers as soon as a Return press newer than After is seen, so the plugin can hold a request open
+// and already know whether Shift was down by the time the newline reaches its text box.
+export function WaitForReturn(After: number, Milliseconds: number): Promise<ReturnType<typeof DescribeReturn>> {
+  if (LastReturn && LastReturn.at > After) {
+    return Promise.resolve(DescribeReturn());
+  }
+
+  return new Promise((Resolve) => {
+    const Wake = () => {
+      clearTimeout(Timer);
+      Waiters.delete(Wake);
+      Resolve(DescribeReturn());
+    };
+    const Timer = setTimeout(Wake, Milliseconds);
+
+    Waiters.add(Wake);
+  });
 }
 
 process.on("exit", () => StopWatchingReturn(true));

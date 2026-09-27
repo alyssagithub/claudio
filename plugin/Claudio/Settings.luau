@@ -53,13 +53,6 @@ const Definitions: {Definition} = {
 		Maximum = 120,
 	},
 	{
-		Key = "Banner",
-		Label = "Show notifications in fullscreen",
-		Detail = "Windows hides its notifications over fullscreen apps, so Claudio draws its own",
-		Group = "Notifications",
-		Default = true,
-	},
-	{
 		Key = "NotifyWhenFocused",
 		Label = "Notify even when Studio is in front",
 		Detail = "When off, you only hear the sound while Studio is in front",

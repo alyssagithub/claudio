@@ -23,7 +23,7 @@ import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListRel
 import { ArmClipboard, AskClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, RestoreFlashing, ShowToast, WriteClipboard } from "./Notify.js";
 import { ForgetConversation, GetModels } from "./Models.js";
 import { Analyze, Warm } from "./Lint.js";
-import { DescribeReturn, StopWatchingReturn, WatchReturn } from "./Keys.js";
+import { DescribeReturn, StopWatchingReturn, WaitForReturn, WatchReturn } from "./Keys.js";
 
 type LoginState = {loggedIn: boolean, detail: string | null};
 
@@ -543,7 +543,6 @@ ${Text}`;
         const Shown = ShowToast(Title, Text, {
           Flash: Body.flash !== false,
           Toast: Body.toast !== false,
-          Banner: Body.banner !== false,
           Anywhere: Body.anywhere === true,
           Sound: Body.sound === true,
           Seconds: typeof Body.seconds === "number" && Body.seconds > 0 ? Math.min(Body.seconds, 600) : 0,
@@ -575,7 +574,9 @@ ${Text}`;
       }
 
       if (Request.method === "GET" && Url.pathname === "/keys/return") {
-        SendJson(Response, 200, DescribeReturn());
+        const After = Number(Url.searchParams.get("after"));
+
+        SendJson(Response, 200, Url.searchParams.has("after") && Number.isFinite(After) ? await WaitForReturn(After, 20000) : DescribeReturn());
         return;
       }
 

@@ -115,6 +115,14 @@ return {
 		conversationId = Typed.optional(Typed.string()),
 		status = Typed.string(),
 		received = Typed.optional(Typed.boolean()),
+		stage = Typed.optional(Typed.string()),
+		thinkingBlock = Typed.optional(Typed.boolean()),
+		retry = Typed.optional(Typed.table({
+			attempt = Typed.number(),
+			maxRetries = Typed.number(),
+			error = Typed.string(),
+			status = Typed.optional(Typed.number()),
+		})),
 		text = Typed.string(),
 		thinking = Typed.optional(Typed.string()),
 		parts = Typed.optional(Typed.array(Typed.table({

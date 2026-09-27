@@ -31,6 +31,10 @@ const Chat = {
 	StreamingThinking = Vide.source(""),
 	StreamingParts = Vide.source({} :: {Types.Piece}),
 	Received = Vide.source(true),
+	Stage = Vide.source(nil :: string?),
+	ThinkingBlock = Vide.source(false),
+	ApiRetry = Vide.source(nil :: Types.Retry?),
+	Stopping = Vide.source(false),
 	Zoomed = Vide.source(nil :: EditableImage?),
 	StreamingPick = Vide.source(nil :: {Model: string, Effort: string?}?),
 	StreamingImages = Vide.source({} :: {EditableImage}),
@@ -2653,6 +2657,13 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		Chat.StreamingThinking(State.thinking or "")
 		Chat.StreamingParts(ReadParts(State.parts))
 		Chat.Received(State.received ~= false)
+		Chat.Stage(State.stage)
+		Chat.ThinkingBlock(State.thinkingBlock == true)
+		Chat.ApiRetry(State.retry)
+
+		if State.status == "cancelling" then
+			Chat.Stopping(true)
+		end
 
 		const Delivered = {}
 
@@ -2811,6 +2822,10 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 	Chat.Question(nil)
 	Chat.Sending(false)
 	Chat.Received(true)
+	Chat.Stage(nil)
+	Chat.ThinkingBlock(false)
+	Chat.ApiRetry(nil)
+	Chat.Stopping(false)
 	Chat.Began(0)
 	Chat.RequestId = nil
 
@@ -2994,6 +3009,10 @@ Start = function(Entry: Types.QueuedMessage)
 
 	Watcher.BeginTurn()
 	Chat.Received(false)
+	Chat.Stage("sending")
+	Chat.ThinkingBlock(false)
+	Chat.ApiRetry(nil)
+	Chat.Stopping(false)
 	Chat.Began(os.clock())
 	Append({
 		Role = "user",
@@ -4295,6 +4314,7 @@ function Chat.Stop()
 		return
 	end
 
+	Chat.Stopping(true)
 	task.spawn(Client.CancelTurn, RequestId)
 end
 

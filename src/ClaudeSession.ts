@@ -995,6 +995,80 @@ function OpenAutoTurn(Session: Session): Turn | null {
   return Turn;
 }
 
+const ToolBlocks = new Set(["tool_use", "server_tool_use", "mcp_tool_use"]);
+
+// Mirrors how the Claude desktop app decides what its working line says: which stage the turn is waiting on,
+// whether a thinking block is streaming, and whether the API is retrying.
+function TrackStage(Turn: Turn, Message: any) {
+  const Pending = Turn.PendingTools || (Turn.PendingTools = new Set());
+  const Before = [Turn.Stage || null, Turn.Thinking === true, Turn.Retry || null];
+  let Stage = Turn.Stage || null;
+  let Thinking = Turn.Thinking === true;
+  let Retry = Turn.Retry || null;
+
+  if (Message.type === "stream_event" && Message.event) {
+    const Event = Message.event;
+    const Opened = Event.type === "content_block_start" && Event.content_block ? Event.content_block.type as string : undefined;
+
+    Retry = null;
+
+    if (Opened !== undefined) {
+      Stage = ToolBlocks.has(Opened) ? "tools" : null;
+    } else if (Event.type === "message_start") {
+      Stage = "model";
+      Pending.clear();
+    } else if (Event.type === "message_delta" && Event.delta && (Event.delta.stop_reason === "tool_use" || Event.delta.stop_reason === "pause_turn")) {
+      Stage = "tools";
+    }
+
+    if (Opened !== undefined || Event.type === "message_stop" || Event.type === "message_delta") {
+      Turn.StreamDriven = true;
+      Thinking = Opened === "thinking" || Opened === "redacted_thinking";
+    }
+  } else if (Message.type === "system") {
+    if (Message.subtype === "status" && Message.status === "requesting") {
+      Stage = "model";
+      Pending.clear();
+    } else if (Message.subtype === "init" && (Stage === "sending" || Stage === "starting")) {
+      Stage = "preparing";
+    } else if (Message.subtype === "api_retry") {
+      Retry = {attempt: Message.attempt, maxRetries: Message.max_retries, error: String(Message.error || "unknown"), status: typeof Message.error_status === "number" ? Message.error_status : null};
+    }
+  } else if (Message.type === "assistant") {
+    let UsesTools = false;
+
+    for (const Block of Blocks(Message)) {
+      if (Block.type !== undefined && ToolBlocks.has(Block.type)) {
+        UsesTools = true;
+
+        if (Block.type === "tool_use" && typeof Block.id === "string") {
+          Pending.add(Block.id);
+        }
+      }
+    }
+
+    if (UsesTools) {
+      Stage = "tools";
+    } else if (Stage !== "tools" || (Pending.size === 0 && !Turn.StreamDriven)) {
+      Stage = null;
+    }
+  } else if (Message.type === "user" && Stage === "tools" && Pending.size > 0) {
+    for (const Block of Blocks(Message)) {
+      if (Block.type === "tool_result" && typeof Block.tool_use_id === "string") {
+        Pending.delete(Block.tool_use_id);
+      }
+    }
+
+    if (Pending.size === 0) {
+      Stage = "model";
+    }
+  }
+
+  if (Stage !== Before[0] || Thinking !== Before[1] || Retry !== Before[2]) {
+    Publish(Turn, {Stage, Thinking, Retry});
+  }
+}
+
 function RouteMessage(Session: Session, Message: any) {
   if (Message.type === "user" && Message.isReplay === true) {
     const Delivered = Session.CurrentTurn;
@@ -1180,6 +1254,8 @@ function RouteMessage(Session: Session, Message: any) {
     return;
   }
 
+  TrackStage(Turn, Message);
+
   if (Message.type === "system" && Message.subtype === "init") {
     if (!AskedForModels) {
       AskedForModels = true;
@@ -1212,7 +1288,6 @@ function RouteMessage(Session: Session, Message: any) {
 
   if (Message.type === "stream_event") {
     const Event = Message.event;
-
     if (!Event || !Event.delta) {
       return;
     }
@@ -2048,6 +2123,7 @@ export function StartTurn(Request: TurnRequest) {
 
   Turn.Session = Session;
   Turn.PromptId = crypto.randomUUID();
+  Turn.Stage = Reusable && Warm ? "sending" : "starting";
   Turn.Received = false;
   Session.AskForTools = Turn.AskForTools;
   Session.GuardTools = Turn.GuardTools;
@@ -2181,6 +2257,9 @@ export function DescribeTurn(Turn: Turn) {
   return {
     requestId: Turn.Id,
     received: Turn.Received !== false,
+    stage: Turn.Stage || null,
+    thinkingBlock: Turn.Thinking === true,
+    retry: Turn.Retry || null,
     conversationId: Turn.ConversationId,
     sessionId: Turn.SessionId,
     status: Turn.Status === "cancelling" ? "running" : Turn.Status,

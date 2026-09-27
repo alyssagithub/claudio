@@ -184,9 +184,19 @@ export type McpServer = {
 
 export type ConnectionStatus = "Disconnected" | "Connecting" | "Connected" | "Error"
 
+export type Retry = {
+	attempt: number,
+	maxRetries: number,
+	error: string,
+	status: number?,
+}
+
 export type Turn = {
 	requestId: string,
 	received: boolean?,
+	stage: string?,
+	thinkingBlock: boolean?,
+	retry: Retry?,
 	automatic: boolean?,
 	waiting: number?,
 	conversationId: string?,

@@ -29,7 +29,6 @@ export function RegisterToasts() {
 type ToastOptions = {
   Flash?: boolean;
   Toast?: boolean;
-  Banner?: boolean;
   Sound?: boolean;
   Anywhere?: boolean;
   Seconds?: number;
@@ -54,7 +53,7 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
     return false;
   }
 
-  if (!Wanted.Flash && !Wanted.Toast && !Wanted.Banner && !Wanted.Sound) {
+  if (!Wanted.Flash && !Wanted.Toast && !Wanted.Sound) {
     return false;
   }
 
@@ -75,7 +74,6 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
       CLAUDIO_BODY: Detail,
       CLAUDIO_NO_FLASH: Wanted.Flash ? "0" : "1",
       CLAUDIO_TOAST: Wanted.Toast ? "1" : "0",
-      CLAUDIO_BANNER: Wanted.Banner ? "1" : "0",
       CLAUDIO_ANYWHERE: Wanted.Anywhere ? "1" : "0",
       CLAUDIO_ICON: IconFile,
     },

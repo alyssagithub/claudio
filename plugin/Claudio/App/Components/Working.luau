@@ -30,7 +30,7 @@ return function()
 		end
 
 		if not Chat.Received() then
-			return "Starting session"
+			return "Sending"
 		end
 
 		if Chat.Waiting() > 0 then

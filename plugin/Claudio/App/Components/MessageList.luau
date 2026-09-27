@@ -166,10 +166,10 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 				LayoutOrder = 4,
 				Size = Settings.SmallText,
 				Visible = function()
-					return Hovered() and not Entry().Sent
+					return Hovered() or Index == 1 or Entry().Sent == true
 				end,
 				OnClick = function()
-					Chat.RemoveQueued(Index)
+					task.spawn(Chat.RemoveQueued, Index)
 				end,
 			},
 			Create "TextButton" {
@@ -231,11 +231,16 @@ return function()
 
 	const Ready = Vide.source(1)
 	local Filling = 0
+	local FilledFor: string?
 
 	Vide.effect(function()
 		const Wanted = Chat.Shown()
+		const Conversation = Chat.ConversationId()
 
-		Chat.ConversationId()
+		if Conversation ~= FilledFor then
+			FilledFor = Conversation
+			Ready(1)
+		end
 
 		if Vide.untrack(Ready) >= Wanted then
 			return
@@ -251,11 +256,6 @@ return function()
 				Ready(math.min(Wanted, Vide.untrack(Ready) + 2))
 			end
 		end)
-	end)
-
-	Vide.effect(function()
-		Chat.ConversationId()
-		Ready(1)
 	end)
 
 	const First = Vide.derive(function()

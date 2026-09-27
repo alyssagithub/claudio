@@ -1331,31 +1331,6 @@ return function(Props: Props)
 				return Props.Attachments ~= nil and #Props.Attachments() > 0
 			end),
 		},
-		Create "TextLabel" {
-			Name = "Sending",
-			AutomaticSize = Enum.AutomaticSize.XY,
-			BackgroundTransparency = 1,
-			TextColor3 = Theme.Colors.DimText,
-			TextSize = Settings.SmallText,
-			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-			LayoutOrder = 2,
-			Visible = function()
-				if not IsUser() or not Props.Index or not Chat.Sending() or Chat.Received() then
-					return false
-				end
-
-				const History = Chat.Messages()
-
-				for At = #History, 1, -1 do
-					if History[At].Role == "user" then
-						return At == Props.Index()
-					end
-				end
-
-				return false
-			end,
-			Text = "Sending…",
-		},
 		Create "Frame" {
 			Name = "Changes",
 			Size = UDim2.fromScale(1, 0),

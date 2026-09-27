@@ -704,6 +704,23 @@ export function AddToTurn(RequestId: string | null, ConversationId: string | nul
   return null;
 }
 
+export async function CancelQueued(RequestId: string, Id: string): Promise<boolean> {
+  const Turn = Turns.get(RequestId);
+  const Query = Turn && Turn.Session ? Turn.Session.Query as unknown as {cancelAsyncMessage?: (Id: string) => Promise<boolean>} | null : null;
+
+  if (!Query || !Query.cancelAsyncMessage || !Awaiting.has(Id)) {
+    return false;
+  }
+
+  const Cancelled = await Query.cancelAsyncMessage(Id).catch(() => false);
+
+  if (Cancelled) {
+    Awaiting.delete(Id);
+  }
+
+  return Cancelled;
+}
+
 const Ended = new Map<string, number>();
 
 export function LastEndedAt(ConversationId: string): number {

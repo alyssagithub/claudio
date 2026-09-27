@@ -333,6 +333,15 @@ function Client.GetConversation(Id: string, Before: number?, Count: number?): (b
 	return Checked(Ok, Result, Schemas.Conversation)
 end
 
+function Client.CancelQueued(RequestId: string, Id: string): boolean
+	const Ok, Result = Http.Request("POST", `{BaseUrl()}/chat/cancel-queued`, {
+		requestId = RequestId,
+		id = Id,
+	})
+
+	return Ok and typeof(Result) == "table" and Result.cancelled == true
+end
+
 function Client.PlaytestKey(): string?
 	const Ok, Result = Http.Request("POST", `{BaseUrl()}/playtest/key`, {})
 

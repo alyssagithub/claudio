@@ -4148,11 +4148,27 @@ function Chat.RemoveQueued(Index: number)
 	const Queue = table.clone(Chat.Queue() :: {Types.QueuedMessage})
 	const Entry = table.remove(Queue, Index)
 
-	Chat.Queue(Queue)
-
 	if not Entry then
 		return
 	end
+
+	if Entry.Sent and not (Chat.RequestId and Entry.Id and Client.CancelQueued(Chat.RequestId, Entry.Id)) then
+		Chat.Say("Claude has already read that message, so it can't be taken back.")
+
+		return
+	end
+
+	const Latest = table.clone(Chat.Queue() :: {Types.QueuedMessage})
+
+	for Position, Candidate in Latest do
+		if Candidate == Entry then
+			table.remove(Latest, Position)
+
+			break
+		end
+	end
+
+	Chat.Queue(Latest)
 
 	DestroyImages(Entry.Previews)
 

@@ -14,7 +14,7 @@ import type { Reacher, ReacherIn } from "./Tools.js";
 import type { Picture, TurnRequest } from "./Types.js";
 import { StudioProcesses } from "./StudioPresence.js";
 import { ReadBuiltInPlugins, SetBuiltInPlugins } from "./StudioSettings.js";
-import { ActiveTurnFor, AddToTurn, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, WarmConversation, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { ActiveTurnFor, AddToTurn, CancelQueued, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, WarmConversation, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetSubagent, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
@@ -628,6 +628,13 @@ ${Text}`;
           ...TurnRequestFrom(Body, ConversationId),
           Images: PicturesFrom(Body),
         })));
+        return;
+      }
+
+      if (Request.method === "POST" && Url.pathname === "/chat/cancel-queued") {
+        const Body = await ReadBody(Request);
+
+        SendJson(Response, 200, {cancelled: typeof Body.requestId === "string" && typeof Body.id === "string" ? await CancelQueued(Body.requestId, Body.id) : false});
         return;
       }
 

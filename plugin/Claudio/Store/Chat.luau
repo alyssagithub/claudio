@@ -736,9 +736,26 @@ const function Playtest(Input: any): any
 	const Action = Input.action
 
 	const function Live(): boolean
+		if not StudioTestService.EditModeActive or RunService:IsRunning() then
+			return true
+		end
+
 		const Held = _G.ClaudioPlaytest :: any
 
-		return not StudioTestService.EditModeActive or RunService:IsRunning() or (Held ~= nil and Held.Done == false)
+		if Held == nil or Held.Done ~= false then
+			return false
+		end
+
+		-- A start that has not returned only counts while Studio could still be bringing the playtest up.
+		-- After that Studio's own state decides, since a plugin reload mid-playtest kills the waiting call
+		-- but leaves this record behind, and it would otherwise block every later start.
+		if typeof(Held.At) == "number" and os.clock() - Held.At < 300 then
+			return true
+		end
+
+		_G.ClaudioPlaytest = nil
+
+		return false
 	end
 
 	if Action == "status" then
@@ -781,6 +798,7 @@ const function Playtest(Input: any): any
 			Mode = Mode,
 			Done = false,
 			Value = nil,
+			At = os.clock(),
 		}
 
 		task.spawn(function()

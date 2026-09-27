@@ -51,23 +51,14 @@ end
 
 const function TasksLabel(): string?
 	local Running = 0
-	local Finished = 0
 
 	for _, Task in Chat.Tasks() do
 		if Task.status == "running" then
 			Running += 1
-		else
-			Finished += 1
 		end
 	end
 
-	if Running > 0 then
-		return `{Running} running task{if Running == 1 then "" else "s"}`
-	elseif Finished > 0 then
-		return `{Finished} task{if Finished == 1 then "" else "s"} finished`
-	end
-
-	return nil
+	return if Running > 0 then `{Running} running task{if Running == 1 then "" else "s"}` else nil
 end
 
 return function()

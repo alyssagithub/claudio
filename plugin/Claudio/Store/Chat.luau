@@ -1245,6 +1245,55 @@ const function Memory(Input: any): any
 	return {text = `{string.format("%.1f", Stats:GetTotalMemoryUsageMb())}MB total, in MB: {table.concat(Lines, ", ")}`}
 end
 
+const function BuildDiskNode(Node: any, Parent: Instance?): Instance
+	if Node.rbxm then
+		const Made = game:GetService("SerializationService"):DeserializeInstancesAsync(game:GetService("EncodingService"):Base64Decode(buffer.fromstring(Node.rbxm)))
+		const Holder = if #Made == 1 then Made[1] else Instance.new("Folder")
+
+		for _, Object in Made do
+			if Object ~= Holder then
+				Object.Parent = Holder
+			end
+		end
+
+		Holder.Name = Node.name
+		Holder.Parent = Parent
+
+		return Holder
+	end
+
+	const Made = Instance.new(Node.class)
+	const Writable = Made :: any
+
+	Made.Name = Node.name
+
+	if Node.source then
+		Writable.Source = Node.source
+	end
+
+	if Node.value then
+		Writable.Value = Node.value
+	end
+
+	for Name, Value in Node.properties or {} do
+		const Current = Writable[Name]
+
+		Writable[Name] = if typeof(Current) == "EnumItem" and typeof(Value) == "string" then (Current.EnumType :: any)[Value:match("[^%.]+$")] else Value
+	end
+
+	for Name, Value in Node.attributes or {} do
+		Made:SetAttribute(Name, Value)
+	end
+
+	for _, Child in Node.children do
+		BuildDiskNode(Child, Made)
+	end
+
+	Made.Parent = Parent
+
+	return Made
+end
+
 const function Rbxm(Input: any): any
 	const SerializationService = game:GetService("SerializationService")
 	const EncodingService = game:GetService("EncodingService")
@@ -1293,6 +1342,19 @@ const function Rbxm(Input: any): any
 
 	const Wanted = {}
 
+	local Assembled: Instance?
+
+	if Input.tree then
+		const Made, Root = pcall(BuildDiskNode, Input.tree, nil)
+
+		if not Made then
+			return {error = `Studio could not build that folder: {tostring(Root)}`}
+		end
+
+		Assembled = Root
+		table.insert(Wanted, Root)
+	end
+
 	for _, Path in Input.paths or {} do
 		const Object = Resolve(Path)
 
@@ -1310,6 +1372,10 @@ const function Rbxm(Input: any): any
 	const Saved, Bytes = pcall(function()
 		return SerializationService:SerializeInstancesAsync(Wanted)
 	end)
+
+	if Assembled then
+		Assembled:Destroy()
+	end
 
 	if not Saved then
 		return {error = `Studio could not write those out: {tostring(Bytes)}`}

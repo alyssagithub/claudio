@@ -1,5 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
+import { ReadDiskTree } from "./DiskTree.js";
+import type { DiskNode } from "./DiskTree.js";
 import { execFile } from "node:child_process";
 import { z } from "zod/v3";
 import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport } from "./Ask.js";
@@ -683,16 +686,31 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
     },
     {
       Name: "rbxm",
-      Description: "Save instances to an rbxm file on disk, or load one back into the place. Give paths and file to save, or file and path to load it under. Use it to keep a copy before something risky, or to move a build between places.",
+      Description: "Save instances to an rbxm file on disk, load one back into the place, or build one from a folder of source files. Give paths and file to save, file and path to load it under, or folder and file to build. Building never touches the open place: Studio assembles the instances on the side and only the file is written. Folders follow Rojo's layout: init.luau makes the folder itself a script, name.server.luau is a Script, name.client.luau a LocalScript, name.luau a ModuleScript, .legacy and .local are a Script and a LocalScript, name.txt is a StringValue, name.rbxm is merged in as it is, and name.meta.json or init.meta.json can set className, properties (plain values, enums by name) and attributes.",
       Schema: {
         file: z.string().describe("Where the file lives on disk."),
+        folder: z.string().optional().describe("A folder of source files to build into the file."),
+        name: z.string().optional().describe("What to call the root instance when building. Defaults to the folder's name."),
         paths: z.array(z.string()).optional().describe("Instances to save. Give these to save, leave them out to load."),
         path: z.string().optional().describe("Where to put what is loaded, such as Workspace."),
         undoName: z.string().optional().describe("What the undo step should be called, when loading."),
       },
-      Run: async (Input: { file: string; paths?: string[]; path?: string; undoName?: string }) => {
-        if (Input.paths && Input.paths.length > 0) {
-          const Found: { error?: string; text?: string; base64?: string; count?: number } | null = await Reach("rbxm", {paths: Input.paths});
+      Run: async (Input: { file: string; folder?: string; name?: string; paths?: string[]; path?: string; undoName?: string }) => {
+        let Tree: DiskNode | undefined;
+
+        if (Input.folder) {
+          try {
+            Tree = ReadDiskTree(Input.folder, Input.name || path.basename(path.resolve(Input.folder)));
+          } catch (Trouble) {
+            return {content: [{
+              type: "text",
+              text: `Built nothing, because the folder could not be read: ${(Trouble as Error).message}`,
+            }]};
+          }
+        }
+
+        if (Tree || (Input.paths && Input.paths.length > 0)) {
+          const Found: { error?: string; text?: string; base64?: string; count?: number } | null = await Reach("rbxm", {paths: Input.paths, tree: Tree});
 
           if (!Found || Found.error || !Found.base64) {
             return {content: [{

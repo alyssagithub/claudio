@@ -613,7 +613,7 @@ ${Text}`;
         const ConversationId = typeof Body.conversationId === "string" ? Body.conversationId : null;
 
         if ((ConversationId || typeof Body.requestId === "string") && (IsConversationBusy(ConversationId) || Body.now === true)) {
-          const Joined = Body.now === true ? AddToTurn(typeof Body.requestId === "string" ? Body.requestId : null, ConversationId, Body.text, PicturesFrom(Body)) : null;
+          const Joined = Body.now === true ? AddToTurn(typeof Body.requestId === "string" ? Body.requestId : null, ConversationId, Body.text, PicturesFrom(Body), typeof Body.id === "string" ? Body.id : undefined) : null;
 
           if (!Joined) {
             SendJson(Response, 409, {error: "That chat is still answering. Stop it first."});

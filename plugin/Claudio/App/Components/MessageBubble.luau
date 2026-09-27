@@ -711,7 +711,6 @@ return function(Props: Props)
 		Kind: "thinking" | "text" | "calls" | "user" | "notice",
 		Text: string?,
 		Calls: {number}?,
-		Pending: boolean?,
 	}
 
 	const function Blocks(): {Block}
@@ -775,7 +774,6 @@ return function(Props: Props)
 					table.insert(Found, {
 						Kind = Piece.Kind,
 						Text = Piece.Text or "",
-						Pending = Piece.Pending,
 					})
 				end
 			end
@@ -1053,19 +1051,7 @@ return function(Props: Props)
 					},
 				},
 			},
-			Create "TextLabel" {
-				Name = "Sending",
-				AutomaticSize = Enum.AutomaticSize.XY,
-				BackgroundTransparency = 1,
-				TextColor3 = Theme.Colors.DimText,
-				TextSize = Settings.SmallText,
-				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				LayoutOrder = 4,
-				Visible = function()
-					return Kind() == "user" and Value().Pending == true
-				end,
-				Text = "Sending…",
-			},
+
 			Create "TextLabel" {
 				Name = "Notice",
 				Size = UDim2.fromScale(1, 0),
@@ -1344,6 +1330,31 @@ return function(Props: Props)
 			end, function()
 				return Props.Attachments ~= nil and #Props.Attachments() > 0
 			end),
+		},
+		Create "TextLabel" {
+			Name = "Sending",
+			AutomaticSize = Enum.AutomaticSize.XY,
+			BackgroundTransparency = 1,
+			TextColor3 = Theme.Colors.DimText,
+			TextSize = Settings.SmallText,
+			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+			LayoutOrder = 2,
+			Visible = function()
+				if not IsUser() or not Props.Index or not Chat.Sending() or Chat.Received() then
+					return false
+				end
+
+				const History = Chat.Messages()
+
+				for At = #History, 1, -1 do
+					if History[At].Role == "user" then
+						return At == Props.Index()
+					end
+				end
+
+				return false
+			end,
+			Text = "Sending…",
 		},
 		Create "Frame" {
 			Name = "Changes",

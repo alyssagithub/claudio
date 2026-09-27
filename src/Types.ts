@@ -126,7 +126,6 @@ export type Part = {
   text?: string;
   id?: string;
   call?: number;
-  pending?: boolean;
 };
 
 export type StoredMessage = {
@@ -343,6 +342,8 @@ export type SdkMessage = {
 
 export type Turn = {
   Id: string;
+  PromptId?: string;
+  Received?: boolean;
   ConversationId: string | null;
   SessionId: string | null;
   Prompt: string;

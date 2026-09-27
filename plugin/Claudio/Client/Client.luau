@@ -97,13 +97,14 @@ const function GetPlaceName(): string
 	return PlaceName :: string
 end
 
-function Client.SendNow(Text: string, ConversationId: string?, RequestId: string?, Images: {Types.ImageUpload}): (boolean, any)
+function Client.SendNow(Text: string, ConversationId: string?, RequestId: string?, Images: {Types.ImageUpload}, Id: string?): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/chat`, {
 		text = Text,
 		conversationId = ConversationId,
 		requestId = RequestId,
 		images = Images,
 		now = true,
+		id = Id,
 	})
 end
 

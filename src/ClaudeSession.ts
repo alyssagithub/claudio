@@ -679,12 +679,13 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
     CommittedText: Text,
     PendingText: "",
     Calls: Turn.Calls.map((Call) => (Call.Status === "running" || Call.Status === "preparing" ? {...Call, Status: "error" as CallStatus} : Call)),
-    Parts: Turn.Parts.map((Part) => (Part.pending ? {...Part, pending: false} : Part)),
   });
   setTimeout(() => Turns.delete(Turn.Id), FinishedTurnLifetimeMilliseconds);
 }
 
-export function AddToTurn(RequestId: string | null, ConversationId: string | null, Text: string, Images: Picture[]): Turn | null {
+const Awaiting = new Map<string, string>();
+
+export function AddToTurn(RequestId: string | null, ConversationId: string | null, Text: string, Images: Picture[], Given?: string): Turn | null {
   for (const Turn of Turns.values()) {
     const Matches = RequestId ? Turn.Id === RequestId : Turn.ConversationId === ConversationId;
 
@@ -692,31 +693,10 @@ export function AddToTurn(RequestId: string | null, ConversationId: string | nul
       continue;
     }
 
-    const Id = crypto.randomUUID();
+    const Id = Given || crypto.randomUUID();
 
+    Awaiting.set(Id, StripContext(Text));
     Turn.Session.Send(UserMessage(Text, Images, Id));
-    Publish(Turn, {
-      Parts: Turn.Parts.concat(
-        Turn.PendingThinking.trim() !== "" ? [{
-          kind: "thinking",
-          text: Turn.PendingThinking,
-        }] : [],
-        Turn.PendingText.trim() !== "" ? [{
-          kind: "text",
-          text: Turn.PendingText,
-        }] : [],
-        [{
-          kind: "user",
-          text: StripContext(Text),
-          id: Id,
-          pending: true,
-        }],
-      ),
-      CommittedThinking: JoinText(Turn.CommittedThinking, Turn.PendingThinking),
-      CommittedText: JoinText(Turn.CommittedText, Turn.PendingText),
-      PendingThinking: "",
-      PendingText: "",
-    });
 
     return Turn;
   }
@@ -1001,9 +981,35 @@ function OpenAutoTurn(Session: Session): Turn | null {
 function RouteMessage(Session: Session, Message: any) {
   if (Message.type === "user" && Message.isReplay === true) {
     const Delivered = Session.CurrentTurn;
+    const Text = Awaiting.get(Message.uuid);
 
-    if (Delivered && Delivered.Parts.some((Part) => Part.pending && Part.id === Message.uuid)) {
-      Publish(Delivered, {Parts: Delivered.Parts.map((Part) => (Part.pending && Part.id === Message.uuid ? {...Part, pending: false} : Part))});
+    if (Delivered && Delivered.PromptId === Message.uuid) {
+      Publish(Delivered, {Received: true});
+    }
+
+    if (Delivered && Text !== undefined) {
+      Awaiting.delete(Message.uuid);
+      Publish(Delivered, {
+        Parts: Delivered.Parts.concat(
+          Delivered.PendingThinking.trim() !== "" ? [{
+            kind: "thinking",
+            text: Delivered.PendingThinking,
+          }] : [],
+          Delivered.PendingText.trim() !== "" ? [{
+            kind: "text",
+            text: Delivered.PendingText,
+          }] : [],
+          [{
+            kind: "user",
+            text: Text,
+            id: Message.uuid,
+          }],
+        ),
+        CommittedThinking: JoinText(Delivered.CommittedThinking, Delivered.PendingThinking),
+        CommittedText: JoinText(Delivered.CommittedText, Delivered.PendingText),
+        PendingThinking: "",
+        PendingText: "",
+      });
     }
 
     return;
@@ -1023,6 +1029,10 @@ function RouteMessage(Session: Session, Message: any) {
   }
 
   const Turn = Session.CurrentTurn || (Message.type === "system" && Message.subtype === "init" ? OpenAutoTurn(Session) : null);
+
+  if (Turn && Turn.Received === false && (Message.type === "assistant" || Message.type === "stream_event")) {
+    Publish(Turn, {Received: true});
+  }
 
   if (Turn && Message.type === "system" && Message.subtype === "compact_boundary") {
     const Metadata = Message.compact_metadata || {};
@@ -2020,6 +2030,8 @@ export function StartTurn(Request: TurnRequest) {
   }
 
   Turn.Session = Session;
+  Turn.PromptId = crypto.randomUUID();
+  Turn.Received = false;
   Session.AskForTools = Turn.AskForTools;
   Session.GuardTools = Turn.GuardTools;
   Session.CapResults = Turn.CapResults;
@@ -2038,14 +2050,14 @@ export function StartTurn(Request: TurnRequest) {
     Session.PendingContext = "";
     Session.PendingPlace = "";
     Session.Place = NewPlace || Session.Place;
-    Session.Send(UserMessage(NewPlace ? NewPlace + "\n\n" + Text : Text, Images));
+    Session.Send(UserMessage(NewPlace ? NewPlace + "\n\n" + Text : Text, Images, Turn.PromptId));
 
     return Turn;
   }
 
   Session.PendingContext = CarriedContext;
   Session.PendingPlace = NewPlace;
-  Session.Send(UserMessage(VisibleText, Images));
+  Session.Send(UserMessage(VisibleText, Images, Turn.PromptId));
 
   return Turn;
 }
@@ -2151,6 +2163,7 @@ export function DescribeTurn(Turn: Turn) {
 
   return {
     requestId: Turn.Id,
+    received: Turn.Received !== false,
     conversationId: Turn.ConversationId,
     sessionId: Turn.SessionId,
     status: Turn.Status === "cancelling" ? "running" : Turn.Status,

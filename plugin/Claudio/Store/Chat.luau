@@ -30,6 +30,7 @@ const Chat = {
 	StreamingText = Vide.source(""),
 	StreamingThinking = Vide.source(""),
 	StreamingParts = Vide.source({} :: {Types.Piece}),
+	Received = Vide.source(true),
 	Zoomed = Vide.source(nil :: EditableImage?),
 	StreamingPick = Vide.source(nil :: {Model: string, Effort: string?}?),
 	StreamingImages = Vide.source({} :: {EditableImage}),
@@ -2536,7 +2537,7 @@ const function ReadParts(Given: any): {Types.Piece}
 			Kind = Part.kind,
 			Text = Part.text,
 			Call = Part.call,
-			Pending = Part.pending,
+			Id = Part.id,
 		})
 	end
 
@@ -2585,6 +2586,32 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		Chat.StreamingText(State.text or "")
 		Chat.StreamingThinking(State.thinking or "")
 		Chat.StreamingParts(ReadParts(State.parts))
+		Chat.Received(State.received ~= false)
+
+		const Delivered = {}
+
+		for _, Part in Chat.StreamingParts() do
+			if Part.Id then
+				Delivered[Part.Id] = true
+			end
+		end
+
+		const Queued = Chat.Queue() :: {Types.QueuedMessage}
+		const Kept = {}
+
+		for _, Entry in Queued do
+			if Entry.Id and Delivered[Entry.Id] then
+				DestroyImages(Entry.Previews)
+
+				continue
+			end
+
+			table.insert(Kept, Entry)
+		end
+
+		if #Kept < #Queued then
+			Chat.Queue(Kept)
+		end
 		Chat.StreamingPick(if State.auto and State.model then {
 			Model = State.model,
 			Effort = State.effort,
@@ -2717,8 +2744,22 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 	Chat.Permission(nil)
 	Chat.Question(nil)
 	Chat.Sending(false)
+	Chat.Received(true)
 	Chat.Began(0)
 	Chat.RequestId = nil
+
+	const Handed: {Types.QueuedMessage} = {}
+	const Unsent: {Types.QueuedMessage} = {}
+
+	for _, Entry in Chat.Queue() :: {Types.QueuedMessage} do
+		table.insert(if Entry.Sent then Handed else Unsent, Entry)
+	end
+
+	for _, Entry in Handed do
+		DestroyImages(Entry.Previews)
+	end
+
+	Chat.Queue(Unsent)
 
 	task.spawn(function()
 		const Id = Chat.ConversationId()
@@ -2755,7 +2796,7 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 		return
 	end
 
-	if Status == "error" then
+	if Status == "error" or #Handed > 0 then
 		return
 	end
 
@@ -2781,9 +2822,18 @@ function Chat.Flush()
 
 	while Chat.Sending() do
 		const Waiting = Chat.Queue() :: {Types.QueuedMessage}
-		const Entry = Waiting[1]
 
-		if not Entry then
+		local Position = 0
+
+		for Index, Candidate in Waiting do
+			if not Candidate.Sent then
+				Position = Index
+
+				break
+			end
+		end
+
+		if Position == 0 then
 			break
 		end
 
@@ -2793,28 +2843,27 @@ function Chat.Flush()
 			continue
 		end
 
-		const Rest = table.clone(Waiting)
-		const Shown = table.clone(Chat.StreamingParts())
+		const Entry = table.clone(Waiting[Position])
+		const Marked = table.clone(Waiting)
 
-		table.remove(Rest, 1)
-		Chat.Queue(Rest)
-		table.insert(Shown, {
-			Kind = "user",
-			Text = Entry.Display,
-			Pending = true,
-		})
-		Chat.StreamingParts(Shown)
+		Entry.Id = HttpService:GenerateGUID(false):lower()
+		Entry.Sent = true
+		Marked[Position] = Entry
+		Chat.Queue(Marked)
 
-		if not Client.SendNow(Entry.Full, Chat.ConversationId(), Chat.RequestId, Entry.Images) then
+		if not Client.SendNow(Entry.Full, Chat.ConversationId(), Chat.RequestId, Entry.Images, Entry.Id) then
 			const Back = table.clone(Chat.Queue() :: {Types.QueuedMessage})
 
-			table.insert(Back, 1, Entry)
+			for Index, Candidate in Back do
+				if Candidate.Id == Entry.Id then
+					Back[Index] = Waiting[Position]
+				end
+			end
+
 			Chat.Queue(Back)
 
 			break
 		end
-
-		DestroyImages(Entry.Previews)
 	end
 
 	Flushing = false
@@ -2878,6 +2927,7 @@ Start = function(Entry: Types.QueuedMessage)
 	end
 
 	Watcher.BeginTurn()
+	Chat.Received(false)
 	Chat.Began(os.clock())
 	Append({
 		Role = "user",
@@ -4068,6 +4118,12 @@ function Chat.InterruptWith(Index: number)
 	const Entry = table.remove(Queue, Index)
 
 	if not Entry then
+		return
+	end
+
+	if Entry.Sent then
+		Chat.Stop()
+
 		return
 	end
 

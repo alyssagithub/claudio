@@ -29,6 +29,10 @@ return function()
 			return "Compacting conversation"
 		end
 
+		if not Chat.Received() then
+			return "Starting session"
+		end
+
 		if Chat.Waiting() > 0 then
 			return `Waiting on {Chat.Waiting()} subagent{if Chat.Waiting() == 1 then "" else "s"}`
 		end

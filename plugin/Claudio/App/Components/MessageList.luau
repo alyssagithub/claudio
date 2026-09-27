@@ -165,7 +165,9 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 				Icon = Config.Icons.Close,
 				LayoutOrder = 4,
 				Size = Settings.SmallText,
-				Visible = Hovered,
+				Visible = function()
+					return Hovered() and not Entry().Sent
+				end,
 				OnClick = function()
 					Chat.RemoveQueued(Index)
 				end,
@@ -183,7 +185,7 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 				LayoutOrder = 5,
 				Text = "Send now",
 				Visible = function()
-					return Hovered() or Index == 1
+					return Hovered() or Index == 1 or Entry().Sent == true
 				end,
 				Activated = function()
 					Chat.InterruptWith(Index)

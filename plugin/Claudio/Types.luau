@@ -26,7 +26,7 @@ export type Piece = {
 	Kind: "thinking" | "text" | "call" | "user" | "notice",
 	Text: string?,
 	Call: number?,
-	Pending: boolean?,
+	Id: string?,
 }
 
 export type Message = {
@@ -83,6 +83,8 @@ export type QueuedMessage = {
 	Images: {ImageUpload},
 	Previews: {EditableImage},
 	Edits: {Change}?,
+	Id: string?,
+	Sent: boolean?,
 }
 
 export type Choice = {
@@ -184,6 +186,7 @@ export type ConnectionStatus = "Disconnected" | "Connecting" | "Connected" | "Er
 
 export type Turn = {
 	requestId: string,
+	received: boolean?,
 	automatic: boolean?,
 	waiting: number?,
 	conversationId: string?,

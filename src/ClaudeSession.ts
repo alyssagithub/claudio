@@ -1256,6 +1256,10 @@ function RouteMessage(Session: Session, Message: any) {
 
   TrackStage(Turn, Message);
 
+  if (Message.type === "assistant" && (Message.error === "rate_limit" || Message.error === "billing_error")) {
+    Turn.LimitHit = true;
+  }
+
   if (Message.type === "system" && Message.subtype === "init") {
     if (!AskedForModels) {
       AskedForModels = true;
@@ -1528,7 +1532,11 @@ function RouteMessage(Session: Session, Message: any) {
     }
   }
 
-  if (Session.Background.size > 0 && Turn.Status === "running" && !Message.is_error) {
+  // Hitting a usage limit comes back as an ordinary result, but nothing can run until it resets, so end
+  // the turn as failed now instead of waiting on background agents that are stopped by the same limit.
+  const Limited = Turn.LimitHit === true || (typeof Message.result === "string" && Message.result.length < 400 && /^\s*(you've hit your|you have hit your|claude ai usage limit reached|you're out of (usage )?credits)/i.test(Message.result));
+
+  if (Session.Background.size > 0 && Turn.Status === "running" && !Message.is_error && !Limited) {
     Turn.Waiting = Session.Background.size;
     Publish(Turn, {});
 
@@ -1547,7 +1555,9 @@ function RouteMessage(Session: Session, Message: any) {
 
   RefreshUsage(Session);
   RefreshContext(Session);
-  FinishTurn(Turn, Message.is_error && Turn.Status !== "cancelling" ? "error" : (Turn.Status === "cancelling" ? "cancelled" : "done"), Message.is_error ? (Message.result || Message.subtype) : null);
+  const Failed = (Message.is_error || Limited) && Turn.Status !== "cancelling";
+
+  FinishTurn(Turn, Failed ? "error" : (Turn.Status === "cancelling" ? "cancelled" : "done"), Failed ? (Message.result || Message.subtype) : null);
 
   if (!KeepSessionsWarm) {
     Session.Close();

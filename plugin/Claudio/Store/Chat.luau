@@ -3898,7 +3898,7 @@ function Chat.Send(Text: string, Quiet: string?)
 		Edits = Edits,
 	}
 
-	if not Chat.Sending() then
+	if not Chat.Sending() and not Chat.Limited() then
 		assert(Start)(Entry)
 
 		return
@@ -4128,24 +4128,89 @@ function Chat.ForkHere(Index: number?)
 	Chat.Fork(Id)
 end
 
-function Chat.ResumeAfterLimit()
-	if Chat.Sending() or Settings.Get("AutoContinue")() ~= true then
-		return
-	end
-
+-- The failed reply that ended on a usage limit, while it is still the last thing in the chat.
+const function LimitedReply(): Types.Message?
 	const Last = Chat.Messages()[#Chat.Messages()]
 
-	if not Last or not Last.Failed or not Last.Error or not Format.IsLimit(Last.Error) then
-		return
+	return if Last and Last.Failed and Last.Error and Format.IsLimit(Last.Error) then Last else nil
+end
+
+-- When the limit message says it resets, such as "resets 1:30am", read as the next such time after the reply.
+const function ResetFromText(Reply: Types.Message): number?
+	const Clock = Format.ResetsAt(Reply.Error or "")
+
+	if not Clock then
+		return nil
 	end
 
+	const Hour, Minute, Half = Clock:lower():match("^(%d+):?(%d*)%s*([ap])m")
+
+	if not Hour then
+		return nil
+	end
+
+	const Base = Reply.At or os.time()
+	const Day = os.date("*t", Base) :: any
+	local Hours = (tonumber(Hour) :: number) % 12
+
+	if Half == "p" then
+		Hours += 12
+	end
+
+	-- os.date agrees with Windows' clock, where DateTime.fromLocalTime came out an hour off in Studio.
+	const Midnight = Base - (Day.hour * 3600 + Day.min * 60 + Day.sec)
+	local Reset = Midnight + Hours * 3600 + (tonumber(Minute) or 0) * 60
+
+	if Reset <= Base then
+		Reset += 86400
+	end
+
+	return Reset
+end
+
+-- Whether the limit is known not to have reset yet, from the usage windows or the limit message itself.
+const function WaitingOnReset(Reply: Types.Message): boolean
 	for _, Limit in Chat.Limits() do
-		if Limit.resetsAt and Limit.utilization and Limit.utilization >= 0.99 and Limit.resetsAt > os.time() then
-			return
+		if Limit.resetsAt and Limit.resetsAt > os.time() and ((Limit.utilization and Limit.utilization >= 0.99) or Limit.status == "rejected") then
+			return true
 		end
 	end
 
-	Chat.Continue(Last.Prompt)
+	const Reset = ResetFromText(Reply)
+
+	return Reset ~= nil and Reset > os.time()
+end
+
+-- Messages sent while the limit holds wait in the queue instead of failing, and go out when work resumes.
+function Chat.Limited(): boolean
+	const Reply = LimitedReply()
+
+	return Reply ~= nil and WaitingOnReset(Reply)
+end
+
+local TriedAt = 0
+
+function Chat.ResumeAfterLimit()
+	if Chat.Sending() or Settings.Get("ContinueAfterLimit")() ~= true then
+		return
+	end
+
+	const Last = LimitedReply()
+
+	if not Last or WaitingOnReset(Last) then
+		return
+	end
+
+	-- Without a known reset time, try again at most every five minutes rather than every second.
+	if os.clock() - TriedAt < 300 then
+		return
+	end
+
+	TriedAt = os.clock()
+
+	const Worked = #(Last.Calls or {}) > 0 or not Format.IsLimit(Last.Text or "")
+
+	Chat.Continue(if Worked then nil else Last.Prompt)
 end
 
 function Chat.Continue(Prompt: string?)

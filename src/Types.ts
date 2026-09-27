@@ -344,6 +344,7 @@ export type Turn = {
   Id: string;
   PromptId?: string;
   Received?: boolean;
+  LimitHit?: boolean;
   Stage?: "sending" | "starting" | "preparing" | "model" | "tools" | null;
   PendingTools?: Set<string>;
   StreamDriven?: boolean;

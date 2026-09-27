@@ -19,7 +19,7 @@ function Limits.Card(Error: () -> string, Retry: () -> (), LayoutOrder: number)
 	end
 
 	const function Auto(): boolean
-		return Settings.Get("AutoContinue")() == true
+		return Settings.Get("ContinueAfterLimit")() == true
 	end
 
 	return Create "Frame" {
@@ -101,7 +101,7 @@ function Limits.Card(Error: () -> string, Retry: () -> (), LayoutOrder: number)
 			AutoButtonColor = false,
 			LayoutOrder = 3,
 			Activated = function()
-				Settings.Set("AutoContinue", not Auto())
+				Settings.Set("ContinueAfterLimit", not Auto())
 			end,
 
 			Create "UIListLayout" {

@@ -940,6 +940,8 @@ return function(Props: Props)
 			WasWorking = IsWorkingNow
 		end)
 
+		const Pointed = Vide.source(false)
+
 		return Create "Frame" {
 			Name = function()
 				return Format.Capitalize(Kind())
@@ -951,6 +953,7 @@ return function(Props: Props)
 			Visible = function()
 				return Kind() ~= "thinking" or Chat.Thinking()
 			end,
+			Vide.action(Covers.Hover(Pointed)),
 
 			Create "UIListLayout" {
 				SortOrder = Enum.SortOrder.LayoutOrder,
@@ -1074,6 +1077,45 @@ return function(Props: Props)
 							return Vector2.new(math.max(20, math.floor(GetBubbleWidth() * 0.85) - 20), math.huge)
 						end,
 					},
+				},
+			},
+			-- A message sent while Claude was working, once Claude has read it, gets the same actions as any
+			-- other message you sent.
+			Create "Frame" {
+				Name = "SentActions",
+				Size = UDim2.fromOffset(0, 18),
+				AutomaticSize = Enum.AutomaticSize.X,
+				BackgroundTransparency = 1,
+				LayoutOrder = 4,
+				Visible = function()
+					return Kind() == "user" and Pointed()
+				end,
+
+				Create "UIListLayout" {
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 4),
+				},
+				IconButton {
+					Icon = Config.Icons.Retry,
+					LayoutOrder = 1,
+					Size = Settings.SmallText,
+					Disabled = Chat.Sending,
+					Tooltip = "Send this again",
+					DisabledTooltip = "Cannot resend while Claude is working",
+					OnClick = function()
+						task.spawn(Chat.Send, Value().Text or "")
+					end,
+				},
+				IconButton {
+					Icon = Config.Icons.Copy,
+					LayoutOrder = 2,
+					Size = Settings.SmallText,
+					Tooltip = "Copy",
+					OnClick = function()
+						task.spawn(Chat.Copy, Value().Text or "")
+					end,
 				},
 			},
 

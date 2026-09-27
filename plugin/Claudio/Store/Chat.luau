@@ -127,6 +127,8 @@ const function Append(Message: Types.Message)
 	const Messages = table.clone(Chat.Messages())
 
 	table.insert(Messages, With(Message, {At = os.time()}))
+	-- Grow the rendered window with the chat, so a new message never pushes an older one out of view.
+	Chat.Shown(Chat.Shown() + 1)
 	Chat.Messages(Messages)
 end
 

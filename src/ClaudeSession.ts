@@ -1,9 +1,10 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, SubagentModels, Subagents, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, ExtraModels, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory } from "./Config.js";
+import { AllowedTools, AutoBias, AutoTier, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, SubagentModels, Subagents, EffortOrder, LeanMode, PlanInstructions, CommandsCacheFile, DesktopConfigPath, ExtraModels, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory, DeveloperUserIds } from "./Config.js";
 import { AddDesktopSession, ExtractContext, LatestContext, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { CapToolOutput } from "./ResultCap.js";
@@ -678,6 +679,7 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
     CommittedText: Text,
     PendingText: "",
     Calls: Turn.Calls.map((Call) => (Call.Status === "running" || Call.Status === "preparing" ? {...Call, Status: "error" as CallStatus} : Call)),
+    Parts: Turn.Parts.map((Part) => (Part.pending ? {...Part, pending: false} : Part)),
   });
   setTimeout(() => Turns.delete(Turn.Id), FinishedTurnLifetimeMilliseconds);
 }
@@ -690,7 +692,9 @@ export function AddToTurn(RequestId: string | null, ConversationId: string | nul
       continue;
     }
 
-    Turn.Session.Send(UserMessage(Text, Images));
+    const Id = crypto.randomUUID();
+
+    Turn.Session.Send(UserMessage(Text, Images, Id));
     Publish(Turn, {
       Parts: Turn.Parts.concat(
         Turn.PendingThinking.trim() !== "" ? [{
@@ -704,6 +708,8 @@ export function AddToTurn(RequestId: string | null, ConversationId: string | nul
         [{
           kind: "user",
           text: StripContext(Text),
+          id: Id,
+          pending: true,
         }],
       ),
       CommittedThinking: JoinText(Turn.CommittedThinking, Turn.PendingThinking),
@@ -857,7 +863,7 @@ export function AnswerPermission(Turn: Turn, PermissionId: string, Allow: boolea
   return true;
 }
 
-function UserMessage(Text: string, Images: Picture[]) {
+function UserMessage(Text: string, Images: Picture[], Id?: string) {
   const Pictures = (Images || []).map((Image: Picture) => ({
     type: "image",
     source: {
@@ -877,6 +883,7 @@ function UserMessage(Text: string, Images: Picture[]) {
       }]),
     },
     parent_tool_use_id: null,
+    ...(Id ? {uuid: Id} : {}),
   };
 }
 
@@ -992,6 +999,16 @@ function OpenAutoTurn(Session: Session): Turn | null {
 }
 
 function RouteMessage(Session: Session, Message: any) {
+  if (Message.type === "user" && Message.isReplay === true) {
+    const Delivered = Session.CurrentTurn;
+
+    if (Delivered && Delivered.Parts.some((Part) => Part.pending && Part.id === Message.uuid)) {
+      Publish(Delivered, {Parts: Delivered.Parts.map((Part) => (Part.pending && Part.id === Message.uuid ? {...Part, pending: false} : Part))});
+    }
+
+    return;
+  }
+
   if (Message.type === "system" && Message.subtype === "background_tasks_changed") {
     Session.Background = new Set(((Message.tasks || []) as {task_id: string, task_type: string, ambient?: boolean}[])
       .filter((Task) => !Task.ambient && /agent/i.test(Task.task_type || ""))
@@ -1542,6 +1559,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
           cwd: TurnWorkingDirectory,
           additionalDirectories: [MirrorSyncedSkills()],
           includePartialMessages: true,
+          extraArgs: {"replay-user-messages": null},
           settings: {
             fastMode: FastMode === true,
             todoFeatureEnabled: true,
@@ -1781,7 +1799,7 @@ export function UsableFolder(Folder: unknown): string | null {
   }
 }
 
-function DescribePlace(Place: {name?: string, placeId?: number, universeId?: number} | null | undefined): string | null {
+function DescribePlace(Place: {name?: string, placeId?: number, universeId?: number, userId?: string} | null | undefined): string | null {
   if (!Place || typeof Place.name !== "string" || Place.name === "") {
     return null;
   }
@@ -1790,7 +1808,13 @@ function DescribePlace(Place: {name?: string, placeId?: number, universeId?: num
     ? `The open place is ${JSON.stringify(String(Place.name).replace(/\s+/g, " ").slice(0, 100))}. It has not been published, so it has no place id or universe id yet.`
     : `The open place is ${JSON.stringify(String(Place.name).replace(/\s+/g, " ").slice(0, 100))}, place id ${Place.placeId}, universe id ${Place.universeId}.`;
 
-  return `<studio_place>\n${Said}\n</studio_place>`;
+  const Described = `<studio_place>\n${Said}\n</studio_place>`;
+
+  if (typeof Place.userId !== "string" || !DeveloperUserIds.includes(Place.userId)) {
+    return Described;
+  }
+
+  return `${Described}\n\n<claudio_developer>\nThe person using this Studio is the developer of Claudio, the plugin and bridge you are running inside. When Claudio's own tools (mcp__claudio__*) or anything else in Claudio misbehaves, returns something wrong, confusing or incomplete, is missing something you needed, or makes you work around it, say so plainly in your reply as a note for fixing Claudio: what you tried, what happened, and what you expected. Then carry on with their task.\n</claudio_developer>`;
 }
 
 let LastStyle = "default";

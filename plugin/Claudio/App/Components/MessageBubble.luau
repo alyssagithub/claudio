@@ -711,6 +711,7 @@ return function(Props: Props)
 		Kind: "thinking" | "text" | "calls" | "user" | "notice",
 		Text: string?,
 		Calls: {number}?,
+		Pending: boolean?,
 	}
 
 	const function Blocks(): {Block}
@@ -774,6 +775,7 @@ return function(Props: Props)
 					table.insert(Found, {
 						Kind = Piece.Kind,
 						Text = Piece.Text or "",
+						Pending = Piece.Pending,
 					})
 				end
 			end
@@ -1050,6 +1052,19 @@ return function(Props: Props)
 						end,
 					},
 				},
+			},
+			Create "TextLabel" {
+				Name = "Sending",
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				TextColor3 = Theme.Colors.DimText,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+				LayoutOrder = 4,
+				Visible = function()
+					return Kind() == "user" and Value().Pending == true
+				end,
+				Text = "Sending…",
 			},
 			Create "TextLabel" {
 				Name = "Notice",

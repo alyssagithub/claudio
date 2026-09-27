@@ -631,6 +631,23 @@ ${Text}`;
         return;
       }
 
+      if (Request.method === "POST" && Url.pathname === "/testing/save") {
+        const Body = await ReadBody(Request);
+        const Bytes = typeof Body.rbxm === "string" ? Buffer.from(Body.rbxm, "base64") : null;
+
+        if (!Bytes || Bytes.subarray(0, 8).toString("latin1") !== "<roblox!") {
+          SendJson(Response, 400, {error: "That is not a binary rbxm."});
+          return;
+        }
+
+        const Target = path.join(path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url)))), "Claudio.rbxm");
+
+        fs.writeFileSync(`${Target}.incoming`, Bytes);
+        fs.renameSync(`${Target}.incoming`, Target);
+        SendJson(Response, 200, {saved: Target, bytes: Bytes.length});
+        return;
+      }
+
       if (Request.method === "GET" && Url.pathname === "/testing/tree") {
         const Folder = path.join(path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url)))), "plugin");
         const Templates = path.join(Folder, "Templates.rbxm");

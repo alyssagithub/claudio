@@ -41,6 +41,8 @@ export const AllowedTools = [
   "WebFetch",
 ];
 export const CappedTools = ["Read", "Glob", "Grep"];
+export const DeveloperUserIds = ["109830895"];
+
 export function SystemPromptFor(ServerNames: string[], UsingSubagents: boolean) {
   const Sections = ["# Claudio\n\nYou are Claudio, a chat assistant in a plugin widget docked in Roblox Studio."];
 

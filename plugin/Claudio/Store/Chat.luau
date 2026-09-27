@@ -2536,6 +2536,7 @@ const function ReadParts(Given: any): {Types.Piece}
 			Kind = Part.kind,
 			Text = Part.text,
 			Call = Part.call,
+			Pending = Part.pending,
 		})
 	end
 
@@ -2793,9 +2794,16 @@ function Chat.Flush()
 		end
 
 		const Rest = table.clone(Waiting)
+		const Shown = table.clone(Chat.StreamingParts())
 
 		table.remove(Rest, 1)
 		Chat.Queue(Rest)
+		table.insert(Shown, {
+			Kind = "user",
+			Text = Entry.Display,
+			Pending = true,
+		})
+		Chat.StreamingParts(Shown)
 
 		if not Client.SendNow(Entry.Full, Chat.ConversationId(), Chat.RequestId, Entry.Images) then
 			const Back = table.clone(Chat.Queue() :: {Types.QueuedMessage})

@@ -120,6 +120,7 @@ return {
 			kind = Typed.string(),
 			text = Typed.optional(Typed.string()),
 			call = Typed.optional(Typed.number()),
+			pending = Typed.optional(Typed.boolean()),
 		}))),
 		activity = Typed.array(Typed.string()),
 		model = Typed.optional(Typed.string()),

@@ -2,11 +2,24 @@ const HttpService = game:GetService("HttpService")
 const EncodingService = game:GetService("EncodingService")
 const SerializationService = game:GetService("SerializationService")
 
-const Answer = HttpService:RequestAsync({
-	Url = `http://127.0.0.1:{plugin:GetSetting("Claudio_Port") or 47225}/testing/tree`,
-	Method = "GET",
-	Headers = {["X-Claudio-Token"] = plugin:GetSetting("Claudio_BridgeToken") or ""},
-})
+const SaveInstead = false
+const Base = `http://127.0.0.1:{plugin:GetSetting("Claudio_Port") or 47225}`
+const Headers = {
+	["Content-Type"] = "application/json",
+	["X-Claudio-Token"] = plugin:GetSetting("Claudio_BridgeToken") or "",
+}
+
+const Fetched, Answer = pcall(function()
+	return HttpService:RequestAsync({
+		Url = `{Base}/testing/tree`,
+		Method = "GET",
+		Headers = Headers,
+	})
+end)
+
+if not Fetched then
+	return `The bridge could not be reached: {Answer}`
+end
 
 if not Answer.Success then
 	return `The bridge would not hand over the plugin source: {Answer.StatusCode} {Answer.Body}`
@@ -70,4 +83,37 @@ if Tree.templates then
 	end
 end
 
-return require((Root :: any).Testing).Mount(plugin)
+if not SaveInstead then
+	return require((Root :: any).Testing).Mount(plugin)
+end
+
+for _, Object in Root:GetDescendants() do
+	if Object:IsA("BaseScript") and Object.Name ~= "Plugin" then
+		Object.Disabled = true
+	end
+end
+
+const Serialized, Bytes = pcall(function()
+	return SerializationService:SerializeInstancesAsync({Root})
+end)
+
+if not Serialized then
+	return `Studio could not serialize the plugin: {Bytes}`
+end
+
+const Sent, Saved = pcall(function()
+	return HttpService:RequestAsync({
+		Url = `{Base}/testing/save`,
+		Method = "POST",
+		Headers = Headers,
+		Body = HttpService:JSONEncode({rbxm = buffer.tostring(EncodingService:Base64Encode(Bytes))}),
+	})
+end)
+
+Root:Destroy()
+
+if not Sent then
+	return `The bridge could not be reached: {Saved}`
+end
+
+return if Saved.Success then `Saved the plugin built from disk: {Saved.Body}` else `The bridge would not save it: {Saved.StatusCode} {Saved.Body}`

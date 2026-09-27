@@ -126,6 +126,7 @@ export type Part = {
   text?: string;
   id?: string;
   call?: number;
+  pending?: boolean;
 };
 
 export type StoredMessage = {
@@ -408,7 +409,7 @@ export type TurnRequest = {
   FastMode?: boolean;
   Mode: string;
   Bypass?: boolean;
-  Place?: {name?: string, placeId?: number, universeId?: number} | null;
+  Place?: {name?: string, placeId?: number, universeId?: number, userId?: string} | null;
   Folder?: string | null;
   OutputStyle?: string;
   StepDown?: boolean;

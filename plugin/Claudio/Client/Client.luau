@@ -9,6 +9,7 @@ const Typed = require(script.Parent.Parent.Packages.typed)
 const Schemas = require(script.Parent.Schemas)
 
 const HttpService = game:GetService("HttpService")
+const StudioService = game:GetService("StudioService")
 
 const function BaseUrl(): string
 	return `http://127.0.0.1:{Settings.Get("Port")()}`
@@ -129,6 +130,9 @@ const function TurnBody(Text: string, ConversationId: string?, Images: {Types.Im
 			name = GetPlaceName(),
 			placeId = if game.PlaceId == 0 then nil else string.format("%d", game.PlaceId),
 			universeId = if game.GameId == 0 then nil else string.format("%d", game.GameId),
+			userId = (select(2, pcall(function(): string?
+				return string.format("%d", StudioService:GetUserId())
+			end))),
 		},
 	}
 end

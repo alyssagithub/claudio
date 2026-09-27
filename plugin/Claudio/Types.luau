@@ -26,6 +26,7 @@ export type Piece = {
 	Kind: "thinking" | "text" | "call" | "user" | "notice",
 	Text: string?,
 	Call: number?,
+	Pending: boolean?,
 }
 
 export type Message = {

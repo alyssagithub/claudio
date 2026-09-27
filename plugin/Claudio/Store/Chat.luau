@@ -3111,8 +3111,6 @@ Start = function(Entry: Types.QueuedMessage)
 			end
 
 			if CurrentGeneration ~= Generation then
-				task.spawn(Client.CancelTurn, Turn.requestId)
-
 				return "cancelled", "", nil
 			end
 
@@ -3577,7 +3575,6 @@ end
 function Chat.Open(Id: string)
 	Chat.LeaveSubagent()
 	if Id == Gallery.Id then
-		Chat.Stop()
 		Reset()
 		Context.Clear()
 		Chat.Shown(40)
@@ -3599,7 +3596,8 @@ function Chat.Open(Id: string)
 		return
 	end
 
-	Chat.Stop()
+	-- Leaving a chat only stops following its turn; the turn keeps going and is picked up again when
+	-- the chat is opened, so several chats can work at once.
 	Reset()
 	Context.Clear()
 	Chat.Shown(40)
@@ -3783,7 +3781,6 @@ end
 
 function Chat.New()
 	Chat.LeaveSubagent()
-	Chat.Stop()
 	Reset()
 	Chat.Shown(40)
 	table.clear(Requested)

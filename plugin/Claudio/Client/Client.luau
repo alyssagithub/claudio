@@ -152,6 +152,10 @@ function Client.PollTurn(RequestId: string, Version: number): (boolean, any)
 	return Checked(Ok, Result, Schemas.Turn)
 end
 
+function Client.FinishedSince(Since: number): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/chat/finished?since={string.format("%d", Since)}`)
+end
+
 function Client.ActiveTurn(ConversationId: string): (boolean, any)
 	return Http.Request("GET", `{BaseUrl()}/chat/active?conversation={HttpService:UrlEncode(ConversationId)}`)
 end

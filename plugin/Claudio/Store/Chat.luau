@@ -102,6 +102,7 @@ const Chat = {
 	RequestId = nil :: string?,
 	CurrentPrompt = "",
 	ReplyListener = nil :: ((Text: string) -> ())?,
+	ElsewhereListener = nil :: ((Title: string, Text: string) -> ())?,
 }
 
 const function With(Record: any, Fields: {[string]: any}): any
@@ -2507,6 +2508,55 @@ function Chat.WatchStudioJobs()
 	const Mounted = (script.Parent.Parent :: Instance).Name:match("Testing$") ~= nil
 	local Asked = 0
 	local Checked = 0
+	local FinishedChecked = 0
+	local FinishedAfter: number? = nil
+	local CheckingFinished = false
+
+	-- Turns keep running in chats you switch away from, and only the chat on screen is followed turn by
+	-- turn, so ask the bridge which turns ended elsewhere and notify for those the same way.
+	const function CheckFinished()
+		if CheckingFinished then
+			return
+		end
+
+		CheckingFinished = true
+
+		const Ok, Result = Client.FinishedSince(FinishedAfter or 0)
+
+		CheckingFinished = false
+
+		if not Ok or typeof(Result) ~= "table" or typeof(Result.now) ~= "number" then
+			return
+		end
+
+		if FinishedAfter == nil then
+			FinishedAfter = Result.now
+
+			return
+		end
+
+		for _, Entry in (if typeof(Result.finished) == "table" then Result.finished else {}) :: {any} do
+			if typeof(Entry) ~= "table" or typeof(Entry.endedAt) ~= "number" then
+				continue
+			end
+
+			FinishedAfter = math.max(FinishedAfter :: number, Entry.endedAt)
+
+			if Entry.conversationId == Chat.ConversationId() or Entry.status == "cancelled" or not Chat.ElsewhereListener then
+				continue
+			end
+
+			local Title = "Another chat"
+
+			for _, Summary in Chat.Conversations() do
+				if Summary.id == Entry.conversationId and typeof(Summary.title) == "string" and Summary.title ~= "" then
+					Title = Summary.title
+				end
+			end
+
+			Chat.ElsewhereListener(Title, if typeof(Entry.text) == "string" then Entry.text else "")
+		end
+	end
 	local SavedDraft = Settings.Fresh("Draft")
 
 	if Chat.Draft() == "" then
@@ -2533,6 +2583,11 @@ function Chat.WatchStudioJobs()
 			if Connection.Status() == "Connected" and os.clock() - Checked > 3 then
 				Checked = os.clock()
 				task.spawn(Chat.Sync)
+			end
+
+			if not Mounted and Connection.Status() == "Connected" and os.clock() - FinishedChecked > 2 then
+				FinishedChecked = os.clock()
+				task.spawn(CheckFinished)
 			end
 
 			task.spawn(Chat.ResumeAfterLimit)

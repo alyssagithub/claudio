@@ -652,6 +652,8 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
 
   if (Turn.ConversationId) {
     Ended.set(Turn.ConversationId, Date.now());
+    Finished.push({conversationId: Turn.ConversationId, endedAt: Date.now(), status: Status, text: (Error && Status === "error" ? Error : Text).slice(-600)});
+    Finished.splice(0, Math.max(0, Finished.length - 50));
     SaveQuietly("FinishTurn", () => UpdateDesktopSession(Turn.ConversationId!, (Session) => {
       Session.lastActivityAt = Date.now();
       Session.completedTurns = ((Session.completedTurns as number) || 0) + 1;
@@ -722,6 +724,15 @@ export async function CancelQueued(RequestId: string, Id: string): Promise<boole
 }
 
 const Ended = new Map<string, number>();
+
+type FinishedTurn = { conversationId: string; endedAt: number; status: string; text: string };
+
+// Recently finished turns, so the plugin can tell you about chats you are not looking at.
+const Finished: FinishedTurn[] = [];
+
+export function FinishedSince(Since: number): FinishedTurn[] {
+  return Finished.filter((Entry) => Entry.endedAt > Since);
+}
 
 export function LastEndedAt(ConversationId: string): number {
   return Ended.get(ConversationId) || 0;

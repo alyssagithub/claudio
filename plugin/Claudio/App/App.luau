@@ -33,6 +33,7 @@ function App.New(CurrentPlugin: Plugin)
 
 	Button:SetActive(Window.Enabled)
 	Chat.ReplyListener = Attention.Notify
+	Chat.ElsewhereListener = Attention.NotifyElsewhere
 
 	const SizeConnection = Window:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 		Chat.WindowWidth(Window.AbsoluteSize.X)
@@ -157,6 +158,7 @@ function App.New(CurrentPlugin: Plugin)
 		Destroy = function()
 			Retrying = false
 			Chat.ReplyListener = nil
+			Chat.ElsewhereListener = nil
 			Chat.Window = nil
 			Chat.Unload()
 			PasteConnection:Disconnect()

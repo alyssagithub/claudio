@@ -45,7 +45,11 @@ function Attention.Closing(Text: string): string
 	return `...{Last:sub(-197)}`
 end
 
-function Attention.Notify(Text: string)
+function Attention.NotifyElsewhere(Title: string, Text: string)
+	Attention.Notify(Text, Title)
+end
+
+function Attention.Notify(Text: string, Chat: string?)
 	const Wanted = {
 		sound = Settings.Get("Sound")(),
 		flash = Settings.Get("Flash")(),
@@ -58,7 +62,7 @@ function Attention.Notify(Text: string)
 		return
 	end
 
-	task.spawn(Client.Notify, Config.Name, Attention.Closing(Text), Wanted)
+	task.spawn(Client.Notify, if Chat then `{Config.Name}: {Chat}` else Config.Name, Attention.Closing(Text), Wanted)
 end
 
 return Attention

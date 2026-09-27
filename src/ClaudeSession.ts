@@ -884,8 +884,14 @@ function UserMessage(Text: string, Images: Picture[], Id?: string) {
   };
 }
 
+// A session with background agents still working counts as busy even with no turn open, since a turn
+// can end on a usage limit while its agents carry on, and closing the session would stop them.
+function Idle(Session: Session): boolean {
+  return !Session.CurrentTurn && Session.Background.size === 0;
+}
+
 function CloseIdleSessions() {
-  const Warm = [...Sessions.values()].filter((Session) => !Session.CurrentTurn);
+  const Warm = [...Sessions.values()].filter(Idle);
 
   for (const Session of Warm) {
     if (Date.now() - Session.LastUsedAt > IdleSessionMilliseconds) {
@@ -893,7 +899,7 @@ function CloseIdleSessions() {
     }
   }
 
-  const Remaining = [...Sessions.values()].filter((Session) => !Session.CurrentTurn).sort((Left, Right) => Left.LastUsedAt - Right.LastUsedAt);
+  const Remaining = [...Sessions.values()].filter(Idle).sort((Left, Right) => Left.LastUsedAt - Right.LastUsedAt);
 
   for (const Session of Remaining.slice(0, Math.max(0, Remaining.length - MaxWarmSessions))) {
     Session.Close();
@@ -1559,7 +1565,7 @@ function RouteMessage(Session: Session, Message: any) {
 
   FinishTurn(Turn, Failed ? "error" : (Turn.Status === "cancelling" ? "cancelled" : "done"), Failed ? (Message.result || Message.subtype) : null);
 
-  if (!KeepSessionsWarm) {
+  if (!KeepSessionsWarm && Session.Background.size === 0) {
     Session.Close();
     return;
   }
@@ -2087,7 +2093,15 @@ export function StartTurn(Request: TurnRequest) {
   LastFolder = Turn.WorkingDirectory;
 
   const Warm = ConversationId ? Sessions.get(ConversationId) : TakeSpare(Chosen.model, Chosen.effort);
-  const Reusable = Warm && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory && Warm.Planning === Turn.Planning && Warm.Mode === PermissionModeFor(Turn.Mode, Turn.Bypass) && Warm.UsingSubagents === Turn.UsingSubagents && Warm.Subagent === Turn.Subagent;
+  const Fits = Warm && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory && Warm.Planning === Turn.Planning && Warm.Mode === PermissionModeFor(Turn.Mode, Turn.Bypass) && Warm.UsingSubagents === Turn.UsingSubagents && Warm.Subagent === Turn.Subagent;
+  // Closing a session also stops its background agents, so while any are working the chat keeps its session
+  // even when a setting changed, rather than losing that work.
+  const Busy = !Fits && Warm && !Warm.CurrentTurn && !Warm.Ended && Warm.Background.size > 0;
+  const Reusable = Fits || Busy;
+
+  if (Busy) {
+    console.log(`Turn ${Turn.Id}: keeping the session despite changed settings, ${Warm.Background.size} background agent${Warm.Background.size === 1 ? "" : "s"} still working`);
+  }
 
   if (Warm && !Reusable) {
     const Reasons = [

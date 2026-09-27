@@ -8,6 +8,7 @@ const Format = require(script.Parent.Parent.Parent.Format)
 const Working = require(script.Parent.Working)
 const MessageBubble = require(script.Parent.MessageBubble)
 const PermissionCard = require(script.Parent.PermissionCard)
+const QueueBar = require(script.Parent.QueueBar)
 
 const Tips = {
 	"Send another message while Claude is working and it waits its turn.",
@@ -421,5 +422,6 @@ return function()
 			Working(),
 		},
 		PermissionCard(),
+		QueueBar(),
 	}
 end

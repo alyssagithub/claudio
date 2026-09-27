@@ -170,23 +170,19 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 	}
 end
 
+-- Queued messages sit at the very end of the message list, so they scroll with the chat like a message
+-- just sent, and anything new that arrives lands above them.
 return function()
 	return Create "Frame" {
-		Name = "QueueBar",
+		Name = "Queue",
 		Size = UDim2.fromScale(1, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		LayoutOrder = 3,
+		LayoutOrder = 2000000,
 		Visible = function()
 			return #Chat.Queue() > 0
 		end,
 
-		Create "UIPadding" {
-			PaddingLeft = UDim.new(0, 8),
-			PaddingRight = UDim.new(0, 8),
-			PaddingTop = UDim.new(0, 4),
-			PaddingBottom = UDim.new(0, 4),
-		},
 		Create "UIListLayout" {
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Padding = UDim.new(0, 6),

@@ -11,7 +11,6 @@ const StatusBar = require(script.Parent.Parent.Components.StatusBar)
 const UpdateBanner = require(script.Parent.Parent.Components.UpdateBanner)
 const MessageList = require(script.Parent.Parent.Components.MessageList)
 const InputBar = require(script.Parent.Parent.Components.InputBar)
-const QueueBar = require(script.Parent.Parent.Components.QueueBar)
 const ChatList = require(script.Parent.Parent.Components.ChatList)
 const SubagentView = require(script.Parent.Parent.Components.SubagentView)
 const PlanBar = require(script.Parent.Parent.Components.PlanBar)
@@ -123,7 +122,7 @@ return function()
 					Vide.effect(function()
 						const Viewing = Chat.Viewing() ~= nil
 
-						for _, Name in {"MessageList", "QueueBar", "InputBar"} do
+						for _, Name in {"MessageList", "InputBar"} do
 							const Found = Object:FindFirstChild(Name)
 
 							if Found and Found:IsA("GuiObject") then
@@ -137,7 +136,6 @@ return function()
 				GalleryBar(),
 				QuestionCard(),
 				PlanBar(),
-				QueueBar(),
 				InputBar(),
 			},
 			Create "TextLabel" {

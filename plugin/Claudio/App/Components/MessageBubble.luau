@@ -297,7 +297,7 @@ return function(Props: Props)
 		while true do
 			const From, To, Question = Output:find('"([^"]+)"="', Search)
 
-			if not From then
+			if not From or not To or not Question then
 				break
 			end
 

@@ -1,5 +1,6 @@
 --!strict
 const RunService = game:GetService("RunService")
+const TweenService = game:GetService("TweenService")
 
 const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Config = require(script.Parent.Parent.Parent.Config)
@@ -63,7 +64,7 @@ const function TasksLabel(): string?
 end
 
 return function()
-	const Dots = Vide.source(1)
+	const Shine = Vide.source(0)
 	const TasksHovered = Vide.source(false)
 	const Seconds = Vide.source(0)
 	const Thought = Vide.source(nil :: string?)
@@ -77,16 +78,12 @@ return function()
 	local SettlingSince = 0
 	local WasWorking = false
 
-	const function Dotted(Text: string): string
-		return `{Text}{string.rep(".", Dots())}`
-	end
-
 	-- The line reads before, then the running tasks as a button that opens the tasks pane, then the stage.
 	const function Pieces(): (string, boolean, string)
 		const Tasks = TasksLabel() ~= nil
 
 		if Chat.Stopping() then
-			return Dotted("Stopping"), Tasks, ""
+			return "", Tasks, "Stopping"
 		end
 
 		if Chat.Waiting() > 0 and Tasks then
@@ -101,7 +98,7 @@ return function()
 		end
 
 		if Chat.Compacting() then
-			return `{Dotted("Compacting session")} · {Clock}`, false, ""
+			return Clock, false, "Compacting session"
 		end
 
 		const Parts = {Clock}
@@ -114,7 +111,7 @@ return function()
 
 		const Label = Thought() or Waiting()
 
-		return table.concat(Parts, " · "), Tasks, if Label then (if Label:sub(1, 11) == "Thought for" then Label else Dotted(Label)) else ""
+		return table.concat(Parts, " · "), Tasks, Label or ""
 	end
 
 	const function Before(): string
@@ -127,6 +124,10 @@ return function()
 
 	const function After(): string
 		return (select(3, Pieces()))
+	end
+
+	const function Shining(): boolean
+		return After() ~= "" and After():sub(1, 11) ~= "Thought for"
 	end
 
 	const function Piece(Name: string, Text: () -> string, LayoutOrder: number, Visible: () -> boolean): TextLabel
@@ -182,7 +183,7 @@ return function()
 				end
 
 				WasThinking = InBlock
-				Dots(math.floor(Elapsed * 2.5) % 3 + 1)
+				Shine(Elapsed % 3 / 3)
 				Seconds(math.floor(Elapsed))
 
 				local Thinking: string? = nil
@@ -267,8 +268,39 @@ return function()
 		end, 5, function()
 			return After() ~= "" and (Before() ~= "" or ShowTasks())
 		end),
-		Piece("Stage", After, 6, function()
-			return After() ~= ""
-		end),
+		Create "TextLabel" {
+			Name = "Stage",
+			AutomaticSize = Enum.AutomaticSize.XY,
+			BackgroundTransparency = 1,
+			TextColor3 = function()
+				return if Shining() then Color3.new(1, 1, 1) else Theme.Colors.DimText()
+			end,
+			TextSize = Settings.TextSize,
+			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+			LayoutOrder = 6,
+			Text = After,
+			Visible = function()
+				return After() ~= ""
+			end,
+
+			Create "UIGradient" {
+				Enabled = Shining,
+				Color = function()
+					const Dim = Theme.Colors.DimText()
+					const Peak = if select(3, Theme.Colors.Background():ToHSV()) > 0.5 then Dim:Lerp(Color3.new(1, 1, 1), 0.7) else Theme.Colors.Text()
+
+					return ColorSequence.new({
+						ColorSequenceKeypoint.new(0, Dim),
+						ColorSequenceKeypoint.new(0.5, Peak),
+						ColorSequenceKeypoint.new(1, Dim),
+					})
+				end,
+				Offset = function()
+					const Phase = math.clamp((Shine() - 0.15) / 0.7, 0, 1)
+
+					return Vector2.new(-1 + 2 * TweenService:GetValue(Phase, Enum.EasingStyle.Quint, Enum.EasingDirection.InOut), 0)
+				end,
+			},
+		},
 	}
 end

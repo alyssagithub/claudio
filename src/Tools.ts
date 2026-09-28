@@ -220,24 +220,39 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       Name: "api",
       Description: "Ask the running engine about the Roblox API: a class's properties, methods and events with full signatures, parameter names, return types, what it inherits and what inherits from it, which members are deprecated or read only, and what security each needs. This is the version of Roblox actually installed, so prefer it over remembering an API or reading documentation that may describe a different version. Narrow with member for one member, search to find a class, enum or member by name, or enumName for an enum's items. Pass deprecated to list only the members you should stop using.",
       Schema: {
-        className: z.string().optional().describe("Class to describe, such as Lighting. Leave out to list every class."),
+        query: z.string().optional().describe("Anything to look up: a class such as Lighting, a member as Class.Member such as UserInputService.GetMouseDelta, or text to search for."),
+        className: z.string().optional().describe("Class to describe, such as Lighting, or Class.Member for one member. Leave out everything to list every class."),
         member: z.string().optional().describe("Only this member of the class."),
         search: z.string().optional().describe("Find a class or enum whose name contains this. Pass className too to search that class's members."),
         enumName: z.string().optional().describe("An enum to list the items of, such as Material."),
         inherited: z.boolean().optional().describe("Include the members every instance has, such as Name and Destroy, which are left out by default."),
         deprecated: z.boolean().optional().describe("Only list members that are deprecated."),
       },
-      Run: async (Input: { className?: string; member?: string; search?: string; enumName?: string; inherited?: boolean; deprecated?: boolean }) => ({content: [{
-        type: "text",
-        text: ApiReport(await Reach("api", {
-          className: Input.className,
-          member: Input.member,
+      Run: async (Input: { query?: string; className?: string; member?: string; search?: string; enumName?: string; inherited?: boolean; deprecated?: boolean }) => {
+        const Named = (Input.className || Input.query || "").trim();
+        const [Class, Member] = Named.includes(".") ? Named.split(".", 2) : [Named, Input.member];
+        const Asked = {
+          className: Class || undefined,
+          member: Member || undefined,
           search: Input.search,
           enumName: Input.enumName,
           inherited: Input.inherited === true,
           deprecated: Input.deprecated === true,
-        })),
-      }]}),
+        };
+        const Answer: any = await Reach("api", Asked);
+
+        if (Input.query && !Input.className && !Named.includes(".") && Answer && typeof Answer.error === "string") {
+          return {content: [{
+            type: "text",
+            text: ApiReport(await Reach("api", {...Asked, className: undefined, search: Named})),
+          }]};
+        }
+
+        return {content: [{
+          type: "text",
+          text: ApiReport(Answer),
+        }]};
+      },
     },
     {
       Name: "modify",

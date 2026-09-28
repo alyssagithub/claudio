@@ -106,10 +106,10 @@ const function Centre(Target: GuiObject): Vector2
 	return Target.AbsolutePosition + Target.AbsoluteSize / 2 + game:GetService("GuiService"):GetGuiInset()
 end
 
-const function Where(Target: GuiObject): string
-	const Point = Centre(Target)
+const function Where(Point: Vector2): string
+	const Shown = Point - game:GetService("GuiService"):GetGuiInset()
 
-	return `{math.floor(Point.X)}, {math.floor(Point.Y)}`
+	return `{math.floor(Shown.X)}, {math.floor(Shown.Y)}`
 end
 
 const function Interact(Body: string): any
@@ -166,6 +166,7 @@ const function Interact(Body: string): any
 		return {text = `Pressed and released {Input.key}. Check the place to confirm what it did.`}
 	end
 
+	const Hold = math.clamp(tonumber(Input.hold) or 0, 0, 5)
 	const Button = if Input.button == "right" then Enum.UserInputType.MouseButton2 elseif Input.button == "middle" then Enum.UserInputType.MouseButton3 else Enum.UserInputType.MouseButton1
 
 	if Action == "drag" and (typeof(Input.path) ~= "string" or Button ~= Enum.UserInputType.MouseButton1) then
@@ -204,7 +205,7 @@ const function Interact(Body: string): any
 				task.wait(0.03)
 			end
 
-			task.wait(0.05)
+			task.wait(0.05 + Hold)
 		end)
 
 		pcall(function()
@@ -216,7 +217,7 @@ const function Interact(Body: string): any
 			return {error = `The drag was refused: {tostring(Refused)}`}
 		end
 
-		return {text = `Held the {(Input.button or "left")} button at {math.floor(From.X)}, {math.floor(From.Y)} and moved the mouse by {Move.X}, {Move.Y} with the cursor locked, so InputChanged and GetMouseDelta saw the movement. Roblox scales the delta by the mouse sensitivity setting.`}
+		return {text = `Held the {(Input.button or "left")} button at {Where(From)} and moved the mouse by {Move.X}, {Move.Y} with the cursor locked, so InputChanged and GetMouseDelta saw the movement. Roblox scales the delta by the mouse sensitivity setting.`}
 	end
 
 	if typeof(Input.path) ~= "string" then
@@ -239,10 +240,10 @@ const function Interact(Body: string): any
 		end)
 
 		if not Sent then
-			return {error = `The press was refused at {Where(Target)}: {tostring(Refused)}`}
+			return {error = `The press was refused at {Where(Point)}: {tostring(Refused)}`}
 		end
 
-		return {text = `Pressed {Target.Name} at {Where(Target)}. Check the place to confirm what it did, because a press that lands on nothing still reports as sent.`}
+		return {text = `Pressed {Target.Name} at {Where(Point)}. Check the place to confirm what it did, because a press that lands on nothing still reports as sent.`}
 	end
 
 	if Action == "hover" then
@@ -251,10 +252,10 @@ const function Interact(Body: string): any
 		end)
 
 		if not Sent then
-			return {error = `The pointer could not be moved to {Where(Target)}: {tostring(Refused)}`}
+			return {error = `The pointer could not be moved to {Where(Point)}: {tostring(Refused)}`}
 		end
 
-		return {text = `Moved the pointer onto {Target.Name} at {Where(Target)}.`}
+		return {text = `Moved the pointer onto {Target.Name} at {Where(Point)}.`}
 	end
 
 	if Action == "scroll" then
@@ -304,14 +305,15 @@ const function Interact(Body: string): any
 			task.wait(0.02)
 		end
 
+		task.wait(Hold)
 		Virtual:SendMouseButton(Finish, Enum.UserInputType.MouseButton1, false, 0)
 	end)
 
 	if not Sent then
-		return {error = `The drag from {Where(Target)} was refused: {tostring(Refused)}`}
+		return {error = `The drag from {Where(Point)} was refused: {tostring(Refused)}`}
 	end
 
-	return {text = `Dragged {Target.Name} from {math.floor(Point.X)}, {math.floor(Point.Y)} to {math.floor(Finish.X)}, {math.floor(Finish.Y)}.`}
+	return {text = `Dragged {Target.Name} from {Where(Point)} to {Where(Finish)}{if Hold > 0 then `, holding {Hold}s before releasing` else ""}. Positions are in the same space as AbsolutePosition.`}
 end
 
 const function Run(Code: string): any

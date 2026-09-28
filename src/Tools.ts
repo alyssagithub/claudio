@@ -25,6 +25,7 @@ const InputDescription = [
   "press clicks the middle of a GuiObject, type sends text to whatever has keyboard focus, key presses and releases a KeyCode by name.",
   "hover moves the pointer onto a GuiObject, scroll turns the wheel over one, and drag holds the button from a GuiObject to another path or by an x and y offset.",
   "A right-button drag, or a drag with no path, holds the button with the cursor locked and sends real mouse movement, so InputChanged deltas and GetMouseDelta see it; use it to turn a camera.",
+  "Positions in answers are in the same space as AbsolutePosition, below the top bar. x and y are a relative move, so prefer to with a target path when dropping onto something. hold waits at the end before releasing, for drops that wait for the pointer to settle.",
   "Needs a play session with a character.",
   "Input that reaches nothing still reports as sent, so check the place afterwards.",
 ].join(" ");
@@ -461,9 +462,10 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         x: z.number().optional().describe("Pixels to drag sideways when there is no to path."),
         y: z.number().optional().describe("Pixels to drag down when there is no to path."),
         button: z.enum(["left", "right", "middle"]).optional().describe("Which mouse button a drag holds. Defaults to left."),
+        hold: z.number().optional().describe("Seconds to keep the button down at the end of a drag before releasing, up to 5."),
         player: z.string().optional().describe("Which client to send it to: a player's name, or their number in join order starting at 1. Defaults to the first player."),
       },
-      Run: async (Input: { action: "press" | "type" | "key" | "hover" | "scroll" | "drag"; path?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number; button?: "left" | "right" | "middle"; player?: string }) => {
+      Run: async (Input: { action: "press" | "type" | "key" | "hover" | "scroll" | "drag"; path?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number; button?: "left" | "right" | "middle"; hold?: number; player?: string }) => {
         if (Input.action === "type" && !Input.text) {
           return {content: [{
             type: "text",
@@ -513,6 +515,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
             x: Input.x,
             y: Input.y,
             button: Input.button,
+            hold: Input.hold,
             player: Input.player,
           }), "Studio did not say what happened."),
         }]};

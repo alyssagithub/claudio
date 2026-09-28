@@ -2,6 +2,8 @@
 const Selection = game:GetService("Selection")
 const StudioService = game:GetService("StudioService")
 const LogService = game:GetService("LogService")
+const RunService = game:GetService("RunService")
+const HttpService = game:GetService("HttpService")
 
 const Vide = require(script.Parent.Parent.Packages.vide)
 const Types = require(script.Parent.Parent.Types)
@@ -116,11 +118,89 @@ function Context.AddRuntime(Label: string, Description: string): string
 	})
 end
 
+const function Recent(History: {any}): {string}
+	const Lines = {}
+
+	for Index = math.max(1, #History - 49), #History do
+		table.insert(Lines, `[{History[Index].messageType.Name:gsub("^Message", "")}] {History[Index].message}`)
+	end
+
+	return Lines
+end
+
 function Context.AddOutput(): string
+	local Lines = Recent(LogService:GetLogHistory())
+
+	if RunService:IsRunning() then
+		const Ok, Reply = Client.RunInSession([[local Lines = {}
+local History = game:GetService("LogService"):GetLogHistory()
+for Index = math.max(1, #History - 49), #History do
+	table.insert(Lines, `[{(History[Index].messageType.Name:gsub("^Message", ""))}] {History[Index].message}`)
+end
+return table.concat(Lines, "\n")]], "server")
+
+		Lines = if Ok and typeof(Reply) == "table" and typeof(Reply.result) == "string" and Reply.result ~= ""
+			then {"Server:", Reply.result, "Client:", table.concat(Lines, "\n")}
+			else Lines
+	end
+
 	return Add({
 		Kind = "output",
 		Label = "Output",
+		Lines = Lines,
+		Data = table.concat(Lines, "\n"),
 	})
+end
+
+const Carried = {
+	output = true,
+	runtime = true,
+	image = true,
+}
+
+function Context.Saved(): string
+	const Kept = {}
+
+	for _, Chip in Context.Chips() do
+		if Carried[Chip.Kind] then
+			table.insert(Kept, {
+				Kind = Chip.Kind,
+				Label = Chip.Label,
+				Token = Chip.Token,
+				Description = Chip.Description,
+				Data = Chip.Data,
+				MediaType = Chip.MediaType,
+				Lines = Chip.Lines,
+			})
+		end
+	end
+
+	return if #Kept == 0 then "" else HttpService:JSONEncode(Kept)
+end
+
+function Context.Restore(Saved: string)
+	const Ok, Given = pcall(HttpService.JSONDecode, HttpService, if Saved == "" then "[]" else Saved)
+
+	if not Ok or typeof(Given) ~= "table" then
+		return
+	end
+
+	const Mine: {[string]: Types.Chip} = {}
+	const Chips = {}
+
+	for _, Chip in Context.Chips() do
+		if not Carried[Chip.Kind] then
+			table.insert(Chips, Chip)
+		elseif Chip.Token then
+			Mine[Chip.Token] = Chip
+		end
+	end
+
+	for _, Chip in Given :: {Types.Chip} do
+		table.insert(Chips, if Chip.Token and Mine[Chip.Token] then Mine[Chip.Token] else Chip)
+	end
+
+	Context.Chips(Chips)
 end
 
 function Context.AddImage(Name: string, Data: string, MediaType: string, Token: string?): string
@@ -211,12 +291,10 @@ const function Describe(Chip: Types.Chip, Lines: {string})
 	end
 
 	if Chip.Kind == "output" then
-		const History = LogService:GetLogHistory()
+		table.insert(Lines, `{Chip.Token} is the Studio output as it was when attached, oldest first:`)
 
-		table.insert(Lines, `{Chip.Token} is the recent Studio output, oldest first:`)
-
-		for Index = math.max(1, #History - 49), #History do
-			table.insert(Lines, `[{History[Index].messageType.Name:gsub("^Message", "")}] {History[Index].message}`)
+		for _, Line in Chip.Lines or Recent(LogService:GetLogHistory()) do
+			table.insert(Lines, Line)
 		end
 
 		return

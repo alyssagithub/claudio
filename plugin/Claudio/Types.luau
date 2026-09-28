@@ -67,6 +67,7 @@ export type Chip = {
 	Description: string?,
 	Data: string?,
 	MediaType: string?,
+	Lines: {string}?,
 }
 
 export type ImageUpload = {

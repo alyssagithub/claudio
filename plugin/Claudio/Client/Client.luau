@@ -434,6 +434,19 @@ function Client.DeleteConversation(Id: string): (boolean, any)
 	return Http.Request("DELETE", `{BaseUrl()}/conversations/{Id}`)
 end
 
+function Client.RunInSession(Code: string, Target: string): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/studio/enqueue`, {
+		kind = "execute",
+		role = "server",
+		timeout = 15,
+		input = {
+			code = Code,
+			target = Target,
+			readOnly = true,
+		},
+	})
+end
+
 function Client.OpenUrl(Url: string): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/open-url`, {url = Url})
 end

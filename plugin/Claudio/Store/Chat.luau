@@ -2567,7 +2567,11 @@ function Chat.WatchStudioJobs()
 			Chat.ElsewhereListener(Title, if typeof(Entry.text) == "string" then Entry.text else "")
 		end
 	end
+
 	local SavedDraft = Settings.Fresh("Draft")
+	local SavedChips = Settings.Fresh("Chips")
+
+	Context.Restore(SavedChips)
 
 	if Chat.Draft() == "" then
 		Chat.Draft(SavedDraft)
@@ -2583,6 +2587,16 @@ function Chat.WatchStudioJobs()
 			elseif Settings.Fresh("Draft") ~= SavedDraft then
 				SavedDraft = Settings.Get("Draft")()
 				Chat.Draft(SavedDraft)
+			end
+
+			const Held = Context.Saved()
+
+			if Held ~= SavedChips then
+				SavedChips = Held
+				Settings.Set("Chips", Held)
+			elseif Settings.Fresh("Chips") ~= SavedChips then
+				Context.Restore(Settings.Get("Chips")())
+				SavedChips = Context.Saved()
 			end
 
 			if Connection.Status() == "Connected" and os.clock() - Asked > 60 then

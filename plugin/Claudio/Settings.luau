@@ -246,6 +246,7 @@ const Hidden: {[string]: string | boolean} = {
 	WidgetOpen = true,
 	ContinueAfterLimit = true,
 	Draft = "",
+	Chips = "",
 }
 
 const Settings = {

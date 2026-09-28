@@ -2589,8 +2589,13 @@ function Chat.WatchStudioJobs()
 				Chat.Draft(SavedDraft)
 			end
 
-			if Settings.Get("Model")() == "claude-sonnet-5-5" then
+			const Picked = Settings.Get("Model")()
+
+			if Picked == "claude-sonnet-5-5" then
 				Settings.Set("Model", "claude-sonnet-5-5[1m]")
+			elseif Picked == "auto" or Picked == "token-saver" or Picked == "default" or Picked == "" then
+				Settings.Set("Model", "opus[1m]")
+				Settings.Set("Effort", "")
 			end
 
 			const Held = Context.Saved()

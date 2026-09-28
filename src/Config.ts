@@ -110,6 +110,7 @@ export const ExtraModels = [
   {
     value: "claude-opus-5-5",
     displayName: "Opus 5.5",
+    fast: true,
     contextWindow: 1000000,
     description: "Latest Opus release · 1M context",
   },

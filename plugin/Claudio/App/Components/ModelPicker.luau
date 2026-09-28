@@ -32,6 +32,12 @@ const function CurrentModel(): Types.ModelInfo?
 	return nil
 end
 
+const function FastModeSupported(): boolean
+	const Model = CurrentModel()
+
+	return Model ~= nil and Model.supportsFastMode == true
+end
+
 const function IsAuto(): boolean
 	return Settings.Get("Model")() == "auto"
 end
@@ -239,9 +245,10 @@ const function GetModels(Extra: boolean): {Types.ModelInfo}
 	return Found
 end
 
-const function Divider(LayoutOrder: number)
+const function Divider(LayoutOrder: number, Visible: (() -> boolean)?)
 	return Create "Frame" {
 		Name = "Divider",
+		Visible = Visible,
 		Size = UDim2.new(1, 0, 0, 1),
 		BackgroundColor3 = Theme.Colors.Border,
 		BorderSizePixel = 0,
@@ -351,19 +358,6 @@ function ModelPicker.Menu()
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			HorizontalFlex = Enum.UIFlexAlignment.Fill,
 		},
-		Row(function()
-			return "Auto"
-		end, function()
-			return "Picks a model for each message based on the effort slider"
-		end, IsAuto, function()
-			Settings.Set("Model", "auto")
-			Settings.Set("Effort", "")
-			Chat.PickerOpen(false)
-		end, 1, nil, function(Entered: boolean)
-			if Entered then
-				CloseMore()
-			end
-		end),
 		Vide.indexes(function()
 			return GetModels(false)
 		end, function(Model: () -> Types.ModelInfo, Index: number)
@@ -397,9 +391,10 @@ function ModelPicker.Menu()
 				end
 			end)
 		end),
-		Divider(9002),
+		Divider(9002, FastModeSupported),
 		Create "TextLabel" {
 			Name = "Section",
+			Visible = FastModeSupported,
 			Size = UDim2.fromScale(1, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
@@ -421,6 +416,7 @@ function ModelPicker.Menu()
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = 9004,
+			Visible = FastModeSupported,
 
 			Create "UIPadding" {
 				PaddingLeft = UDim.new(0, 8),

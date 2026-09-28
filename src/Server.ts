@@ -21,7 +21,7 @@ import { AvatarFor } from "./EasterEgg.js";
 import { HandToken, IssuePlaytestKey, PlaytestKeyMatches, PlaytestLive, RevokePlaytestKey, TokenMatches } from "./Token.js";
 import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
 import { ArmClipboard, AskClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, RestoreFlashing, ShowToast, WriteClipboard } from "./Notify.js";
-import { ForgetConversation, GetModels } from "./Models.js";
+import { ForgetConversation, GetModels, SupportsFastMode } from "./Models.js";
 import { Analyze, Warm } from "./Lint.js";
 import { DescribeReturn, StopWatchingReturn, WaitForReturn, WatchReturn } from "./Keys.js";
 
@@ -177,7 +177,7 @@ function TurnRequestFrom(Body: Record<string, any>, ConversationId: string | nul
     AskForTools: Body.askForTools !== false,
     GuardTools: Body.guardTools === true,
     ExtraPrompt: Body.extraPrompt !== false,
-    FastMode: Body.fastMode === true,
+    FastMode: Body.fastMode === true && SupportsFastMode(typeof Body.model === "string" ? Body.model : undefined),
     Mode: typeof Body.mode === "string" ? Body.mode : DefaultMode,
     Bypass: Body.bypass === true && !PlaytestLive(),
     Escalate: Body.escalate === true,

@@ -10,6 +10,7 @@ type ModelEntry = {
   supportedEffortLevels: string[];
   contextWindow: number;
   extra?: boolean;
+  supportsFastMode?: boolean;
 };
 
 const Trouble = new Map<string, number>();
@@ -17,22 +18,13 @@ const Complaints = /^\s*(no|nope)\b|\b(wrong|incorrect|broken|failing|failed)\b|
 const HardWords = /\b(refactor|debug|investigate|why|architecture|design|redesign|rewrite|optimi[sz]e|profile|race|deadlock|memory leak|migrate|plan|audit|review|trace|reproduce)\b/i;
 const EditWords = /\b(fix|change|add|remove|rename|move|create|make|write|update|implement|convert|replace|delete|build)\b/i;
 
-const Retired = ["auto-lean", "delegation"];
+const Retired = ["auto-lean", "delegation", "default", LeanMode.value];
 
-function WithLeanMode(List: ModelEntry[]): ModelEntry[] {
-  const Kept = List.filter((Model) => Model.value !== LeanMode.value && !Retired.includes(Model.value));
-
-  return [{
-    value: LeanMode.value,
-    displayName: LeanMode.displayName,
-    description: LeanMode.description,
-    supportsEffort: false,
-    supportedEffortLevels: [] as string[],
-    contextWindow: 0,
-  }].concat(Kept);
+function WithoutRetired(List: ModelEntry[]): ModelEntry[] {
+  return List.filter((Model) => !Retired.includes(Model.value));
 }
 
-let Models = WithLeanMode(ReadModelsCache());
+let Models = WithoutRetired(ReadModelsCache());
 
 function ReadModelsCache(): ModelEntry[] {
   try {
@@ -43,7 +35,13 @@ function ReadModelsCache(): ModelEntry[] {
 }
 
 export function GetModels() {
-  return WithLeanMode(Models);
+  return WithoutRetired(Models);
+}
+
+export function SupportsFastMode(Value: string | undefined): boolean {
+  const Model = Models.find((Entry) => Entry.value === Value);
+
+  return !Model || Model.supportsFastMode === true;
 }
 
 export function SupportsEffort(Value: string, Effort: string | null | undefined): boolean {
@@ -77,6 +75,7 @@ export function RememberModels(List: unknown): void {
     supportsEffort: Boolean(Model.supportsEffort),
     supportedEffortLevels: Model.supportedEffortLevels || [],
     contextWindow: Model.contextWindow || 0,
+    supportsFastMode: Model.supportsFastMode === true,
     extra: Model.value === "sonnet" && /^Sonnet 5(?!\.)/.test(String(Model.description || "")) ? true : undefined,
   }));
 
@@ -97,6 +96,7 @@ export function RememberModels(List: unknown): void {
         supportsEffort: true,
         supportedEffortLevels: ["low", "medium", "high", "xhigh", "max"],
         contextWindow: Extra.contextWindow,
+        supportsFastMode: Extra.fast === true,
         extra: true,
       });
     }

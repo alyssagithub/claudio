@@ -120,6 +120,7 @@ export type ModelInfo = {
 	supportedEffortLevels: {string},
 	contextWindow: number?,
 	extra: boolean?,
+	supportsFastMode: boolean?,
 }
 
 export type Change = {

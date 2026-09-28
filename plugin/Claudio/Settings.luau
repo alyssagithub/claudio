@@ -231,7 +231,7 @@ const function Read(Key: string, OwnOnly: boolean?): any
 end
 
 const Hidden: {[string]: string | boolean} = {
-	Model = "default",
+	Model = "opus[1m]",
 	Effort = "",
 	FastMode = false,
 	DeclinedVersion = "",

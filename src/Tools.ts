@@ -120,6 +120,28 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
     return (await LiveSession()) ? null : What;
   }
 
+  // Stop returns as soon as the session takes the request, but Studio needs a while to tear the playtest
+  // down; wait until the editor reports it is back in edit mode so the next start is not refused.
+  async function WaitUntilStopped(Signal?: AbortSignal): Promise<string> {
+    const Began = Date.now();
+
+    while (Date.now() - Began < 60000) {
+      if (Signal && Signal.aborted) {
+        return " Stopped waiting for it to close because the call was cancelled.";
+      }
+
+      const Status: { text?: string } | null = await Reach("playtest", {action: "status"});
+
+      if (Status && typeof Status.text === "string" && Status.text.startsWith("No playtest")) {
+        return ` Studio was back in edit mode ${Math.round((Date.now() - Began) / 1000)}s later.`;
+      }
+
+      await new Promise((Resolve) => setTimeout(Resolve, 500));
+    }
+
+    return " Studio had still not left the playtest after a minute, so check it before starting another.";
+  }
+
   async function WaitUntilLoaded(Clients: number, Signal?: AbortSignal): Promise<string> {
     const Began = Date.now();
 
@@ -509,7 +531,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
 
           return {content: [{
             type: "text",
-            text: Input.action === "players" && Answer.startsWith("Players went") ? Answer + await WaitUntilLoaded((Reachable.Players || 0) + Adding, Signal) : Answer,
+            text: Input.action === "players" && Answer.startsWith("Players went") ? Answer + await WaitUntilLoaded((Reachable.Players || 0) + Adding, Signal) : (Input.action === "stop" && Answer.startsWith("Playtest stopped") ? Answer + await WaitUntilStopped(Signal) : Answer),
           }]};
         }
 
@@ -546,12 +568,14 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
             }]};
           }
 
+          const Relayed = Said(await ReachIn("server", "playtest", {
+            action: Found.relay,
+            players: Found.players,
+          }), "The session did not say what happened.");
+
           return {content: [{
             type: "text",
-            text: Said(await ReachIn("server", "playtest", {
-              action: Found.relay,
-              players: Found.players,
-            }), "The session did not say what happened."),
+            text: Found.relay === "stop" && Relayed.startsWith("Playtest stopped") ? Relayed + await WaitUntilStopped(Signal) : Relayed,
           }]};
         }
 

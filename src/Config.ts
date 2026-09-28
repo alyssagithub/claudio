@@ -103,6 +103,7 @@ export const ExtraModels = [
   {
     value: "claude-sonnet-5-5[1m]",
     displayName: "Sonnet 5.5",
+    featured: true,
     contextWindow: 1000000,
     description: "Latest Sonnet release · 1M context",
   },

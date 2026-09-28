@@ -102,6 +102,20 @@ export function RememberModels(List: unknown): void {
     }
   }
 
+  for (const Featured of ExtraModels.filter((Entry) => Entry.featured)) {
+    const From = Models.findIndex((Model) => Model.value === Featured.value);
+    const Older = Models.findIndex((Model) => Model.value === "sonnet");
+
+    if (From < 0) {
+      continue;
+    }
+
+    const [Entry] = Models.splice(From, 1);
+
+    delete Entry.extra;
+    Models.splice(Older >= 0 && Older <= From ? Older : Models.length, 0, Entry);
+  }
+
   try {
     fs.mkdirSync(path.dirname(ModelsCacheFile), {recursive: true});
     fs.writeFileSync(ModelsCacheFile, JSON.stringify(Models));

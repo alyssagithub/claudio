@@ -212,6 +212,7 @@ export type Turn = {
 	thinkingBlock: boolean?,
 	retry: Retry?,
 	automatic: boolean?,
+	prompt: string?,
 	waiting: number?,
 	conversationId: string?,
 	sessionId: string?,

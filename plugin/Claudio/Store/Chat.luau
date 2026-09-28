@@ -3093,16 +3093,27 @@ Attach = function(ConversationId: string)
 
 	task.spawn(Chat.Flush)
 
+	const Prompt = if typeof(Turn.prompt) == "string" then Turn.prompt:match("^%s*(.-)%s*$") else nil
+	local Last: number?
+
 	for Index = #Chat.Messages(), 1, -1 do
-		if Turn.automatic then
+		if Chat.Messages()[Index].Role == "user" then
+			Last = Index
+
 			break
 		end
+	end
 
-		if Chat.Messages()[Index].Role == "user" then
-			Chat.CurrentPrompt = Chat.Messages()[Index].Text
-			Chat.Messages(table.move(Chat.Messages(), 1, Index, 1, {}))
-
-			break
+	if not Turn.automatic then
+		if Last and (not Prompt or Chat.Messages()[Last].Text:match("^%s*(.-)%s*$") == Prompt) then
+			Chat.CurrentPrompt = Chat.Messages()[Last].Text
+			Chat.Messages(table.move(Chat.Messages(), 1, Last, 1, {}))
+		elseif Prompt then
+			Chat.CurrentPrompt = Prompt
+			Append({
+				Role = "user",
+				Text = Prompt,
+			})
 		end
 	end
 

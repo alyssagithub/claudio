@@ -2520,6 +2520,7 @@ export function DescribeTurn(Turn: Turn) {
     compacting: Turn.Compacting === true,
     waiting: Turn.Waiting || 0,
     automatic: Turn.Prompt === "",
+    prompt: StripContext(Turn.Prompt),
     milliseconds: Turn.Milliseconds || (Turn.Status === "running" ? Date.now() - Turn.StartedAt : 0),
     tokens: {
       input: Turn.Usage.Input,

@@ -1,8 +1,6 @@
 --!strict
 -- The background tasks pane, following the Claude desktop app's: running tasks first, finished ones folded
 -- under a count with a button to clear them, and each Bash task opening to its command and output.
-const HttpService = game:GetService("HttpService")
-
 const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Config = require(script.Parent.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Parent.Settings)
@@ -49,10 +47,23 @@ const function HasSummary(Task: Types.BackgroundTask): boolean
 	return typeof(Task.summary) == "string" and Task.summary ~= "" and Task.summary ~= Task.description
 end
 
+-- A tool's input arrives as "key: value" lines, with a long value running on until the next key.
 const function Command(Task: Types.BackgroundTask): string?
-	const Ok, Input = pcall(HttpService.JSONDecode, HttpService, Task.input or "")
+	local Current: string? = nil
+	const Found: {[string]: string} = {}
 
-	return if Ok and typeof(Input) == "table" and typeof(Input.command) == "string" then Input.command else nil
+	for _, Line in string.split(Task.input or "", "\n") do
+		const Key, Value = Line:match("^([%w_]+): (.*)$")
+
+		if Key and Value then
+			Current = Key
+			Found[Key] = Value
+		elseif Current then
+			Found[Current] ..= `\n{Line}`
+		end
+	end
+
+	return Found.command
 end
 
 const function Label(Text: string | () -> string, LayoutOrder: number, Colour: (() -> Color3)?, Size: (() -> number)?): TextLabel
@@ -100,6 +111,16 @@ const function Block(Text: () -> string, LayoutOrder: number, Visible: () -> boo
 			Text = Text,
 		},
 	}
+end
+
+-- Output keeps to a fixed height and follows the newest lines, as the desktop app's box does.
+const function OutputBox(Text: () -> string?, Visible: () -> boolean): Frame
+	return Block(function()
+		const Lines = string.split(((Text() or ""):gsub("%s+$", "")), "\n")
+		const From = math.max(1, #Lines - 11)
+
+		return (if From > 1 then "…\n" else "") .. table.concat(Lines, "\n", From)
+	end, 2, Visible)
 end
 
 const function Row(Value: () -> Types.BackgroundTask): Frame
@@ -158,6 +179,32 @@ const function Row(Value: () -> Types.BackgroundTask): Frame
 
 		return if Task.endedAt then Format.Clock(math.max(0, math.floor((Task.endedAt - Task.startedAt) / 1000))) else nil
 	end
+
+	const function Status(): string
+		const Task = Value()
+
+		if IsBash(Task) and (Output() or "") == "" then
+			if Loading() then
+				return "Loading output…"
+			end
+
+			if Task.status == "running" then
+				return "No output yet"
+			end
+		end
+
+		if HasSummary(Task) and not (IsBash(Task) and (Output() or "") ~= "") then
+			return Task.summary :: string
+		end
+
+		return if IsBash(Task) and (Output() or "") == "" then "No output captured." else ""
+	end
+
+	const Note = Label(Status, 3, Theme.Colors.DimText)
+
+	Vide.effect(function()
+		Note.Visible = Status() ~= ""
+	end)
 
 	return Create "Frame" {
 		Name = "Task",
@@ -362,30 +409,10 @@ const function Row(Value: () -> Types.BackgroundTask): Frame
 			end, 1, function()
 				return IsBash(Value()) and Command(Value()) ~= nil
 			end),
-			Block(function()
-				return Output() or ""
-			end, 2, function()
+			OutputBox(Output, function()
 				return IsBash(Value()) and (Output() or "") ~= ""
 			end),
-			Label(function()
-				const Task = Value()
-
-				if IsBash(Task) and (Output() or "") == "" then
-					if Loading() then
-						return "Loading output…"
-					end
-
-					if Task.status == "running" then
-						return "No output yet"
-					end
-				end
-
-				if HasSummary(Task) and not (IsBash(Task) and (Output() or "") ~= "") then
-					return Task.summary :: string
-				end
-
-				return if IsBash(Task) and (Output() or "") == "" then "No output captured." else ""
-			end, 3, Theme.Colors.DimText),
+			Note,
 		},
 	}
 end
@@ -487,20 +514,25 @@ const function Section(Heading: string, Tasks: () -> {Types.BackgroundTask}, Col
 				HorizontalFlex = Enum.UIFlexAlignment.Fill,
 				Padding = UDim.new(0, 4),
 			},
-			Vide.values(Tasks, function(Task: Types.BackgroundTask, Index: () -> number)
-				const Current = Vide.derive(function(): Types.BackgroundTask
-					for _, Latest in Chat.BackgroundTasks() do
-						if Latest.id == Task.id then
-							return Latest
-						end
-					end
+			-- Rows are keyed by task id, since each refresh brings new tables and keying by value would rebuild
+			-- every row, closing any that were opened.
+			Vide.indexes(Vide.derive(function(): {[string]: Types.BackgroundTask}
+				const Keyed = {}
 
-					return Task
-				end)
+				for _, Task in Tasks() do
+					Keyed[Task.id] = Task
+				end
+
+				return Keyed
+			end), function(Current: () -> Types.BackgroundTask, Id: string)
 				const Made = Row(Current)
 
 				Vide.effect(function()
-					Made.LayoutOrder = Index()
+					for Position, Task in Tasks() do
+						if Task.id == Id then
+							Made.LayoutOrder = Position
+						end
+					end
 				end)
 
 				return Made

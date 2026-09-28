@@ -98,11 +98,11 @@ return function()
 					return "Settings"
 				end
 
-				if Chat.TasksOpen() then
-					return "Tasks"
+				if Chat.ListOpen() then
+					return "List"
 				end
 
-				return if Chat.ListOpen() then "List" else "Messages"
+				return if Chat.TasksOpen() then "Tasks" else "Messages"
 			end)({
 				Settings = SettingsPage,
 				List = ChatList,

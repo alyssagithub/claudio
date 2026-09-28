@@ -2606,6 +2606,14 @@ function Chat.WatchStudioJobs()
 
 			if Mounted then
 				_G.ClaudioMountSeen = DateTime.now().UnixTimestampMillis / 1000
+
+				-- Record the mount's chat straight away, so the real plugin never notifies for it.
+				const Current = Chat.ConversationId()
+
+				if Current then
+					_G.ClaudioTestedChats = _G.ClaudioTestedChats or {}
+					_G.ClaudioTestedChats[Current] = true
+				end
 			else
 				const Seen = _G.ClaudioMountSeen
 				const Yield = typeof(Seen) == "number" and math.abs(DateTime.now().UnixTimestampMillis / 1000 - Seen) < 5

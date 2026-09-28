@@ -60,9 +60,11 @@ function StudioMemory(): Promise<{Editor: number, Room: number}> {
 
 async function Headroom(Clients: number, Starting: boolean): Promise<string | null> {
   const Measured = await StudioMemory();
-  const Editor = Math.max(Measured.Editor, 2 * 1024 * 1024 * 1024);
-  const Needed = (Starting ? Editor * 0.6 : 0) + Clients * Editor * 0.45;
-  const Gigabytes = (Bytes: number) => (Bytes / (1024 * 1024 * 1024)).toFixed(1);
+  const Gigabyte = 1024 * 1024 * 1024;
+  // Only refuse when there is truly no room left. Estimates scaled from the editor's size refused tests that
+  // then ran fine when forced, since a playtest shares much of what the editor has already loaded.
+  const Needed = (Starting ? 0.5 * Gigabyte : 0) + Clients * 0.25 * Gigabyte;
+  const Gigabytes = (Bytes: number) => (Bytes / Gigabyte).toFixed(1);
 
   if (Measured.Room >= Needed) {
     return null;

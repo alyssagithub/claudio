@@ -40,7 +40,6 @@ export type Message = {
 	ImageIds: {number}?,
 	Model: string?,
 	Effort: string?,
-	Auto: boolean?,
 	Checkpoint: number?,
 	Edits: {Change}?,
 	Calls: {ToolCall}?,
@@ -79,7 +78,6 @@ export type QueuedMessage = {
 	Display: string,
 	Full: string,
 	Extra: string?,
-	Escalate: boolean?,
 	Attachments: {string},
 	Images: {ImageUpload},
 	Previews: {EditableImage},
@@ -139,7 +137,6 @@ export type ToolCall = {
 	milliseconds: number,
 	startedAt: number?,
 	steps: {string}?,
-	delegate: {name: string, model: string}?,
 	lines: {added: number, removed: number}?,
 	image: number?,
 }

@@ -21,7 +21,7 @@ import { AvatarFor } from "./EasterEgg.js";
 import { HandToken, IssuePlaytestKey, PlaytestKeyMatches, PlaytestLive, RevokePlaytestKey, TokenMatches } from "./Token.js";
 import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
 import { ArmClipboard, AskClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, RestoreFlashing, ShowToast, WriteClipboard } from "./Notify.js";
-import { ForgetConversation, GetModels, SupportsFastMode } from "./Models.js";
+import { GetModels, SupportsFastMode } from "./Models.js";
 import { Analyze, Warm } from "./Lint.js";
 import { DescribeReturn, StopWatchingReturn, WaitForReturn, WatchReturn } from "./Keys.js";
 
@@ -180,7 +180,6 @@ function TurnRequestFrom(Body: Record<string, any>, ConversationId: string | nul
     FastMode: Body.fastMode === true && SupportsFastMode(typeof Body.model === "string" ? Body.model : undefined),
     Mode: typeof Body.mode === "string" ? Body.mode : DefaultMode,
     Bypass: Body.bypass === true && !PlaytestLive(),
-    Escalate: Body.escalate === true,
     Place: Body.place && typeof Body.place === "object" ? Body.place : null,
     Folder: (ConversationId ? ListConversations().find((Entry) => Entry.id === ConversationId)?.folder : null) || (typeof Body.workingDirectory === "string" ? Body.workingDirectory : null),
     OutputStyle: typeof Body.outputStyle === "string" ? Body.outputStyle : "default",
@@ -369,7 +368,6 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
 
   if (Request.method === "DELETE" && Id) {
     CloseConversation(Id);
-    ForgetConversation(Id);
 
     if (DeleteConversation(Id)) {
       SendJson(Response, 200, {deleted: Id});
@@ -518,7 +516,7 @@ export function StartServer(Port: number) {
           loggedIn: Login && Login.loggedIn,
           loginDetail: Login && Login.detail,
           mcpServers: Object.keys(ReadMcpServers()),
-          systemPrompt: SystemPromptFor(Object.keys(ReadMcpServers()), false),
+          systemPrompt: SystemPromptFor(Object.keys(ReadMcpServers())),
           limits: GetLimits(),
           workingDirectory: LastUsedFolder() || null,
         });

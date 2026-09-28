@@ -108,7 +108,7 @@ function Client.SendNow(Text: string, ConversationId: string?, RequestId: string
 	})
 end
 
-const function TurnBody(Text: string, ConversationId: string?, Images: {Types.ImageUpload}, Escalate: boolean?): {[string]: any}
+const function TurnBody(Text: string, ConversationId: string?, Images: {Types.ImageUpload}): {[string]: any}
 	const Effort = Settings.Get("Effort")()
 
 	return {
@@ -124,7 +124,6 @@ const function TurnBody(Text: string, ConversationId: string?, Images: {Types.Im
 		mode = Settings.Get("Mode")(),
 		bypass = Settings.Get("Bypass")(),
 		workingDirectory = Settings.Get("WorkingFolder")(),
-		escalate = Escalate,
 		outputStyle = string.lower(Settings.Get("OutputStyle")()),
 		stepDown = Settings.Get("StepDown")(),
 		place = {
@@ -138,8 +137,8 @@ const function TurnBody(Text: string, ConversationId: string?, Images: {Types.Im
 	}
 end
 
-function Client.StartTurn(Text: string, ConversationId: string?, Images: {Types.ImageUpload}, Escalate: boolean?): (boolean, any)
-	return Http.Request("POST", `{BaseUrl()}/chat`, TurnBody(Text, ConversationId, Images, Escalate))
+function Client.StartTurn(Text: string, ConversationId: string?, Images: {Types.ImageUpload}): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/chat`, TurnBody(Text, ConversationId, Images))
 end
 
 function Client.Warm(ConversationId: string)

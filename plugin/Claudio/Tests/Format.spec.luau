@@ -86,18 +86,4 @@ return function()
 			expect(Format.ResetsAt("You've hit your limit")).to.equal(nil)
 		end)
 	end)
-
-	describe("Model", function()
-		it("turns an SDK id into a name", function()
-			expect(Format.Model("claude-sonnet-5")).to.equal("Sonnet 5")
-			expect(Format.Model("claude-opus-4-8")).to.equal("Opus 4.8")
-			expect(Format.Model("haiku")).to.equal("Haiku")
-			expect(Format.Model("")).to.equal("")
-		end)
-
-		it("drops a date stamp from the version", function()
-			expect(Format.Model("claude-opus-4-20250514")).to.equal("Opus 4")
-			expect(Format.Model("claude-haiku-4-5-20251001")).to.equal("Haiku 4.5")
-		end)
-	end)
 end

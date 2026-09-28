@@ -38,21 +38,7 @@ const function FastModeSupported(): boolean
 	return Model ~= nil and Model.supportsFastMode == true
 end
 
-const function IsAuto(): boolean
-	return Settings.Get("Model")() == "auto"
-end
-
 const function EffortLevels(): {string}
-	if IsAuto() then
-		return {
-			"low",
-			"medium",
-			"high",
-			"xhigh",
-			"max",
-		}
-	end
-
 	const Model = CurrentModel()
 
 	return if Model and Model.supportsEffort then Model.supportedEffortLevels else {}
@@ -65,11 +51,11 @@ const function CurrentEffort(): string
 		return Chosen
 	end
 
-	return if IsAuto() then "xhigh" else "low"
+	return "low"
 end
 
 const function EffortLabel(): string
-	if Settings.Get("Effort")() == "" and not IsAuto() then
+	if Settings.Get("Effort")() == "" then
 		return "Default"
 	end
 
@@ -830,10 +816,6 @@ function ModelPicker.EffortHelp()
 			ZIndex = 200,
 			LayoutOrder = 2,
 			Text = function()
-				if IsAuto() then
-					return "Lower uses cheaper models and less thinking. Higher uses stronger models and more thinking, which is more accurate but uses your limits faster."
-				end
-
 				return "Higher effort means more thorough responses, but takes longer and uses your limits faster."
 			end,
 		},
@@ -938,9 +920,7 @@ function ModelPicker.EffortMenu()
 				TextColor3 = Theme.Colors.DimText,
 				TextSize = Settings.SmallText,
 				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				Text = function()
-					return if IsAuto() then "Cheaper" else "Faster"
-				end,
+				Text = "Faster",
 			},
 			Create "TextLabel" {
 				Name = "Smarter",
@@ -951,9 +931,7 @@ function ModelPicker.EffortMenu()
 				TextColor3 = Theme.Colors.DimText,
 				TextSize = Settings.SmallText,
 				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				Text = function()
-					return if IsAuto() then "More accurate" else "Smarter"
-				end,
+				Text = "Smarter",
 			},
 		},
 		Slider {

@@ -44,7 +44,6 @@ type Props = {
 	Index: (() -> number)?,
 	Attachments: (() -> {string})?,
 	Images: (() -> {EditableImage})?,
-	Model: (() -> string?)?,
 	Live: boolean?,
 	Checkpoint: (() -> number?)?,
 	LayoutOrder: any,
@@ -92,12 +91,6 @@ const function Describe(Entry: Types.ToolCall, Running: boolean): string
 
 	if Wrote then
 		return Wrote
-	end
-
-	if Entry.delegate then
-		const Sent = Entry.delegate :: {name: string, model: string}
-
-		return `{if Running then "Delegating" else "Delegated"} to the {Sent.name} on {Format.Model(Sent.model)}`
 	end
 
 	const Name = Entry.name
@@ -811,7 +804,6 @@ return function(Props: Props)
 		const Calls: {Types.ToolCall} = if Props.Calls then Props.Calls() else {}
 		local Commands = 0
 		local Questions = 0
-		local Sent = 0
 		local Added = 0
 		local Removed = 0
 		local Measured = false
@@ -835,12 +827,6 @@ return function(Props: Props)
 				return Describe(Entry, true)
 			end
 
-			if Entry.delegate then
-				Sent += 1
-
-				continue
-			end
-
 			if IsCommand(Entry.name) then
 				Commands += 1
 			end
@@ -861,7 +847,7 @@ return function(Props: Props)
 			end
 		end
 
-		const Tools = #Chosen - Commands - Questions - Sent - #Files - #Reads
+		const Tools = #Chosen - Commands - Questions - #Files - #Reads
 		const Parts = {}
 
 		if #Files > 0 and #Files <= 2 then
@@ -874,10 +860,6 @@ return function(Props: Props)
 			table.insert(Parts, `read {table.concat(Reads, ", ")}`)
 		elseif #Reads > 2 then
 			table.insert(Parts, `read {#Reads} files`)
-		end
-
-		if Sent > 0 then
-			table.insert(Parts, if Sent == 1 then "delegated a read" else `delegated {Sent} reads`)
 		end
 
 		if Commands > 0 then
@@ -1675,11 +1657,6 @@ return function(Props: Props)
 				Create "UIPadding" {PaddingLeft = UDim.new(0, 4)},
 			},
 		},
-		Note("Model", if Props.Live then -2 else 1000002, function()
-			return if Props.Model then Props.Model() or "" else ""
-		end, function()
-			return Props.Model ~= nil and Props.Model() ~= nil
-		end),
 		Create "Frame" {
 			Name = "Subagents",
 			Size = UDim2.fromScale(1, 0),

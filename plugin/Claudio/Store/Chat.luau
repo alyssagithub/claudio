@@ -36,7 +36,6 @@ const Chat = {
 	ApiRetry = Vide.source(nil :: Types.Retry?),
 	Stopping = Vide.source(false),
 	Zoomed = Vide.source(nil :: EditableImage?),
-	StreamingPick = Vide.source(nil :: {Model: string, Effort: string?}?),
 	StreamingImages = Vide.source({} :: {EditableImage}),
 	Activity = Vide.source({} :: {string}),
 	Permission = Vide.source(nil :: Types.Permission?),
@@ -163,7 +162,6 @@ const function Reset()
 	Chat.StreamingText("")
 	Chat.StreamingThinking("")
 	Chat.StreamingParts({})
-	Chat.StreamingPick(nil)
 	Chat.StreamingImages({})
 	Chat.Activity({})
 	Chat.Calls({})
@@ -355,13 +353,15 @@ const function Find(Input: any): any
 
 		Scanned += 1
 
+		const Lines = string.split(Body, "\n")
+
 		if Scanned <= 5 then
-			table.insert(Searched, `{Script:GetFullName()} ({#string.split(Body, "\n")} lines)`)
+			table.insert(Searched, `{Script:GetFullName()} ({#Lines} lines)`)
 		end
 
 		local Line = 0
 
-		for _, Text in string.split(Body, "\n") do
+		for _, Text in Lines do
 			Line += 1
 
 			if Text:lower():find(Lower, 1, true) then
@@ -2579,6 +2579,15 @@ function Chat.WatchStudioJobs()
 		end
 	end
 
+	const Picked = Settings.Get("Model")()
+
+	if Picked == "claude-sonnet-5-5" then
+		Settings.Set("Model", "claude-sonnet-5-5[1m]")
+	elseif Picked == "auto" or Picked == "token-saver" or Picked == "default" or Picked == "" then
+		Settings.Set("Model", "opus[1m]")
+		Settings.Set("Effort", "")
+	end
+
 	local SavedDraft = Settings.Fresh("Draft")
 	local SavedChips = Settings.Fresh("Chips")
 
@@ -2598,15 +2607,6 @@ function Chat.WatchStudioJobs()
 			elseif Settings.Fresh("Draft") ~= SavedDraft then
 				SavedDraft = Settings.Get("Draft")()
 				Chat.Draft(SavedDraft)
-			end
-
-			const Picked = Settings.Get("Model")()
-
-			if Picked == "claude-sonnet-5-5" then
-				Settings.Set("Model", "claude-sonnet-5-5[1m]")
-			elseif Picked == "auto" or Picked == "token-saver" or Picked == "default" or Picked == "" then
-				Settings.Set("Model", "opus[1m]")
-				Settings.Set("Effort", "")
 			end
 
 			const Held = Context.Saved()
@@ -2819,10 +2819,6 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 		if #Kept < #Queued then
 			Chat.Queue(Kept)
 		end
-		Chat.StreamingPick(if State.auto and State.model then {
-			Model = State.model,
-			Effort = State.effort,
-		} else nil)
 		Chat.Limits(State.limits or Chat.Limits())
 		Chat.Tasks(State.tasks or {})
 		Chat.Waiting(State.waiting or 0)
@@ -2932,7 +2928,6 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 		Images = Chat.StreamingImages(),
 		Model = if State then State.model else nil,
 		Effort = if State then State.effort else nil,
-		Auto = if State then State.auto else nil,
 	})
 	if State and State.tokens and State.tokens.input > 0 then
 		const History = Chat.Messages()
@@ -2949,7 +2944,6 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 	Chat.StreamingText("")
 	Chat.StreamingThinking("")
 	Chat.StreamingParts({})
-	Chat.StreamingPick(nil)
 	Chat.StreamingImages({})
 	Chat.Activity({})
 	Chat.Permission(nil)
@@ -3188,7 +3182,7 @@ Start = function(Entry: Types.QueuedMessage)
 
 	task.spawn(function()
 		const Ok, Status, Reply, State = pcall(function(): (string, string, Types.Turn?)
-			const Started, Turn = Client.StartTurn(Entry.Full, Chat.ConversationId(), Entry.Images, Entry.Escalate)
+			const Started, Turn = Client.StartTurn(Entry.Full, Chat.ConversationId(), Entry.Images)
 
 			if not Started then
 				return "error", `Could not reach the bridge: {Turn}`, nil

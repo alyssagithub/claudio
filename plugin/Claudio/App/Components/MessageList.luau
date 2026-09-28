@@ -4,7 +4,6 @@ const Settings = require(script.Parent.Parent.Parent.Settings)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Theme = require(script.Parent.Parent.Theme)
-const Format = require(script.Parent.Parent.Parent.Format)
 const Working = require(script.Parent.Working)
 const MessageBubble = require(script.Parent.MessageBubble)
 const PermissionCard = require(script.Parent.PermissionCard)
@@ -22,16 +21,6 @@ const Tips = {
 }
 
 const Create = Vide.create
-
-const function Describe(Model: string?, Effort: string?, Auto: boolean?): string?
-	if not Model or not Auto then
-		return nil
-	end
-
-	const Named = Format.Model(Model)
-
-	return if Effort and Effort ~= "none" then `Auto mode picked {Named} at {Effort} effort for this message` else `Auto mode picked {Named} for this message`
-end
 
 const function Another(Last: string): string
 	if #Tips < 2 then
@@ -334,9 +323,6 @@ return function()
 				Images = function()
 					return Message.Images or {}
 				end,
-				Model = function()
-					return Describe(Message.Model, Message.Effort, Message.Auto)
-				end,
 				Calls = function()
 					return Message.Calls or {}
 				end,
@@ -411,11 +397,6 @@ return function()
 				Parts = Chat.StreamingParts,
 				Calls = Chat.Calls,
 				Images = Chat.StreamingImages,
-				Model = function()
-					const Pick = Chat.StreamingPick()
-
-					return if Pick then Describe(Pick.Model, Pick.Effort, true) else nil
-				end,
 				Live = true,
 				LayoutOrder = 1,
 			},

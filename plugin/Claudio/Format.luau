@@ -52,26 +52,6 @@ function Format.Clock(Seconds: number): string
 	return `{Seconds // 3600}h {(Seconds % 3600) // 60}m {Seconds % 60}s`
 end
 
-function Format.Model(Name: string): string
-	if Name == "" then
-		return ""
-	end
-
-	const Family, Major, Minor = Name:match("^claude%-(%a+)%-(%d+)%-?(%d*)")
-
-	if Family and Major then
-		return `{Format.Capitalize(Family)} {Major}{if Minor and Minor ~= "" and #Minor <= 2 then `.{Minor}` else ""}`
-	end
-
-	const Base, Suffix = Name:match("^(%a+)%[(%w+)%]$")
-
-	if Base and Suffix then
-		return `{Format.Capitalize(Base)} {Suffix:upper()}`
-	end
-
-	return Format.Capitalize(Name)
-end
-
 function Format.Large(Value: number): string
 	if Value >= 1000000 then
 		return `{(string.format("%.1f", Value / 1000000):gsub("%.0$", ""))}M`

@@ -79,11 +79,6 @@ export type LineCount = {
   removed: number;
 };
 
-export type Subagent = {
-  name: string;
-  model: string;
-};
-
 export type CallStatus = "preparing" | "running" | "done" | "error";
 
 export type Call = {
@@ -95,7 +90,6 @@ export type Call = {
   StartedAt: number;
   Milliseconds: number;
   Steps?: string[];
-  Subagent: Subagent | null;
   Lines?: LineCount | null;
   Image?: number | null;
 };
@@ -107,7 +101,6 @@ export type SentCall = {
   status: string;
   steps: string[];
   milliseconds: number;
-  delegate: Subagent | null;
   lines: LineCount | null;
   image: number | null;
 };
@@ -265,11 +258,6 @@ export type ModelInfo = {
   version?: string;
 };
 
-export type Tier = {
-  model: string;
-  effort: string | null;
-  delegate: string;
-};
 
 export type Mode = {
   value: string;
@@ -296,12 +284,9 @@ export type Session = {
   WorkingDirectory: string;
   Model: string;
   Mode: string;
-  Subagent: string;
-  UsingSubagents: boolean;
   Planning: boolean;
   AskForTools: boolean;
   GuardTools: boolean;
-  CapResults?: boolean;
   ExtraPrompt: boolean;
   FastMode: boolean;
   OutputStyle: string;
@@ -371,19 +356,15 @@ export type Turn = {
   ConversationId: string | null;
   SessionId: string | null;
   Prompt: string;
-  Auto: boolean;
-  CapResults: boolean;
   Planning: boolean;
   Compacting: boolean;
   Waiting: number;
   OutputStyle: string;
   StepDown: boolean;
   FallenFrom: string | null;
-  UsingSubagents: boolean;
   Tasks: Task[];
   Model: string;
   Effort: string | null;
-  Subagent: string;
   AskForTools: boolean;
   GuardTools: boolean;
   ExtraPrompt: boolean;
@@ -429,7 +410,6 @@ export type TurnRequest = {
   Effort: string | null;
   AskForTools?: boolean;
   GuardTools?: boolean;
-  Escalate?: boolean;
   ExtraPrompt?: boolean;
   FastMode?: boolean;
   Mode: string;

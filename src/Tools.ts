@@ -134,7 +134,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
 
       const Status: { text?: string } | null = await Reach("playtest", {action: "status"});
 
-      if (Status && typeof Status.text === "string" && Status.text.startsWith("No playtest")) {
+      if (Status && typeof Status.text === "string" && Status.text.startsWith("No playtest") && !(await LiveSession())) {
         return ` Studio was back in edit mode ${Math.round((Date.now() - Began) / 1000)}s later.`;
       }
 

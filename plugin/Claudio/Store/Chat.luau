@@ -2546,7 +2546,11 @@ function Chat.WatchStudioJobs()
 
 			FinishedAfter = math.max(FinishedAfter :: number, Entry.endedAt)
 
-			if Entry.conversationId == Chat.ConversationId() or Entry.status == "cancelled" or not Chat.ElsewhereListener then
+			-- Chats the testing mount started are its own business, and it notifies for them itself.
+			const Testing = _G.ClaudioTestedChats
+			const Tested = typeof(Testing) == "table" and Testing[Entry.conversationId] == true
+
+			if Entry.conversationId == Chat.ConversationId() or Entry.status == "cancelled" or Tested or not Chat.ElsewhereListener then
 				continue
 			end
 

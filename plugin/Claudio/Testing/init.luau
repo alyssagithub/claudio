@@ -82,6 +82,9 @@ const function Note()
 
 	if Id and not Progress.Known[Id] then
 		Progress.Made[Id] = true
+		-- Never cleared, so the real plugin keeps ignoring a test chat that finishes after the mount is gone.
+		_G.ClaudioTestedChats = _G.ClaudioTestedChats or {}
+		_G.ClaudioTestedChats[Id] = true
 	end
 end
 

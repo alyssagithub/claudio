@@ -70,7 +70,7 @@ export function LogReport(Found: LogAnswer) {
   return `${Lines.join("\n")}${Tail}`;
 }
 
-export type FindAnswer = { error?: string; hits?: string[]; scanned?: number; more: number } | null;
+export type FindAnswer = { error?: string; hits?: string[]; scanned?: number; more: number; searched?: string[]; empty?: number; root?: string } | null;
 
 export function FindReport(Found: FindAnswer) {
   if (!Found) {
@@ -84,7 +84,12 @@ export function FindReport(Found: FindAnswer) {
   const Hits = Found.hits || [];
 
   if (Hits.length === 0) {
-    return `No match in ${Found.scanned} scripts.`;
+    const Scanned = Found.scanned || 0;
+    const Where = Found.searched && Found.searched.length > 0 ? `: ${Found.searched.join(", ")}${Scanned > Found.searched.length ? `, and ${Scanned - Found.searched.length} more` : ""}` : "";
+    const Skipped = Found.empty ? ` ${Found.empty} script${Found.empty === 1 ? "" : "s"} with no source were skipped.` : "";
+    const Nothing = Scanned === 0 ? ` Nothing under ${Found.root || "there"} has any script source to search.` : "";
+
+    return `No match in ${Scanned} script${Scanned === 1 ? "" : "s"}${Where}.${Skipped}${Nothing} find reads script source only, so text built at runtime, kept in an attribute or a property, or living in a script it requires instead will not match; search that script or read the instance with properties.`;
   }
 
   return `${Hits.join("\n")}${Found.more > 0 ? `\n${Found.more} more matches not shown; raise limit to see them.` : ""}`;

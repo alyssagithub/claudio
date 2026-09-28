@@ -337,7 +337,9 @@ const function Find(Input: any): any
 	const Lower = Needle:lower()
 	const Limit = math.clamp(tonumber(Input.limit) or 40, 1, 200)
 	const Hits = {}
+	const Searched = {}
 	local Scanned = 0
+	local Empty = 0
 	local More = 0
 
 	for _, Script in Sources(Root) do
@@ -346,10 +348,16 @@ const function Find(Input: any): any
 		Breathe()
 
 		if Body == "" then
+			Empty += 1
+
 			continue
 		end
 
 		Scanned += 1
+
+		if Scanned <= 5 then
+			table.insert(Searched, `{Script:GetFullName()} ({#string.split(Body, "\n")} lines)`)
+		end
 
 		local Line = 0
 
@@ -370,6 +378,9 @@ const function Find(Input: any): any
 		hits = Hits,
 		scanned = Scanned,
 		more = More,
+		searched = Searched,
+		empty = Empty,
+		root = Root:GetFullName(),
 	}
 end
 

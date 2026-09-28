@@ -93,7 +93,26 @@ const function Find(Path: string): (GuiObject?, string?)
 
 	while Ancestor and Ancestor ~= game do
 		if Ancestor:IsA("GuiObject") and not (Ancestor :: GuiObject).Visible then
-			return nil, `{Target.Name} is not being drawn because {Ancestor.Name} is hidden, so input would do nothing.`
+			const Hidden = Ancestor :: GuiObject
+			const Others = {}
+
+			const Parent = Hidden.Parent
+			const Siblings: {Instance} = if Parent then Parent:GetChildren() else {}
+
+			for _, Sibling in Siblings do
+				if Sibling ~= Hidden and Sibling:IsA("GuiObject") and (Sibling :: GuiObject).Visible then
+					const Alike = Sibling.Name:find(Hidden.Name, 1, true) ~= nil or Hidden.Name:find(Sibling.Name, 1, true) ~= nil
+					const Same = Sibling:FindFirstChild(Target.Name, true)
+
+					if Same and Same:IsA("GuiObject") and (Alike or #Others == 0) then
+						table.insert(Others, if Alike then 1 else #Others + 1, Same:GetFullName())
+					end
+				end
+			end
+
+			const Suggestion = if #Others > 0 then ` The visible copy is probably {Others[1]}; a hidden template and the live copy of the same interface often have different names.` else ""
+
+			return nil, `{Target.Name} is not being drawn because {Ancestor.Name} is hidden, so input would do nothing.{Suggestion}`
 		end
 
 		Ancestor = Ancestor.Parent

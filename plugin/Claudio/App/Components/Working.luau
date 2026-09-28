@@ -7,6 +7,7 @@ const Settings = require(script.Parent.Parent.Parent.Settings)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Theme = require(script.Parent.Parent.Theme)
 const Format = require(script.Parent.Parent.Parent.Format)
+const Covers = require(script.Parent.Parent.Covers)
 
 const Create = Vide.create
 
@@ -63,6 +64,7 @@ end
 
 return function()
 	const Dots = Vide.source(1)
+	const TasksHovered = Vide.source(false)
 	const Seconds = Vide.source(0)
 	const Thought = Vide.source(nil :: string?)
 	const Waiting = Vide.source(nil :: string?)
@@ -79,27 +81,27 @@ return function()
 		return `{Text}{string.rep(".", Dots())}`
 	end
 
-	const function Line(): string
-		const Tasks = TasksLabel()
-		const Working = Chat.Waiting() == 0
+	-- The line reads before, then the running tasks as a button that opens the tasks pane, then the stage.
+	const function Pieces(): (string, boolean, string)
+		const Tasks = TasksLabel() ~= nil
 
 		if Chat.Stopping() then
-			return if Tasks then `{Dotted("Stopping")} · {Tasks}` else Dotted("Stopping")
+			return Dotted("Stopping"), Tasks, ""
 		end
 
-		if not Working and Tasks then
-			return Tasks
+		if Chat.Waiting() > 0 and Tasks then
+			return "", true, ""
 		end
 
 		const Clock = Format.Clock(Seconds())
 		const Retry = Chat.ApiRetry()
 
 		if Retry then
-			return `{ShortError(Retry)} · Retrying ({Retry.attempt}/{Retry.maxRetries}) · {Clock}`
+			return `{ShortError(Retry)} · Retrying ({Retry.attempt}/{Retry.maxRetries}) · {Clock}`, false, ""
 		end
 
 		if Chat.Compacting() then
-			return `{Dotted("Compacting session")} · {Clock}`
+			return `{Dotted("Compacting session")} · {Clock}`, false, ""
 		end
 
 		const Parts = {Clock}
@@ -110,17 +112,35 @@ return function()
 			table.insert(Parts, `{Format.Amount(Counted)} tokens`)
 		end
 
-		if Tasks then
-			table.insert(Parts, Tasks)
-		end
-
 		const Label = Thought() or Waiting()
 
-		if Label then
-			table.insert(Parts, if Label:sub(1, 11) == "Thought for" then Label else Dotted(Label))
-		end
+		return table.concat(Parts, " · "), Tasks, if Label then (if Label:sub(1, 11) == "Thought for" then Label else Dotted(Label)) else ""
+	end
 
-		return table.concat(Parts, " · ")
+	const function Before(): string
+		return (select(1, Pieces()))
+	end
+
+	const function ShowTasks(): boolean
+		return (select(2, Pieces()))
+	end
+
+	const function After(): string
+		return (select(3, Pieces()))
+	end
+
+	const function Piece(Name: string, Text: () -> string, LayoutOrder: number, Visible: () -> boolean): TextLabel
+		return Create "TextLabel" {
+			Name = Name,
+			AutomaticSize = Enum.AutomaticSize.XY,
+			BackgroundTransparency = 1,
+			TextColor3 = Theme.Colors.DimText,
+			TextSize = Settings.TextSize,
+			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+			LayoutOrder = LayoutOrder,
+			Text = Text,
+			Visible = Visible,
+		}
 	end
 
 	return Create "TextButton" {
@@ -214,15 +234,41 @@ return function()
 			Image = Config.ButtonIcon,
 			LayoutOrder = 1,
 		},
-		Create "TextLabel" {
-			Name = "Detail",
+		Piece("Detail", Before, 2, function()
+			return Before() ~= ""
+		end),
+		Piece("TasksDot", function()
+			return "·"
+		end, 3, function()
+			return ShowTasks() and Before() ~= ""
+		end),
+		Create "TextButton" {
+			Name = "Tasks",
 			AutomaticSize = Enum.AutomaticSize.XY,
 			BackgroundTransparency = 1,
-			TextColor3 = Theme.Colors.DimText,
+			AutoButtonColor = false,
+			TextColor3 = function()
+				return if TasksHovered() then Theme.Colors.Text() else Theme.Colors.DimText()
+			end,
 			TextSize = Settings.TextSize,
 			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-			LayoutOrder = 2,
-			Text = Line,
+			LayoutOrder = 4,
+			Text = function()
+				return TasksLabel() or ""
+			end,
+			Visible = ShowTasks,
+			Activated = function()
+				Chat.TasksOpen(true)
+			end,
+			Vide.action(Covers.Hover(TasksHovered)),
 		},
+		Piece("StageDot", function()
+			return "·"
+		end, 5, function()
+			return After() ~= "" and (Before() ~= "" or ShowTasks())
+		end),
+		Piece("Stage", After, 6, function()
+			return After() ~= ""
+		end),
 	}
 end

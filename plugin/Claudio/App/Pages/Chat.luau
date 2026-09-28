@@ -17,6 +17,7 @@ const PlanBar = require(script.Parent.Parent.Components.PlanBar)
 const QuestionCard = require(script.Parent.Parent.Components.QuestionCard)
 const GalleryBar = require(script.Parent.Parent.Components.GalleryBar)
 const SettingsPage = require(script.Parent.Parent.Components.SettingsPage)
+const TasksPanel = require(script.Parent.Parent.Components.TasksPanel)
 const ContextMenu = require(script.Parent.Parent.Components.ContextMenu)
 const Tooltip = require(script.Parent.Parent.Components.Tooltip)
 const ModelPicker = require(script.Parent.Parent.Components.ModelPicker)
@@ -97,10 +98,15 @@ return function()
 					return "Settings"
 				end
 
+				if Chat.TasksOpen() then
+					return "Tasks"
+				end
+
 				return if Chat.ListOpen() then "List" else "Messages"
 			end)({
 				Settings = SettingsPage,
 				List = ChatList,
+				Tasks = TasksPanel,
 			}),
 			Create "Frame" {
 				Name = "Messages",
@@ -108,7 +114,7 @@ return function()
 				BackgroundTransparency = 1,
 				LayoutOrder = 2,
 				Visible = function()
-					return not Chat.SettingsOpen() and not Chat.ListOpen()
+					return not Chat.SettingsOpen() and not Chat.ListOpen() and not Chat.TasksOpen()
 				end,
 
 				Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},

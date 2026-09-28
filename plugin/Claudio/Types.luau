@@ -184,6 +184,19 @@ export type McpServer = {
 
 export type ConnectionStatus = "Disconnected" | "Connecting" | "Connected" | "Error"
 
+export type BackgroundTask = {
+	id: string,
+	description: string,
+	kind: string,
+	status: string,
+	startedAt: number,
+	endedAt: number?,
+	input: string,
+	prompt: string?,
+	summary: string?,
+	toolUseId: string?,
+}
+
 export type Retry = {
 	attempt: number,
 	maxRetries: number,

@@ -152,6 +152,22 @@ function Client.PollTurn(RequestId: string, Version: number): (boolean, any)
 	return Checked(Ok, Result, Schemas.Turn)
 end
 
+function Client.ListTasks(ConversationId: string): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/tasks?conversation={HttpService:UrlEncode(ConversationId)}`)
+end
+
+function Client.TaskOutput(ConversationId: string, Id: string): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/tasks/output?conversation={HttpService:UrlEncode(ConversationId)}&id={HttpService:UrlEncode(Id)}`)
+end
+
+function Client.StopTask(ConversationId: string, Id: string): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/tasks/stop?conversation={HttpService:UrlEncode(ConversationId)}`, {id = Id})
+end
+
+function Client.ClearTasks(ConversationId: string): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/tasks/clear?conversation={HttpService:UrlEncode(ConversationId)}`, {})
+end
+
 function Client.FinishedSince(Since: number): (boolean, any)
 	return Http.Request("GET", `{BaseUrl()}/chat/finished?since={string.format("%d", Since)}`)
 end

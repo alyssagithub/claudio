@@ -64,6 +64,8 @@ const Chat = {
 	Viewing = Vide.source(nil :: {Parent: string, ToolUseId: string, Title: string}?),
 	Watched = Vide.source({} :: {Types.Message}),
 	SubagentsOpen = Vide.source(false),
+	TasksOpen = Vide.source(false),
+	BackgroundTasks = Vide.source({} :: {Types.BackgroundTask}),
 	Planning = Vide.source(false),
 	Compacting = Vide.source(false),
 	Tokens = Vide.source(nil :: Types.Tokens?),
@@ -2587,6 +2589,10 @@ function Chat.WatchStudioJobs()
 				task.spawn(Chat.Sync)
 			end
 
+			if Chat.TasksOpen() and Connection.Status() == "Connected" then
+				task.spawn(Chat.RefreshTasks)
+			end
+
 			if not Mounted and Connection.Status() == "Connected" and os.clock() - FinishedChecked > 2 then
 				FinishedChecked = os.clock()
 				task.spawn(CheckFinished)
@@ -3586,6 +3592,7 @@ function Chat.Open(Id: string)
 		Chat.Shown(Chat.Fits(Gallery.Messages(), #Gallery.Messages()))
 		Chat.Messages(Gallery.Messages())
 		Chat.ListOpen(false)
+		Chat.TasksOpen(false)
 
 		return
 	end
@@ -3642,6 +3649,7 @@ function Chat.Open(Id: string)
 	Chat.Title(Conversation.title)
 	Chat.LoadChapters()
 	Chat.ListOpen(false)
+	Chat.TasksOpen(false)
 	KnownEnded = Ended(Conversation.id) or 0
 	Attach(Conversation.id)
 	task.spawn(function()
@@ -3791,6 +3799,7 @@ function Chat.New()
 	Chat.Title("New chat")
 	Settings.Set("LastChat", "")
 	Chat.ListOpen(false)
+	Chat.TasksOpen(false)
 	Chat.SettingsOpen(false)
 	Chat.VersionOpen(false)
 	Chat.VersionPick("")
@@ -4261,6 +4270,22 @@ function Chat.Limited(): boolean
 end
 
 local TriedAt = 0
+
+function Chat.RefreshTasks()
+	const Id = Chat.ConversationId()
+
+	if not Id then
+		Chat.BackgroundTasks({})
+
+		return
+	end
+
+	const Ok, Result = Client.ListTasks(Id)
+
+	if Ok and typeof(Result) == "table" and typeof(Result.tasks) == "table" and Chat.ConversationId() == Id then
+		Chat.BackgroundTasks(Result.tasks)
+	end
+end
 
 function Chat.ResumeAfterLimit()
 	if Chat.Sending() or Settings.Get("ContinueAfterLimit")() ~= true then

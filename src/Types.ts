@@ -197,6 +197,22 @@ export type Task = {
   ToolUseId?: string | null;
 };
 
+// A background task as the tasks panel shows it; kept on the session because tasks outlive the turn that started them.
+export type TaskRecord = {
+  Id: string;
+  Description: string;
+  Kind: string;
+  Status: string;
+  StartedAt: number;
+  EndedAt: number | null;
+  ToolUseId: string | null;
+  Input: string;
+  Prompt: string | null;
+  OutputFile: string | null;
+  Summary: string | null;
+  Owner: Turn | null;
+};
+
 export type Asked = {
   Id: string;
   Questions: Question[];
@@ -302,6 +318,7 @@ export type Session = {
   CurrentTurn: Turn | null;
   LastTurn?: Turn | null;
   Background: Set<string>;
+  TaskLog: Map<string, TaskRecord>;
   FilesBefore: Map<string, string>;
   LineCounts: Map<string, LineCount>;
   Query: Query | null;

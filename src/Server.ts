@@ -14,7 +14,7 @@ import type { Reacher, ReacherIn } from "./Tools.js";
 import type { Picture, TurnRequest } from "./Types.js";
 import { StudioProcesses } from "./StudioPresence.js";
 import { ReadBuiltInPlugins, SetBuiltInPlugins } from "./StudioSettings.js";
-import { ActiveTurnFor, AddToTurn, FinishedSince, CancelQueued, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, WarmConversation, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { ActiveTurnFor, AddToTurn, FinishedSince, ListTasks, TaskOutput, StopTask, ClearFinishedTasks, CancelQueued, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, WarmConversation, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetSubagent, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
@@ -958,6 +958,33 @@ ${Text}`;
 
         SendJson(Response, 200, GetCommands(Folder));
         return;
+      }
+
+      if (Url.pathname.startsWith("/tasks")) {
+        const Conversation = Url.searchParams.get("conversation") || "";
+
+        if (Request.method === "GET" && Url.pathname === "/tasks") {
+          SendJson(Response, 200, {tasks: ListTasks(Conversation)});
+          return;
+        }
+
+        if (Request.method === "GET" && Url.pathname === "/tasks/output") {
+          SendJson(Response, 200, {text: TaskOutput(Conversation, Url.searchParams.get("id") || "")});
+          return;
+        }
+
+        if (Request.method === "POST" && Url.pathname === "/tasks/stop") {
+          const Body = await ReadBody(Request);
+
+          SendJson(Response, 200, {stopped: typeof Body.id === "string" ? await StopTask(Conversation, Body.id) : false});
+          return;
+        }
+
+        if (Request.method === "POST" && Url.pathname === "/tasks/clear") {
+          ClearFinishedTasks(Conversation);
+          SendJson(Response, 200, {cleared: true});
+          return;
+        }
       }
 
       if (Request.method === "GET" && Url.pathname === "/chat/finished") {

@@ -725,6 +725,144 @@ export async function CancelQueued(RequestId: string, Id: string): Promise<boole
 
 const Ended = new Map<string, number>();
 
+function LogTask(Session: Session, Message: any) {
+  const Id = Message.task_id;
+
+  if (typeof Id !== "string") {
+    return;
+  }
+
+  const Known = Session.TaskLog.get(Id);
+
+  if (Message.subtype === "task_started") {
+    const Owner = Session.CurrentTurn;
+    const Call = Owner && Message.tool_use_id ? Owner.Calls.find((Entry) => Entry.Id === Message.tool_use_id) : undefined;
+
+    Session.TaskLog.set(Id, {
+      Id,
+      Description: Message.description || "Working",
+      Kind: Message.task_type || Message.subagent_type || "task",
+      Status: "running",
+      StartedAt: Date.now(),
+      EndedAt: null,
+      ToolUseId: Message.tool_use_id || null,
+      Input: Call ? Call.Input : "",
+      Prompt: typeof Message.prompt === "string" ? Message.prompt : null,
+      OutputFile: null,
+      Summary: null,
+      Owner,
+    });
+
+    return;
+  }
+
+  if (!Known) {
+    return;
+  }
+
+  if (Message.subtype === "task_updated") {
+    const Status = Message.patch && Message.patch.status;
+
+    if (typeof Status === "string") {
+      Known.Status = Status;
+
+      if (Status !== "running" && Status !== "pending") {
+        Known.EndedAt = Known.EndedAt || Date.now();
+      }
+    }
+
+    return;
+  }
+
+  Known.Status = typeof Message.status === "string" ? Message.status : "completed";
+  Known.EndedAt = Known.EndedAt || Date.now();
+  Known.OutputFile = typeof Message.output_file === "string" ? Message.output_file : Known.OutputFile;
+  Known.Summary = typeof Message.summary === "string" ? Message.summary : Known.Summary;
+}
+
+export function ListTasks(ConversationId: string) {
+  const Session = Sessions.get(ConversationId);
+
+  if (!Session) {
+    return [];
+  }
+
+  return [...Session.TaskLog.values()].map((Task) => {
+    const Call = Task.Owner && Task.ToolUseId ? Task.Owner.Calls.find((Entry) => Entry.Id === Task.ToolUseId) : undefined;
+
+    return {
+      id: Task.Id,
+      description: Task.Description,
+      kind: Task.Kind,
+      status: Task.Status,
+      startedAt: Task.StartedAt,
+      endedAt: Task.EndedAt,
+      input: (Task.Input || (Call ? Call.Input : "")).slice(0, 4000),
+      prompt: Task.Prompt ? Task.Prompt.slice(0, 4000) : null,
+      summary: Task.Summary,
+      toolUseId: Task.ToolUseId,
+    };
+  });
+}
+
+export function TaskOutput(ConversationId: string, Id: string): string | null {
+  const Session = Sessions.get(ConversationId);
+  const Task = Session ? Session.TaskLog.get(Id) : undefined;
+
+  if (!Task) {
+    return null;
+  }
+
+  let File = Task.OutputFile;
+
+  if (!File && Task.Owner && Task.ToolUseId) {
+    const Call = Task.Owner.Calls.find((Entry) => Entry.Id === Task.ToolUseId);
+    const Found = Call ? /Output is being written to:\s*(.+?)\s*$/m.exec(Call.Output || "") : null;
+
+    File = Found ? Found[1].replace(/\.$/, "") : null;
+  }
+
+  if (!File || /\.jsonl$/i.test(File) || !fs.existsSync(File)) {
+    return Task.Summary || "";
+  }
+
+  const Size = fs.statSync(File).size;
+  const Handle = fs.openSync(File, "r");
+  const Length = Math.min(Size, 16000);
+  const Chunk = Buffer.alloc(Length);
+
+  fs.readSync(Handle, Chunk, 0, Length, Size - Length);
+  fs.closeSync(Handle);
+
+  return (Size > Length ? "..." : "") + Chunk.toString("utf8");
+}
+
+export async function StopTask(ConversationId: string, Id: string): Promise<boolean> {
+  const Session = Sessions.get(ConversationId);
+
+  if (!Session || !Session.Query || !Session.TaskLog.has(Id)) {
+    return false;
+  }
+
+  try {
+    await Session.Query.stopTask(Id);
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function ClearFinishedTasks(ConversationId: string) {
+  const Session = Sessions.get(ConversationId);
+
+  for (const [Id, Task] of Session ? Session.TaskLog : []) {
+    if (Task.Status !== "running" && Task.Status !== "pending") {
+      Session!.TaskLog.delete(Id);
+    }
+  }
+}
+
 type FinishedTurn = { conversationId: string; endedAt: number; status: string; text: string };
 
 // Recently finished turns, so the plugin can tell you about chats you are not looking at.
@@ -1231,6 +1369,10 @@ function RouteMessage(Session: Session, Message: any) {
     return;
   }
 
+  if (Message.type === "system" && (Message.subtype === "task_started" || Message.subtype === "task_updated" || Message.subtype === "task_notification")) {
+    LogTask(Session, Message);
+  }
+
   if (Turn && Message.type === "system" && Message.subtype === "task_started") {
     Publish(Turn, {
       Tasks: Turn.Tasks.concat([{
@@ -1621,6 +1763,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
     CurrentTurn: null,
     LastUsedAt: Date.now(),
     Query: null,
+    TaskLog: new Map(),
     Send(Message: unknown) {
       Pending.push(Message);
 

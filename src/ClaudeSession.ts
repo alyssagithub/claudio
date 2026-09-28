@@ -817,9 +817,9 @@ export function TaskOutput(ConversationId: string, Id: string): string | null {
 
   if (!File && Task.Owner && Task.ToolUseId) {
     const Call = Task.Owner.Calls.find((Entry) => Entry.Id === Task.ToolUseId);
-    const Found = Call ? /Output is being written to:\s*(.+?)\s*$/m.exec(Call.Output || "") : null;
+    const Found = Call ? /Output is being written to:\s*(.+?\.output)\b/.exec(Call.Output || "") : null;
 
-    File = Found ? Found[1].replace(/\.$/, "") : null;
+    File = Found ? Found[1] : null;
   }
 
   if (!File || /\.jsonl$/i.test(File) || !fs.existsSync(File)) {

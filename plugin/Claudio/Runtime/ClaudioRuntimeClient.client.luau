@@ -166,6 +166,59 @@ const function Interact(Body: string): any
 		return {text = `Pressed and released {Input.key}. Check the place to confirm what it did.`}
 	end
 
+	const Button = if Input.button == "right" then Enum.UserInputType.MouseButton2 elseif Input.button == "middle" then Enum.UserInputType.MouseButton3 else Enum.UserInputType.MouseButton1
+
+	if Action == "drag" and (typeof(Input.path) ~= "string" or Button ~= Enum.UserInputType.MouseButton1) then
+		const UserInputService = game:GetService("UserInputService")
+		const Move = Vector2.new(tonumber(Input.x) or 0, tonumber(Input.y) or 0)
+		local From = (workspace.CurrentCamera :: Camera).ViewportSize / 2
+
+		if typeof(Input.path) == "string" then
+			const Target, Trouble = Find(Input.path)
+
+			if not Target then
+				return {error = Trouble}
+			end
+
+			From = Centre(Target)
+		end
+
+		if Move.Magnitude == 0 then
+			return {error = "A movement drag needs x and y, the pixels to move the mouse by."}
+		end
+
+		const Previous = UserInputService.MouseBehavior
+		const Sent, Refused = pcall(function()
+			Virtual:SendMousePosition(From)
+			Virtual:SendMouseButton(From, Button, true, 0)
+			task.wait(0.1)
+
+			if UserInputService.MouseBehavior == Enum.MouseBehavior.Default then
+				UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+			end
+
+			task.wait(0.05)
+
+			for _ = 1, 15 do
+				Virtual:SendMouseDelta(Move / 15)
+				task.wait(0.03)
+			end
+
+			task.wait(0.05)
+		end)
+
+		pcall(function()
+			Virtual:SendMouseButton(From, Button, false, 0)
+		end)
+		UserInputService.MouseBehavior = Previous
+
+		if not Sent then
+			return {error = `The drag was refused: {tostring(Refused)}`}
+		end
+
+		return {text = `Held the {(Input.button or "left")} button at {math.floor(From.X)}, {math.floor(From.Y)} and moved the mouse by {Move.X}, {Move.Y} with the cursor locked, so InputChanged and GetMouseDelta saw the movement. Roblox scales the delta by the mouse sensitivity setting.`}
+	end
+
 	if typeof(Input.path) ~= "string" then
 		return {error = `{Action} needs a path to the GuiObject to act on.`}
 	end

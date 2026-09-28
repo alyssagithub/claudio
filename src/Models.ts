@@ -77,6 +77,7 @@ export function RememberModels(List: unknown): void {
     supportsEffort: Boolean(Model.supportsEffort),
     supportedEffortLevels: Model.supportedEffortLevels || [],
     contextWindow: Model.contextWindow || 0,
+    extra: Model.value === "sonnet" && /^Sonnet 5(?!\.)/.test(String(Model.description || "")) ? true : undefined,
   }));
 
   for (const Extra of ExtraModels) {

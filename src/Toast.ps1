@@ -10,6 +10,8 @@ $Icon = & $Escape ("file:///" + ($env:CLAUDIO_ICON -replace "\\", "/"))
 
 # The alarm scenario is one of the kinds Windows lets through Do Not Disturb, which it turns on while a
 # fullscreen app is in front, so this shows over fullscreen too. Alarms loop a sound by default, hence silent.
+$Audio = if ($env:CLAUDIO_SOUND -eq "1") { '<audio src="ms-winsoundevent:Notification.Default" loop="false"/>' } else { '<audio silent="true"/>' }
+
 $Xml = @"
 <toast scenario="alarm">
   <visual>
@@ -19,7 +21,7 @@ $Xml = @"
       <text>$Body</text>
     </binding>
   </visual>
-  <audio silent="true"/>
+  $Audio
   <actions>
     <action content="Dismiss" arguments="dismiss" activationType="system"/>
   </actions>

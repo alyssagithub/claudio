@@ -62,8 +62,14 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
 
   LastShownAt = Date.now();
 
-  if (Wanted.Sound) {
-    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "$Chime = Join-Path $env:WINDIR 'Media\\Windows Notify System Generic.wav'; if (Test-Path $Chime) { (New-Object Media.SoundPlayer $Chime).PlaySync() } else { [System.Media.SystemSounds]::Asterisk.Play(); Start-Sleep -Milliseconds 1000 }"], {windowsHide: true}, () => {});
+  const Chime = () => {
+    if (Wanted.Sound) {
+      execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "$Chime = Join-Path $env:WINDIR 'Media\\Windows Notify System Generic.wav'; if (Test-Path $Chime) { (New-Object Media.SoundPlayer $Chime).PlaySync() } else { [System.Media.SystemSounds]::Asterisk.Play(); Start-Sleep -Milliseconds 1000 }"], {windowsHide: true}, () => {});
+    }
+  };
+
+  if (!Wanted.Toast) {
+    Chime();
   }
 
   execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ScriptPath], {
@@ -80,10 +86,13 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
   }, (Error, Stdout, Stderr) => {
     if (Error) {
       console.error(`Notification failed: ${(Stderr || Error.message).slice(0, 300)}`);
-      return;
     }
 
-    if (!Stdout.includes("toast")) {
+    if (Error || !Stdout.includes("toast")) {
+      if (Wanted.Toast) {
+        Chime();
+      }
+
       return;
     }
 
@@ -96,11 +105,14 @@ export function ShowToast(Title: unknown, Body: unknown, Options?: ToastOptions 
         CLAUDIO_ICON: IconFile,
         CLAUDIO_APP_ID: "Claudio",
         CLAUDIO_TOAST_SECONDS: String(Wanted.Seconds || 0),
+        CLAUDIO_SOUND: Wanted.Sound ? "1" : "0",
       },
     }, (Trouble, Said) => {
       if (!Trouble && Said.includes("shown")) {
         return;
       }
+
+      Chime();
 
       notifier.notify({
         appID: "Claudio",

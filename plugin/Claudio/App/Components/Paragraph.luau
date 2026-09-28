@@ -6,6 +6,7 @@ const Navigate = require(script.Parent.Parent.Parent.Navigate)
 const Types = require(script.Parent.Parent.Parent.Types)
 const Theme = require(script.Parent.Parent.Theme)
 const Selectable = require(script.Parent.Selectable)
+const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 
 const function Escaped(Text: string): string
 	return (Text:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"))
@@ -33,7 +34,7 @@ return function(Text: () -> string, LayoutOrder: number, Live: boolean?)
 		Urls = Urls,
 		Text = function()
 			const Accent = Theme.Colors.Accent():ToHex()
-			local Rich = Markdown.Rich(Text(), Settings.TextSize(), Accent)
+			local Rich = Markdown.Rich(Text(), Settings.TextSize(), Accent, Chat.KnownTokens())
 			const Paths = {}
 
 			for Path in Links() do

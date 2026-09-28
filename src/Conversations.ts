@@ -254,6 +254,10 @@ export function ExtractContext(Text: string): string {
   return (Text.match(ContextPattern) || []).join("\n\n");
 }
 
+function AttachedTokens(Text: string): string[] {
+  return (Text.match(/<studio_context>[\s\S]*?<\/studio_context>/g) || []).flatMap((Block) => [...Block.matchAll(/^(\[[^\]\n]+\]) is /gm)].map((Found) => Found[1]));
+}
+
 export function StripContext(Text: string): string {
   return Text
     .replace(/\n*<studio_context>[\s\S]*?<\/studio_context>\n*/g, "")
@@ -907,6 +911,7 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
         role: "user",
         text: StripContext(TextOf(Line.message.content)),
         images: Attached,
+        attachments: AttachedTokens(TextOf(Line.message.content)),
         at: TimeOf(Line),
         uuid: Line.uuid,
         parent: Line.parentUuid,

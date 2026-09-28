@@ -16,14 +16,24 @@ local Held = 0
 
 const Mono = 'font family="rbxasset://fonts/families/RobotoMono.json"'
 
-function Markdown.Rich(Text: string, Size: number?, Accent: string?): string
-	const Key = `{Size or 0}|{Accent or ""}|{Text}`
+function Markdown.Rich(Text: string, Size: number?, Accent: string?, Known: {[string]: boolean}?): string
+	const Present = {}
+
+	for Token in (Known or {}) :: {[string]: boolean} do
+		if Text:find(Token, 1, true) then
+			table.insert(Present, Token)
+		end
+	end
+
+	table.sort(Present)
+
+	const Key = `{Size or 0}|{Accent or ""}|{table.concat(Present, "\0")}|{Text}`
 
 	if Cached[Key] then
 		return Cached[Key]
 	end
 
-	const Built = Markdown.Build(Text, Size, Accent)
+	const Built = Markdown.Build(Text, Size, Accent, Known)
 
 	if Held > 400 then
 		table.clear(Cached)
@@ -62,7 +72,7 @@ function Markdown.Inline(Text: string): string
 	const function Hold(Rich: string): string
 		table.insert(Held, Rich)
 
-		return `{#Held}`
+		return `\3{#Held}\3`
 	end
 
 	local Marked = Text:gsub("%[([^%]]-)%]%([^%)]-%)", function(Label: string): string
@@ -84,14 +94,19 @@ function Markdown.Inline(Text: string): string
 		return `<i>{Body}</i>`
 	end)
 
-	return (Marked:gsub("(%d+)", function(Index: string): string
+	return (Marked:gsub("\3(%d+)\3", function(Index: string): string
 		return Held[tonumber(Index) :: number]
 	end))
 end
 
-function Markdown.Tokens(Text: string, Accent: string, Fade: boolean): string
+function Markdown.Tokens(Text: string, Accent: string, Fade: boolean, Known: {[string]: boolean}?): string
 	const Pieces: {string} = {}
+	const Recognized: {[string]: boolean} = {}
 	local At = 1
+
+	for Token in (Known or {}) :: {[string]: boolean} do
+		Recognized[Format.Escape(Token)] = true
+	end
 
 	const function Plain(Body: string)
 		if Body == "" then
@@ -108,7 +123,7 @@ function Markdown.Tokens(Text: string, Accent: string, Fade: boolean): string
 	while At <= #Text do
 		local Start, Stop = Text:find("%[[^%[%]\n]+%]", At)
 
-		while Start and Stop and Text:sub(Stop + 1, Stop + 1) == "(" do
+		while Start and Stop and (Text:sub(Stop + 1, Stop + 1) == "(" or not Recognized[Text:sub(Start, Stop)]) do
 			Start, Stop = Text:find("%[[^%[%]\n]+%]", Stop + 1)
 		end
 
@@ -139,7 +154,7 @@ function Markdown.Tokens(Text: string, Accent: string, Fade: boolean): string
 	return table.concat(Pieces)
 end
 
-function Markdown.Build(Text: string, Size: number?, Accent: string?): string
+function Markdown.Build(Text: string, Size: number?, Accent: string?, Known: {[string]: boolean}?): string
 	const Lines: {string} = {}
 
 	for _, Line in string.split(Format.Escape(Text), "\n") do
@@ -175,7 +190,7 @@ function Markdown.Build(Text: string, Size: number?, Accent: string?): string
 		Marked = Markdown.Coded(Marked)
 
 		if Accent then
-			Marked = Markdown.Tokens(Marked, Accent, false)
+			Marked = Markdown.Tokens(Marked, Accent, false, Known)
 		end
 
 		table.insert(Lines, Marked)

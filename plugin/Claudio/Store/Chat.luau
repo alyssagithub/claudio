@@ -3485,6 +3485,7 @@ const function Loaded(Given: {any}): {Types.Message}
 			Parts = ReadParts(Message.parts),
 			Calls = Message.calls,
 			ImageIds = Message.images,
+			Attachments = Message.attachments,
 			At = Message.at,
 			Tokens = Message.tokens,
 			Cost = Message.cost,
@@ -4211,6 +4212,30 @@ function Chat.Copy(Text: string)
 	const Ok = Client.WriteClipboard(Text)
 
 	Chat.Say(if Ok then "Copied to the clipboard." else "Could not reach the bridge to copy that.")
+end
+
+function Chat.KnownTokens(): {[string]: boolean}
+	const Known = {}
+
+	for _, Chip in Context.Chips() do
+		if Chip.Token then
+			Known[Chip.Token] = true
+		end
+	end
+
+	for _, Message in Chat.Messages() do
+		for _, Token in Message.Attachments or {} do
+			Known[Token] = true
+		end
+	end
+
+	for _, Entry in Chat.Queue() do
+		for _, Token in Entry.Attachments do
+			Known[Token] = true
+		end
+	end
+
+	return Known
 end
 
 function Chat.OpenUrl(Url: string)

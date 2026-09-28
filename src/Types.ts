@@ -135,6 +135,7 @@ export type StoredMessage = {
   parts?: Part[];
   calls?: StoredCall[];
   images: number[];
+  attachments?: string[];
   at: number | null;
   tokens?: Tokens | null;
   cost?: number;

@@ -307,7 +307,7 @@ return function()
 			TextYAlignment = Enum.TextYAlignment.Top,
 			ZIndex = 2,
 			Text = function()
-				return Markdown.Tokens(Format.Escape(Chat.Draft()), Theme.Colors.Accent():ToHex(), true)
+				return Markdown.Tokens(Format.Escape(Chat.Draft()), Theme.Colors.Accent():ToHex(), true, Chat.KnownTokens())
 			end,
 		},
 	}

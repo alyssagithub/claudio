@@ -80,7 +80,15 @@ export function RememberModels(List: unknown): void {
   }));
 
   for (const Extra of ExtraModels) {
-    if (!Models.some((Model) => Model.value === Extra.value)) {
+    const Listed = Models.find((Model) => Model.value === Extra.value);
+
+    if (Listed && Listed.description === "Custom model") {
+      Listed.displayName = Extra.displayName;
+      Listed.description = Extra.description || "";
+      Listed.contextWindow = Extra.contextWindow;
+    }
+
+    if (!Listed) {
       Models.push({
         value: Extra.value,
         displayName: Extra.displayName,

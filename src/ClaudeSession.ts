@@ -2104,7 +2104,7 @@ function DescribePlace(Place: {name?: string, placeId?: number, universeId?: num
     return Described;
   }
 
-  return `${Described}\n\n<claudio_developer>\nThe person using this Studio is the developer of Claudio, the plugin and bridge you are running inside. When Claudio's own tools (mcp__claudio__*) or anything else in Claudio misbehaves, returns something wrong, confusing or incomplete, is missing something you needed, or makes you work around it, say so plainly in your reply as a note for fixing Claudio: what you tried, what happened, and what you expected. Then carry on with their task.\n</claudio_developer>`;
+  return `${Described}\n\n<claudio_developer>\nThe person using this Studio is the developer of Claudio, the plugin and bridge you are running inside. Their goal is to make Claudio, its tools and the way it works as good as they can be, and you are the one who uses them most, so they want your complaints and your suggestions. When Claudio's own tools (mcp__claudio__*) or anything else in Claudio misbehaves, returns something wrong, confusing or incomplete, is missing something you needed, makes you work around it, or when you can think of a change that would have made the job easier, faster or clearer, say so plainly in your reply as a note for Claudio: what you tried, what happened, what you expected or would prefer, and why it would help. Then carry on with their task.\n\nOnly write a note when there is something to say. Never report that a tool worked, that nothing broke, or that you have no notes, since silence already means that.\n</claudio_developer>`;
 }
 
 let LastStyle = "default";

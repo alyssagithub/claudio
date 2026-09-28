@@ -10,7 +10,13 @@ $Icon = & $Escape ("file:///" + ($env:CLAUDIO_ICON -replace "\\", "/"))
 
 # The alarm scenario is one of the kinds Windows lets through Do Not Disturb, which it turns on while a
 # fullscreen app is in front, so this shows over fullscreen too. Alarms loop a sound by default, hence silent.
-$Audio = if ($env:CLAUDIO_SOUND -eq "1") { '<audio src="ms-winsoundevent:Notification.Default" loop="false"/>' } else { '<audio silent="true"/>' }
+$Chime = $null
+$ChimePath = Join-Path $env:WINDIR "Media\Windows Notify System Generic.wav"
+
+if ($env:CLAUDIO_SOUND -eq "1" -and (Test-Path $ChimePath)) {
+    $Chime = New-Object Media.SoundPlayer $ChimePath
+    $Chime.Load()
+}
 
 $Xml = @"
 <toast scenario="alarm">
@@ -21,7 +27,7 @@ $Xml = @"
       <text>$Body</text>
     </binding>
   </visual>
-  $Audio
+  <audio silent="true"/>
   <actions>
     <action content="Dismiss" arguments="dismiss" activationType="system"/>
   </actions>
@@ -37,6 +43,11 @@ $Toast.Group = "claudio"
 
 $Notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($env:CLAUDIO_APP_ID)
 $Notifier.Show($Toast)
+
+if ($Chime) {
+    Start-Sleep -Milliseconds 250
+    $Chime.PlaySync()
+}
 
 [Console]::Out.WriteLine("shown")
 [Console]::Out.Flush()

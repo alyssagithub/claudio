@@ -2609,8 +2609,9 @@ function Chat.WatchStudioJobs()
 
 				-- Record the mount's chat straight away, so the real plugin never notifies for it.
 				const Current = Chat.ConversationId()
+				const Known = if typeof(_G.ClaudioTestState) == "table" then _G.ClaudioTestState.Known else nil
 
-				if Current then
+				if Current and not (typeof(Known) == "table" and Known[Current]) then
 					_G.ClaudioTestedChats = _G.ClaudioTestedChats or {}
 					_G.ClaudioTestedChats[Current] = true
 				end

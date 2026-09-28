@@ -36,8 +36,45 @@ function Markdown.Rich(Text: string, Size: number?, Accent: string?): string
 	return Built
 end
 
+const BareUrl = "https?://[^%s<>\"'`]+"
+
+const function Trimmed(Url: string): string
+	return (Url:gsub("[%.,;:!%?%)%]%*_]+$", ""))
+end
+
+function Markdown.FindUrls(Text: string): {[string]: string}
+	const Found: {[string]: string} = {}
+
+	for Label, Url in Text:gmatch("%[([^%]]+)%]%(([^%)%s]+)%)") do
+		Found[Label :: string] = Url :: string
+	end
+
+	for Url in Text:gsub("%[[^%]]-%]%([^%)]-%)", ""):gmatch(BareUrl) do
+		Found[Trimmed(Url)] = Trimmed(Url)
+	end
+
+	return Found
+end
+
 function Markdown.Inline(Text: string): string
-	local Marked = Text:gsub("%*%*%*(.-)%*%*%*", "<b><i>%1</i></b>")
+	const Held: {string} = {}
+
+	const function Hold(Rich: string): string
+		table.insert(Held, Rich)
+
+		return `{#Held}`
+	end
+
+	local Marked = Text:gsub("%[([^%]]-)%]%([^%)]-%)", function(Label: string): string
+		return Hold(`<u>{Label}</u>`)
+	end)
+
+	Marked = Marked:gsub(BareUrl, function(Url: string): string
+		const Kept = Trimmed(Url)
+
+		return `{Hold(`<u>{Kept}</u>`)}{Url:sub(#Kept + 1)}`
+	end)
+	Marked = Marked:gsub("%*%*%*(.-)%*%*%*", "<b><i>%1</i></b>")
 
 	Marked = Marked:gsub("%*%*(.-)%*%*", "<b>%1</b>")
 	Marked = Marked:gsub("%f[%w_]__(.-)__%f[^%w_]", "<b>%1</b>")
@@ -46,11 +83,10 @@ function Markdown.Inline(Text: string): string
 	Marked = Marked:gsub("%f[%w_]_(.-)_%f[^%w_]", function(Body: string): string
 		return `<i>{Body}</i>`
 	end)
-	Marked = Marked:gsub("%[([^%]]-)%]%([^%)]-%)", function(Label: string): string
-		return `<u>{Label}</u>`
-	end)
 
-	return Marked
+	return (Marked:gsub("(%d+)", function(Index: string): string
+		return Held[tonumber(Index) :: number]
+	end))
 end
 
 function Markdown.Tokens(Text: string, Accent: string, Fade: boolean): string

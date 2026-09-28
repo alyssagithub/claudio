@@ -23,13 +23,7 @@ return function(Text: () -> string, LayoutOrder: number, Live: boolean?)
 	end)
 
 	const Urls = Vide.derive(function(): {[string]: string}
-		const Found: {[string]: string} = {}
-
-		for Label, Url in Text():gmatch("%[([^%]]+)%]%(([^%)%s]+)%)") do
-			Found[Label :: string] = Url :: string
-		end
-
-		return Found
+		return Markdown.FindUrls(Text())
 	end)
 
 	return Selectable {

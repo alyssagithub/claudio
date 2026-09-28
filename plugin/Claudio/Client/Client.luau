@@ -434,6 +434,10 @@ function Client.DeleteConversation(Id: string): (boolean, any)
 	return Http.Request("DELETE", `{BaseUrl()}/conversations/{Id}`)
 end
 
+function Client.OpenUrl(Url: string): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/open-url`, {url = Url})
+end
+
 function Client.Notify(Title: string, Body: string, Options: {[string]: any}): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/notify`, {
 		title = Title,

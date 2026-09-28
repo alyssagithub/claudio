@@ -223,7 +223,7 @@ return function(Props: Props)
 
 				for Label, Url in (if Props.Urls then Props.Urls() else {}) :: {[string]: string} do
 					if Spanning(Box.Text, Label, At) then
-						task.spawn(Chat.Copy, Url)
+						task.spawn(Chat.OpenUrl, Url)
 
 						return
 					end

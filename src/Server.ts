@@ -525,6 +525,30 @@ export function StartServer(Port: number) {
         return;
       }
 
+      if (Request.method === "POST" && Url.pathname === "/open-url") {
+        const Body = await ReadBody(Request);
+        let Target: URL | null = null;
+
+        try {
+          Target = new URL(typeof Body.url === "string" ? Body.url : "");
+        } catch {
+          Target = null;
+        }
+
+        if (!Target || (Target.protocol !== "http:" && Target.protocol !== "https:")) {
+          SendJson(Response, 400, {error: "Only http and https links open."});
+          return;
+        }
+
+        const [Program, Arguments] = process.platform === "win32"
+          ? ["rundll32.exe", ["url.dll,FileProtocolHandler", Target.href]]
+          : [process.platform === "darwin" ? "open" : "xdg-open", [Target.href]];
+
+        execFile(Program, Arguments, {windowsHide: true}, () => {});
+        SendJson(Response, 200, {opened: true});
+        return;
+      }
+
       if (Request.method === "POST" && Url.pathname === "/notify") {
         const Body = await ReadBody(Request);
         const Title = typeof Body.title === "string" ? Body.title : "Claudio";

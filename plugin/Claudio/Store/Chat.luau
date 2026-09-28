@@ -4213,6 +4213,14 @@ function Chat.Copy(Text: string)
 	Chat.Say(if Ok then "Copied to the clipboard." else "Could not reach the bridge to copy that.")
 end
 
+function Chat.OpenUrl(Url: string)
+	if Client.OpenUrl(Url) then
+		return
+	end
+
+	Chat.Copy(Url)
+end
+
 function Chat.ForkHere(Index: number?)
 	const Id = Chat.ConversationId()
 

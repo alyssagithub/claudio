@@ -2988,7 +2988,7 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 	task.spawn(Chat.Refresh)
 	task.spawn(Chat.RefreshUsage, 5)
 
-	if Chat.ReplyListener then
+	if Chat.ReplyListener and Status ~= "cancelled" then
 		Chat.ReplyListener(Text)
 	end
 

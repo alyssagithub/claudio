@@ -117,6 +117,7 @@ export const ExtraModels = [
   {
     value: "claude-opus-5",
     displayName: "Opus 5",
+    fast: true,
     contextWindow: 1000000,
     description: "Earlier Opus release · 1M context",
   },
@@ -129,6 +130,7 @@ export const ExtraModels = [
   {
     value: "claude-opus-4-8",
     displayName: "Opus 4.8",
+    fast: true,
     contextWindow: 1000000,
     description: "Earlier Opus release · 1M context",
   },

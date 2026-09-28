@@ -101,10 +101,10 @@ export function PriceFor(Model: string) {
 }
 export const ExtraModels = [
   {
-    value: "claude-sonnet-5-5",
+    value: "claude-sonnet-5-5[1m]",
     displayName: "Sonnet 5.5",
-    contextWindow: 200000,
-    description: "Latest Sonnet release · 200k context",
+    contextWindow: 1000000,
+    description: "Latest Sonnet release · 1M context",
   },
   {
     value: "claude-opus-5-5",

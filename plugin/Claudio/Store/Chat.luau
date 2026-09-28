@@ -2589,6 +2589,10 @@ function Chat.WatchStudioJobs()
 				Chat.Draft(SavedDraft)
 			end
 
+			if Settings.Get("Model")() == "claude-sonnet-5-5" then
+				Settings.Set("Model", "claude-sonnet-5-5[1m]")
+			end
+
 			const Held = Context.Saved()
 
 			if Held ~= SavedChips then

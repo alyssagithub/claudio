@@ -2147,7 +2147,9 @@ export function ApplyStyleEverywhere(OutputStyle: string, StepDown: boolean) {
   }
 }
 
-function Choose({ Text, ConversationId, Images, Model, Effort, Escalate, Mode, Folder }: TurnRequest, Record: boolean) {
+function Choose(Given: TurnRequest, Record: boolean) {
+  const { Text, ConversationId, Images, Effort, Escalate, Mode, Folder } = Given;
+  const Model = Given.Model === "claude-sonnet-5-5" ? "claude-sonnet-5-5[1m]" : Given.Model;
   const Lean = Model === LeanMode.value;
   const Auto = Lean || !Model || Model === "auto";
 

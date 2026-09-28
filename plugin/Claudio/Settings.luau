@@ -81,6 +81,13 @@ const Definitions: {Definition} = {
 		Default = true,
 	},
 	{
+		Key = "PromptSuggestions",
+		Label = "Suggest what to say next",
+		Detail = "Shows a guess at your next message in the empty box, and Tab fills it in",
+		Group = "Chat",
+		Default = true,
+	},
+	{
 		Key = "AttachSelection",
 		Label = "Always attach the selection",
 		Detail = "Sends whatever is selected in the Explorer with every message",

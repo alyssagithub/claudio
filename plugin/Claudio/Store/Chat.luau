@@ -65,6 +65,7 @@ const Chat = {
 	Watched = Vide.source({} :: {Types.Message}),
 	SubagentsOpen = Vide.source(false),
 	TasksOpen = Vide.source(false),
+	Suggestion = Vide.source(nil :: string?),
 	BackgroundTasks = Vide.source({} :: {Types.BackgroundTask}),
 	Planning = Vide.source(false),
 	Compacting = Vide.source(false),
@@ -170,6 +171,7 @@ const function Reset()
 	Chat.Elapsed(0)
 	Chat.Permission(nil)
 	Chat.Question(nil)
+	Chat.Suggestion(nil)
 	Chat.Sending(false)
 	Chat.Began(0)
 	Chat.RequestId = nil
@@ -2871,6 +2873,10 @@ const function Ended(Id: string): (number?, boolean)
 		return nil, false
 	end
 
+	if Chat.ConversationId() == Id and not Chat.Sending() then
+		Chat.Suggestion(if typeof(Result.suggestion) == "string" then Result.suggestion else nil)
+	end
+
 	return if typeof(Result.endedAt) == "number" then Result.endedAt else 0, typeof(Result.turn) == "table"
 end
 
@@ -2916,6 +2922,17 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 	Chat.Question(nil)
 	Chat.Sending(false)
 	Chat.Received(true)
+
+	const Id = Chat.ConversationId()
+
+	task.spawn(function()
+		const Deadline = os.clock() + 20
+
+		while Id and os.clock() < Deadline and Chat.ConversationId() == Id and not Chat.Sending() and not Chat.Suggestion() do
+			task.wait(0.5)
+			Ended(Id)
+		end
+	end)
 	Chat.Stage(nil)
 	Chat.ThinkingBlock(false)
 	Chat.ApiRetry(nil)
@@ -3092,6 +3109,7 @@ end
 
 Start = function(Entry: Types.QueuedMessage)
 	Generation += 1
+	Chat.Suggestion(nil)
 
 	const CurrentGeneration = Generation
 

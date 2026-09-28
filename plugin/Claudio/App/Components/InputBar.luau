@@ -157,6 +157,10 @@ return function()
 		TextColor3 = Theme.Colors.Text,
 		PlaceholderColor3 = Theme.Colors.DimText,
 		PlaceholderText = function()
+			if Settings.Get("PromptSuggestions")() and Chat.Suggestion() then
+				return Chat.Suggestion() :: string
+			end
+
 			return if Chat.WindowWidth() < 300 then "/ for commands, @ for objects" else "Type / for commands, @ for objects"
 		end,
 		TextSize = Settings.TextSize,
@@ -187,6 +191,18 @@ return function()
 		Vide.changed("Text", function(Text: string)
 			const Previous = Chat.Draft()
 			const Cursor = if Box then Box.CursorPosition else -1
+			const Suggested = Chat.Suggestion()
+
+			if Previous == "" and Text:match("^\t+$") and Suggested and Settings.Get("PromptSuggestions")() then
+				Chat.Draft(Suggested)
+				Box.Text = Suggested
+				task.defer(function()
+					Box.CursorPosition = #Suggested + 1
+					Follow()
+				end)
+
+				return
+			end
 
 			-- Enter also types a carriage return after the newline; drop it so the draft only holds \n.
 			if Text:find("\r", 1, true) then

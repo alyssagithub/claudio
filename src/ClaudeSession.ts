@@ -876,6 +876,12 @@ export function LastEndedAt(ConversationId: string): number {
   return Ended.get(ConversationId) || 0;
 }
 
+const Suggestions = new Map<string, string>();
+
+export function SuggestionFor(ConversationId: string): string | null {
+  return Suggestions.get(ConversationId) || null;
+}
+
 export function ActiveTurnFor(ConversationId: string): Turn | null {
   for (const Turn of Turns.values()) {
     if (Turn.ConversationId === ConversationId && (Turn.Status === "running" || Turn.Status === "cancelling")) {
@@ -1225,6 +1231,16 @@ function TrackStage(Turn: Turn, Message: any) {
 }
 
 function RouteMessage(Session: Session, Message: any) {
+  if (Message.type === "prompt_suggestion") {
+    const Id = Message.session_id || Session.ConversationId;
+
+    if (Id && !Session.CurrentTurn && typeof Message.suggestion === "string" && Message.suggestion.trim() !== "") {
+      Suggestions.set(Id, Message.suggestion.trim());
+    }
+
+    return;
+  }
+
   if (Message.type === "user" && Message.isReplay === true) {
     const Delivered = Session.CurrentTurn;
     const Text = Awaiting.get(Message.uuid);
@@ -1831,6 +1847,8 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
           cwd: TurnWorkingDirectory,
           additionalDirectories: [MirrorSyncedSkills()],
           includePartialMessages: true,
+          promptSuggestions: true,
+          env: {...process.env, CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: "true"},
           extraArgs: {"replay-user-messages": null},
           settings: {
             fastMode: FastMode === true,
@@ -2187,6 +2205,10 @@ export function StartTurn(Request: TurnRequest) {
 
   LastStyle = OutputStyle || "default";
   LastStepDown = StepDown !== false;
+
+  if (ConversationId) {
+    Suggestions.delete(ConversationId);
+  }
 
   const { Lean, Auto, Planning, Folder, Chosen } = Choose(Request, true);
   const Turn: Turn = {

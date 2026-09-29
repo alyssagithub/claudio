@@ -157,6 +157,24 @@ return function(Input: any, Resolve: (string) -> Instance?): any
 	const Chosen = Selection:Get()
 	const Made: {Instance} = {}
 	local Wall: Part?
+	const Parked: {{Object: Instance, Parent: Instance}} = {}
+	local Hold: Folder?
+
+	const function Park(Target: Instance)
+		if not Hold then
+			const Holding = Instance.new("Folder")
+
+			Holding.Name = "ClaudioRenderHold"
+			Holding.Parent = game:GetService("ServerStorage")
+			Hold = Holding
+		end
+
+		table.insert(Parked, {
+			Object = Target,
+			Parent = Target.Parent :: Instance,
+		})
+		Target.Parent = Hold
+	end
 
 	const function Set(Target: Instance, Property: string, Value: any)
 		const Ok, Before = pcall(function(): any
@@ -181,6 +199,16 @@ return function(Input: any, Resolve: (string) -> Instance?): any
 			pcall(function()
 				(Change.Object :: any)[Change.Property] = Change.Value
 			end)
+		end
+
+		for _, Entry in Parked do
+			pcall(function()
+				Entry.Object.Parent = Entry.Parent
+			end)
+		end
+
+		if Hold and #Hold:GetChildren() == 0 then
+			Hold:Destroy()
 		end
 
 		for _, Instance in Made do
@@ -239,8 +267,10 @@ return function(Input: any, Resolve: (string) -> Instance?): any
 				for _, Effect in Holder:GetDescendants() do
 					if Effect:IsA("PostEffect") then
 						Set(Effect, "Enabled", false)
-					elseif Effect:IsA("Atmosphere") or Effect:IsA("Clouds") then
-						Set(Effect, "Parent", nil)
+					elseif Effect:IsA("Clouds") then
+						Set(Effect, "Enabled", false)
+					elseif Effect:IsA("Atmosphere") then
+						Park(Effect)
 					end
 				end
 			end

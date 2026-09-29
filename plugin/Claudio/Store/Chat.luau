@@ -3492,9 +3492,12 @@ const function LoadImagesFor(Index: number, CurrentGeneration: number)
 
 			if Ok and CurrentGeneration == Generation then
 				const Built, Picture = pcall(Pictures.Build, Image.width, Image.height, Image.pixels)
+				const Index = ImageIndex
 
 				if Built then
-					Fetched[Slot] = Picture
+					Fetched[Slot] = Pictures.Tag(Picture, function()
+						return Client.GetConversationImage(Id, Index, 2048)
+					end)
 				end
 			end
 
@@ -4325,7 +4328,9 @@ function Chat.ViewPicture(Path: string)
 		return
 	end
 
-	Chat.Zoomed(Pictures.Build(Result.width, Result.height, Result.pixels))
+	Chat.Zoomed(Pictures.Tag(Pictures.Build(Result.width, Result.height, Result.pixels), function()
+		return Client.ReadPicture(Path, 2048)
+	end))
 end
 
 function Chat.OpenPicture(Image: EditableImage)

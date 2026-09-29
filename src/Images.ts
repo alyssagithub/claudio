@@ -27,14 +27,15 @@ function DecodeBytes(MediaType: string, Bytes: Buffer): DecodedImage | null {
   return null;
 }
 
-export function DecodeImage(MediaType: string, Base64: string): SentImage | null {
+export function DecodeImage(MediaType: string, Base64: string, Side = MaxImageSide): SentImage | null {
   const Decoded = DecodeBytes(MediaType, Buffer.from(Base64, "base64"));
 
   if (!Decoded) {
     return null;
   }
 
-  const Scale = Math.min(1, MaxImageSide / Decoded.width, MaxImageSide / Decoded.height);
+  const Limit = Math.min(Math.max(Math.floor(Side) || MaxImageSide, 16), 2048);
+  const Scale = Math.min(1, Limit / Decoded.width, Limit / Decoded.height);
   const Width = Math.max(1, Math.round(Decoded.width * Scale));
   const Height = Math.max(1, Math.round(Decoded.height * Scale));
   const Source = Buffer.from(Decoded.data.buffer, Decoded.data.byteOffset, Decoded.data.byteLength);

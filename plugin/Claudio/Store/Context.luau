@@ -219,6 +219,12 @@ function Context.AddImage(Name: string, Data: string, MediaType: string, Token: 
 
 		if Ok and Find(Added) then
 			Built, Picture = pcall(Pictures.Build, Decoded.width, Decoded.height, Decoded.pixels)
+
+			if Built then
+				Pictures.Tag(Picture, function()
+					return Client.DecodeImage(Data, MediaType, 2048)
+				end)
+			end
 		end
 
 		const Chips = table.clone(Context.Chips() :: {Types.Chip})

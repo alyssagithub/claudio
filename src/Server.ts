@@ -249,7 +249,7 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
   }
 
   if (Request.method === "GET" && Id && Segments[2] === "image" && Segments[3]) {
-    const Image = GetConversationImage(Id, Number(Segments[3]));
+    const Image = GetConversationImage(Id, Number(Segments[3]), Number(new URL(Request.url || "", "http://localhost").searchParams.get("side")) || undefined);
 
     if (!Image) {
       SendJson(Response, 404, {error: "No such image"});
@@ -541,7 +541,7 @@ export function StartServer(Port: number) {
 
       if (Request.method === "POST" && Url.pathname === "/pictures/read") {
         const Body = await ReadBody(Request);
-        const Picture = typeof Body.path === "string" && /\.(png|jpe?g)$/i.test(Body.path) ? ReadPicture(Body.path) : null;
+        const Picture = typeof Body.path === "string" && /\.(png|jpe?g)$/i.test(Body.path) ? ReadPicture(Body.path, Number(Body.side) || undefined) : null;
 
         SendJson(Response, Picture ? 200 : 400, Picture || {error: "Could not read that picture."});
         return;
@@ -840,7 +840,7 @@ ${Text}`;
 
       if (Request.method === "POST" && Url.pathname === "/decode") {
         const Body = await ReadBody(Request);
-        const Decoded = typeof Body.data === "string" ? DecodeImage(Body.mediaType || "image/png", Body.data) : null;
+        const Decoded = typeof Body.data === "string" ? DecodeImage(Body.mediaType || "image/png", Body.data, Number(Body.side) || undefined) : null;
 
         SendJson(Response, Decoded ? 200 : 400, Decoded || {error: "Could not decode that image"});
         return;

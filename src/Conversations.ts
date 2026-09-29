@@ -592,14 +592,14 @@ export function ListConversations(): Listing[] {
   return Summaries.sort((Left, Right) => (Number(Right.starred) - Number(Left.starred)) || (Right.updatedAt - Left.updatedAt));
 }
 
-export function GetConversationImage(Id: string, Wanted: number) {
+export function GetConversationImage(Id: string, Wanted: number, Side?: number) {
   const File = FindFile(Id);
   const Found = (File ? ReadLines(File) || [] : [])
     .filter((Line) => !Line.isSidechain && Line.type === "user" && Line.message)
     .flatMap((Line) => ImagesInContent(Line.message!.content));
   const Image = Number.isInteger(Wanted) && Wanted !== 0 ? Found.at(Wanted > 0 ? Wanted - 1 : Wanted) : null;
 
-  return Image ? DecodeImage(Image.mediaType, Image.data) : null;
+  return Image ? DecodeImage(Image.mediaType, Image.data, Side) : null;
 }
 
 function ReadCosts(): CostStore {

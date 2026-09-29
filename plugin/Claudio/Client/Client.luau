@@ -233,10 +233,11 @@ function Client.DisarmClipboard(Marker: string): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/clipboard/disarm`, {marker = Marker, stamp = DateTime.now().UnixTimestampMillis})
 end
 
-function Client.DecodeImage(Data: string, MediaType: string): (boolean, any)
+function Client.DecodeImage(Data: string, MediaType: string, Side: number?): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/decode`, {
 		data = Data,
 		mediaType = MediaType,
+		side = Side,
 	})
 end
 
@@ -400,8 +401,8 @@ function Client.GetSubagent(Id: string, ToolUseId: string, Running: boolean): (b
 	return Http.Request("GET", `{BaseUrl()}/conversations/{Id}/subagents/{ToolUseId}{if Running then "/live" else ""}`)
 end
 
-function Client.GetConversationImage(Id: string, Index: number): (boolean, any)
-	return Http.Request("GET", `{BaseUrl()}/conversations/{Id}/image/{Index}`)
+function Client.GetConversationImage(Id: string, Index: number, Side: number?): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/conversations/{Id}/image/{Index}{if Side then `?side={Side}` else ""}`)
 end
 
 function Client.RenameConversation(Id: string, Title: string): (boolean, any)
@@ -461,8 +462,8 @@ function Client.ProbePaths(Paths: {string}): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/paths`, {paths = Paths})
 end
 
-function Client.ReadPicture(Path: string): (boolean, any)
-	return Http.Request("POST", `{BaseUrl()}/pictures/read`, {path = Path})
+function Client.ReadPicture(Path: string, Side: number?): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/pictures/read`, {path = Path, side = Side})
 end
 
 function Client.SavePicture(Width: number, Height: number, Pixels: string, Open: boolean): (boolean, any)

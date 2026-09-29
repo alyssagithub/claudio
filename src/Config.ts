@@ -66,6 +66,7 @@ export function SystemPromptFor(ServerNames: string[]) {
       "`math.tau`, `math.nan`, `math.e`, `math.phi`, `math.sqrt2`, `math.isnan`, `math.isinf`, `math.isfinite`.",
       "`EncodingService`: Base64, Blake/MD5/SHA hashes, zstd.",
       "`UIShadow`: a GuiObject shadow instance, with `Enabled`.",
+      "`Folder.IconTint`: a Color3 that tints the folder's icon in the Explorer, for colour-coding folders.",
     ].map((Fact) => `- ${Fact}`).join("\n"),
     "</roblox_reference>",
   ].join("\n\n"));

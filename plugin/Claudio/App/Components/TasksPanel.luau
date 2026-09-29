@@ -12,6 +12,8 @@ const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const Icon = require(script.Parent.Icon)
 const IconButton = require(script.Parent.IconButton)
+const CodeBox = require(script.Parent.CodeBox)
+const Syntax = require(script.Parent.Parent.Parent.Syntax)
 
 const Create = Vide.create
 
@@ -32,8 +34,6 @@ const Statuses: {[string]: string} = {
 	stopped = "Stopped",
 	failed = "Failed",
 }
-
-const Monospace = Font.new("rbxasset://fonts/families/RobotoMono.json")
 
 const function IsBash(Task: Types.BackgroundTask): boolean
 	return Task.kind == "local_bash"
@@ -80,47 +80,11 @@ const function Label(Text: string | () -> string, LayoutOrder: number, Colour: (
 	}
 end
 
-const function Block(Text: () -> string, LayoutOrder: number, Visible: () -> boolean): Frame
-	return Create "Frame" {
-		Name = "Block",
-		Size = UDim2.fromScale(1, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
-		BackgroundColor3 = Theme.Colors.Background,
-		LayoutOrder = LayoutOrder,
-		Visible = Visible,
+const function Tail(Text: string?): string
+	const Lines = string.split(((Text or ""):gsub("%s+$", "")), "\n")
+	const From = math.max(1, #Lines - 11)
 
-		Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-		Create "UIStroke" {Color = Theme.Colors.Border},
-		Create "UIPadding" {
-			PaddingLeft = UDim.new(0, 8),
-			PaddingRight = UDim.new(0, 8),
-			PaddingTop = UDim.new(0, 6),
-			PaddingBottom = UDim.new(0, 6),
-		},
-		Create "TextLabel" {
-			Name = "Text",
-			Size = UDim2.fromScale(1, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundTransparency = 1,
-			TextColor3 = Theme.Colors.Text,
-			TextSize = Settings.SmallText,
-			FontFace = Monospace,
-			TextWrapped = true,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextYAlignment = Enum.TextYAlignment.Top,
-			Text = Text,
-		},
-	}
-end
-
--- Output keeps to a fixed height and follows the newest lines, as the desktop app's box does.
-const function OutputBox(Text: () -> string?, Visible: () -> boolean): Frame
-	return Block(function()
-		const Lines = string.split(((Text() or ""):gsub("%s+$", "")), "\n")
-		const From = math.max(1, #Lines - 11)
-
-		return (if From > 1 then "…\n" else "") .. table.concat(Lines, "\n", From)
-	end, 2, Visible)
+	return (if From > 1 then "…\n" else "") .. table.concat(Lines, "\n", From)
 end
 
 const function Row(Value: () -> Types.BackgroundTask): Frame
@@ -206,10 +170,17 @@ const function Row(Value: () -> Types.BackgroundTask): Frame
 		Note.Visible = Status() ~= ""
 	end)
 
-	return Create "Frame" {
+	return Create "TextButton" {
 		Name = "Task",
 		Size = UDim2.fromScale(1, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
+		Text = "",
+		AutoButtonColor = false,
+		Activated = function()
+			if Expandable() then
+				Expanded(not Expanded())
+			end
+		end,
 		BackgroundColor3 = Theme.Colors.Panel,
 		BackgroundTransparency = function()
 			return if Hovered() and Expandable() then 0 else 0.3
@@ -240,19 +211,12 @@ const function Row(Value: () -> Types.BackgroundTask): Frame
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, 6),
 			},
-			Create "TextButton" {
+			Create "Frame" {
 				Name = "Title",
 				Size = UDim2.fromScale(0, 0),
 				AutomaticSize = Enum.AutomaticSize.XY,
 				BackgroundTransparency = 1,
-				AutoButtonColor = false,
-				Text = "",
 				LayoutOrder = 1,
-				Activated = function()
-					if Expandable() then
-						Expanded(not Expanded())
-					end
-				end,
 
 				Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
 				Create "UIListLayout" {
@@ -279,17 +243,24 @@ const function Row(Value: () -> Types.BackgroundTask): Frame
 
 					Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Shrink},
 				},
-				Icon {
-					Name = Config.Icons.Right,
-					Size = Settings.SmallText,
-					LayoutOrder = 2,
-					Rotation = function()
-						return if Expanded() then 90 else 0
-					end,
-					Visible = function()
-						return Expandable() and (Hovered() or Expanded())
-					end,
-				},
+				Vide.show(function()
+					return Expandable() and Expanded()
+				end, function()
+					return Icon {
+						Name = Config.Icons.Down,
+						Size = Settings.SmallText,
+						LayoutOrder = 2,
+					}
+				end),
+				Vide.show(function()
+					return Expandable() and not Expanded()
+				end, function()
+					return Icon {
+						Name = Config.Icons.Right,
+						Size = Settings.SmallText,
+						LayoutOrder = 2,
+					}
+				end),
 			},
 			IconButton {
 				Icon = Config.Icons.Stop,
@@ -404,14 +375,35 @@ const function Row(Value: () -> Types.BackgroundTask): Frame
 				HorizontalFlex = Enum.UIFlexAlignment.Fill,
 				Padding = UDim.new(0, 5),
 			},
-			Block(function()
-				return Command(Value()) or ""
-			end, 1, function()
-				return IsBash(Value()) and Command(Value()) ~= nil
-			end),
-			OutputBox(Output, function()
-				return IsBash(Value()) and (Output() or "") ~= ""
-			end),
+			CodeBox {
+				Name = "Command",
+				LayoutOrder = 1,
+				Small = true,
+				Visible = function()
+					return IsBash(Value()) and Command(Value()) ~= nil
+				end,
+				Text = function()
+					return Command(Value()) or ""
+				end,
+				Rich = function()
+					return Syntax.Highlight(Command(Value()) or "", "sh")
+				end,
+			},
+			CodeBox {
+				Name = "Output",
+				LayoutOrder = 2,
+				Small = true,
+				Visible = function()
+					return IsBash(Value()) and (Output() or "") ~= ""
+				end,
+				Colour = Theme.Colors.DimText,
+				Text = function()
+					return Tail(Output())
+				end,
+				Rich = function()
+					return Format.Escape(Tail(Output()))
+				end,
+			},
 			Note,
 		},
 	}

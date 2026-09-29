@@ -1,6 +1,6 @@
 import { PNG } from "pngjs";
 import jpeg from "jpeg-js";
-import { MaxImageWidth } from "./Config.js";
+import { MaxImageSide } from "./Config.js";
 import type { Content, ContentBlock, DecodedImage, Picture, SentImage } from "./Types.js";
 
 function DecodeBytes(MediaType: string, Bytes: Buffer): DecodedImage | null {
@@ -34,7 +34,7 @@ export function DecodeImage(MediaType: string, Base64: string): SentImage | null
     return null;
   }
 
-  const Scale = Math.min(1, MaxImageWidth / Decoded.width);
+  const Scale = Math.min(1, MaxImageSide / Decoded.width, MaxImageSide / Decoded.height);
   const Width = Math.max(1, Math.round(Decoded.width * Scale));
   const Height = Math.max(1, Math.round(Decoded.height * Scale));
   const Source = Buffer.from(Decoded.data.buffer, Decoded.data.byteOffset, Decoded.data.byteLength);

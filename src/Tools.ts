@@ -64,18 +64,28 @@ function StudioMemory(): Promise<{Editor: number, Test: number, Room: number}> {
 }
 
 async function Headroom(Clients: number, Starting: boolean): Promise<string | null> {
-  const Measured = await StudioMemory();
   const Gigabyte = 1024 * 1024 * 1024;
-  const Each = Math.max(1.2 * Gigabyte, Measured.Test || Measured.Editor * 0.25);
   const Processes = Clients + (Starting ? 1 : 0);
-  const Needed = Processes * Each + 0.5 * Gigabyte;
   const Gigabytes = (Bytes: number) => (Bytes / Gigabyte).toFixed(1);
+  const Began = Date.now();
+  let Measured = await StudioMemory();
+  let Each = Math.max(1.2 * Gigabyte, Measured.Test || Measured.Editor * 0.25);
+  let Needed = Processes * Each + 0.5 * Gigabyte;
+  let Most = Measured.Room;
+
+  while (Measured.Room < Needed && Date.now() - Began < 20000) {
+    await new Promise((Resolve) => setTimeout(Resolve, 2000));
+    Measured = await StudioMemory();
+    Each = Math.max(1.2 * Gigabyte, Measured.Test || Measured.Editor * 0.25);
+    Needed = Processes * Each + 0.5 * Gigabyte;
+    Most = Math.max(Most, Measured.Room);
+  }
 
   if (Measured.Room >= Needed) {
     return null;
   }
 
-  return `Not starting that: ${Starting ? "a server and " : ""}${Clients} client${Clients === 1 ? "" : "s"} are ${Processes} Studio processes of about ${Gigabytes(Each)} GB each, plus room to spare, so about ${Gigabytes(Needed)} GB, and this machine only has ${Gigabytes(Measured.Room)} GB left even counting the page file. Running out crashes the whole machine, not just Studio. Use fewer players, or pass force only if the user asks for it.`;
+  return `Not starting that: ${Starting ? "a server and " : ""}${Clients} client${Clients === 1 ? "" : "s"} are ${Processes} Studio processes of about ${Gigabytes(Each)} GB each, plus room to spare, so about ${Gigabytes(Needed)} GB, and over 20 seconds of watching this machine had at most ${Gigabytes(Most)} GB free even counting the page file. Running out crashes the whole machine, not just Studio. Use fewer players, or pass force only if the user asks for it.`;
 }
 
 const LintDescription = [

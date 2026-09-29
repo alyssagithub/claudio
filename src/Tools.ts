@@ -36,13 +36,14 @@ const PlaytestDescription = [
   "Check status first rather than assuming.",
   "start and players wait until the server and every client have loaded and can run code, up to three minutes, so the session is usable as soon as the call returns.",
   "This runs without a player character, so LocalPlayer and PlayerGui are not available.",
-  "A multiplayer test opens a server and one client per player, each its own Studio process at roughly half the editor's memory, so the tool checks that the machine can hold them, counting the page file, before starting one or adding players. It refuses only when they would not fit at all; when they only fit by paging, the test runs but slowly. Pass force to go ahead anyway.",
+  "A multiplayer test opens a server and one client per player, each its own Studio process of a gigabyte or more, measured from the ones already running. Before starting one or adding players the tool checks they fit in free memory with room to spare, counting the page file, and refuses when they would not, because running out crashes the whole machine. Pass force only when the user asks for it.",
+  "stop closes the test's own Studio windows from outside when the session does not answer, so a hung multiplayer test can always be stopped; the editor is never touched.",
 ].join(" ");
 
-function StudioMemory(): Promise<{Editor: number, Room: number}> {
+function StudioMemory(): Promise<{Editor: number, Test: number, Room: number}> {
   const [Program, Arguments, Scale] = process.platform === "win32"
-    ? ["powershell", ["-NoProfile", "-Command", "\"$((Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Sort-Object PrivateMemorySize64 -Descending | Select-Object -First 1).PrivateMemorySize64) $((Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory * 1024)\""], 1]
-    : ["sh", ["-c", "ps -axo rss,comm | grep -i RobloxStudio | sort -rn | head -1 | awk '{print $1}'"], 1024];
+    ? ["powershell", ["-NoProfile", "-Command", "\"$((Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Sort-Object PrivateMemorySize64 -Descending | ForEach-Object { $_.PrivateMemorySize64 }) -join ',') $((Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory * 1024)\""], 1]
+    : ["sh", ["-c", "echo $(ps -axo rss,comm | grep -i RobloxStudio | sort -rn | awk '{print $1}' | paste -sd, -) 0"], 1024];
 
   return new Promise((Resolve) => {
     execFile(Program as string, Arguments as string[], {
@@ -50,11 +51,13 @@ function StudioMemory(): Promise<{Editor: number, Room: number}> {
       timeout: 8000,
       windowsHide: true,
     }, (Trouble, Said) => {
-      const [Editor, Room] = String(Said || "").trim().split(/\s+/).map(Number);
+      const [Sizes, Room] = String(Said || "").trim().split(/\s+/);
+      const Each = String(Sizes || "").split(",").map(Number).filter((Size) => Size > 0).map((Size) => Size * (Scale as number));
 
       Resolve({
-        Editor: Trouble ? 0 : (Editor || 0) * (Scale as number),
-        Room: Trouble || !Room ? os.freemem() : Room,
+        Editor: Trouble ? 0 : Each[0] || 0,
+        Test: Trouble ? 0 : Math.max(0, ...Each.slice(1)),
+        Room: Trouble || !Number(Room) ? os.freemem() : Number(Room),
       });
     });
   });
@@ -63,16 +66,16 @@ function StudioMemory(): Promise<{Editor: number, Room: number}> {
 async function Headroom(Clients: number, Starting: boolean): Promise<string | null> {
   const Measured = await StudioMemory();
   const Gigabyte = 1024 * 1024 * 1024;
-  // Only refuse when there is truly no room left. Estimates scaled from the editor's size refused tests that
-  // then ran fine when forced, since a playtest shares much of what the editor has already loaded.
-  const Needed = (Starting ? 0.5 * Gigabyte : 0) + Clients * 0.25 * Gigabyte;
+  const Each = Math.max(1.2 * Gigabyte, Measured.Test || Measured.Editor * 0.25);
+  const Processes = Clients + (Starting ? 1 : 0);
+  const Needed = Processes * Each + 0.5 * Gigabyte;
   const Gigabytes = (Bytes: number) => (Bytes / Gigabyte).toFixed(1);
 
   if (Measured.Room >= Needed) {
     return null;
   }
 
-  return `Not starting that: ${Starting ? "a server and " : ""}${Clients} client${Clients === 1 ? "" : "s"} need about ${Gigabytes(Needed)} GB, and this machine only has ${Gigabytes(Measured.Room)} GB left even counting the page file, so Studio would run out of memory. Close things, use fewer players, or pass force to try anyway.`;
+  return `Not starting that: ${Starting ? "a server and " : ""}${Clients} client${Clients === 1 ? "" : "s"} are ${Processes} Studio processes of about ${Gigabytes(Each)} GB each, plus room to spare, so about ${Gigabytes(Needed)} GB, and this machine only has ${Gigabytes(Measured.Room)} GB left even counting the page file. Running out crashes the whole machine, not just Studio. Use fewer players, or pass force only if the user asks for it.`;
 }
 
 const LintDescription = [
@@ -143,7 +146,18 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       await new Promise((Resolve) => setTimeout(Resolve, 500));
     }
 
-    return " Studio had still not left the playtest after a minute, so check it before starting another.";
+    return await ForceStop(" Studio had still not left the playtest after a minute.");
+  }
+
+  async function ForceStop(Before: string): Promise<string> {
+    const { CloseTestProcesses } = await import("./StudioPresence.js");
+    const Closed = await CloseTestProcesses();
+
+    if (Closed === 0) {
+      return `${Before} No separate test windows were open to close from outside, so stop it from Studio's toolbar.`;
+    }
+
+    return `${Before} Closed ${Closed} test Studio window${Closed === 1 ? "" : "s"} from outside, leaving the editor alone.`;
   }
 
   async function WaitUntilLoaded(Clients: number, Signal?: AbortSignal): Promise<string> {
@@ -156,8 +170,8 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
 
       const Session = await LiveSession();
 
-      if (Session && Session.Able && Session.Ready >= Clients) {
-        return ` Everything loaded ${Math.round((Date.now() - Began) / 1000)}s later: the server${Clients === 0 ? "" : Clients === 1 ? " and the client" : ` and all ${Clients} clients`} can run code now.`;
+      if (Session && Session.Able && Session.Ready >= Clients && (Clients === 0 || (Session.Players || 0) >= Clients)) {
+        return ` Everything loaded ${Math.round((Date.now() - Began) / 1000)}s later: the server${Clients === 0 ? "" : Clients === 1 ? " and the client" : ` and all ${Clients} clients`} can run code now, and the server's player list has ${Session.Players || 0} player${Session.Players === 1 ? "" : "s"} in it.`;
       }
 
       await new Promise((Resolve) => setTimeout(Resolve, 1000));
@@ -173,7 +187,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       return " After three minutes the server is up but Claudio's plugin is not running inside it, so code cannot run there yet.";
     }
 
-    return ` After three minutes only ${Session.Ready} of ${Clients} clients had finished loading. Check the place before relying on the rest.`;
+    return ` After three minutes only ${Session.Ready} of ${Clients} clients had finished loading and the server's player list has ${Session.Players || 0}. Check the place before relying on the rest.`;
   }
 
   return [
@@ -607,7 +621,16 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
           const Answer = Said(await ReachIn("server", "playtest", {
             action: Input.action,
             players: Input.players,
-          }), "The session did not say what happened.");
+          }, Input.action === "stop" ? 20 : undefined), "The session did not say what happened.");
+
+          if (Input.action === "stop" && !Answer.startsWith("Playtest stopped")) {
+            setTimeout(Release, 12000);
+
+            return {content: [{
+              type: "text",
+              text: await ForceStop(`The session did not stop itself: ${Answer}`),
+            }]};
+          }
 
           setTimeout(Release, 12000);
 
@@ -642,6 +665,13 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
 
         if (Found && Found.relay) {
           const Missing = await NeedsSession(`Studio only allows ${Found.relay} from inside the running session, and the session is not reachable. It needs Allow HTTP Requests turned on in Game Settings before the playtest starts, otherwise stop it from Studio's toolbar.`);
+
+          if (Missing && Found.relay === "stop") {
+            return {content: [{
+              type: "text",
+              text: await ForceStop("The session is not reachable."),
+            }]};
+          }
 
           if (Missing) {
             return {content: [{

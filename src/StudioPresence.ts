@@ -1,4 +1,4 @@
-import { exec } from "node:child_process";
+import { exec, execFile } from "node:child_process";
 
 
 function Run(Command: string): Promise<string> {
@@ -21,6 +21,16 @@ export async function StudioProcesses() {
   }
 
   return [];
+}
+
+export function CloseTestProcesses(): Promise<number> {
+  if (process.platform !== "win32") {
+    return Promise.resolve(0);
+  }
+
+  return new Promise((Resolve) => {
+    execFile("powershell", ["-NoProfile", "-Command", `$All = @(Get-CimInstance Win32_Process -Filter 'Name = ''RobloxStudioBeta.exe'''); $Ids = $All | ForEach-Object { $_.ProcessId }; $Tests = @($All | Where-Object { $Ids -contains $_.ParentProcessId }); $Tests | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; $Tests.Count`], {timeout: 15000, windowsHide: true}, (Trouble, Output) => Resolve(Trouble ? 0 : Number(String(Output).trim()) || 0));
+  });
 }
 
 type PresenceInfo = {

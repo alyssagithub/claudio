@@ -211,8 +211,10 @@ task.spawn(function()
 	while RunService:IsRunning() and task.wait(1) do
 		local Ready = 0
 
-		for _ in Loaded do
-			Ready += 1
+		for Player in Loaded do
+			if Player.Parent then
+				Ready += 1
+			end
 		end
 
 		const Ok, Reply = Call("GET", `/studio/job?role=server&canRun={Builder() ~= nil}&clients={#game:GetService("Players"):GetPlayers()}&ready={Ready}`, nil)

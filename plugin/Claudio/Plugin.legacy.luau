@@ -19,6 +19,22 @@ if Playing and RunService:IsServer() then
 	return
 end
 
+const Players = game:GetService("Players")
+
+if Playing and not Players.LocalPlayer then
+	Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+end
+
+const Local = Players.LocalPlayer
+
+if Playing and Local and Local.UserId <= 0 then
+	require(script.Parent.Settings).Load(plugin)
+	Builder.Serve()
+	require(script.Parent.Runtime).Start(plugin)
+
+	return
+end
+
 const Settings = require(script.Parent.Settings)
 const Watcher = require(script.Parent.Watcher)
 const App = require(script.Parent.App.App)

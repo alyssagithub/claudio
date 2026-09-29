@@ -330,7 +330,7 @@ const function Interact(Body: string): any
 	return {text = `Dragged {Target.Name} from {Where(Point)} to {Where(Finish)}{if Hold > 0 then `, holding {Hold}s before releasing` else ""}. Positions are in the same space as AbsolutePosition.`}
 end
 
-const function Run(Code: string): any
+const function Run(Code: string, Within: string?): any
 	const Said = {}
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
 		if #Said < 200 and Kind ~= Enum.MessageType.MessageInfo then
@@ -355,7 +355,11 @@ const function Run(Code: string): any
 		return Finish({error = "Claudio's plugin is not running inside this play session, so there is nothing to build the code with. Stop the playtest and start it again, and if that does not help, reinstall the plugin."})
 	end
 
-	const Payload = Making:Invoke("{{BuildKey}}", `return function(breathe)\n{Code}\nend`)
+	const Payload = Making:Invoke("{{BuildKey}}", `return function(breathe)\n{Code}\nend`, Within)
+
+	if typeof(Payload) == "string" then
+		return Finish({error = Payload})
+	end
 
 	if not Payload then
 		return Finish({error = "Claudio could not turn that code into a module to run it."})
@@ -402,6 +406,12 @@ Remote.OnClientEvent:Connect(function(Id: string, Kind: string, Body: string)
 	const Ok, Result = pcall(function(): any
 		if Kind == "input" then
 			return Interact(Body)
+		end
+
+		if Kind == "scoped" then
+			const Given = HttpService:JSONDecode(Body)
+
+			return Run(Given.code, Given.within)
 		end
 
 		return Run(Body)

@@ -4,6 +4,7 @@ const RunService = game:GetService("RunService")
 const ServerScriptService = game:GetService("ServerScriptService")
 
 const Settings = require(script.Parent.Parent.Settings)
+const Scoped = require(script.Parent.Scoped)
 
 const Name = "ClaudioBuild"
 
@@ -21,11 +22,23 @@ function Builder.Serve()
 
 	Bindable.Name = Name
 
-	Bindable.OnInvoke = function(Given: any, Source: any): any
+	Bindable.OnInvoke = function(Given: any, Source: any, Within: any): any
 		const Key = Settings.Get("BuildKey")()
 
 		if Key == "" or Given ~= Key or typeof(Source) ~= "string" then
 			return nil
+		end
+
+		local Text = Source
+
+		if typeof(Within) == "string" and Within ~= "" then
+			const Spliced, _, Trouble = Scoped.Splice(Within, Source)
+
+			if not Spliced then
+				return Trouble
+			end
+
+			Text = Spliced
 		end
 
 		const Payload = Instance.new("ModuleScript")
@@ -33,7 +46,7 @@ function Builder.Serve()
 		Payload.Name = "ClaudioPayload"
 
 		const Written = pcall(function()
-			(Payload :: any).Source = Source
+			(Payload :: any).Source = Text
 		end)
 
 		if not Written then

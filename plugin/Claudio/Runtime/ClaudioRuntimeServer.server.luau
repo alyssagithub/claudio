@@ -139,7 +139,7 @@ const function Explain(Trouble: string, Said: {string}): string
 	return Trouble
 end
 
-const function Run(Code: string): any
+const function Run(Code: string, Within: string?): any
 	const Said = {}
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
 		if #Said < 200 and Kind ~= Enum.MessageType.MessageInfo then
@@ -164,7 +164,11 @@ const function Run(Code: string): any
 		return Finish({error = "Claudio's plugin is not running inside this play session, so there is nothing to build the code with. Stop the playtest and start it again, and if that does not help, reinstall the plugin."})
 	end
 
-	const Payload = Making:Invoke(BuildKey, `return function(breathe)\n{Code}\nend`)
+	const Payload = Making:Invoke(BuildKey, `return function(breathe)\n{Code}\nend`, Within)
+
+	if typeof(Payload) == "string" then
+		return Finish({error = Payload})
+	end
 
 	if not Payload then
 		return Finish({error = "Claudio could not turn that code into a module to run it."})
@@ -391,10 +395,14 @@ task.spawn(function()
 						return {error = `No player matches "{Wanted}". In the session: {table.concat(Names, ", ")}.`}
 					end
 
+					if Job.kind == "execute" and typeof(Job.input.within) == "string" then
+						return AskClient(Player, "scoped", HttpService:JSONEncode(Job.input))
+					end
+
 					return AskClient(Player, if Job.kind == "input" then "input" else "execute", if Job.kind == "input" then HttpService:JSONEncode(Job.input) else Job.input.code)
 				end
 
-				return Run(Job.input.code)
+				return Run(Job.input.code, Job.input.within)
 			end)
 
 			if not (Done and Outcome == nil) then

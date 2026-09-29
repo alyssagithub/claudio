@@ -2265,9 +2265,26 @@ const function Execute(Input: any): any
 	const ChangeHistoryService = game:GetService("ChangeHistoryService")
 	const Said = {}
 
+	const Wrapped = `return function(plugin, breathe)\n{Code}\nend`
+	local Source = Wrapped
+	local Offset = 1
+
+	if typeof(Input.within) == "string" and Input.within ~= "" then
+		const Spliced, Before, Trouble = require(script.Parent.Parent.Runtime.Scoped).Splice(Input.within, Wrapped)
+
+		if not Spliced then
+			return {error = Trouble}
+		end
+
+		Source = Spliced
+		Offset = Before + 1
+	end
+
 	const function Placed(Message: string): string
 		return (Message:gsub("[%w_%.]*ClaudioExecute:(%d+):?%s*", function(Digits: string): string
-			return `line {(tonumber(Digits) or 1) - 1}: `
+			const Line = (tonumber(Digits) or 1) - Offset
+
+			return if Line < 1 then `the module, line {Line + Offset - 1}: ` else `line {Line}: `
 		end))
 	end
 
@@ -2305,7 +2322,7 @@ const function Execute(Input: any): any
 	const Holder = Instance.new("ModuleScript")
 
 	Holder.Name = "ClaudioExecute"
-	Holder.Source = `return function(plugin, breathe)\n{Code}\nend`
+	Holder.Source = Source
 
 	const function Finish(): ()
 		task.wait(0.15)
@@ -2361,15 +2378,13 @@ const function Execute(Input: any): any
 		const Broke = Result :: any
 		const Message = tostring(Broke.Message)
 
-		Answer.error = (Message:gsub("[%w_%.]*ClaudioExecute:(%d+):?%s*", function(Digits: string): string
-			return `line {(tonumber(Digits) or 1) - 1}: `
-		end))
+		Answer.error = Placed(Message)
 
 		const Where = tonumber(Message:match("ClaudioExecute:(%d+)"))
 
 		if Where then
 			const Lines = string.split(Code, "\n")
-			const Real = Where - 1
+			const Real = Where - Offset
 
 			if Lines[Real] then
 				Answer.line = `line {Real}: {Lines[Real]}`
@@ -2382,7 +2397,7 @@ const function Execute(Input: any): any
 			const Numbered = Frame:match("ClaudioExecute:(%d+)")
 
 			if Numbered then
-				table.insert(Frames, `line {(tonumber(Numbered) or 1) - 1}`)
+				table.insert(Frames, `line {(tonumber(Numbered) or 1) - Offset}`)
 			end
 		end
 

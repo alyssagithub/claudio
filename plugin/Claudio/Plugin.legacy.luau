@@ -2,6 +2,7 @@
 const RunService = game:GetService("RunService")
 
 const Playing = not RunService:IsEdit()
+const RunMode = Playing and RunService:IsRunMode()
 
 if not plugin then
 	return
@@ -16,12 +17,14 @@ if Playing and RunService:IsServer() then
 	require(script.Parent.Runtime).Start(plugin)
 	require(script.Parent.Picker).Start(plugin)
 
-	return
+	if not RunMode then
+		return
+	end
 end
 
 const Players = game:GetService("Players")
 
-if Playing and not Players.LocalPlayer then
+if Playing and not RunMode and not Players.LocalPlayer then
 	Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
 end
 
@@ -41,7 +44,7 @@ const App = require(script.Parent.App.App)
 
 Settings.Load(plugin)
 
-if Playing then
+if Playing and not RunMode then
 	Builder.Serve()
 	require(script.Parent.Runtime).Start(plugin)
 end
@@ -58,7 +61,7 @@ end
 
 const Running = App.New(plugin)
 
-if Playing then
+if Playing and not RunMode then
 	task.spawn(require(script.Parent.Picker).Start, plugin)
 end
 

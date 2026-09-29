@@ -492,8 +492,9 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         undoName: z.string().optional().describe("What the undo step should be called, such as \"Rename the doors\"."),
         timeout: z.number().optional().describe("How long to wait, in seconds, when the code is expected to take a while. Five minutes by default, thirty at most."),
         player: z.string().optional().describe("Which client to run on when target is client: a player's name, or their number in join order starting at 1. Defaults to the first player."),
+        within: z.string().optional().describe("Path of a ModuleScript to run inside: the code runs after a fresh copy of the module's body, above its final return, so its private locals and functions are in scope to call and test. The copy is separate, so the real module's state is untouched, and script refers to the copy. The module's top-level code runs first, so one that waits on something only present in a playtest will wait until the timeout in edit; set a short timeout or run it in a session."),
       },
-      Run: async (Input: { code: string; target?: "edit" | "server" | "client"; readOnly?: boolean; undoName?: string; timeout?: number; player?: string }) => {
+      Run: async (Input: { code: string; target?: "edit" | "server" | "client"; readOnly?: boolean; undoName?: string; timeout?: number; player?: string; within?: string }) => {
         const Where = Input.target || "edit";
 
         if (Where !== "edit") {
@@ -513,6 +514,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
           readOnly: Input.readOnly === true,
           undoName: Input.undoName,
           player: Input.player,
+          within: Input.within,
         };
         const Found: ExecuteAnswer = await ReachIn(Where === "edit" ? "edit" : "server", "execute", Sent, Input.timeout);
 

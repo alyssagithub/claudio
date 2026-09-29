@@ -1242,7 +1242,7 @@ function RouteMessage(Session: Session, Message: any) {
 
   if (Message.type === "system" && Message.subtype === "background_tasks_changed") {
     Session.Background = new Set(((Message.tasks || []) as {task_id: string, task_type: string, ambient?: boolean}[])
-      .filter((Task) => !Task.ambient && /agent/i.test(Task.task_type || ""))
+      .filter((Task) => !Task.ambient)
       .map((Task) => Task.task_id));
 
     if (Session.CurrentTurn && Session.CurrentTurn.Waiting > 0) {

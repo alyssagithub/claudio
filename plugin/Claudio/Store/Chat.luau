@@ -2308,16 +2308,7 @@ const function Execute(Input: any): any
 		Recording = ChangeHistoryService:TryBeginRecording("ClaudioExecute", Input.undoName or "Claudio ran a script")
 	end
 
-	_G.ClaudioFresh = function(Module: ModuleScript): any
-		const Where = Module.Parent
-		const Copy = Module:Clone()
-
-		Module:Destroy()
-
-		Copy.Parent = Where
-
-		return (require :: any)(Copy)
-	end
+	_G.ClaudioFresh = require(script.Parent.Parent.Fresh).Load
 
 	const Holder = Instance.new("ModuleScript")
 

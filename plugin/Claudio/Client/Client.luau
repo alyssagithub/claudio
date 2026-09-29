@@ -453,6 +453,23 @@ function Client.OpenFile(Path: string, Reveal: boolean): (boolean, any)
 	})
 end
 
+function Client.ProbePaths(Paths: {string}): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/paths`, {paths = Paths})
+end
+
+function Client.ReadPicture(Path: string): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/pictures/read`, {path = Path})
+end
+
+function Client.SavePicture(Width: number, Height: number, Pixels: string, Open: boolean): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/pictures/save`, {
+		width = Width,
+		height = Height,
+		pixels = Pixels,
+		open = Open,
+	})
+end
+
 function Client.OpenUrl(Url: string): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/open-url`, {url = Url})
 end

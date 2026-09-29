@@ -8,7 +8,6 @@ import { z } from "zod/v3";
 import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport } from "./Ask.js";
 import type { LogAnswer, ExecuteAnswer } from "./Ask.js";
 import { QuietFlash } from "./Notify.js";
-import { ShareFiles } from "./Shared.js";
 
 const ExecuteDescription = [
   "Run Luau inside the open place and get back what it returned, what it printed, and where it failed.",
@@ -275,20 +274,61 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       }]}),
     },
     {
-      Name: "share_file",
-      Description: "Give the user files from this computer, such as a report, an export, a saved model or a picture. Each one appears in the chat as a card they can open or show in its folder, and the first picture is also shown inline. Use this whenever the user should get a file, instead of only mentioning its path.",
+      Name: "render",
+      Description: "Render a part, model or folder to a picture like a product shot, at any angle, with a transparent background, a solid colour, or the real scene behind it. Use it when the user asks to see or export how something looks from a particular side, or for a clean picture of an object on its own. Give view for a named side, or yaw and pitch in degrees to orbit around it: yaw 0 looks at its front, 90 its left side, 180 its back, and pitch 90 looks straight down. The camera fits the object tightly; distance above 1 backs away and below 1 moves in. Everything else is hidden unless isolate is false, and the camera, lighting and selection are always put back. The picture is saved as a PNG and its path returned.",
       Schema: {
-        paths: z.array(z.string()).min(1).max(10).describe("Full paths of the files to give the user."),
+        path: z.string().describe("The part, model or folder to render, such as Workspace.Car."),
+        view: z.enum(["front", "back", "left", "right", "top", "bottom", "three-quarter"]).optional().describe("A named side to look from. Overrides yaw and pitch when they are left out."),
+        yaw: z.number().optional().describe("Degrees around the object, measured from its front. 35 by default."),
+        pitch: z.number().optional().describe("Degrees above the object, from -90 below to 90 above. 25 by default."),
+        distance: z.number().optional().describe("How far the camera sits, as a multiple of the tight fit. 1 by default."),
+        fov: z.number().optional().describe("Field of view in degrees. 30 by default; lower flattens perspective."),
+        size: z.number().optional().describe("Output width and height in screen pixels, 512 by default, up to the viewport's height."),
+        background: z.string().optional().describe("transparent (the default), scene to keep the real surroundings, or a hex colour such as #202020."),
+        isolate: z.boolean().optional().describe("Hide every other part while rendering. True by default."),
+        lighting: z.enum(["scene", "studio"]).optional().describe("scene keeps the place's lighting; studio uses flat, even lighting that shows the object clearly."),
+        file: z.string().optional().describe("Where to save the PNG. Defaults to a file in the user's Claudio renders folder."),
       },
-      Run: async (Input: { paths: string[] }) => {
-        const { Lines, Images } = ShareFiles(Input.paths);
+      Run: async (Input: { path: string; view?: string; yaw?: number; pitch?: number; distance?: number; fov?: number; size?: number; background?: string; isolate?: boolean; lighting?: string; file?: string }) => {
+        const Rendered: { error?: string; width: number; height: number; pixels: string; text: string } | null = await Reach("render", Input, 120);
+
+        if (!Rendered || Rendered.error) {
+          return {content: [{
+            type: "text",
+            text: (Rendered && Rendered.error) || "Studio did not answer.",
+          }]};
+        }
+
+        const { EncodePixels } = await import("./Capture.js");
+        const Made = EncodePixels(Rendered.width, Rendered.height, Rendered.pixels) as { error?: string; data: string };
+
+        if (Made.error) {
+          return {content: [{
+            type: "text",
+            text: Made.error,
+          }]};
+        }
+
+        const Saved = Input.file || path.join(os.homedir(), ".claudio", "renders", `render-${new Date().toISOString().replace(/[:.]/g, "-")}.png`);
+        let Note = `, saved to ${Saved}`;
+
+        try {
+          fs.mkdirSync(path.dirname(Saved), {recursive: true});
+          fs.writeFileSync(Saved, Buffer.from(Made.data, "base64"));
+        } catch (Trouble) {
+          Note = `, but could not save to ${Saved}: ${(Trouble as Error).message}`;
+        }
 
         return {content: [
           {
-            type: "text",
-            text: Lines.join("\n"),
+            type: "image",
+            data: Made.data,
+            mimeType: "image/png",
           },
-          ...Images,
+          {
+            type: "text",
+            text: `${Rendered.text}${Note}`,
+          },
         ]};
       },
     },

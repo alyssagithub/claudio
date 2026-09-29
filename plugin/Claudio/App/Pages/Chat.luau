@@ -5,7 +5,6 @@ const Settings = require(script.Parent.Parent.Parent.Settings)
 const Client = require(script.Parent.Parent.Parent.Client.Client)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Context = require(script.Parent.Parent.Parent.Store.Context)
-const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const StatusBar = require(script.Parent.Parent.Components.StatusBar)
 const UpdateBanner = require(script.Parent.Parent.Components.UpdateBanner)
@@ -25,6 +24,7 @@ const ChapterList = require(script.Parent.Parent.Components.ChapterList)
 const Picker = require(script.Parent.Parent.Parent.Picker)
 const DeleteDialog = require(script.Parent.Parent.Components.DeleteDialog)
 const RewindDialog = require(script.Parent.Parent.Components.RewindDialog)
+const ImageViewer = require(script.Parent.Parent.Components.ImageViewer)
 
 const Create = Vide.create
 
@@ -176,36 +176,7 @@ return function()
 		ModelPicker.Menu(),
 		ModelPicker.EffortMenu(),
 		ModelPicker.EffortHelp(),
-		Create "ImageButton" {
-			Name = "Zoom",
-			Vide.action(Covers.Add),
-			Size = UDim2.fromScale(1, 1),
-			BackgroundColor3 = Color3.new(),
-			BackgroundTransparency = 0.25,
-			AutoButtonColor = false,
-			ZIndex = 300,
-			Visible = function()
-				return Chat.Zoomed() ~= nil
-			end,
-			Activated = function()
-				Chat.Zoomed(nil)
-			end,
-
-			Create "ImageLabel" {
-				Name = "Big",
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromScale(0.94, 0.94),
-				BackgroundTransparency = 1,
-				ScaleType = Enum.ScaleType.Fit,
-				ZIndex = 301,
-				ImageContent = function()
-					const Image = Chat.Zoomed()
-
-					return if Image then Content.fromObject(Image) else Content.none
-				end,
-			},
-		},
+		ImageViewer(),
 		ModelPicker.ModeMenu(),
 		DeleteDialog(),
 		RewindDialog(),

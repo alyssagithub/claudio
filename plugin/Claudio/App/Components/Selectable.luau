@@ -18,6 +18,7 @@ export type Props = {
 	LayoutOrder: any,
 	Links: (() -> {[string]: string})?,
 	Urls: (() -> {[string]: string})?,
+	Files: (() -> {[string]: string})?,
 	Children: {Instance}?,
 }
 
@@ -216,6 +217,21 @@ return function(Props: Props)
 				for Path, Full in (if Props.Links then Props.Links() else {}) :: {[string]: string} do
 					if Spanning(Box.Text, Path, At) then
 						task.spawn(Navigate.Go, {Path = Full})
+
+						return
+					end
+				end
+
+				for Path, Kind in (if Props.Files then Props.Files() else {}) :: {[string]: string} do
+					if Spanning(Box.Text, Path, At) then
+						if Chat.Window then
+							Chat.MenuPosition(Chat.Window:GetRelativeMousePosition())
+						end
+
+						Chat.FileMenu({
+							Path = Path,
+							Kind = Kind,
+						})
 
 						return
 					end

@@ -2,80 +2,88 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
+import { PNG } from "pngjs";
+import jpeg from "jpeg-js";
 
-const SharedFile = path.join(os.homedir(), ".claudio", "shared.json");
-const Pictures: Record<string, string> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-};
+const Runnable = /\.(exe|bat|cmd|com|ps1|psm1|vbs|vbe|js|jse|wsf|wsh|msi|msp|lnk|scr|hta|jar|reg|cpl|pif|scf|url|appref-ms)$/i;
 
-function ReadShared(): string[] {
-  try {
-    const Saved = JSON.parse(fs.readFileSync(SharedFile, "utf8"));
-
-    return Array.isArray(Saved) ? Saved.filter((Entry) => typeof Entry === "string") : [];
-  } catch {
-    return [];
+function Launch(Target: string, Reveal: boolean) {
+  if (process.platform === "win32") {
+    execFile("explorer.exe", Reveal ? [`/select,${Target}`] : [Target], {windowsHide: true}, () => {});
+    return;
   }
+
+  execFile(process.platform === "darwin" ? "open" : "xdg-open", [Reveal ? path.dirname(Target) : Target], () => {});
 }
 
-export function ShareFiles(Paths: string[]) {
-  const Shared = ReadShared();
-  const Lines: string[] = [];
-  const Images: { type: "image"; data: string; mimeType: string }[] = [];
+export function ProbePaths(Paths: unknown[]): Record<string, "file" | "folder"> {
+  const Found: Record<string, "file" | "folder"> = {};
 
-  for (const Given of Paths) {
-    const Full = path.resolve(Given);
-    let Stat: fs.Stats;
+  for (const Given of Paths.slice(0, 200)) {
+    if (typeof Given !== "string" || !path.isAbsolute(Given)) {
+      continue;
+    }
 
     try {
-      Stat = fs.statSync(Full);
+      Found[Given] = fs.statSync(Given).isDirectory() ? "folder" : "file";
     } catch {
-      Lines.push(`Missing ${Full}: there is no file there.`);
       continue;
-    }
-
-    if (!Stat.isFile()) {
-      Lines.push(`Missing ${Full}: that is a folder, not a file.`);
-      continue;
-    }
-
-    Shared.push(Full);
-    Lines.push(`Shared ${Full} (${Stat.size >= 1048576 ? `${(Stat.size / 1048576).toFixed(1)} MB` : Stat.size >= 1024 ? `${Math.round(Stat.size / 1024)} KB` : `${Stat.size} B`})`);
-
-    const Kind = Pictures[path.extname(Full).toLowerCase()];
-
-    if (Kind && Images.length === 0 && Stat.size <= 5 * 1024 * 1024) {
-      Images.push({type: "image", data: fs.readFileSync(Full).toString("base64"), mimeType: Kind});
     }
   }
 
-  fs.mkdirSync(path.dirname(SharedFile), {recursive: true});
-  fs.writeFileSync(SharedFile, JSON.stringify([...new Set(Shared)].slice(-500)));
-
-  return {Lines, Images};
+  return Found;
 }
 
-export function OpenShared(Given: string, Reveal: boolean): string | null {
-  const Full = path.resolve(Given);
-
-  if (!ReadShared().includes(Full)) {
-    return "Only files Claude shared in a chat can be opened from here.";
+export function OpenPath(Given: string, Reveal: boolean): string | null {
+  if (!path.isAbsolute(Given) || !fs.existsSync(Given)) {
+    return "There is nothing at that path.";
   }
 
-  if (!fs.existsSync(Full)) {
-    return "That file is not there any more.";
+  if (!Reveal && Runnable.test(Given)) {
+    return "That file runs a program, so Claudio only shows it in its folder.";
   }
 
-  if (process.platform !== "win32") {
-    execFile(process.platform === "darwin" ? "open" : "xdg-open", Reveal ? [path.dirname(Full)] : [Full], () => {});
-    return null;
-  }
-
-  execFile("explorer.exe", Reveal ? [`/select,${Full}`] : [Full], {windowsHide: true}, () => {});
+  Launch(path.resolve(Given), Reveal);
 
   return null;
+}
+
+export function ReadPicture(Given: string): { width: number; height: number; pixels: string } | null {
+  try {
+    const Bytes = fs.readFileSync(Given);
+    const Decoded = /\.png$/i.test(Given) ? PNG.sync.read(Bytes) : jpeg.decode(Bytes, {useTArray: true, formatAsRGBA: true});
+    const Scale = Math.min(1, 1024 / Decoded.width, 1024 / Decoded.height);
+    const Width = Math.max(1, Math.round(Decoded.width * Scale));
+    const Height = Math.max(1, Math.round(Decoded.height * Scale));
+    const Source = Buffer.from(Decoded.data.buffer, Decoded.data.byteOffset, Decoded.data.byteLength);
+    const Pixels = Buffer.alloc(Width * Height * 4);
+
+    for (let Y = 0; Y < Height; Y += 1) {
+      for (let X = 0; X < Width; X += 1) {
+        const From = (Math.min(Decoded.height - 1, Math.floor(Y / Scale)) * Decoded.width + Math.min(Decoded.width - 1, Math.floor(X / Scale))) * 4;
+
+        Source.copy(Pixels, (Y * Width + X) * 4, From, From + 4);
+      }
+    }
+
+    return {width: Width, height: Height, pixels: Pixels.toString("base64")};
+  } catch {
+    return null;
+  }
+}
+
+export function SavePicture(Width: number, Height: number, Pixels: string, Open: boolean): string {
+  const Picture = new PNG({width: Width, height: Height});
+  const Folder = path.join(os.homedir(), ".claudio", "pictures");
+  const Saved = path.join(Folder, `picture-${new Date().toISOString().replace(/[:.]/g, "-")}.png`);
+
+  Buffer.from(Pixels, "base64").copy(Picture.data);
+  fs.mkdirSync(Folder, {recursive: true});
+  fs.writeFileSync(Saved, PNG.sync.write(Picture));
+
+  if (Open) {
+    Launch(Saved, false);
+  }
+
+  return Saved;
 }

@@ -15,6 +15,7 @@ const Watcher = require(script.Parent.Parent.Watcher)
 const Settings = require(script.Parent.Parent.Settings)
 const Client = require(script.Parent.Parent.Client.Client)
 const Pictures = require(script.Parent.Parent.Pictures)
+const Base64 = require(script.Parent.Parent.Base64)
 const Breathe = require(script.Parent.Parent.Breathe)
 const Context = require(script.Parent.Context)
 const Navigate = require(script.Parent.Parent.Navigate)
@@ -36,6 +37,8 @@ const Chat = {
 	ApiRetry = Vide.source(nil :: Types.Retry?),
 	Stopping = Vide.source(false),
 	Zoomed = Vide.source(nil :: EditableImage?),
+	KnownPaths = Vide.source({} :: {[string]: string}),
+	FileMenu = Vide.source(nil :: {Path: string, Kind: string}?),
 	StreamingImages = Vide.source({} :: {EditableImage}),
 	Activity = Vide.source({} :: {string}),
 	Permission = Vide.source(nil :: Types.Permission?),
@@ -2493,6 +2496,10 @@ const function RunStudioJob(Job: any)
 				return Shoot(Job.input)
 			end
 
+			if Job.kind == "render" then
+				return require(script.Parent.Parent.Render)(Job.input, Resolve)
+			end
+
 			if Job.kind == "mark" then
 				return Mark(Job.input)
 			end
@@ -4275,6 +4282,53 @@ function Chat.KnownTokens(): {[string]: boolean}
 	end
 
 	return Known
+end
+
+const Probing: {[string]: boolean} = {}
+
+function Chat.ProbePaths(Paths: {string})
+	const Asking = {}
+
+	for _, Path in Paths do
+		if not Probing[Path] and Chat.KnownPaths()[Path] == nil then
+			Probing[Path] = true
+			table.insert(Asking, Path)
+		end
+	end
+
+	if #Asking == 0 then
+		return
+	end
+
+	const Ok, Result = Client.ProbePaths(Asking)
+	const Known = table.clone(Chat.KnownPaths())
+
+	for _, Path in Asking do
+		Known[Path] = if Ok and typeof(Result) == "table" and typeof(Result.kinds) == "table" and Result.kinds[Path] then Result.kinds[Path] else ""
+	end
+
+	Chat.KnownPaths(Known)
+end
+
+function Chat.ViewPicture(Path: string)
+	const Ok, Result = Client.ReadPicture(Path)
+
+	if not Ok or typeof(Result) ~= "table" or typeof(Result.pixels) ~= "string" then
+		Chat.Say(`Could not show that picture: {if Ok then "it is not a PNG or JPEG Claudio can read" else Result}`)
+
+		return
+	end
+
+	Chat.Zoomed(Pictures.Build(Result.width, Result.height, Result.pixels))
+end
+
+function Chat.OpenPicture(Image: EditableImage)
+	const Size = Image.Size
+	const Ok, Result = Client.SavePicture(Size.X, Size.Y, Base64.Encode(buffer.tostring(Image:ReadPixelsBuffer(Vector2.zero, Size))), true)
+
+	if not Ok then
+		Chat.Say(`Could not open that picture outside Studio: {Result}`)
+	end
 end
 
 function Chat.OpenFile(Path: string, Reveal: boolean)

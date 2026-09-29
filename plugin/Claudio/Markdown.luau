@@ -52,6 +52,22 @@ const function Trimmed(Url: string): string
 	return (Url:gsub("[%.,;:!%?%)%]%*_]+$", ""))
 end
 
+function Markdown.FindPaths(Text: string): {string}
+	const Found = {}
+	const Seen = {}
+
+	for Path in Text:gmatch("%a:[\\/][^%s<>\"|%?%*`]+") do
+		const Kept = (Path:gsub("[%.,;:!%)%]%*_'\\]+$", ""))
+
+		if #Kept > 3 and not Seen[Kept] then
+			Seen[Kept] = true
+			table.insert(Found, Kept)
+		end
+	end
+
+	return Found
+end
+
 function Markdown.FindUrls(Text: string): {[string]: string}
 	const Found: {[string]: string} = {}
 

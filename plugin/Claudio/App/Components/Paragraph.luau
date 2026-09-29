@@ -27,17 +27,42 @@ return function(Text: () -> string, LayoutOrder: number, Live: boolean?)
 		return Markdown.FindUrls(Text())
 	end)
 
+	const Files = Vide.derive(function(): {[string]: string}
+		const Found: {[string]: string} = {}
+		const Unknown = {}
+		const Known = Chat.KnownPaths()
+
+		for _, Path in Markdown.FindPaths(Text()) do
+			if Known[Path] == nil then
+				table.insert(Unknown, Path)
+			elseif Known[Path] ~= "" then
+				Found[Path] = Known[Path]
+			end
+		end
+
+		if #Unknown > 0 then
+			task.defer(Chat.ProbePaths, Unknown)
+		end
+
+		return Found
+	end)
+
 	return Selectable {
 		Name = "Paragraph",
 		LayoutOrder = LayoutOrder,
 		Links = Links,
 		Urls = Urls,
+		Files = Files,
 		Text = function()
 			const Accent = Theme.Colors.Accent():ToHex()
 			local Rich = Markdown.Rich(Text(), Settings.TextSize(), Accent, Chat.KnownTokens())
 			const Paths = {}
 
 			for Path in Links() do
+				table.insert(Paths, Path)
+			end
+
+			for Path in Files() do
 				table.insert(Paths, Path)
 			end
 

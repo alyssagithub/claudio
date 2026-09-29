@@ -22,7 +22,7 @@ import { HandToken, IssuePlaytestKey, PlaytestKeyMatches, PlaytestLive, RevokePl
 import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
 import { ArmClipboard, AskClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, RestoreFlashing, ShowToast, WriteClipboard } from "./Notify.js";
 import { GetModels, SupportsFastMode } from "./Models.js";
-import { OpenShared } from "./Shared.js";
+import { OpenPath, ProbePaths, ReadPicture, SavePicture } from "./Shared.js";
 import { Analyze, Warm } from "./Lint.js";
 import { DescribeReturn, StopWatchingReturn, WaitForReturn, WatchReturn } from "./Keys.js";
 
@@ -526,9 +526,38 @@ export function StartServer(Port: number) {
 
       if (Request.method === "POST" && Url.pathname === "/open-file") {
         const Body = await ReadBody(Request);
-        const Refused = typeof Body.path === "string" ? OpenShared(Body.path, Body.reveal === true) : "Give the path of a shared file.";
+        const Refused = typeof Body.path === "string" ? OpenPath(Body.path, Body.reveal === true) : "Give a path to open.";
 
         SendJson(Response, Refused ? 400 : 200, Refused ? {error: Refused} : {opened: true});
+        return;
+      }
+
+      if (Request.method === "POST" && Url.pathname === "/paths") {
+        const Body = await ReadBody(Request);
+
+        SendJson(Response, 200, {kinds: ProbePaths(Array.isArray(Body.paths) ? Body.paths : [])});
+        return;
+      }
+
+      if (Request.method === "POST" && Url.pathname === "/pictures/read") {
+        const Body = await ReadBody(Request);
+        const Picture = typeof Body.path === "string" && /\.(png|jpe?g)$/i.test(Body.path) ? ReadPicture(Body.path) : null;
+
+        SendJson(Response, Picture ? 200 : 400, Picture || {error: "Could not read that picture."});
+        return;
+      }
+
+      if (Request.method === "POST" && Url.pathname === "/pictures/save") {
+        const Body = await ReadBody(Request);
+        const Width = Number(Body.width);
+        const Height = Number(Body.height);
+
+        if (!Number.isInteger(Width) || !Number.isInteger(Height) || Width < 1 || Height < 1 || Width * Height > 4096 * 4096 || typeof Body.pixels !== "string") {
+          SendJson(Response, 400, {error: "That picture is not valid."});
+          return;
+        }
+
+        SendJson(Response, 200, {path: SavePicture(Width, Height, Body.pixels, Body.open === true)});
         return;
       }
 

@@ -150,6 +150,14 @@ end
 
 return function()
 	const FolderPosition, FolderMeasure = Place()
+	const FilePosition, FileMeasure = Place()
+
+	const function FileChosen(): {Path: string, Kind: string}
+		return Chat.FileMenu() or {
+			Path = "",
+			Kind = "",
+		}
+	end
 	const MenuPosition, MenuMeasure = Place()
 
 	return Create "Frame" {
@@ -159,7 +167,7 @@ return function()
 		BackgroundTransparency = 1,
 		ZIndex = 100,
 		Visible = function()
-			return Chosen() ~= nil or Chat.MenuFolder() ~= nil
+			return Chosen() ~= nil or Chat.MenuFolder() ~= nil or Chat.FileMenu() ~= nil
 		end,
 
 		Create "TextButton" {
@@ -172,13 +180,68 @@ return function()
 			Activated = function()
 				Chat.MenuFor(nil)
 				Chat.MenuFolder(nil)
+				Chat.FileMenu(nil)
 			end,
 
 			Vide.action(function(Object: TextButton)
 				Vide.cleanup(Object.MouseButton2Click:Connect(function()
 					Chat.MenuFor(nil)
 					Chat.MenuFolder(nil)
+					Chat.FileMenu(nil)
 				end))
+			end),
+		},
+		Create "Frame" {
+			Name = "FileMenu",
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.fromOffset(160, 0),
+			BackgroundColor3 = Theme.Colors.Background,
+			ZIndex = 101,
+			Visible = function()
+				return Chat.FileMenu() ~= nil
+			end,
+			Position = FilePosition,
+
+			FileMeasure,
+			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
+			Create "UIStroke" {Color = Theme.Colors.Border},
+			Create "UIPadding" {
+				PaddingLeft = UDim.new(0, 3),
+				PaddingRight = UDim.new(0, 3),
+				PaddingTop = UDim.new(0, 3),
+				PaddingBottom = UDim.new(0, 3),
+			},
+			Create "UIListLayout" {
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				HorizontalFlex = Enum.UIFlexAlignment.Fill,
+			},
+			Item(function()
+				return if FileChosen().Kind == "folder" then "Open folder" else "Open"
+			end, 1, false, function()
+				const File = FileChosen()
+
+				Chat.FileMenu(nil)
+				task.spawn(Chat.OpenFile, File.Path, false)
+			end),
+			Item(function()
+				return "Show in folder"
+			end, 2, false, function()
+				const File = FileChosen()
+
+				Chat.FileMenu(nil)
+				task.spawn(Chat.OpenFile, File.Path, true)
+			end),
+			Vide.show(function()
+				return FileChosen().Path:lower():match("%.png$") ~= nil or FileChosen().Path:lower():match("%.jpe?g$") ~= nil
+			end, function()
+				return Item(function()
+					return "View picture"
+				end, 3, false, function()
+					const File = FileChosen()
+
+					Chat.FileMenu(nil)
+					task.spawn(Chat.ViewPicture, File.Path)
+				end)
 			end),
 		},
 		Create "Frame" {

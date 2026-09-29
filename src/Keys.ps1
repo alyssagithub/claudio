@@ -55,10 +55,10 @@ public static class ReturnWatch {
 
             bool Control = (GetAsyncKeyState(0x11) & 0x8000) != 0;
 
-            if ((Key == 0x0D || (Key == 0x43 && Control)) && StudioInFront()) {
+            if ((Key == 0x0D || ((Key == 0x43 || Key == 0x56) && Control)) && StudioInFront()) {
                 bool Shift = (GetAsyncKeyState(0x10) & 0x8000) != 0;
 
-                Console.Out.WriteLine("{\"at\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"shift\":" + (Shift ? "true" : "false") + ",\"key\":\"" + (Key == 0x0D ? "return" : "copy") + "\"}");
+                Console.Out.WriteLine("{\"at\":" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + ",\"shift\":" + (Shift ? "true" : "false") + ",\"key\":\"" + (Key == 0x0D ? "return" : Key == 0x56 ? "paste" : "copy") + "\"}");
                 Console.Out.Flush();
             }
         }

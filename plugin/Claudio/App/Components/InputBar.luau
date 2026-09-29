@@ -143,6 +143,31 @@ return function()
 		Arm()
 	end
 
+	Vide.cleanup(Keys.OnPaste(function()
+		if not Box or not Box:IsFocused() or Marker == "" or not Settings.Get("ClipboardPaste")() then
+			return
+		end
+
+		const Token = Marker
+		const Before = Chat.Draft()
+
+		task.wait(0.25)
+
+		if Marker ~= Token or Chat.Draft() ~= Before or Chat.Draft():find(Token, 1, true) then
+			return
+		end
+
+		const Ok, Image = Client.GetClipboardImage(nil)
+
+		if not Ok or typeof(Image) ~= "table" or not Image.data or Marker ~= Token then
+			return
+		end
+
+		Context.AddImage("Image", Image.data, Image.mediaType, Token)
+		Insert(Token)
+		Arm()
+	end))
+
 	const function Remove(Token: string)
 		Context.Remove(Token)
 		Chat.Draft((Chat.Draft():gsub(Token:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"), "")):gsub("  +", " "))

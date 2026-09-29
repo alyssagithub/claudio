@@ -10,6 +10,7 @@ type ReturnPress = { at: number; shift: boolean };
 let LastReturn: ReturnPress | null = null;
 const Waiters = new Set<() => void>();
 let LastCopy = 0;
+let LastPaste = 0;
 let Watcher: ChildProcess | null = null;
 let Ready = false;
 let Failed: string | null = null;
@@ -54,6 +55,12 @@ export function WatchReturn() {
 
         if (typeof Parsed.at === "number" && Parsed.key === "copy") {
           LastCopy = Parsed.at;
+        } else if (typeof Parsed.at === "number" && Parsed.key === "paste") {
+          LastPaste = Parsed.at;
+
+          for (const Wake of [...Waiters]) {
+            Wake();
+          }
         } else if (typeof Parsed.at === "number" && typeof Parsed.shift === "boolean") {
           LastReturn = {
             at: Parsed.at,
@@ -131,14 +138,15 @@ export function DescribeReturn() {
     at: LastReturn ? LastReturn.at : 0,
     shift: LastReturn ? LastReturn.shift : false,
     copyAt: LastCopy,
+    pasteAt: LastPaste,
     now: Date.now(),
   };
 }
 
 // Answers as soon as a Return press newer than After is seen, so the plugin can hold a request open
 // and already know whether Shift was down by the time the newline reaches its text box.
-export function WaitForReturn(After: number, Milliseconds: number): Promise<ReturnType<typeof DescribeReturn>> {
-  if (LastReturn && LastReturn.at > After) {
+export function WaitForReturn(After: number, Milliseconds: number, PasteAfter = Infinity): Promise<ReturnType<typeof DescribeReturn>> {
+  if ((LastReturn && LastReturn.at > After) || LastPaste > PasteAfter) {
     return Promise.resolve(DescribeReturn());
   }
 

@@ -9,6 +9,7 @@ local Syncing = false
 local Feeding = 0
 local Fed = false
 local Latest: {shift: boolean, seenAt: number}? = nil
+const Pasted: {() -> ()} = {}
 
 const function Sync()
 	if Syncing then
@@ -41,9 +42,10 @@ const function Feed()
 
 	task.spawn(function()
 		local After: number? = nil
+		local PasteAfter: number? = nil
 
 		while Feeding == Mine do
-			const Ok, Seen = Client.LastReturn(After)
+			const Ok, Seen = Client.LastReturn(After, PasteAfter)
 
 			if Feeding ~= Mine then
 				break
@@ -63,8 +65,30 @@ const function Feed()
 			end
 
 			After = math.max(After or 0, Seen.at)
+
+			if typeof(Seen.pasteAt) == "number" then
+				if PasteAfter and Seen.pasteAt > PasteAfter then
+					for _, Listener in table.clone(Pasted) do
+						task.spawn(Listener)
+					end
+				end
+
+				PasteAfter = math.max(PasteAfter or 0, Seen.pasteAt)
+			end
 		end
 	end)
+end
+
+function Keys.OnPaste(Listener: () -> ()): () -> ()
+	table.insert(Pasted, Listener)
+
+	return function()
+		const At = table.find(Pasted, Listener)
+
+		if At then
+			table.remove(Pasted, At)
+		end
+	end
 end
 
 function Keys.Hold()

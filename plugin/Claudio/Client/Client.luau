@@ -382,8 +382,12 @@ function Client.WatchKeys(On: boolean): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/keys/watch`, {on = On})
 end
 
-function Client.LastReturn(After: number?): (boolean, any)
-	return Http.Request("GET", if After then `{BaseUrl()}/keys/return?after={string.format("%d", After)}` else `{BaseUrl()}/keys/return`)
+function Client.LastReturn(After: number?, PasteAfter: number?): (boolean, any)
+	if not After then
+		return Http.Request("GET", `{BaseUrl()}/keys/return`)
+	end
+
+	return Http.Request("GET", `{BaseUrl()}/keys/return?after={string.format("%d", After)}{if PasteAfter then `&pasteAfter={string.format("%d", PasteAfter)}` else ""}`)
 end
 
 function Client.ConversationExists(Id: string): boolean

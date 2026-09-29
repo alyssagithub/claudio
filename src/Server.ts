@@ -635,8 +635,9 @@ ${Text}`;
 
       if (Request.method === "GET" && Url.pathname === "/keys/return") {
         const After = Number(Url.searchParams.get("after"));
+        const PasteAfter = Number(Url.searchParams.get("pasteAfter"));
 
-        SendJson(Response, 200, Url.searchParams.has("after") && Number.isFinite(After) ? await WaitForReturn(After, 20000) : DescribeReturn());
+        SendJson(Response, 200, Url.searchParams.has("after") && Number.isFinite(After) ? await WaitForReturn(After, 20000, Url.searchParams.has("pasteAfter") && Number.isFinite(PasteAfter) ? PasteAfter : Infinity) : DescribeReturn());
         return;
       }
 

@@ -814,6 +814,7 @@ function Assemble(Lines: TranscriptEntry[], Id: string, File: string, Partial: b
       Last.images = Last.images.concat(PendingImages);
       Last.tokens = Plus(Last.tokens || null, Used) || Last.tokens;
       Last.cost = (Last.cost || 0) + (Spent || 0);
+      Last.at = TimeOf(Replied) || Last.at;
     } else {
       Messages.push({
         role: "assistant",

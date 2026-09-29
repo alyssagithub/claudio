@@ -264,7 +264,7 @@ export function AskClipboard(Command: string, Marker = ""): Promise<string> {
 let Armed: { Marker: string; Image: ClipboardPicture } | null = null;
 let Generation = 0;
 let Current = "";
-const Dropped: string[] = [];
+const Dropped = new Map<string, number>();
 
 function Picture(Data: string): ClipboardPicture {
   return {
@@ -287,8 +287,10 @@ function Remember(Marker: string, Answer: string) {
   return Outcome;
 }
 
-export async function ArmClipboard(Marker: string): Promise<string> {
-  if (Dropped.includes(Marker)) {
+export async function ArmClipboard(Marker: string, Stamp = Date.now()): Promise<string> {
+  const Stale = () => (Dropped.get(Marker) ?? -Infinity) >= Stamp;
+
+  if (Stale()) {
     return "disarmed";
   }
 
@@ -298,7 +300,7 @@ export async function ArmClipboard(Marker: string): Promise<string> {
   const Mine = Generation;
   const Outcome = Remember(Marker, await AskClipboard("arm", Marker));
 
-  if (Mine !== Generation || Dropped.includes(Marker)) {
+  if (Mine !== Generation || Stale()) {
     return Outcome;
   }
 
@@ -306,7 +308,7 @@ export async function ArmClipboard(Marker: string): Promise<string> {
   let Busy = false;
 
   const Watch = setInterval(async () => {
-    if (Mine !== Generation || Dropped.includes(Marker) || Date.now() - Began > 10 * 60 * 1000) {
+    if (Mine !== Generation || Stale() || Date.now() - Began > 10 * 60 * 1000) {
       clearInterval(Watch);
       return;
     }
@@ -323,9 +325,15 @@ export async function ArmClipboard(Marker: string): Promise<string> {
   return Outcome;
 }
 
-export async function DisarmClipboard(Marker: string): Promise<string> {
-  Dropped.push(Marker);
-  Dropped.splice(0, Math.max(0, Dropped.length - 50));
+export async function DisarmClipboard(Marker: string, Stamp = Date.now()): Promise<string> {
+  const Latest = Math.max(Dropped.get(Marker) ?? -Infinity, Stamp);
+
+  Dropped.delete(Marker);
+  Dropped.set(Marker, Latest);
+
+  for (const Old of [...Dropped.keys()].slice(0, Math.max(0, Dropped.size - 50))) {
+    Dropped.delete(Old);
+  }
 
   if (Marker === Current) {
     Generation += 1;

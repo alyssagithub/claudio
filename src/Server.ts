@@ -848,7 +848,8 @@ ${Text}`;
       if (Request.method === "POST" && (Url.pathname === "/clipboard/arm" || Url.pathname === "/clipboard/disarm")) {
         const Body = await ReadBody(Request);
         const Marker = typeof Body.marker === "string" ? Body.marker.slice(0, 64) : "";
-        const Outcome = Url.pathname === "/clipboard/arm" ? await ArmClipboard(Marker) : await DisarmClipboard(Marker);
+        const Stamp = typeof Body.stamp === "number" && Number.isFinite(Body.stamp) ? Body.stamp : Date.now();
+        const Outcome = Url.pathname === "/clipboard/arm" ? await ArmClipboard(Marker, Stamp) : await DisarmClipboard(Marker, Stamp);
 
         SendJson(Response, 200, {outcome: Outcome});
         return;

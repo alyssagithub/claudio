@@ -226,11 +226,11 @@ function Client.GetClipboardImage(Marker: string?): (boolean, any)
 end
 
 function Client.ArmClipboard(Marker: string): (boolean, any)
-	return Http.Request("POST", `{BaseUrl()}/clipboard/arm`, {marker = Marker})
+	return Http.Request("POST", `{BaseUrl()}/clipboard/arm`, {marker = Marker, stamp = DateTime.now().UnixTimestampMillis})
 end
 
 function Client.DisarmClipboard(Marker: string): (boolean, any)
-	return Http.Request("POST", `{BaseUrl()}/clipboard/disarm`, {marker = Marker})
+	return Http.Request("POST", `{BaseUrl()}/clipboard/disarm`, {marker = Marker, stamp = DateTime.now().UnixTimestampMillis})
 end
 
 function Client.DecodeImage(Data: string, MediaType: string): (boolean, any)

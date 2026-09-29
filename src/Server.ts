@@ -22,6 +22,7 @@ import { HandToken, IssuePlaytestKey, PlaytestKeyMatches, PlaytestLive, RevokePl
 import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
 import { ArmClipboard, AskClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, RestoreFlashing, ShowToast, WriteClipboard } from "./Notify.js";
 import { GetModels, SupportsFastMode } from "./Models.js";
+import { OpenShared } from "./Shared.js";
 import { Analyze, Warm } from "./Lint.js";
 import { DescribeReturn, StopWatchingReturn, WaitForReturn, WatchReturn } from "./Keys.js";
 
@@ -520,6 +521,14 @@ export function StartServer(Port: number) {
           limits: GetLimits(),
           workingDirectory: LastUsedFolder() || null,
         });
+        return;
+      }
+
+      if (Request.method === "POST" && Url.pathname === "/open-file") {
+        const Body = await ReadBody(Request);
+        const Refused = typeof Body.path === "string" ? OpenShared(Body.path, Body.reveal === true) : "Give the path of a shared file.";
+
+        SendJson(Response, Refused ? 400 : 200, Refused ? {error: Refused} : {opened: true});
         return;
       }
 

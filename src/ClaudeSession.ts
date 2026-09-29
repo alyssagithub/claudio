@@ -1820,6 +1820,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
             display: "summarized",
           },
           permissionMode: Session.Mode as PermissionMode,
+          disallowedTools: ["SendUserFile"],
           planModeInstructions: PlanInstructions,
           canUseTool: async (ToolName, Input) => {
             if (ToolName !== "AskUserQuestion") {

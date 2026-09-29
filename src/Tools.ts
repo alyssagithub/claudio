@@ -8,6 +8,7 @@ import { z } from "zod/v3";
 import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport } from "./Ask.js";
 import type { LogAnswer, ExecuteAnswer } from "./Ask.js";
 import { QuietFlash } from "./Notify.js";
+import { ShareFiles } from "./Shared.js";
 
 const ExecuteDescription = [
   "Run Luau inside the open place and get back what it returned, what it printed, and where it failed.",
@@ -272,6 +273,24 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         type: "text",
         text: Said(await Reach("modify", Input),"Studio did not say what happened."),
       }]}),
+    },
+    {
+      Name: "share_file",
+      Description: "Give the user files from this computer, such as a report, an export, a saved model or a picture. Each one appears in the chat as a card they can open or show in its folder, and the first picture is also shown inline. Use this whenever the user should get a file, instead of only mentioning its path.",
+      Schema: {
+        paths: z.array(z.string()).min(1).max(10).describe("Full paths of the files to give the user."),
+      },
+      Run: async (Input: { paths: string[] }) => {
+        const { Lines, Images } = ShareFiles(Input.paths);
+
+        return {content: [
+          {
+            type: "text",
+            text: Lines.join("\n"),
+          },
+          ...Images,
+        ]};
+      },
     },
     {
       Name: "capture",

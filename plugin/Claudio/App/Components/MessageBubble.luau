@@ -437,12 +437,112 @@ return function(Props: Props)
 			end
 		end)
 
+		const function Shared(): {{Path: string, Size: string}}
+			const Found = {}
+
+			if not Value().name:match("share_file$") then
+				return Found
+			end
+
+			for Path, Size in Value().output:gmatch("Shared ([^\n]-) %(([^%)]+)%)") do
+				table.insert(Found, {
+					Path = Path,
+					Size = Size or "",
+				})
+			end
+
+			return Found
+		end
+
 		return Create "Frame" {
 			Name = "ToolCall",
 			Size = UDim2.fromScale(1, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = Index,
+
+			Vide.indexes(Shared, function(File: () -> {Path: string, Size: string}, Order: number)
+				return Create "Frame" {
+					Name = "SharedFile",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundColor3 = Theme.Colors.Panel,
+					LayoutOrder = -100 + Order,
+
+					Create "UICorner" {CornerRadius = UDim.new(0, 6)},
+					Create "UIStroke" {Color = Theme.Colors.Border},
+					Create "UIPadding" {
+						PaddingLeft = UDim.new(0, 10),
+						PaddingRight = UDim.new(0, 8),
+						PaddingTop = UDim.new(0, 6),
+						PaddingBottom = UDim.new(0, 6),
+					},
+					Create "UIListLayout" {
+						FillDirection = Enum.FillDirection.Horizontal,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, 8),
+					},
+					Icon {
+						Name = Config.Icons.File,
+						Size = Settings.TextSize,
+						LayoutOrder = 1,
+					},
+					Create "Frame" {
+						Name = "Names",
+						Size = UDim2.fromScale(0, 0),
+						AutomaticSize = Enum.AutomaticSize.XY,
+						BackgroundTransparency = 1,
+						LayoutOrder = 2,
+
+						Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
+						Create "UIListLayout" {SortOrder = Enum.SortOrder.LayoutOrder},
+						Create "TextLabel" {
+							Name = "FileName",
+							Size = UDim2.fromScale(1, 0),
+							AutomaticSize = Enum.AutomaticSize.Y,
+							BackgroundTransparency = 1,
+							TextColor3 = Theme.Colors.Text,
+							TextSize = Settings.TextSize,
+							FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+							TextTruncate = Enum.TextTruncate.AtEnd,
+							TextXAlignment = Enum.TextXAlignment.Left,
+							LayoutOrder = 1,
+							Text = function()
+								return File().Path:match("[^/\\]+$") or File().Path
+							end,
+						},
+						Create "TextLabel" {
+							Name = "FileSize",
+							Size = UDim2.fromScale(1, 0),
+							AutomaticSize = Enum.AutomaticSize.Y,
+							BackgroundTransparency = 1,
+							TextColor3 = Theme.Colors.DimText,
+							TextSize = Settings.SmallText,
+							FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+							TextXAlignment = Enum.TextXAlignment.Left,
+							LayoutOrder = 2,
+							Text = function()
+								return File().Size
+							end,
+						},
+					},
+					Button {
+						Text = "Open",
+						LayoutOrder = 3,
+						OnClick = function()
+							task.spawn(Chat.OpenFile, File().Path, false)
+						end,
+					},
+					Button {
+						Text = "Show in folder",
+						LayoutOrder = 4,
+						OnClick = function()
+							task.spawn(Chat.OpenFile, File().Path, true)
+						end,
+					},
+				}
+			end),
 
 			Create "UIListLayout" {
 				SortOrder = Enum.SortOrder.LayoutOrder,
@@ -694,7 +794,7 @@ return function(Props: Props)
 				Vide.show(function()
 					const Slot = Value().image
 
-					return Open() and Slot ~= nil and Props.Images ~= nil and (Props.Images() :: {EditableImage?})[Slot] ~= nil
+					return (Open() or Value().name:match("share_file$") ~= nil) and Slot ~= nil and Props.Images ~= nil and (Props.Images() :: {EditableImage?})[Slot] ~= nil
 				end, function()
 					const Picture = (Props.Images :: () -> {EditableImage})()[Value().image :: number]
 
@@ -1594,6 +1694,12 @@ return function(Props: Props)
 							return Entry().Path ~= nil and not HasLineCounts()
 						end,
 						Text = function()
+							const Fields = Entry().Fields
+
+							if Fields and #Fields > 0 then
+								return `set {table.concat(Fields, ", ")}`
+							end
+
 							return (Entry().Text:match("^(%a+)") or ""):lower()
 						end,
 

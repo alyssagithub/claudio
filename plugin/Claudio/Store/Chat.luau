@@ -4277,6 +4277,14 @@ function Chat.KnownTokens(): {[string]: boolean}
 	return Known
 end
 
+function Chat.OpenFile(Path: string, Reveal: boolean)
+	const Ok, Trouble = Client.OpenFile(Path, Reveal)
+
+	if not Ok then
+		Chat.Say(`Could not open that file: {Trouble}`)
+	end
+end
+
 function Chat.OpenUrl(Url: string)
 	if Client.OpenUrl(Url) then
 		return

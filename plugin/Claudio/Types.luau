@@ -125,6 +125,7 @@ export type Change = {
 	Kind: "added" | "removed" | "changed",
 	Text: string,
 	Path: string?,
+	Fields: {string}?,
 	Added: number?,
 	Removed: number?,
 }

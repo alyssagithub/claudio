@@ -490,6 +490,7 @@ const function Describe(Where: Bucket): {Types.Change}
 				Deleted = {},
 			})[1],
 			Path = Path,
+			Fields = if #Item.Fields > 0 then Item.Fields else nil,
 		}
 
 		if Object and Object:IsA("LuaSourceContainer") and (Item.Before or Item.Verb == "Created") then

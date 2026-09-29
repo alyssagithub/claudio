@@ -446,6 +446,13 @@ function Client.RunInSession(Code: string, Target: string): (boolean, any)
 	})
 end
 
+function Client.OpenFile(Path: string, Reveal: boolean): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/open-file`, {
+		path = Path,
+		reveal = Reveal,
+	})
+end
+
 function Client.OpenUrl(Url: string): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/open-url`, {url = Url})
 end

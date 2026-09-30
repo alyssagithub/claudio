@@ -14,6 +14,7 @@ import { ReadPluginSetting } from "./PluginSettings.js";
 import { MirrorSkills, MirrorSyncedSkills } from "./SyncedSkills.js";
 import { CountLines, EditedFile, ReadFileText } from "./Lines.js";
 import { GetModels, RememberModels, SupportsEffort } from "./Models.js";
+import { ListServerTools } from "./McpTools.js";
 import type { Asked, Breakdown, Call, CallStatus, ContentBlock, Content, JobAnswer, LineCount, Part, Permission, Picture, Question, Query, SdkMessage, SentImage, Session, Task, Turn, TurnRequest, Usage } from "./Types.js";
 
 const Turns = new Map<string, Turn>();
@@ -275,15 +276,58 @@ function IsAllowedTool(ToolName: string) {
 
 const ServerStatuses: Record<string, string> = {};
 
-export function GetMcpServers() {
-  const Configured = ReadMcpServers();
+type ServerTools = { name: string; status: string; tools: { name: string; description: string }[] };
 
-  return Object.entries(Configured).map(([Name, Definition]) => ({
-    name: Name,
-    command: Definition.command,
-    arguments: (Definition.args || []).join(" "),
-    status: ServerStatuses[Name] || "unknown",
+let KnownTools: ServerTools[] = [];
+
+async function ReadServerTools(): Promise<ServerTools[]> {
+  const Ready = [...Sessions.values()].find((Entry) => Entry.Query && !Entry.Ended);
+
+  if (!Ready || !Ready.Query) {
+    return KnownTools;
+  }
+
+  try {
+    const Listed = await Promise.race([
+      Ready.Query.mcpServerStatus(),
+      new Promise<never>((_, Reject) => setTimeout(() => Reject(new Error("timed out")), 10000)),
+    ]);
+
+    KnownTools = Listed.map((Server) => ({
+      name: Server.name,
+      status: Server.status,
+      tools: (Server.tools || []).map((Tool) => ({name: Tool.name, description: Tool.description || ""})),
+    }));
+  } catch {
+    return KnownTools;
+  }
+
+  return KnownTools;
+}
+
+export async function GetMcpServers() {
+  const Configured = ReadMcpServers();
+  const Live = await ReadServerTools();
+  const Listed = await Promise.all(Object.entries(Configured).map(async ([Name, Definition]) => {
+    const Found = Live.find((Server) => Server.name === Name);
+    const Described = await ListServerTools(Definition.command, Definition.args || [], Definition.env);
+
+    return {
+      name: Name,
+      command: Definition.command,
+      arguments: (Definition.args || []).join(" "),
+      status: (Found && Found.status) || ServerStatuses[Name] || (Described ? "connected" : "unknown"),
+      tools: Described || (Found ? Found.tools : []),
+    };
   }));
+
+  for (const Server of Live) {
+    if (!Listed.some((Entry) => Entry.name === Server.name)) {
+      Listed.push({name: Server.name, command: "", arguments: "", status: Server.status, tools: Server.tools});
+    }
+  }
+
+  return Listed;
 }
 
 function RememberServers(Init: {mcp_servers?: {name: string, status: string}[]}) {

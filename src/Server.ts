@@ -928,7 +928,7 @@ ${Text}`;
       }
 
       if (Request.method === "GET" && Url.pathname === "/mcp") {
-        SendJson(Response, 200, {servers: GetMcpServers()});
+        SendJson(Response, 200, {servers: await GetMcpServers()});
         return;
       }
 

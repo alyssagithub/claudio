@@ -175,11 +175,17 @@ export type Command = {
 	description: string,
 }
 
+export type McpTool = {
+	name: string,
+	description: string,
+}
+
 export type McpServer = {
 	name: string,
 	command: string,
 	arguments: string,
 	status: string,
+	tools: {McpTool}?,
 }
 
 export type ConnectionStatus = "Disconnected" | "Connecting" | "Connected" | "Error"

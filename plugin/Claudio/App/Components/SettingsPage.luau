@@ -219,7 +219,96 @@ const function Row(Definition: Settings.Definition, LayoutOrder: number)
 	}
 end
 
+const function Tool(Entry: () -> Types.McpTool, Index: number)
+	const Open = Vide.source(false)
+
+	return Create "TextButton" {
+		Name = "Tool",
+		Size = UDim2.fromScale(1, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = Theme.Colors.Input,
+		BackgroundTransparency = function()
+			return if Open() then 0 else 1
+		end,
+		AutoButtonColor = false,
+		Text = "",
+		LayoutOrder = 10 + Index,
+		Activated = function()
+			Open(not Open())
+		end,
+
+		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+		Create "UIPadding" {
+			PaddingLeft = UDim.new(0, 6),
+			PaddingRight = UDim.new(0, 6),
+			PaddingTop = UDim.new(0, 3),
+			PaddingBottom = UDim.new(0, 3),
+		},
+		Create "UIListLayout" {
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			HorizontalFlex = Enum.UIFlexAlignment.Fill,
+			Padding = UDim.new(0, 3),
+		},
+		Create "Frame" {
+			Name = "Heading",
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			LayoutOrder = 1,
+
+			Create "UIListLayout" {
+				FillDirection = Enum.FillDirection.Horizontal,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 4),
+			},
+			Icon {
+				Name = function()
+					return if Open() then Config.Icons.Down else Config.Icons.Right
+				end,
+				Size = Settings.SmallText,
+				LayoutOrder = 1,
+			},
+			Create "TextLabel" {
+				Name = "ToolName",
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				TextColor3 = Theme.Colors.Text,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.Code),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				LayoutOrder = 2,
+				Text = function()
+					return Entry().name
+				end,
+			},
+		},
+		Create "TextLabel" {
+			Name = "Description",
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			TextColor3 = Theme.Colors.DimText,
+			TextSize = Settings.SmallText,
+			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			LayoutOrder = 2,
+			Visible = Open,
+			Text = function()
+				return if Entry().description ~= "" then Entry().description else "This server does not share the tool's description with Claudio."
+			end,
+		},
+	}
+end
+
 const function Server(Entry: () -> Types.McpServer, Index: number)
+	const Open = Vide.source(false)
+
+	const function Tools(): {Types.McpTool}
+		return Entry().tools or {}
+	end
+
 	return Create "Frame" {
 		Name = "Server",
 		Size = UDim2.fromScale(1, 0),
@@ -240,18 +329,35 @@ const function Server(Entry: () -> Types.McpServer, Index: number)
 			HorizontalFlex = Enum.UIFlexAlignment.Fill,
 			Padding = UDim.new(0, 2),
 		},
-		Create "Frame" {
+		Create "TextButton" {
 			Name = "Heading",
 			Size = UDim2.fromScale(1, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
+			AutoButtonColor = false,
+			Text = "",
 			LayoutOrder = 1,
+			Activated = function()
+				if #Tools() > 0 then
+					Open(not Open())
+				end
+			end,
 
 			Create "UIListLayout" {
 				FillDirection = Enum.FillDirection.Horizontal,
 				VerticalAlignment = Enum.VerticalAlignment.Center,
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				Padding = UDim.new(0, 6),
+			},
+			Icon {
+				Name = function()
+					return if Open() then Config.Icons.Down else Config.Icons.Right
+				end,
+				Size = Settings.SmallText,
+				LayoutOrder = 0,
+				Visible = function()
+					return #Tools() > 0
+				end,
 			},
 			Create "TextLabel" {
 				Name = "Title",
@@ -266,6 +372,24 @@ const function Server(Entry: () -> Types.McpServer, Index: number)
 					return Entry().name
 				end,
 			},
+			Create "TextLabel" {
+				Name = "Count",
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				TextColor3 = Theme.Colors.DimText,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+				LayoutOrder = 2,
+				Text = function()
+					const Count = #Tools()
+
+					if Count == 0 then
+						return if Entry().status == "connected" then "no tools" else Entry().status
+					end
+
+					return if Count == 1 then "1 tool" else `{Count} tools`
+				end,
+			},
 		},
 		Create "TextLabel" {
 			Name = "Command",
@@ -278,10 +402,16 @@ const function Server(Entry: () -> Types.McpServer, Index: number)
 			TextWrapped = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			LayoutOrder = 2,
+			Visible = function()
+				return Entry().command ~= ""
+			end,
 			Text = function()
 				return `{Entry().command} {Entry().arguments}`
 			end,
 		},
+		Vide.indexes(function()
+			return if Open() then Tools() else {}
+		end, Tool),
 	}
 end
 

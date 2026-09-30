@@ -7,7 +7,10 @@ export type Block = {
 	Box: TextBox,
 	Range: ({number}?) -> {number},
 	Native: () -> (),
+	Rich: (() -> string)?,
 }
+
+type Style = {Font: Enum.Font, Size: number}
 
 const Selection = {}
 
@@ -15,6 +18,21 @@ const Blocks: {Block} = {}
 
 local Origin: Block?
 local Anchor = 0
+local Words = false
+local LastBox: TextBox?
+local LastClick = 0
+
+const function Place(Box: TextBox, From: number, To: number)
+	if From == To then
+		Box.SelectionStart = -1
+		Box.CursorPosition = To
+
+		return
+	end
+
+	Box.SelectionStart = From
+	Box.CursorPosition = To
+end
 local Crossed = false
 local Dragging = 0
 
@@ -85,18 +103,124 @@ const function Ordered(): {Block}
 	return Sorted
 end
 
-const Layouts: {[TextBox]: {Key: string, Rows: {{number}}}} = setmetatable({}, {__mode = "k"}) :: any
+const Entities: {[string]: string} = {
+	["&lt;"] = "<",
+	["&gt;"] = ">",
+	["&amp;"] = "&",
+	["&quot;"] = "\"",
+	["&apos;"] = "'",
+}
 
-const function Rows(Box: TextBox, Width: number, Measure: (string) -> number): {{number}}
+const Bolder: {[Enum.Font]: Enum.Font} = {
+	[Enum.Font.BuilderSans] = Enum.Font.BuilderSansBold,
+	[Enum.Font.BuilderSansMedium] = Enum.Font.BuilderSansBold,
+	[Enum.Font.SourceSans] = Enum.Font.SourceSansBold,
+	[Enum.Font.Gotham] = Enum.Font.GothamBold,
+}
+
+const function Styles(Box: TextBox, Rich: string?): {Style}
+	const Base: Style = {Font = Box.Font, Size = Box.TextSize}
+	const Found: {Style} = {}
+
+	if not Rich then
+		return Found
+	end
+
+	const Fonts: {{Mono: boolean, Size: number?}} = {}
+	local Bold = 0
+	local At = 1
+
+	while At <= #Rich do
+		const Tag = Rich:match("^<[^>]->", At)
+
+		if Tag then
+			if Tag == "<b>" then
+				Bold += 1
+			elseif Tag == "</b>" then
+				Bold = math.max(0, Bold - 1)
+			elseif Tag:match("^<font") then
+				table.insert(Fonts, {
+					Mono = Tag:find("Mono", 1, true) ~= nil,
+					Size = tonumber(Tag:match('size="(%d+)"')),
+				})
+			elseif Tag == "</font>" then
+				table.remove(Fonts)
+			end
+
+			At += #Tag
+
+			continue
+		end
+
+		local Mono = false
+		local Size = Base.Size
+
+		for _, Entry in Fonts do
+			Mono = Mono or Entry.Mono
+			Size = Entry.Size or Size
+		end
+
+		const Font = if Mono then Enum.Font.RobotoMono elseif Bold > 0 then Bolder[Base.Font] or Base.Font else Base.Font
+		const Style = if Font == Base.Font and Size == Base.Size then Base else {Font = Font, Size = Size}
+		const Entity = Rich:match("^&%a+;", At)
+		const Piece = if Entity and Entities[Entity] then Entities[Entity] else (Rich:match("^[%z\1-\127\194-\244][\128-\191]*", At) or Rich:sub(At, At))
+
+		for _ = 1, #Piece do
+			table.insert(Found, Style)
+		end
+
+		At += if Entity and Entities[Entity] then #Entity else #Piece
+	end
+
+	return if #Found == #Box.Text then Found else {}
+end
+
+const Layouts: {[TextBox]: {Key: string, Rows: {{number}}, Styles: {Style}}} = setmetatable({}, {__mode = "k"}) :: any
+
+const function Measurer(Box: TextBox, Found: {Style}): (number, number) -> number
 	const Text = Box.Text
-	const Key = `{Width}|{Box.TextSize}|{Box.Font.Name}|{Text}`
+	const Wide = Vector2.new(1e5, 1e5)
+
+	return function(From: number, To: number): number
+		if To < From then
+			return 0
+		end
+
+		if #Found == 0 then
+			return TextService:GetTextSize(Text:sub(From, To), Box.TextSize, Box.Font, Wide).X
+		end
+
+		local Width = 0
+		local Start = From
+
+		while Start <= To do
+			const Style = Found[Start]
+			local Stop = Start
+
+			while Stop < To and Found[Stop + 1] == Style do
+				Stop += 1
+			end
+
+			Width += TextService:GetTextSize(Text:sub(Start, Stop), Style.Size, Style.Font, Wide).X
+			Start = Stop + 1
+		end
+
+		return Width
+	end
+end
+
+const function Layout(Box: TextBox, Width: number, Rich: string?): ({{number}}, (number, number) -> number, {Style})
+	const Text = Box.Text
+	const Key = `{Width}|{Box.TextSize}|{Box.Font.Name}|{Rich or Text}`
 	const Known = Layouts[Box]
 
 	if Known and Known.Key == Key then
-		return Known.Rows
+		return Known.Rows, Measurer(Box, Known.Styles), Known.Styles
 	end
 
-	const Found = {}
+	const Found = Styles(Box, Rich)
+	const Measure = Measurer(Box, Found)
+	const Rows = {}
 	local Start = 1
 
 	while Start <= #Text + 1 do
@@ -110,8 +234,13 @@ const function Rows(Box: TextBox, Width: number, Measure: (string) -> number): {
 			while Next <= Stop do
 				const Word = Text:match("^[^ \n]* *", Next) :: string
 				const Ending = Next + #Word
+				local Last = math.min(Ending, Stop) - 1
 
-				if #Word == 0 or (Measure((Text:sub(From, math.min(Ending, Stop) - 1):gsub(" +$", ""))) > Width and Fit > From) then
+				while Last >= From and Text:sub(Last, Last) == " " do
+					Last -= 1
+				end
+
+				if #Word == 0 or (Measure(From, Last) > Width and Fit > From) then
 					break
 				end
 
@@ -123,7 +252,7 @@ const function Rows(Box: TextBox, Width: number, Measure: (string) -> number): {
 				Fit = Stop
 			end
 
-			table.insert(Found, {
+			table.insert(Rows, {
 				From,
 				Fit,
 			})
@@ -140,34 +269,58 @@ const function Rows(Box: TextBox, Width: number, Measure: (string) -> number): {
 
 	Layouts[Box] = {
 		Key = Key,
-		Rows = Found,
+		Rows = Rows,
+		Styles = Found,
 	}
 
-	return Found
+	return Rows, Measure, Found
 end
 
-function Selection.IndexAt(Box: TextBox, Point: Vector2): number
+const function Height(Box: TextBox, Found: {Style}, Row: {number}): number
+	const Wide = Vector2.new(1e5, 1e5)
+	local Tallest = TextService:GetTextSize("Ag", Box.TextSize, Box.Font, Wide).Y
+
+	for Index = Row[1], Row[2] - 1 do
+		const Style = Found[Index]
+
+		if Style and Style.Size ~= Box.TextSize then
+			Tallest = math.max(Tallest, TextService:GetTextSize("Ag", Style.Size, Style.Font, Wide).Y)
+		end
+	end
+
+	return Tallest
+end
+
+function Selection.IndexAt(Box: TextBox, Point: Vector2, Rich: string?): number
 	const Text = Box.Text
 	const Padding = Box:FindFirstChildOfClass("UIPadding")
 	const Left = if Padding then Padding.PaddingLeft.Offset else 0
-	const Wide = Vector2.new(1e5, 1e5)
 	const X = Point.X - Box.AbsolutePosition.X - Left
+	const Rows, Measure, Found = Layout(Box, Box.AbsoluteSize.X - Left - (if Padding then Padding.PaddingRight.Offset else 0), Rich)
+	local Y = Point.Y - Box.AbsolutePosition.Y - (if Padding then Padding.PaddingTop.Offset else 0)
+	local Row = Rows[#Rows]
 
-	const function Measure(Piece: string): number
-		return TextService:GetTextSize(Piece, Box.TextSize, Box.Font, Wide).X
+	for _, Candidate in Rows do
+		const Tall = Height(Box, Found, Candidate)
+
+		if Y < Tall then
+			Row = Candidate
+
+			break
+		end
+
+		Y -= Tall
 	end
 
-	const Row = Rows(Box, Box.AbsoluteSize.X - Left - (if Padding then Padding.PaddingRight.Offset else 0), Measure)[math.max(0, math.floor((Point.Y - Box.AbsolutePosition.Y - (if Padding then Padding.PaddingTop.Offset else 0)) / TextService:GetTextSize("Ag", Box.TextSize, Box.Font, Wide).Y)) + 1]
-
-	if not Row then
-		return #Text + 1
+	if not Row or Y < 0 and Row == Rows[1] and Point.Y < Box.AbsolutePosition.Y then
+		return 1
 	end
 
 	const From, Fit = Row[1], Row[2]
 	local Best = From
 
 	for Index = From, Fit do
-		if Measure(Text:sub(From, Index - 1)) > X then
+		if Measure(From, Index - 1) > X then
 			break
 		end
 
@@ -178,10 +331,26 @@ function Selection.IndexAt(Box: TextBox, Point: Vector2): number
 		return math.min(Best, #Text + 1)
 	end
 
-	const Before = Measure(Text:sub(From, Best - 1))
-	const After = Measure(Text:sub(From, Best))
+	const Before = Measure(From, Best - 1)
+	const After = Measure(From, Best)
 
 	return math.min(if X - Before > After - X then Best + 1 else Best, #Text + 1)
+end
+
+function Selection.Word(Box: TextBox, At: number): (number, number)
+	const Text = Box.Text
+	local Start = At
+	local Finish = At
+
+	while Start > 1 and Text:sub(Start - 1, Start - 1):match("[%w_]") do
+		Start -= 1
+	end
+
+	while Finish <= #Text and Text:sub(Finish, Finish):match("[%w_]") do
+		Finish += 1
+	end
+
+	return Start, Finish
 end
 
 const function Extend(Point: Vector2)
@@ -190,6 +359,19 @@ const function Extend(Point: Vector2)
 	end
 
 	if Bounds.Contains(Origin.Box, Point) and not Crossed then
+		const Reach = Selection.IndexAt(Origin.Box, Point, if Origin.Rich then Origin.Rich() else nil)
+
+		if Words then
+			const Start = math.min(Anchor, (Selection.Word(Origin.Box, Reach)))
+			const _, Finish = Selection.Word(Origin.Box, math.max(Reach, Anchor))
+
+			Place(Origin.Box, Start, math.max(Finish, Anchor))
+
+			return
+		end
+
+		Place(Origin.Box, Anchor, Reach)
+
 		return
 	end
 
@@ -243,7 +425,7 @@ const function Extend(Point: Vector2)
 		return
 	end
 
-	const Reach = Selection.IndexAt(Target.Box, Point)
+	const Reach = Selection.IndexAt(Target.Box, Point, if Target.Rich then Target.Rich() else nil)
 
 	Crossed = true
 
@@ -271,15 +453,25 @@ const function Extend(Point: Vector2)
 	end
 end
 
-function Selection.Begin(Entry: Block, Widget: any)
+function Selection.Begin(Entry: Block, Widget: any, Point: Vector2)
+	const Again = LastBox == Entry.Box and os.clock() - LastClick < 0.4
+
 	Clear()
 	Origin = Entry
 	Dragging += 1
+	LastBox = Entry.Box
+	LastClick = if Again then 0 else os.clock()
+	Anchor = Selection.IndexAt(Entry.Box, Point, if Entry.Rich then Entry.Rich() else nil)
+	Words = Again
+
+	if Again then
+		Anchor = (Selection.Word(Entry.Box, Anchor))
+	end
 
 	const Mine = Dragging
 
 	task.defer(function()
-		Anchor = Entry.Box.CursorPosition
+		Extend(Point)
 
 		if not Widget then
 			return

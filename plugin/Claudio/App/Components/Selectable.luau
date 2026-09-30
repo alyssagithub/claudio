@@ -137,6 +137,7 @@ return function(Props: Props)
 		Box = nil :: any,
 		Range = Range,
 		Native = Track,
+		Rich = Props.Text,
 	}
 
 	Box = Create "TextBox" {
@@ -194,7 +195,7 @@ return function(Props: Props)
 				return
 			end
 
-			Selection.Begin(Entry, Box:FindFirstAncestorWhichIsA("PluginGui"))
+			Selection.Begin(Entry, Box:FindFirstAncestorWhichIsA("PluginGui"), Vector2.new(Input.Position.X, Input.Position.Y))
 		end,
 		InputEnded = function(Input: InputObject)
 			if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then

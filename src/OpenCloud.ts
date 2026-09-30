@@ -110,3 +110,66 @@ export async function CallOpenCloud(Call: OpenCloudCall): Promise<string> {
 
   return `${Method} ${Url.pathname}${Url.search} -> ${Response.status} ${Response.statusText}${Hint}\n${Text.slice(0, MostCallText)}`;
 }
+
+export function FindOpenCloudKey(Text: string): string | null {
+  const Found = Text.split(/\s+/).filter((Word) => Word.length >= 100 && /^[\w+/=.-]+$/.test(Word));
+
+  return Found.length > 0 ? Found[Found.length - 1] : null;
+}
+
+export async function RunKeyHook(): Promise<void> {
+  let Given = "";
+
+  for await (const Chunk of process.stdin) {
+    Given += Chunk;
+  }
+
+  let Prompt = "";
+
+  try {
+    Prompt = String((JSON.parse(Given) as { prompt?: unknown }).prompt || "");
+  } catch {
+    return;
+  }
+
+  const Key = FindOpenCloudKey(Prompt);
+
+  if (!Key) {
+    return;
+  }
+
+  SaveOpenCloudKey(Key);
+  process.stdout.write(JSON.stringify({
+    decision: "block",
+    reason: "Claudio saved your Open Cloud API key and stopped that message, so the key never reached Claude or this chat. Send your request again without the key.",
+  }));
+}
+
+export function InstallKeyHook(): string {
+  const File = path.join(os.homedir(), ".claude", "settings.json");
+  let Settings: { hooks?: Record<string, unknown[]> } = {};
+
+  try {
+    Settings = JSON.parse(fs.readFileSync(File, "utf8"));
+  } catch (Trouble) {
+    if ((Trouble as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw new Error(`Could not read ${File}: ${(Trouble as Error).message}`);
+    }
+  }
+
+  const Command = "claudio key-hook";
+  const Hooks = Settings.hooks || {};
+  const Submitted = (Hooks.UserPromptSubmit || []) as { hooks?: { command?: string }[] }[];
+
+  if (Submitted.some((Entry) => (Entry.hooks || []).some((Hook) => Hook.command === Command))) {
+    return `The key hook is already in ${File}.`;
+  }
+
+  Submitted.push({hooks: [{type: "command", command: Command} as { command: string }]});
+  Hooks.UserPromptSubmit = Submitted;
+  Settings.hooks = Hooks;
+  fs.mkdirSync(path.dirname(File), {recursive: true});
+  fs.writeFileSync(File, JSON.stringify(Settings, null, 2));
+
+  return `Added the key hook to ${File}. Claude Code chats, including the desktop app's Code chats, now save a pasted Open Cloud key and stop that message.`;
+}

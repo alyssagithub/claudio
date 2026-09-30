@@ -114,7 +114,28 @@ const function Number(Definition: Settings.Definition)
 	return Box
 end
 
+const function Reset(Definition: Settings.Definition, LayoutOrder: number)
+	return IconButton {
+		Icon = Config.Icons.Restore,
+		LayoutOrder = LayoutOrder,
+		Size = Settings.SmallText,
+		Tooltip = `Reset to {if typeof(Definition.Default) == "boolean" then (if Definition.Default then "on" else "off") else tostring(Definition.Default)}`,
+		Visible = function()
+			return Settings.Get(Definition.Key)() ~= Definition.Default
+		end,
+		OnClick = function()
+			Settings.Set(Definition.Key, Definition.Default)
+
+			if Definition.Studio then
+				task.spawn(Client.SetBuiltInPlugins, Definition.Default)
+			end
+		end,
+	}
+end
+
 const function Row(Definition: Settings.Definition, LayoutOrder: number)
+	const Stacked = Definition.Options ~= nil and #Definition.Options > 2
+
 	return Create "Frame" {
 		Name = "Setting",
 		Size = UDim2.fromScale(1, 0),
@@ -191,8 +212,10 @@ const function Row(Definition: Settings.Definition, LayoutOrder: number)
 				end,
 				Text = "Restart Studio for this to take effect",
 			} else nil,
+			if Stacked then Reset(Definition, 4) else nil,
 		},
 		if Definition.Options then Choice(Definition) elseif Definition.Minimum then Number(Definition) else Toggle(Definition.Key, if Definition.Studio then Client.SetBuiltInPlugins else nil),
+		if Stacked then nil else Reset(Definition, 3),
 	}
 end
 

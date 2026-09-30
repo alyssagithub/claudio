@@ -157,7 +157,7 @@ export function InstallKeyHook(): string {
     }
   }
 
-  const Command = "claudio key-hook";
+  const Command = `"${process.execPath}" "${path.resolve(process.argv[1])}" key-hook`;
   const Hooks = Settings.hooks || {};
   const Submitted = (Hooks.UserPromptSubmit || []) as { hooks?: { command?: string }[] }[];
 

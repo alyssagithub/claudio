@@ -39,7 +39,7 @@ export async function CallOpenCloud(Call: OpenCloudCall): Promise<string> {
   const Key = OpenCloudKey();
 
   if (!Key) {
-    return "No Open Cloud API key is set. Ask the user to paste their key into the chat, on its own or inside a message; Claudio saves it and swaps it for a placeholder before the message reaches you, so you never see it.";
+    return "No Open Cloud API key is set. Tell the user one of these, so the key never reaches you: in the Claudio panel in Studio, or in a Claude Code chat once `claudio setup` or `claudio install-key-hook` has run, paste the key into the chat and Claudio saves it before the message is sent; anywhere else, run `claudio apikey` in a terminal and paste it there. Never ask them to paste it to you in a chat without one of those.";
   }
 
   let Url: URL;
@@ -172,4 +172,45 @@ export function InstallKeyHook(): string {
   fs.writeFileSync(File, JSON.stringify(Settings, null, 2));
 
   return `Added the key hook to ${File}. Claude Code chats, including the desktop app's Code chats, now save a pasted Open Cloud key and stop that message.`;
+}
+
+export function AskForKey(): Promise<void> {
+  return new Promise((Resolve) => {
+    const Input = process.stdin;
+    let Typed = "";
+
+    process.stdout.write("Paste your Open Cloud API key and press Enter. It is not shown. Type clear to remove the saved key: ");
+    Input.setRawMode?.(true);
+    Input.resume();
+    Input.setEncoding("utf8");
+
+    const Read = (Chunk: string) => {
+      for (const Character of Chunk) {
+        if (Character === "\u0003") {
+          process.stdout.write("\nCancelled.\n");
+          process.exit(1);
+        }
+
+        if (Character !== "\r" && Character !== "\n") {
+          Typed = Character === "\u0008" || Character === "\u007f" ? Typed.slice(0, -1) : Typed + Character;
+
+          continue;
+        }
+
+        Input.setRawMode?.(false);
+        Input.pause();
+        Input.off("data", Read);
+
+        const Key = Typed.trim();
+
+        SaveOpenCloudKey(Key === "" || Key.toLowerCase() === "clear" ? null : Key);
+        process.stdout.write(Key === "" || Key.toLowerCase() === "clear" ? "\nRemoved the saved key.\n" : "\nSaved. Claude can now use it through Claudio's opencloud tool without seeing it.\n");
+        Resolve();
+
+        return;
+      }
+    };
+
+    Input.on("data", Read);
+  });
 }

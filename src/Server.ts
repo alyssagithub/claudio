@@ -563,7 +563,9 @@ export function StartServer(Port: number) {
       }
 
       if (Url.pathname === "/opencloud/key" && Request.method === "GET") {
-        SendJson(Response, 200, {saved: OpenCloudKey() !== null});
+        const Key = OpenCloudKey();
+
+        SendJson(Response, 200, {saved: Key !== null, start: Key ? Key.slice(0, 10) : null});
         return;
       }
 

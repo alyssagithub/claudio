@@ -282,15 +282,7 @@ const function Heading(Text: string, LayoutOrder: number)
 end
 
 const function Groups(): {string}
-	const Found = {}
-
-	for _, Definition in Settings.Definitions do
-		if not table.find(Found, Definition.Group) then
-			table.insert(Found, Definition.Group)
-		end
-	end
-
-	return Found
+	return {"Chat", "Claude", "Safety", "Notifications", "Appearance", "Connections"}
 end
 
 return function()
@@ -298,12 +290,14 @@ return function()
 
 	const Open = Vide.source(Groups()[1])
 	const KeySaved = Vide.source(nil :: boolean?)
+	const KeyStart = Vide.source("")
 	local KeyBox: TextBox
 
 	task.spawn(function()
 		const Ok, Result = Client.OpenCloudKeySaved()
 
 		KeySaved(if Ok and typeof(Result) == "table" then Result.saved == true else nil)
+		KeyStart(if Ok and typeof(Result) == "table" and typeof(Result.start) == "string" then Result.start else "")
 	end)
 
 	const function TakeKey()
@@ -319,12 +313,24 @@ return function()
 		task.spawn(function()
 			if Client.SaveOpenCloudKey(Key) then
 				KeySaved(true)
+				KeyStart(Key:sub(1, 10))
 			else
 				Chat.Say("Could not reach the bridge to save that key. Try again once Claudio is connected.")
 			end
 		end)
 	end
 	const PromptOpen = Vide.source(false)
+	const Query = Vide.source("")
+
+	const function Matches(Words: string): boolean
+		const Wanted = Query():lower():match("^%s*(.-)%s*$") :: string
+
+		return Words:lower():find(Wanted, 1, true) ~= nil
+	end
+
+	const function Shown(Group: string, Words: string): boolean
+		return if Query():match("%S") then Matches(Words) else Open() == Group
+	end
 
 	const function Tab(Name: string, LayoutOrder: number)
 		const function Showing(): boolean
@@ -370,7 +376,7 @@ return function()
 			BackgroundTransparency = 1,
 			LayoutOrder = 100 + Order,
 			Visible = function()
-				return Open() == Definition.Group
+				return Shown(Definition.Group, `{Definition.Label} {Definition.Detail} {Definition.Group}`)
 			end,
 
 			Row(Definition, 1),
@@ -409,10 +415,41 @@ return function()
 
 			Create "UIListLayout" {
 				FillDirection = Enum.FillDirection.Horizontal,
-				HorizontalAlignment = Enum.HorizontalAlignment.Right,
+				VerticalAlignment = Enum.VerticalAlignment.Center,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 6),
+			},
+			Create "TextBox" {
+				Name = "Search",
+				Size = function()
+					return UDim2.new(0, 0, 0, Settings.TextSize() + 12)
+				end,
+				BackgroundColor3 = Theme.Colors.Input,
+				TextColor3 = Theme.Colors.Text,
+				PlaceholderColor3 = Theme.Colors.DimText,
+				PlaceholderText = "Search settings",
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				ClearTextOnFocus = false,
+				Text = Query,
+				LayoutOrder = 1,
+
+				Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
+				Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+				Create "UIPadding" {
+					PaddingLeft = UDim.new(0, 6),
+					PaddingRight = UDim.new(0, 6),
+				},
+				Create "UIStroke" {
+					Color = Theme.Colors.Border,
+					ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+				},
+				Vide.changed("Text", Query),
 			},
 			Button {
 				Text = "Reset to defaults",
+				LayoutOrder = 2,
 				OnClick = Settings.Reset,
 			},
 		},
@@ -422,6 +459,9 @@ return function()
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = 1,
+			Visible = function()
+				return not Query():match("%S")
+			end,
 
 			Create "UIGridLayout" {
 				CellSize = function()
@@ -440,384 +480,411 @@ return function()
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = 7899,
-			Visible = function()
-				return Open() == "Connection"
-			end,
 
 			Create "UIListLayout" {
 				Padding = UDim.new(0, 8),
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				HorizontalFlex = Enum.UIFlexAlignment.Fill,
 			},
-			Create "TextButton" {
-				Name = "PromptHeading",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				Text = "",
-				LayoutOrder = 7900,
-				Activated = function()
-					PromptOpen(not PromptOpen())
-				end,
-
-				Create "UIPadding" {PaddingTop = UDim.new(0, 8)},
-				Create "UIListLayout" {
-					FillDirection = Enum.FillDirection.Horizontal,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 4),
-				},
-				Icon {
-					Name = function()
-						return if PromptOpen() then Config.Icons.Down else Config.Icons.Right
-					end,
-					Size = Settings.SmallText,
-					LayoutOrder = 1,
-				},
-				Create "TextLabel" {
-					AutomaticSize = Enum.AutomaticSize.XY,
-					BackgroundTransparency = 1,
-					TextColor3 = Theme.Colors.DimText,
-					TextSize = function()
-						return Settings.TextSize() - 1
-					end,
-					FontFace = Font.fromEnum(Enum.Font.BuilderSansBold),
-					LayoutOrder = 2,
-					Text = "Claudio's own instructions",
-				},
-			},
-			Create "TextBox" {
-				Name = "Prompt",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundColor3 = Theme.Colors.Code,
-				TextColor3 = Theme.Colors.CodeText,
-				TextSize = Settings.SmallText,
-				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				TextWrapped = true,
-				MultiLine = true,
-				TextEditable = false,
-				ClearTextOnFocus = false,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				TextYAlignment = Enum.TextYAlignment.Top,
-				LayoutOrder = 7901,
-				Visible = PromptOpen,
-				Text = PromptText,
-
-				Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-				Create "UIPadding" {
-					PaddingLeft = UDim.new(0, 10),
-					PaddingRight = UDim.new(0, 34),
-					PaddingTop = UDim.new(0, 8),
-					PaddingBottom = UDim.new(0, 8),
-				},
-				Create "Frame" {
-					Name = "CopyCorner",
-					Position = UDim2.new(1, 4, 0, -2),
-					Size = UDim2.fromScale(0, 0),
-					AutomaticSize = Enum.AutomaticSize.XY,
-					BackgroundTransparency = 1,
-
-					IconButton {
-						Icon = Config.Icons.Copy,
-						Size = Settings.SmallText,
-						Tooltip = "Copy instructions",
-						OnClick = function()
-							task.spawn(Chat.Copy, PromptText())
-						end,
-					},
-				},
-			},
-			Heading("Working folder", 7930),
-			Create "TextLabel" {
-				Name = "FolderNow",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				TextColor3 = Theme.Colors.DimText,
-				TextSize = Settings.SmallText,
-				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				TextWrapped = true,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				LayoutOrder = 7931,
-				Text = function()
-					const Folder = Settings.Get("WorkingFolder")()
-
-					return if Folder == "" then "No folder. Claude can still work in your place, but can't read files on disk" else `Claude runs in {Folder}`
-				end,
-			},
 			Create "Frame" {
-				Name = "FolderActions",
-				Size = UDim2.new(1, 0, 0, 24),
-				BackgroundTransparency = 1,
-				LayoutOrder = 7932,
-
-				Create "UIListLayout" {
-					FillDirection = Enum.FillDirection.Horizontal,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 6),
-				},
-				Button {
-					Text = function()
-						return if Settings.Get("WorkingFolder")() == "" then "Pick a folder" else "Change folder"
-					end,
-					LayoutOrder = 1,
-					OnClick = function()
-						Chat.SettingsOpen(false)
-						Settings.Set("FolderAsked", false)
-					end,
-				},
-				Button {
-					Text = "Clear folder",
-					LayoutOrder = 2,
-					Visible = function()
-						return Settings.Get("WorkingFolder")() ~= ""
-					end,
-					OnClick = function()
-						Settings.Set("WorkingFolder", "")
-					end,
-				},
-			},
-			Heading("Open Cloud API key", 7940),
-			Create "TextLabel" {
-				Name = "KeyNow",
+				Name = "ClaudeExtras",
 				Size = UDim2.fromScale(1, 0),
 				AutomaticSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
-				TextColor3 = Theme.Colors.DimText,
-				TextSize = Settings.SmallText,
-				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				TextWrapped = true,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				LayoutOrder = 7941,
-				Text = function()
-					const Saved = KeySaved()
-
-					if Saved == nil then
-						return "Lets Claude use Roblox's Open Cloud API, for game passes, products, badges and data stores. Paste a key below; it is saved on this computer and never shown to Claude."
-					end
-
-					return if Saved then "A key is saved. Paste a new one to replace it." else "No key saved. Paste one below; it is saved on this computer and never shown to Claude."
+				Visible = function()
+					return Shown("Claude", "claude instructions working folder")
 				end,
-			},
-			Create "Frame" {
-				Name = "KeyActions",
-				Size = UDim2.new(1, 0, 0, 24),
-				BackgroundTransparency = 1,
-				LayoutOrder = 7942,
 
 				Create "UIListLayout" {
-					FillDirection = Enum.FillDirection.Horizontal,
-					VerticalAlignment = Enum.VerticalAlignment.Center,
+					Padding = UDim.new(0, 8),
 					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 6),
+					HorizontalFlex = Enum.UIFlexAlignment.Fill,
 				},
-				Create "TextBox" {
-					Name = "Key",
-					Size = UDim2.new(0, 0, 1, 0),
-					BackgroundColor3 = Theme.Colors.Input,
-					TextColor3 = Theme.Colors.Text,
-					PlaceholderColor3 = Theme.Colors.DimText,
-					PlaceholderText = "Paste an API key",
-					TextSize = Settings.SmallText,
-					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextTruncate = Enum.TextTruncate.AtEnd,
-					ClearTextOnFocus = true,
-					Text = "",
-					LayoutOrder = 1,
-
-					Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
-					Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-					Create "UIPadding" {
-						PaddingLeft = UDim.new(0, 6),
-						PaddingRight = UDim.new(0, 6),
-					},
-					Create "UIStroke" {
-						Color = Theme.Colors.Border,
-						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-					},
-					Vide.action(function(Object: TextBox)
-						KeyBox = Object
-						Vide.cleanup(Object:GetPropertyChangedSignal("Text"):Connect(TakeKey))
-						Vide.cleanup(Object.FocusLost:Connect(function()
-							Object.Text = ""
-						end))
-					end),
-				},
-				Button {
-					Text = "Remove",
-					LayoutOrder = 2,
-					Visible = function()
-						return KeySaved() == true
-					end,
-					OnClick = function()
-						task.spawn(function()
-							if Client.SaveOpenCloudKey(nil) then
-								KeySaved(false)
-							end
-						end)
-					end,
-				},
-			},
-			Heading("Plugin version", 7950),
-			Create "TextLabel" {
-				Name = "VersionNote",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				TextColor3 = Theme.Colors.DimText,
-				TextSize = Settings.SmallText,
-				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				TextWrapped = true,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				LayoutOrder = 7951,
-				Text = function()
-					const Found = Chat.Versions()
-
-					if not Found then
-						return "Connect to the bridge to see other versions."
-					end
-
-					if #Found.releases == 0 then
-						return `You are on {Chat.Installed()}. No published releases were found.`
-					end
-
-					const Running = Chat.Installed()
-
-					if Found.current ~= Running then
-						return `{Found.current} is installed and loads when you restart Studio. You are running {Running} until then.`
-					end
-
-					if Found.bridge and Found.bridge ~= Running then
-						return `The plugin is on {Running} and the bridge is on {Found.bridge}. Pick one below so they match.`
-					end
-
-					return `You are on {Running}. Pick another version to install. It loads after you restart Studio.`
-				end,
-			},
-			Create "Frame" {
-				Name = "VersionPicker",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				LayoutOrder = 7952,
-
-				Create "UIListLayout" {
-					FillDirection = Enum.FillDirection.Horizontal,
-					VerticalAlignment = Enum.VerticalAlignment.Top,
-					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 6),
-				},
-				Create "Frame" {
-					Name = "Choice",
-					Size = UDim2.fromScale(0, 0),
+				Create "TextButton" {
+					Name = "PromptHeading",
+					Size = UDim2.fromScale(1, 0),
 					AutomaticSize = Enum.AutomaticSize.Y,
 					BackgroundTransparency = 1,
-					LayoutOrder = 1,
+					Text = "",
+					LayoutOrder = 7900,
+					Activated = function()
+						PromptOpen(not PromptOpen())
+					end,
 
-					Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
+					Create "UIPadding" {PaddingTop = UDim.new(0, 8)},
 					Create "UIListLayout" {
+						FillDirection = Enum.FillDirection.Horizontal,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
 						SortOrder = Enum.SortOrder.LayoutOrder,
-						HorizontalFlex = Enum.UIFlexAlignment.Fill,
-						Padding = UDim.new(0, 2),
+						Padding = UDim.new(0, 4),
 					},
-					Create "TextButton" {
-						Name = "Selected",
-						Size = UDim2.new(1, 0, 0, 26),
-						BackgroundColor3 = Theme.Colors.Input,
-						TextColor3 = Theme.Colors.Text,
-						TextSize = Settings.SmallText,
-						FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-						TextXAlignment = Enum.TextXAlignment.Left,
-						AutoButtonColor = false,
+					Icon {
+						Name = function()
+							return if PromptOpen() then Config.Icons.Down else Config.Icons.Right
+						end,
+						Size = Settings.SmallText,
 						LayoutOrder = 1,
-						Text = function()
-							const Picked = Chat.VersionPick()
-
-							return `  {if Picked == "" then Chat.Installed() else Picked}{if Picked == "" or Picked == Chat.Installed() then "  · installed" else ""}`
+					},
+					Create "TextLabel" {
+						AutomaticSize = Enum.AutomaticSize.XY,
+						BackgroundTransparency = 1,
+						TextColor3 = Theme.Colors.DimText,
+						TextSize = function()
+							return Settings.TextSize() - 1
 						end,
-						Activated = function()
-							Chat.VersionOpen(not Chat.VersionOpen())
-						end,
+						FontFace = Font.fromEnum(Enum.Font.BuilderSansBold),
+						LayoutOrder = 2,
+						Text = "Claudio's own instructions",
+					},
+				},
+				Create "TextBox" {
+					Name = "Prompt",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundColor3 = Theme.Colors.Code,
+					TextColor3 = Theme.Colors.CodeText,
+					TextSize = Settings.SmallText,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+					TextWrapped = true,
+					MultiLine = true,
+					TextEditable = false,
+					ClearTextOnFocus = false,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextYAlignment = Enum.TextYAlignment.Top,
+					LayoutOrder = 7901,
+					Visible = PromptOpen,
+					Text = PromptText,
 
-						Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-						Create "TextLabel" {
-							Name = "Arrow",
-							AnchorPoint = Vector2.new(1, 0.5),
-							Position = UDim2.new(1, -8, 0.5, 0),
-							AutomaticSize = Enum.AutomaticSize.XY,
-							BackgroundTransparency = 1,
-							TextColor3 = Theme.Colors.DimText,
-							TextSize = Settings.SmallText,
-							FontFace = Config.IconFont,
-							Text = function()
-								return if Chat.VersionOpen() then Config.Icons.Up else Config.Icons.Down
+					Create "UICorner" {CornerRadius = UDim.new(0, 6)},
+					Create "UIPadding" {
+						PaddingLeft = UDim.new(0, 10),
+						PaddingRight = UDim.new(0, 34),
+						PaddingTop = UDim.new(0, 8),
+						PaddingBottom = UDim.new(0, 8),
+					},
+					Create "Frame" {
+						Name = "CopyCorner",
+						Position = UDim2.new(1, 4, 0, -2),
+						Size = UDim2.fromScale(0, 0),
+						AutomaticSize = Enum.AutomaticSize.XY,
+						BackgroundTransparency = 1,
+
+						IconButton {
+							Icon = Config.Icons.Copy,
+							Size = Settings.SmallText,
+							Tooltip = "Copy instructions",
+							OnClick = function()
+								task.spawn(Chat.Copy, PromptText())
 							end,
 						},
 					},
-					Vide.indexes(function()
+				},
+				Heading("Working folder", 7930),
+				Create "TextLabel" {
+					Name = "FolderNow",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					TextColor3 = Theme.Colors.DimText,
+					TextSize = Settings.SmallText,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					LayoutOrder = 7931,
+					Text = function()
+						const Folder = Settings.Get("WorkingFolder")()
+
+						return if Folder == "" then "No folder. Claude can still work in your place, but can't read files on disk" else `Claude runs in {Folder}`
+					end,
+				},
+				Create "Frame" {
+					Name = "FolderActions",
+					Size = UDim2.new(1, 0, 0, 24),
+					BackgroundTransparency = 1,
+					LayoutOrder = 7932,
+
+					Create "UIListLayout" {
+						FillDirection = Enum.FillDirection.Horizontal,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, 6),
+					},
+					Button {
+						Text = function()
+							return if Settings.Get("WorkingFolder")() == "" then "Pick a folder" else "Change folder"
+						end,
+						LayoutOrder = 1,
+						OnClick = function()
+							Chat.SettingsOpen(false)
+							Settings.Set("FolderAsked", false)
+						end,
+					},
+					Button {
+						Text = "Clear folder",
+						LayoutOrder = 2,
+						Visible = function()
+							return Settings.Get("WorkingFolder")() ~= ""
+						end,
+						OnClick = function()
+							Settings.Set("WorkingFolder", "")
+						end,
+					},
+				},
+			},
+			Create "Frame" {
+				Name = "ConnectionExtras",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				Visible = function()
+					return Shown("Connections", "connections open cloud api key plugin version mcp servers")
+				end,
+
+				Create "UIListLayout" {
+					Padding = UDim.new(0, 8),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					HorizontalFlex = Enum.UIFlexAlignment.Fill,
+				},
+				Heading("Open Cloud API key", 7940),
+				Create "TextLabel" {
+					Name = "KeyNow",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					TextColor3 = Theme.Colors.DimText,
+					TextSize = Settings.SmallText,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					LayoutOrder = 7941,
+					Text = function()
+						const Saved = KeySaved()
+
+						if Saved == nil then
+							return "Lets Claude use Roblox's Open Cloud API, for game passes, products, badges and data stores. Paste a key below; it is saved on this computer and never shown to Claude."
+						end
+
+						return if Saved then `Saved key {KeyStart()}… Paste a new one to replace it.` else "No key saved. Paste one below; it is saved on this computer and never shown to Claude."
+					end,
+				},
+				Create "Frame" {
+					Name = "KeyActions",
+					Size = UDim2.new(1, 0, 0, 24),
+					BackgroundTransparency = 1,
+					LayoutOrder = 7942,
+
+					Create "UIListLayout" {
+						FillDirection = Enum.FillDirection.Horizontal,
+						VerticalAlignment = Enum.VerticalAlignment.Center,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, 6),
+					},
+					Create "TextBox" {
+						Name = "Key",
+						Size = UDim2.new(0, 0, 1, 0),
+						BackgroundColor3 = Theme.Colors.Input,
+						TextColor3 = Theme.Colors.Text,
+						PlaceholderColor3 = Theme.Colors.DimText,
+						PlaceholderText = "Paste an API key",
+						TextSize = Settings.SmallText,
+						FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+						TextXAlignment = Enum.TextXAlignment.Left,
+						TextTruncate = Enum.TextTruncate.AtEnd,
+						ClearTextOnFocus = true,
+						Text = "",
+						LayoutOrder = 1,
+
+						Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
+						Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+						Create "UIPadding" {
+							PaddingLeft = UDim.new(0, 6),
+							PaddingRight = UDim.new(0, 6),
+						},
+						Create "UIStroke" {
+							Color = Theme.Colors.Border,
+							ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+						},
+						Vide.action(function(Object: TextBox)
+							KeyBox = Object
+							Vide.cleanup(Object:GetPropertyChangedSignal("Text"):Connect(TakeKey))
+							Vide.cleanup(Object.FocusLost:Connect(function()
+								Object.Text = ""
+							end))
+						end),
+					},
+					Button {
+						Text = "Remove",
+						LayoutOrder = 2,
+						Visible = function()
+							return KeySaved() == true
+						end,
+						OnClick = function()
+							task.spawn(function()
+								if Client.SaveOpenCloudKey(nil) then
+									KeySaved(false)
+								end
+							end)
+						end,
+					},
+				},
+				Heading("Plugin version", 7950),
+				Create "TextLabel" {
+					Name = "VersionNote",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					TextColor3 = Theme.Colors.DimText,
+					TextSize = Settings.SmallText,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					LayoutOrder = 7951,
+					Text = function()
 						const Found = Chat.Versions()
 
-						return if Found and Chat.VersionOpen() then Found.releases else {}
-					end, function(Release: () -> Types.Release, Index: number)
-						return Create "TextButton" {
-							Name = "Option",
-							Size = UDim2.new(1, 0, 0, 24),
-							BackgroundColor3 = Theme.Colors.Button,
+						if not Found then
+							return "Connect to the bridge to see other versions."
+						end
+
+						if #Found.releases == 0 then
+							return `You are on {Chat.Installed()}. No published releases were found.`
+						end
+
+						const Running = Chat.Installed()
+
+						if Found.current ~= Running then
+							return `{Found.current} is installed and loads when you restart Studio. You are running {Running} until then.`
+						end
+
+						if Found.bridge and Found.bridge ~= Running then
+							return `The plugin is on {Running} and the bridge is on {Found.bridge}. Pick one below so they match.`
+						end
+
+						return `You are on {Running}. Pick another version to install. It loads after you restart Studio.`
+					end,
+				},
+				Create "Frame" {
+					Name = "VersionPicker",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					LayoutOrder = 7952,
+
+					Create "UIListLayout" {
+						FillDirection = Enum.FillDirection.Horizontal,
+						VerticalAlignment = Enum.VerticalAlignment.Top,
+						SortOrder = Enum.SortOrder.LayoutOrder,
+						Padding = UDim.new(0, 6),
+					},
+					Create "Frame" {
+						Name = "Choice",
+						Size = UDim2.fromScale(0, 0),
+						AutomaticSize = Enum.AutomaticSize.Y,
+						BackgroundTransparency = 1,
+						LayoutOrder = 1,
+
+						Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
+						Create "UIListLayout" {
+							SortOrder = Enum.SortOrder.LayoutOrder,
+							HorizontalFlex = Enum.UIFlexAlignment.Fill,
+							Padding = UDim.new(0, 2),
+						},
+						Create "TextButton" {
+							Name = "Selected",
+							Size = UDim2.new(1, 0, 0, 26),
+							BackgroundColor3 = Theme.Colors.Input,
 							TextColor3 = Theme.Colors.Text,
 							TextSize = Settings.SmallText,
 							FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 							TextXAlignment = Enum.TextXAlignment.Left,
 							AutoButtonColor = false,
-							LayoutOrder = 1 + Index,
+							LayoutOrder = 1,
 							Text = function()
-								const Entry = Release()
+								const Picked = Chat.VersionPick()
 
-								return `  {Entry.version}{if Entry.prerelease then " (pre-release)" else ""}{if Entry.version == Chat.Installed() then "  · installed" else ""}`
+								return `  {if Picked == "" then Chat.Installed() else Picked}{if Picked == "" or Picked == Chat.Installed() then "  · installed" else ""}`
 							end,
 							Activated = function()
-								Chat.VersionPick(Release().version)
-								Chat.VersionOpen(false)
+								Chat.VersionOpen(not Chat.VersionOpen())
 							end,
 
 							Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-						}
-					end),
-				},
-				Button {
-					Text = function()
-						return if Chat.Updating() then "Working" else "Switch"
-					end,
-					Primary = true,
-					LayoutOrder = 2,
-					Visible = function()
-						const Picked = Chat.VersionPick()
+							Create "TextLabel" {
+								Name = "Arrow",
+								AnchorPoint = Vector2.new(1, 0.5),
+								Position = UDim2.new(1, -8, 0.5, 0),
+								AutomaticSize = Enum.AutomaticSize.XY,
+								BackgroundTransparency = 1,
+								TextColor3 = Theme.Colors.DimText,
+								TextSize = Settings.SmallText,
+								FontFace = Config.IconFont,
+								Text = function()
+									return if Chat.VersionOpen() then Config.Icons.Up else Config.Icons.Down
+								end,
+							},
+						},
+						Vide.indexes(function()
+							const Found = Chat.Versions()
 
-						return Picked ~= "" and Picked ~= Chat.Installed()
-					end,
-					OnClick = function()
-						task.spawn(Chat.InstallVersion, Chat.VersionPick())
-					end,
+							return if Found and Chat.VersionOpen() then Found.releases else {}
+						end, function(Release: () -> Types.Release, Index: number)
+							return Create "TextButton" {
+								Name = "Option",
+								Size = UDim2.new(1, 0, 0, 24),
+								BackgroundColor3 = Theme.Colors.Button,
+								TextColor3 = Theme.Colors.Text,
+								TextSize = Settings.SmallText,
+								FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+								TextXAlignment = Enum.TextXAlignment.Left,
+								AutoButtonColor = false,
+								LayoutOrder = 1 + Index,
+								Text = function()
+									const Entry = Release()
+
+									return `  {Entry.version}{if Entry.prerelease then " (pre-release)" else ""}{if Entry.version == Chat.Installed() then "  · installed" else ""}`
+								end,
+								Activated = function()
+									Chat.VersionPick(Release().version)
+									Chat.VersionOpen(false)
+								end,
+
+								Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+							}
+						end),
+					},
+					Button {
+						Text = function()
+							return if Chat.Updating() then "Working" else "Switch"
+						end,
+						Primary = true,
+						LayoutOrder = 2,
+						Visible = function()
+							const Picked = Chat.VersionPick()
+
+							return Picked ~= "" and Picked ~= Chat.Installed()
+						end,
+						OnClick = function()
+							task.spawn(Chat.InstallVersion, Chat.VersionPick())
+						end,
+					},
 				},
-			},
-			Heading("MCP servers", 7999),
-			Vide.indexes(Chat.McpServers, Server),
-			Create "TextLabel" {
-				Name = "NoServers",
-				Size = UDim2.fromScale(1, 0),
-				AutomaticSize = Enum.AutomaticSize.Y,
-				BackgroundTransparency = 1,
-				TextColor3 = Theme.Colors.DimText,
-				TextSize = Settings.SmallText,
-				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-				TextWrapped = true,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				LayoutOrder = 8999,
-				Visible = function()
-					return #Chat.McpServers() == 0
-				end,
-				Text = "No MCP servers are set up for Claudio. They come from the Claude desktop app's config.",
+				Heading("MCP servers", 7999),
+				Vide.indexes(Chat.McpServers, Server),
+				Create "TextLabel" {
+					Name = "NoServers",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					TextColor3 = Theme.Colors.DimText,
+					TextSize = Settings.SmallText,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					LayoutOrder = 8999,
+					Visible = function()
+						return #Chat.McpServers() == 0
+					end,
+					Text = "No MCP servers are set up for Claudio. They come from the Claude desktop app's config.",
+				},
 			},
 		},
 	}

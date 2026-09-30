@@ -39,7 +39,7 @@ export async function CallOpenCloud(Call: OpenCloudCall): Promise<string> {
   const Key = OpenCloudKey();
 
   if (!Key) {
-    return "No Open Cloud API key is set. Tell the user one of these, so the key never reaches you: paste it into the Open Cloud API key box in the Claudio panel's settings in Studio; in a Claude Code chat once `claudio setup` or `claudio install-key-hook` has run, paste it into the chat and Claudio saves it before the message is sent; or run `claudio apikey` in a terminal and paste it there. Never ask them to paste it to you in a chat without one of those.";
+    return "No Open Cloud API key is set. Tell the user one of these, so the key never reaches you: open the Claudio panel in Studio and paste it into the Open Cloud API key box in its settings, under Connections, or run `claudio apikey` in a terminal and paste it there. Never ask them to paste it to you in a chat without one of those.";
   }
 
   let Url: URL;
@@ -104,74 +104,17 @@ export async function CallOpenCloud(Call: OpenCloudCall): Promise<string> {
     Text = Text.trim();
   }
 
-  const Hint = Response.status === 401 || Response.status === 403
-    ? "\nThe key was refused for this call. It may lack the permission or the experience this needs, or have expired; the user can add them on the Creator Dashboard or paste a new key."
-    : "";
+  let Hint = "";
+
+  if (Response.status === 401 || Response.status === 403) {
+    const Needed = await ScopesFor(Method, Url.pathname);
+
+    Hint = Needed.length > 0
+      ? `\nThe key was refused. Tell the user this call needs the ${Needed.join(" or ")} permission${Needed.length === 1 ? "" : "s"}: on the Creator Dashboard, open their API key, add ${Needed.length === 1 ? "it" : "one of them"}, and make sure this experience is in the key's list, then try again.`
+      : "\nThe key was refused for this call. It may lack the permission or the experience this needs, or have expired; the user can add them on the Creator Dashboard or paste a new key.";
+  }
 
   return `${Method} ${Url.pathname}${Url.search} -> ${Response.status} ${Response.statusText}${Hint}\n${Text.slice(0, MostCallText)}`;
-}
-
-export function FindOpenCloudKey(Text: string): string | null {
-  const Found = Text.split(/\s+/).filter((Word) => Word.length >= 100 && /^[\w+/=.-]+$/.test(Word));
-
-  return Found.length > 0 ? Found[Found.length - 1] : null;
-}
-
-export async function RunKeyHook(): Promise<void> {
-  let Given = "";
-
-  for await (const Chunk of process.stdin) {
-    Given += Chunk;
-  }
-
-  let Prompt = "";
-
-  try {
-    Prompt = String((JSON.parse(Given) as { prompt?: unknown }).prompt || "");
-  } catch {
-    return;
-  }
-
-  const Key = FindOpenCloudKey(Prompt);
-
-  if (!Key) {
-    return;
-  }
-
-  SaveOpenCloudKey(Key);
-  process.stdout.write(JSON.stringify({
-    decision: "block",
-    reason: "Claudio saved your Open Cloud API key and stopped that message, so the key never reached Claude or this chat. Send your request again without the key.",
-  }));
-}
-
-export function InstallKeyHook(): string {
-  const File = path.join(os.homedir(), ".claude", "settings.json");
-  let Settings: { hooks?: Record<string, unknown[]> } = {};
-
-  try {
-    Settings = JSON.parse(fs.readFileSync(File, "utf8"));
-  } catch (Trouble) {
-    if ((Trouble as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`Could not read ${File}: ${(Trouble as Error).message}`);
-    }
-  }
-
-  const Command = `"${process.execPath}" "${path.resolve(process.argv[1])}" key-hook`;
-  const Hooks = Settings.hooks || {};
-  const Submitted = (Hooks.UserPromptSubmit || []) as { hooks?: { command?: string }[] }[];
-
-  if (Submitted.some((Entry) => (Entry.hooks || []).some((Hook) => Hook.command === Command))) {
-    return `The key hook is already in ${File}.`;
-  }
-
-  Submitted.push({hooks: [{type: "command", command: Command} as { command: string }]});
-  Hooks.UserPromptSubmit = Submitted;
-  Settings.hooks = Hooks;
-  fs.mkdirSync(path.dirname(File), {recursive: true});
-  fs.writeFileSync(File, JSON.stringify(Settings, null, 2));
-
-  return `Added the key hook to ${File}. Claude Code chats, including the desktop app's Code chats, now save a pasted Open Cloud key and stop that message.`;
 }
 
 export function AskForKey(): Promise<void> {
@@ -213,4 +156,51 @@ export function AskForKey(): Promise<void> {
 
     Input.on("data", Read);
   });
+}
+
+const SpecFile = path.join(os.homedir(), ".claudio", "opencloud-scopes.json");
+
+type ScopeRoute = { method: string; pattern: string; scopes: string[] };
+
+async function ScopeRoutes(): Promise<ScopeRoute[]> {
+  try {
+    const Cached = JSON.parse(fs.readFileSync(SpecFile, "utf8")) as { at: number; routes: ScopeRoute[] };
+
+    if (Date.now() - Cached.at < 7 * 24 * 60 * 60 * 1000) {
+      return Cached.routes;
+    }
+  } catch {
+    null;
+  }
+
+  try {
+    const Spec = await (await fetch("https://create.roblox.com/docs/cloud/openapi.json", {signal: AbortSignal.timeout(20000)})).json() as { paths: Record<string, Record<string, { "x-roblox-scopes"?: { name: string }[]; security?: Record<string, string[]>[] }>> };
+    const Routes: ScopeRoute[] = [];
+
+    for (const [Template, Methods] of Object.entries(Spec.paths || {})) {
+      for (const [Method, Operation] of Object.entries(Methods)) {
+        const Named = (Operation["x-roblox-scopes"] || []).map((Scope) => Scope.name);
+        const Secured = (Operation.security || []).flatMap((Entry) => Object.values(Entry).flat());
+        const Scopes = [...new Set([...Named, ...Secured])].filter((Scope) => Scope.includes(":"));
+
+        if (Scopes.length > 0) {
+          Routes.push({method: Method.toUpperCase(), pattern: `^${Template.replace(/[.*+?^$()|[\]\]/g, "\$&").replace(/\?\{[^}]+\?\}/g, "[^/]+").replace(/\{[^}]+\}/g, "[^/]+")}$`, scopes: Scopes});
+        }
+      }
+    }
+
+    fs.mkdirSync(path.dirname(SpecFile), {recursive: true});
+    fs.writeFileSync(SpecFile, JSON.stringify({at: Date.now(), routes: Routes}));
+
+    return Routes;
+  } catch {
+    return [];
+  }
+}
+
+export async function ScopesFor(Method: string, Pathname: string): Promise<string[]> {
+  const Routes = await ScopeRoutes();
+  const Found = Routes.find((Route) => Route.method === Method && new RegExp(Route.pattern).test(Pathname));
+
+  return Found ? Found.scopes : [];
 }

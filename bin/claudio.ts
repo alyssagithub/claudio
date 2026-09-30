@@ -6,7 +6,7 @@ import { RunSetup } from "../src/Setup.js";
 import { RunUninstall } from "../src/Uninstall.js";
 import { ReportVersion } from "../src/Version.js";
 import { InstallStartup, RestartBridge, StopBridge, UninstallStartup } from "../src/Startup.js";
-import { AskForKey, InstallKeyHook, RunKeyHook } from "../src/OpenCloud.js";
+import { AskForKey } from "../src/OpenCloud.js";
 
 const Arguments = process.argv.slice(2);
 const Command = Arguments[0];
@@ -56,14 +56,6 @@ if (Command === "setup") {
   RestartBridge(ChosenPort()).catch(Fail);
 } else if (Command === "apikey") {
   AskForKey().catch(Fail);
-} else if (Command === "key-hook") {
-  RunKeyHook().catch(() => process.exit(0));
-} else if (Command === "install-key-hook") {
-  try {
-    console.log(InstallKeyHook());
-  } catch (Trouble) {
-    Fail(Trouble as Error);
-  }
 } else if (Command === "stop") {
   StopBridge(ChosenPort());
 } else if (Command === undefined || Command === "start" || Command === "--port") {
@@ -79,7 +71,6 @@ if (Command === "setup") {
     "  claudio restart             Restart the running bridge",
     "  claudio stop                Stop the running bridge",
     "  claudio apikey              Set the Open Cloud API key without showing it",
-    "  claudio install-key-hook    Let Claude Code chats save a pasted Open Cloud key",
     "  claudio version             Show the installed version",
     "  claudio uninstall           Remove Claudio",
   ].join("\n"));

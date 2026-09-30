@@ -2,7 +2,6 @@ import { exec, spawn } from "node:child_process";
 import { InstallPlugin } from "./PluginInstaller.js";
 import { GetPluginsFolder } from "./StudioPaths.js";
 import { InstallStartup } from "./Startup.js";
-import { InstallKeyHook } from "./OpenCloud.js";
 
 type RunResult = {
   Ok: boolean;
@@ -89,12 +88,6 @@ export async function RunSetup(LocalPath?: string | null): Promise<void> {
     }
   } else {
     Manual.push("Start the bridge by running `claudio` and leaving that window open. Starting it automatically is Windows-only so far.");
-  }
-
-  try {
-    console.log(InstallKeyHook());
-  } catch (Error) {
-    Manual.push(`Run \`claudio install-key-hook\` so Claude Code chats can take an Open Cloud key (${(Error as NodeJS.ErrnoException).message})`);
   }
 
   Manual.push("Restart Roblox Studio, then open the Claudio button in the Plugins tab.");

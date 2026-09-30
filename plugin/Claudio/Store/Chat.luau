@@ -2510,6 +2510,12 @@ const function RunStudioJob(Job: any)
 				return require(script.Parent.Parent.Render)(Job.input, Resolve)
 			end
 
+			if Job.kind == "quality" then
+				settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+
+				return {text = "Studio's graphics level is back to automatic."}
+			end
+
 			if Job.kind == "mark" then
 				return Mark(Job.input)
 			end

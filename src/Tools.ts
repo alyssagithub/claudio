@@ -90,6 +90,8 @@ async function Headroom(Clients: number, Starting: boolean): Promise<string | nu
   return `Not starting that: ${Starting ? "a server and " : ""}${Clients} client${Clients === 1 ? "" : "s"} are ${Processes} Studio processes of about ${Gigabytes(Each)} GB each, plus room to spare, so about ${Gigabytes(Needed)} GB, and over 20 seconds of watching this machine had at most ${Gigabytes(Most)} GB free even counting the page file. Running out crashes the whole machine, not just Studio. Use fewer players, or pass force only if the user asks for it.`;
 }
 
+let QualityChanged = false;
+
 const LintDescription = [
   "Check scripts in the open place for analyzer warnings, including scripts nobody has edited.",
   "Pass paths to narrow it, or leave it empty to check everything.",
@@ -142,6 +144,19 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
   // Stop returns as soon as the session takes the request, but Studio needs a while to tear the playtest
   // down; wait until the editor reports it is back in edit mode so the next start is not refused.
   async function WaitUntilStopped(Signal?: AbortSignal): Promise<string> {
+    const Said = await WaitForEditMode(Signal);
+
+    if (!QualityChanged || !Said.includes("back in edit mode")) {
+      return Said;
+    }
+
+    QualityChanged = false;
+    await Reach("quality", {});
+
+    return `${Said} Studio's graphics level was put back to automatic.`;
+  }
+
+  async function WaitForEditMode(Signal?: AbortSignal): Promise<string> {
     const Began = Date.now();
 
     while (Date.now() - Began < 60000) {
@@ -659,13 +674,43 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       Name: "playtest",
       Description: PlaytestDescription,
       Schema: {
-        action: z.enum(["start", "stop", "status", "players"]).describe("What to do. Use status to find out what is happening before changing it; during a multiplayer test it also says how many players are in. The players action adds players, so never use it just to count them."),
+        action: z.enum(["start", "stop", "status", "players", "quality"]).describe("quality sets the playtest's graphics level from 1 to 10, as a player on a weaker or stronger device would see it; capture the window to see the result. Stopping the playtest puts Studio's graphics level back to automatic. " + "What to do. Use status to find out what is happening before changing it; during a multiplayer test it also says how many players are in. The players action adds players, so never use it just to count them."),
         mode: z.enum(["play", "run", "multiplayer"]).optional().describe("How to start it. play gives a character, run simulates without one, multiplayer starts a server with several clients. Defaults to play."),
         players: z.number().optional().describe("How many players, for multiplayer starts and for the players action."),
+        level: z.number().optional().describe("Graphics level from 1, the lowest, to 10, the highest, for the quality action."),
+        player: z.string().optional().describe("Which client the quality action applies to: a player's name, or their number in join order. Defaults to the first player."),
         force: z.boolean().optional().describe("Start a multiplayer test or add players even when the memory check says the machine cannot carry it."),
       },
-      Run: async (Input: { action: "start" | "stop" | "status" | "players"; mode?: "play" | "run" | "multiplayer"; players?: number; force?: boolean }, Extra?: unknown) => {
+      Run: async (Input: { action: "start" | "stop" | "status" | "players" | "quality"; mode?: "play" | "run" | "multiplayer"; players?: number; force?: boolean; level?: number; player?: string }, Extra?: unknown) => {
         const Signal = (Extra as {signal?: AbortSignal} | undefined)?.signal;
+
+        if (Input.action === "quality") {
+          const Missing = await NeedsSession("Setting the graphics level needs a running playtest with a client. Start one first.");
+
+          if (Missing) {
+            return {content: [{
+              type: "text",
+              text: Missing,
+            }]};
+          }
+
+          const Level = Math.min(10, Math.max(1, Math.round(Input.level || 5)));
+
+          QualityChanged = true;
+          const Set: { error?: string; now?: string } | null = await ReachIn("server", "quality", {level: Level, player: Input.player});
+
+          if (!Set || Set.error) {
+            return {content: [{
+              type: "text",
+              text: (Set && Set.error) || "The client did not answer.",
+            }]};
+          }
+
+          return {content: [{
+            type: "text",
+            text: `The playtest now renders at graphics level ${Level} (${Set.now}). Capture the window to see it. Stopping the playtest puts Studio back to automatic.`,
+          }]};
+        }
         const Reachable = await LiveSession();
         const Adding = Input.action === "players" ? Math.max(1, Math.floor(Input.players || 1)) : (Input.action === "start" && Input.mode === "multiplayer" ? Math.max(2, Math.floor(Input.players || 2)) : 0);
         const Refused = Adding > 0 && Input.force !== true ? await Headroom(Adding, Input.action === "start") : null;

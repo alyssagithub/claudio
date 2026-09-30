@@ -25,7 +25,20 @@ function Builder.Serve()
 	Bindable.OnInvoke = function(Given: any, Source: any, Within: any): any
 		const Key = Settings.Get("BuildKey")()
 
-		if Key == "" or Given ~= Key or typeof(Source) ~= "string" then
+		if Key == "" or Given ~= Key then
+			return nil
+		end
+
+		if typeof(Source) == "table" and typeof(Source.quality) == "number" then
+			const Level = math.clamp(math.round(Source.quality), 1, 10)
+			const Rendered, Trouble = pcall(function()
+				(settings() :: any).Rendering.QualityLevel = (Enum.QualityLevel :: any)[`Level{string.format("%02d", math.clamp(Level * 2 - 1, 1, 21))}`]
+			end)
+
+			return if Rendered then {now = tostring((settings() :: any).Rendering.QualityLevel)} else {error = `Studio refused the graphics level: {tostring(Trouble)}`}
+		end
+
+		if typeof(Source) ~= "string" then
 			return nil
 		end
 

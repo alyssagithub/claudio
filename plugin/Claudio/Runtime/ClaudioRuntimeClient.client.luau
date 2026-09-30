@@ -431,6 +431,16 @@ Remote.OnClientEvent:Connect(function(Id: string, Kind: string, Body: string)
 			return Interact(Body)
 		end
 
+		if Kind == "quality" then
+			const Making = Builder()
+
+			if not Making then
+				return {error = "Claudio's plugin is not running inside this client, so the graphics level cannot be changed."}
+			end
+
+			return Making:Invoke("{{BuildKey}}", {quality = tonumber(Body) or 5})
+		end
+
 		if Kind == "scoped" then
 			const Given = HttpService:JSONDecode(Body)
 

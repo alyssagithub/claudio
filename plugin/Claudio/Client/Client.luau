@@ -475,6 +475,14 @@ function Client.SavePicture(Width: number, Height: number, Pixels: string, Open:
 	})
 end
 
+function Client.SaveOpenCloudKey(Key: string?): (boolean, any)
+	if not Key then
+		return Http.Request("DELETE", `{BaseUrl()}/opencloud/key`)
+	end
+
+	return Http.Request("POST", `{BaseUrl()}/opencloud/key`, {key = Key})
+end
+
 function Client.OpenUrl(Url: string): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/open-url`, {url = Url})
 end

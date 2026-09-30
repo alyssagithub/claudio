@@ -8,6 +8,7 @@ import { z } from "zod/v3";
 import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport } from "./Ask.js";
 import type { LogAnswer, ExecuteAnswer } from "./Ask.js";
 import { QuietFlash } from "./Notify.js";
+import { CallOpenCloud } from "./OpenCloud.js";
 
 const ExecuteDescription = [
   "Run Luau inside the open place and get back what it returned, what it printed, and where it failed.",
@@ -241,6 +242,23 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
           path: Input.path,
           names: Input.names,
         })),
+      }]}),
+    },
+    {
+      Name: "opencloud",
+      Description: "Call Roblox's Open Cloud web API at apis.roblox.com with the user's saved API key, for anything outside the open place: data stores and ordered data stores, memory stores, messaging, publishing places, universe and place settings, badges, game passes, developer products, assets, and more. Give the path, such as /cloud/v2/universes/{universeId}/data-stores, taking the universe and place ids from the studio_place note. Claudio adds the key itself and you never see it. Writes act on the live experience, so read first and say what a write will change before making it. A 401 or 403 means the key lacks that permission or experience. Monetization and badges: game passes are POST or PATCH /game-passes/v1/universes/{universeId}/game-passes[/{id}] and GET .../game-passes/creator; developer products are POST or PATCH /developer-products/v2/universes/{universeId}/developer-products[/{id}] and GET .../developer-products/creator; badges are POST /legacy-badges/v1/universes/{universeId}/badges and PATCH /legacy-badges/v1/badges/{id}. These take form fields and an icon file rather than JSON; if a field name is wrong the error names the expected ones. Badges beyond the daily free quota cost Robux, so confirm with the user before creating one past it.",
+      Schema: {
+        method: z.enum(["GET", "POST", "PATCH", "PUT", "DELETE"]).optional().describe("HTTP method. GET by default."),
+        path: z.string().describe("Path under https://apis.roblox.com, such as /cloud/v2/universes/123/data-stores, or a full https://apis.roblox.com address."),
+        query: z.record(z.union([z.string(), z.number(), z.boolean()])).optional().describe("Query parameters, such as maxPageSize or pageToken."),
+        body: z.any().optional().describe("Request body. Objects are sent as JSON; a string is sent as it is."),
+        contentType: z.string().optional().describe("Content type for a string body, such as application/octet-stream."),
+        form: z.record(z.union([z.string(), z.number(), z.boolean()])).optional().describe("Send the body as multipart form fields instead, such as Name, Description and Price."),
+        files: z.record(z.string()).optional().describe("Files to upload in the form, as field name to full local path, such as an icon PNG."),
+      },
+      Run: async (Input: { method?: string; path: string; query?: Record<string, string | number | boolean>; body?: unknown; contentType?: string; form?: Record<string, string | number | boolean>; files?: Record<string, string> }) => ({content: [{
+        type: "text",
+        text: await CallOpenCloud(Input),
       }]}),
     },
     {

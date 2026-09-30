@@ -1894,7 +1894,7 @@ const function Api(Input: any): any
 					return (Reflection :: any)[Method](Reflection, Input.className, {})
 				end)
 
-				if Ok then
+				if Ok and typeof(Listed) == "table" then
 					for _, Entry in Listed do
 						if tostring(Entry.Name):lower():find(Needle, 1, true) and #Hits < 120 then
 							table.insert(Hits, `{Input.className}.{tostring(Entry.Name)}`)

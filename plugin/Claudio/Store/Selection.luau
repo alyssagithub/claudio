@@ -88,7 +88,7 @@ end
 const Layouts: {[TextBox]: {Key: string, Rows: {{number}}}} = setmetatable({}, {__mode = "k"}) :: any
 
 const function Rows(Box: TextBox, Width: number, Measure: (string) -> number): {{number}}
-	const Text = Box.Text
+	const Text = Box.ContentText
 	const Key = `{Width}|{Box.TextSize}|{Box.Font.Name}|{Text}`
 	const Known = Layouts[Box]
 
@@ -147,7 +147,7 @@ const function Rows(Box: TextBox, Width: number, Measure: (string) -> number): {
 end
 
 function Selection.IndexAt(Box: TextBox, Point: Vector2): number
-	const Text = Box.Text
+	const Text = Box.ContentText
 	const Padding = Box:FindFirstChildOfClass("UIPadding")
 	const Left = if Padding then Padding.PaddingLeft.Offset else 0
 	const Wide = Vector2.new(1e5, 1e5)
@@ -248,7 +248,7 @@ const function Extend(Point: Vector2)
 	Crossed = true
 
 	for Index, Entry in Sorted do
-		const Length = #Entry.Box.Text + 1
+		const Length = #Entry.Box.ContentText + 1
 
 		if Entry == Origin then
 			Entry.Range({
@@ -318,7 +318,7 @@ function Selection.Text(): string?
 		const Range = Entry.Range()
 
 		if Range[2] > Range[1] then
-			table.insert(Pieces, Entry.Box.Text:sub(Range[1], Range[2] - 1))
+			table.insert(Pieces, Entry.Box.ContentText:sub(Range[1], Range[2] - 1))
 		end
 	end
 

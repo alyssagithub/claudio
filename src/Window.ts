@@ -149,6 +149,97 @@ Write-Output ('OK|' + $Bitmap.Width + '|' + $Bitmap.Height + '|' + $Text.ToStrin
 $Bitmap.Dispose()
 `;
 
+const ClickScript = `
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class Poke {
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr extra);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr handle, StringBuilder text, int count);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr handle, out uint process);
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr handle, out Rect rect);
+  [DllImport("user32.dll")] public static extern IntPtr RealChildWindowFromPoint(IntPtr parent, Point point);
+  [DllImport("user32.dll")] public static extern bool ScreenToClient(IntPtr handle, ref Point point);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr handle, uint message, IntPtr wide, IntPtr low);
+  public delegate bool EnumWindowsProc(IntPtr handle, IntPtr extra);
+  [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left, Top, Right, Bottom; }
+  [StructLayout(LayoutKind.Sequential)] public struct Point { public int X, Y; }
+}
+"@
+$Studio = @(Get-Process | Where-Object { $_.Name -like 'RobloxStudio*' } | ForEach-Object { [uint32]$_.Id })
+$Found = [IntPtr]::Zero
+$Callback = [Poke+EnumWindowsProc]{
+  param($Handle, $Extra)
+  if (-not [Poke]::IsWindowVisible($Handle)) { return $true }
+  $Owner = [uint32]0
+  [void][Poke]::GetWindowThreadProcessId($Handle, [ref]$Owner)
+  if ($Studio -notcontains $Owner) { return $true }
+  $Text = New-Object System.Text.StringBuilder 512
+  [void][Poke]::GetWindowText($Handle, $Text, 512)
+  if ($Text.ToString().EndsWith('Roblox Studio') -and $script:Found -eq [IntPtr]::Zero) { $script:Found = $Handle }
+  return $true
+}
+[void][Poke]::EnumWindows($Callback, [IntPtr]::Zero)
+if ($Found -eq [IntPtr]::Zero) { Write-Output 'NONE'; exit 0 }
+$Rect = New-Object Poke+Rect
+[void][Poke]::GetWindowRect($Found, [ref]$Rect)
+$Screen = New-Object Poke+Point
+$Screen.X = $Rect.Left + [int]$env:CLAUDIO_CLICK_X
+$Screen.Y = $Rect.Top + [int]$env:CLAUDIO_CLICK_Y
+$Target = $Found
+while ($true) {
+  $Local = $Screen
+  [void][Poke]::ScreenToClient($Target, [ref]$Local)
+  $Child = [Poke]::RealChildWindowFromPoint($Target, $Local)
+  if ($Child -eq [IntPtr]::Zero -or $Child -eq $Target) { break }
+  $Target = $Child
+}
+$Point = $Screen
+[void][Poke]::ScreenToClient($Target, [ref]$Point)
+$Packed = [IntPtr](($Point.Y -shl 16) -bor ($Point.X -band 0xFFFF))
+$Down, $Up, $Held = switch ($env:CLAUDIO_CLICK_BUTTON) { 'right' { 0x204, 0x205, 2 } 'middle' { 0x207, 0x208, 16 } default { 0x201, 0x202, 1 } }
+[void][Poke]::PostMessage($Target, 0x200, [IntPtr]::Zero, $Packed)
+[void][Poke]::PostMessage($Target, $Down, [IntPtr]$Held, $Packed)
+Start-Sleep -Milliseconds 60
+[void][Poke]::PostMessage($Target, $Up, [IntPtr]::Zero, $Packed)
+Write-Output ('OK|' + $Point.X + '|' + $Point.Y)
+`;
+
+export function ClickWindow(X: number, Y: number, Button: string): Promise<string> {
+  if (process.platform !== "win32") {
+    return Promise.resolve("Clicking the Studio window only works on Windows.");
+  }
+
+  return new Promise((Resolve) => {
+    execFile("powershell", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ClickScript], {
+      timeout: 20000,
+      windowsHide: true,
+      env: {
+        ...process.env,
+        CLAUDIO_CLICK_X: String(Math.round(X)),
+        CLAUDIO_CLICK_Y: String(Math.round(Y)),
+        CLAUDIO_CLICK_BUTTON: Button,
+      },
+    }, (Trouble, Output, Errors) => {
+      const Line = String(Output || "").trim().split(/\r?\n/).pop() || "";
+
+      if (Line === "NONE") {
+        Resolve("No Roblox Studio window is open to click.");
+        return;
+      }
+
+      if (Trouble || !Line.startsWith("OK|")) {
+        Resolve(`Could not click the Studio window: ${String(Errors || Trouble && Trouble.message || Line).trim().slice(0, 300)}`);
+        return;
+      }
+
+      Resolve(`Clicked the ${Button} button at ${Math.round(X)}, ${Math.round(Y)} in the Studio window, as a real click sent to the window without bringing it forward. Capture the window again to see what it did.`);
+    });
+  });
+}
+
 export function CaptureWindow(Title: string | null | undefined, Crop: CropBox): Promise<WindowShot> {
   if (process.platform !== "win32") {
     return Promise.resolve({error: "Capturing the Studio window only works on Windows, because it reads the window through Win32. Use the viewport capture instead."});

@@ -28,6 +28,7 @@ const InputDescription = [
   "Positions in answers are in the same space as AbsolutePosition, below the top bar. x and y are a relative move, so prefer to with a target path when dropping onto something. hold waits at the end before releasing, for drops that wait for the pointer to settle.",
   "Needs a play session with a character.",
   "Input that reaches nothing still reports as sent, so check the place afterwards.",
+  "Roblox refuses simulated input on CoreGui, such as purchase and prompt windows. Take a window capture and use click with window set to true and the capture's pixel coordinates; that sends a real click to the Studio window. Studio test purchases cost nothing.",
 ].join(" ");
 
 const PlaytestDescription = [
@@ -469,6 +470,19 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
           padding: Input.padding,
         });
 
+        if ((!Shot || Shot.error) && !Input.around && !(Input.width && Input.height)) {
+          const { CaptureWindow } = await import("./Window.js");
+          const Taken = await CaptureWindow(undefined, {}) as { error?: string; data: string; title: string; width: number; height: number };
+
+          if (Framed && Framed.restore) {
+            await Reach("frame", {restore: true});
+          }
+
+          if (!Taken.error) {
+            return Picture(Taken.data, `${Taken.width}x${Taken.height} of the window "${Taken.title}", because the viewport capture failed (${(Shot && Shot.error) || "Studio did not answer"}). During a playtest the editor's viewport is not what is on screen, so the whole window is the reliable view`);
+          }
+        }
+
         if (Framed && Framed.restore) {
           await Reach("frame", {restore: true});
         }
@@ -538,19 +552,20 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       Name: "input",
       Description: InputDescription,
       Schema: {
-        action: z.enum(["press", "type", "key", "hover", "scroll", "drag"]).describe("What to send."),
+        action: z.enum(["press", "click", "type", "key", "hover", "scroll", "drag"]).describe("What to send. click hits a point given by x and y instead of a path."),
+        window: z.boolean().optional().describe("For click: x and y are pixels in a capture of the Studio window, and the click is sent to that window as a real mouse click instead of simulated game input. This reaches CoreGui, such as purchase and prompt windows, which refuse simulated input, and works without a play session."),
         path: z.string().optional().describe("Full instance path of the GuiObject for press, hover, scroll and drag."),
         text: z.string().optional().describe("The text to type, for type."),
         key: z.string().optional().describe("KeyCode name to press and release, such as Return or E, for key."),
         amount: z.number().optional().describe("Wheel amount for scroll, negative scrolls down. Defaults to -1."),
         to: z.string().optional().describe("Full instance path to drag onto, for drag."),
-        x: z.number().optional().describe("Pixels to drag sideways when there is no to path."),
-        y: z.number().optional().describe("Pixels to drag down when there is no to path."),
+        x: z.number().optional().describe("For click, the point's x in AbsolutePosition space, or in window capture pixels with window. For drag, pixels to move sideways when there is no to path."),
+        y: z.number().optional().describe("For click, the point's y. For drag, pixels to move down when there is no to path."),
         button: z.enum(["left", "right", "middle"]).optional().describe("Which mouse button a drag holds. Defaults to left."),
         hold: z.number().optional().describe("Seconds to keep the button down at the end of a drag before releasing, up to 5."),
         player: z.string().optional().describe("Which client to send it to: a player's name, or their number in join order starting at 1. Defaults to the first player."),
       },
-      Run: async (Input: { action: "press" | "type" | "key" | "hover" | "scroll" | "drag"; path?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number; button?: "left" | "right" | "middle"; hold?: number; player?: string }) => {
+      Run: async (Input: { action: "press" | "click" | "type" | "key" | "hover" | "scroll" | "drag"; window?: boolean; path?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number; button?: "left" | "right" | "middle"; hold?: number; player?: string }) => {
         if (Input.action === "type" && !Input.text) {
           return {content: [{
             type: "text",
@@ -565,7 +580,23 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
           }]};
         }
 
-        if (Input.action !== "type" && Input.action !== "key" && Input.action !== "drag" && !Input.path) {
+        if (Input.action === "click" && (Input.x === undefined || Input.y === undefined)) {
+          return {content: [{
+            type: "text",
+            text: "A click needs x and y.",
+          }]};
+        }
+
+        if (Input.action === "click" && Input.window === true) {
+          const { ClickWindow } = await import("./Window.js");
+
+          return {content: [{
+            type: "text",
+            text: await ClickWindow(Input.x as number, Input.y as number, Input.button || "left"),
+          }]};
+        }
+
+        if (Input.action !== "type" && Input.action !== "key" && Input.action !== "drag" && Input.action !== "click" && !Input.path) {
           return {content: [{
             type: "text",
             text: `${Input.action} needs path, the full instance path of the GuiObject to act on.`,

@@ -183,6 +183,29 @@ const function Interact(Body: string): any
 	const Hold = math.clamp(tonumber(Input.hold) or 0, 0, 5)
 	const Button = if Input.button == "right" then Enum.UserInputType.MouseButton2 elseif Input.button == "middle" then Enum.UserInputType.MouseButton3 else Enum.UserInputType.MouseButton1
 
+	if Action == "click" then
+		const X = tonumber(Input.x)
+		const Y = tonumber(Input.y)
+
+		if not X or not Y then
+			return {error = "A click needs x and y, in the same space as AbsolutePosition."}
+		end
+
+		const Point = Vector2.new(X, Y) + game:GetService("GuiService"):GetGuiInset()
+		const Sent, Refused = pcall(function()
+			Virtual:SendMousePosition(Point)
+			Virtual:SendMouseButton(Point, Button, true, 0)
+			task.wait(0.05)
+			Virtual:SendMouseButton(Point, Button, false, 0)
+		end)
+
+		if not Sent then
+			return {error = `The click at {Where(Point)} was refused: {tostring(Refused)}. Roblox refuses simulated input on CoreGui, such as purchase and prompt windows; click those with window set to true, using coordinates from a window capture.`}
+		end
+
+		return {text = `Clicked the {(Input.button or "left")} button at {Where(Point)}. Check the place to confirm what it did, because a click on nothing still reports as sent.`}
+	end
+
 	if Action == "drag" and (typeof(Input.path) ~= "string" or Button ~= Enum.UserInputType.MouseButton1) then
 		const UserInputService = game:GetService("UserInputService")
 		const Move = Vector2.new(tonumber(Input.x) or 0, tonumber(Input.y) or 0)

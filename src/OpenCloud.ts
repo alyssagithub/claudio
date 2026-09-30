@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { execFile } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { MostCallText } from "./Config.js";
@@ -35,7 +36,25 @@ export type OpenCloudCall = {
   files?: Record<string, string>;
 };
 
-export async function CallOpenCloud(Call: OpenCloudCall): Promise<string> {
+function ConfirmSpend(Cost: number, Name: string): Promise<boolean> {
+  if (process.platform !== "win32") {
+    return Promise.resolve(false);
+  }
+
+  const Script = "Add-Type -AssemblyName System.Windows.Forms; $Answer = [System.Windows.Forms.MessageBox]::Show($env:CLAUDIO_SPEND_TEXT, 'Claudio: spend Robux?', 'YesNo', 'Warning', 'Button2', 'DefaultDesktopOnly'); if ($Answer -eq 'Yes') { 'yes' } else { 'no' }";
+
+  return new Promise((Resolve) => {
+    execFile("powershell", ["-NoProfile", "-NonInteractive", "-Command", Script], {
+      timeout: 10 * 60 * 1000,
+      env: {...process.env, CLAUDIO_SPEND_TEXT: `Claude wants to create the badge "${Name.slice(0, 80)}", which costs ${Cost} Robux from your account.
+
+Click Yes only if you want to spend ${Cost} Robux. No keeps your Robux and cancels the badge.`},
+    }, (Trouble, Output) => Resolve(!Trouble && String(Output).trim() === "yes"));
+  });
+}
+
+export async function CallOpenCloud(Given: OpenCloudCall): Promise<string> {
+  let Call = Given;
   const Key = OpenCloudKey();
 
   if (!Key) {
@@ -59,6 +78,23 @@ export async function CallOpenCloud(Call: OpenCloudCall): Promise<string> {
   }
 
   const Method = (Call.method || "GET").toUpperCase();
+
+  if (Method === "POST" && /^\/legacy-badges\/v1\/universes\/[^/]+\/badges\/?$/.test(Url.pathname)) {
+    const Form = {...(Call.form || {})};
+    const Cost = Number(Form.expectedCost || 0);
+
+    if (!Number.isFinite(Cost) || Cost < 0) {
+      return "expectedCost must be a number of Robux, so the badge was not created.";
+    }
+
+    if (Cost > 0 && !(await ConfirmSpend(Cost, String(Form.name || "a badge")))) {
+      return `The user did not approve spending ${Cost} Robux, so the badge was not created and nothing was spent. Do not try again unless the user asks for it in their own words.`;
+    }
+
+    Form.expectedCost = Cost;
+    Call = {...Call, form: Form, body: undefined};
+  }
+
   const Headers: Record<string, string> = {"x-api-key": Key};
   let Body: string | FormData | undefined;
 
@@ -105,6 +141,10 @@ export async function CallOpenCloud(Call: OpenCloudCall): Promise<string> {
   }
 
   let Hint = "";
+
+  if (Response.status === 400 && /legacy-badges/.test(Url.pathname) && /cost/i.test(Text)) {
+    Hint = "\nRoblox would charge Robux for this badge, most likely because today's free badges are used up, so it was not created and nothing was spent. Tell the user the cost and ask whether they want to pay it. Only if they clearly say yes, call again with expectedCost set to that amount; Claudio then shows them a Windows dialog to approve the exact amount, and nothing is spent unless they click Yes there.";
+  }
 
   if (Response.status === 401 || Response.status === 403) {
     const Needed = await ScopesFor(Method, Url.pathname);

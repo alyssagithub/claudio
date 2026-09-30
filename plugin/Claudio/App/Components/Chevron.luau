@@ -6,6 +6,7 @@ const Settings = require(script.Parent.Parent.Parent.Settings)
 const Config = require(script.Parent.Parent.Parent.Config)
 const Theme = require(script.Parent.Parent.Theme)
 const Icon = require(script.Parent.Icon)
+const Pictures = require(script.Parent.Parent.Parent.Pictures)
 
 const Create = Vide.create
 
@@ -39,7 +40,7 @@ type Props = {
 
 return function(Props: Props)
 	if Drawable == nil then
-		Drawable = pcall(function()
+		Drawable = Pictures.Available() and pcall(function()
 			AssetService:CreateEditableImage({Size = Vector2.new(Edge, Edge)}):DrawRectangle(Vector2.zero, Vector2.one, Color3.new(), 1, Enum.ImageCombineType.Overwrite)
 		end)
 	end

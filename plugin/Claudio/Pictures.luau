@@ -16,9 +16,26 @@ export type Full = {
 }
 
 const Side = 1024
+local Allowed: boolean? = nil
 const Origins: {[EditableImage]: () -> (boolean, any)} = setmetatable({}, {__mode = "k"}) :: any
 
+Pictures.Off = "EditableImage is turned off for this place, so Claudio cannot show or read pictures here. Turn on EditableImage in the Security tab of Game Settings to use them."
+
+function Pictures.Available(): boolean
+	if Allowed == nil then
+		Allowed = pcall(function()
+			AssetService:CreateEditableImage({Size = Vector2.one}):Destroy()
+		end)
+	end
+
+	return Allowed :: boolean
+end
+
 function Pictures.Build(Width: number, Height: number, PixelsBase64: string): EditableImage
+	if not Pictures.Available() then
+		error(Pictures.Off, 0)
+	end
+
 	const Image = AssetService:CreateEditableImage({Size = Vector2.new(Width, Height)})
 
 	Image:WritePixelsBuffer(Vector2.zero, Vector2.new(Width, Height), Base64.Decode(PixelsBase64))
@@ -33,6 +50,10 @@ function Pictures.Tag(Image: EditableImage, Fetch: () -> (boolean, any)): Editab
 end
 
 function Pictures.Tiles(Width: number, Height: number, PixelsBase64: string): {Tile}
+	if not Pictures.Available() then
+		error(Pictures.Off, 0)
+	end
+
 	const Pixels = Base64.Decode(PixelsBase64)
 	const Tiles = {}
 

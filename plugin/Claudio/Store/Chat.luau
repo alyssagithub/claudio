@@ -1539,6 +1539,10 @@ const function ScreenBounds(Object: Instance, Viewport: Vector2): any
 end
 
 const function Shoot(Input: any): any
+	if not Pictures.Available() then
+		return {error = Pictures.Off}
+	end
+
 	const CaptureService = game:GetService("CaptureService")
 	const AssetService = game:GetService("AssetService")
 	const Base64 = require(script.Parent.Parent.Base64)

@@ -7,6 +7,7 @@ const RunService = game:GetService("RunService")
 const Selection = game:GetService("Selection")
 
 const Base64 = require(script.Parent.Base64)
+const Pictures = require(script.Parent.Pictures)
 const Breathe = require(script.Parent.Breathe)
 
 const Views: {[string]: {number}} = {
@@ -40,6 +41,10 @@ const function Settle()
 end
 
 const function Screenshot(): (EditableImage?, string?)
+	if not Pictures.Available() then
+		return nil, Pictures.Off
+	end
+
 	local Taken: any
 	local Done = false
 

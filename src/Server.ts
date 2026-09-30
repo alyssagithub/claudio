@@ -24,6 +24,7 @@ import { ArmClipboard, AskClipboard, DisarmClipboard, ReadClipboardImage, Regist
 import { GetModels, SupportsFastMode } from "./Models.js";
 import { OpenPath, ProbePaths, ReadPicture, SavePicture } from "./Shared.js";
 import { SaveOpenCloudKey } from "./OpenCloud.js";
+import { FinishSignIn } from "./RobloxSignIn.js";
 import { Analyze, Warm } from "./Lint.js";
 import { DescribeReturn, StopWatchingReturn, WaitForReturn, WatchReturn } from "./Keys.js";
 
@@ -483,6 +484,14 @@ export function StartServer(Port: number) {
     const Segments = Url.pathname.split("/").filter(Boolean);
 
     try {
+      if (Request.method === "GET" && Url.pathname === "/oauth/callback") {
+        const Said = await FinishSignIn(Url.searchParams);
+
+        Response.writeHead(200, {"content-type": "text/html; charset=utf-8"});
+        Response.end(`<!doctype html><meta charset="utf-8"><title>Claudio</title><body style="font-family:system-ui;background:#1b1b1f;color:#eee;display:grid;place-items:center;height:100vh;margin:0"><p>${Said.replace(/[&<>]/g, (Character) => `&#${Character.charCodeAt(0)};`)}</p>`);
+        return;
+      }
+
       if (Request.headers.origin !== undefined) {
         SendJson(Response, 403, {error: "Browser requests are not accepted"});
         return;

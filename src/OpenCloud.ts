@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { MostCallText } from "./Config.js";
+import { AccessToken, SignIn, SignOut } from "./RobloxSignIn.js";
 
 const KeyFile = path.join(os.homedir(), ".claudio", "opencloud.json");
 
@@ -33,12 +34,34 @@ export type OpenCloudCall = {
   contentType?: string;
   form?: Record<string, string | number | boolean>;
   files?: Record<string, string>;
+  account?: "signin" | "signout";
 };
 
 export async function CallOpenCloud(Call: OpenCloudCall): Promise<string> {
+  if (Call.account === "signout") {
+    SignOut();
+
+    return "Signed out of Roblox. Calls fall back to the saved API key, if there is one.";
+  }
+
+  if (Call.account === "signin") {
+    SignOut();
+  }
+
+  let Token = await AccessToken();
   const Key = OpenCloudKey();
 
-  if (!Key) {
+  if (!Token && (!Key || Call.account === "signin")) {
+    const Trouble = await SignIn(180);
+
+    if (Trouble) {
+      return `${Trouble}${Key ? " The saved API key was not used." : ""}`;
+    }
+
+    Token = await AccessToken();
+  }
+
+  if (!Token && !Key) {
     return "No Open Cloud API key is set. Tell the user one of these, so the key never reaches you: in the Claudio panel in Studio, or in a Claude Code chat once `claudio setup` or `claudio install-key-hook` has run, paste the key into the chat and Claudio saves it before the message is sent; anywhere else, run `claudio apikey` in a terminal and paste it there. Never ask them to paste it to you in a chat without one of those.";
   }
 
@@ -59,7 +82,7 @@ export async function CallOpenCloud(Call: OpenCloudCall): Promise<string> {
   }
 
   const Method = (Call.method || "GET").toUpperCase();
-  const Headers: Record<string, string> = {"x-api-key": Key};
+  const Headers: Record<string, string> = Token ? {authorization: `Bearer ${Token}`} : {"x-api-key": Key as string};
   let Body: string | FormData | undefined;
 
   if ((Call.form || Call.files) && Method !== "GET" && Method !== "HEAD") {
@@ -105,7 +128,9 @@ export async function CallOpenCloud(Call: OpenCloudCall): Promise<string> {
   }
 
   const Hint = Response.status === 401 || Response.status === 403
-    ? "\nThe key was refused for this call. It may lack the permission or the experience this needs, or have expired; the user can add them on the Creator Dashboard or paste a new key."
+    ? (Token
+      ? "\nThe Roblox sign-in was refused for this call. The user may not have picked this experience when approving; call again with account set to signin so they can approve it."
+      : "\nThe key was refused for this call. It may lack the permission or the experience this needs, or have expired; the user can add them on the Creator Dashboard or paste a new key.")
     : "";
 
   return `${Method} ${Url.pathname}${Url.search} -> ${Response.status} ${Response.statusText}${Hint}\n${Text.slice(0, MostCallText)}`;

@@ -155,9 +155,8 @@ return function(Props: Props)
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		LayoutOrder = Props.LayoutOrder,
-		RichText = true,
 		Text = function()
-			return Props.Text()
+			return Keys.Clean(Props.Text())
 		end,
 		Focused = function()
 			Focused += 1

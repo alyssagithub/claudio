@@ -55,9 +55,7 @@ return function(Text: () -> string, LayoutOrder: number, Live: boolean?)
 		Files = Files,
 		Text = function()
 			const Accent = Theme.Colors.Accent():ToHex()
-			const Plain = Theme.Colors.Text()
-			const Strong = if Plain.R + Plain.G + Plain.B > 1.5 then "FFFFFF" else "000000"
-			local Rich = Markdown.Rich(Text(), Settings.TextSize(), Accent, Chat.KnownTokens(), Strong)
+			local Rich = Markdown.Rich(Text(), Settings.TextSize(), Accent, Chat.KnownTokens())
 			const Paths = {}
 
 			for Path in Links() do

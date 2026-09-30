@@ -16,7 +16,7 @@ local Held = 0
 
 const Mono = 'font family="rbxasset://fonts/families/RobotoMono.json"'
 
-function Markdown.Rich(Text: string, Size: number?, Accent: string?, Known: {[string]: boolean}?, Strong: string?): string
+function Markdown.Rich(Text: string, Size: number?, Accent: string?, Known: {[string]: boolean}?): string
 	const Present = {}
 
 	for Token in (Known or {}) :: {[string]: boolean} do
@@ -27,13 +27,13 @@ function Markdown.Rich(Text: string, Size: number?, Accent: string?, Known: {[st
 
 	table.sort(Present)
 
-	const Key = `{Size or 0}|{Accent or ""}|{Strong or ""}|{table.concat(Present, "\0")}|{Text}`
+	const Key = `{Size or 0}|{Accent or ""}|{table.concat(Present, "\0")}|{Text}`
 
 	if Cached[Key] then
 		return Cached[Key]
 	end
 
-	const Built = (Markdown.Build(Text, Size, Accent, Known):gsub("\4S", Strong or "FFFFFF"):gsub("\4A", Accent or Strong or "FFFFFF"))
+	const Built = Markdown.Build(Text, Size, Accent, Known)
 
 	if Held > 400 then
 		table.clear(Cached)
@@ -100,10 +100,10 @@ function Markdown.Inline(Text: string): string
 
 		return `{Hold(`<u>{Kept}</u>`)}{Url:sub(#Kept + 1)}`
 	end)
-	Marked = Marked:gsub("%*%*%*(.-)%*%*%*", '<font color="#\4S"><i>%1</i></font>')
+	Marked = Marked:gsub("%*%*%*(.-)%*%*%*", "<b><i>%1</i></b>")
 
-	Marked = Marked:gsub("%*%*(.-)%*%*", '<font color="#\4S">%1</font>')
-	Marked = Marked:gsub("%f[%w_]__(.-)__%f[^%w_]", '<font color="#\4S">%1</font>')
+	Marked = Marked:gsub("%*%*(.-)%*%*", "<b>%1</b>")
+	Marked = Marked:gsub("%f[%w_]__(.-)__%f[^%w_]", "<b>%1</b>")
 	Marked = Marked:gsub("%*(.-)%*", "<i>%1</i>")
 	Marked = Marked:gsub("~~(.-)~~", "<s>%1</s>")
 	Marked = Marked:gsub("%f[%w_]_(.-)_%f[^%w_]", function(Body: string): string
@@ -187,7 +187,13 @@ function Markdown.Build(Text: string, Size: number?, Accent: string?, Known: {[s
 				return Whole
 			end
 
-			return `<font color="#\4S">{Heading}</font>`
+			const Raised = if #Hashes == 1 then 4 elseif #Hashes == 2 then 2 else 0
+
+			if Raised == 0 or not Size then
+				return `<b>{Heading}</b>`
+			end
+
+			return `<font size="{Size + Raised}"><b>{Heading}</b></font>`
 		end)
 
 		Marked = Marked:gsub("^(%s*)[%*%-]%s+%[([ xX])%]%s+", function(...: string): string
@@ -197,7 +203,7 @@ function Markdown.Build(Text: string, Size: number?, Accent: string?, Known: {[s
 		end)
 		Marked = Marked:gsub("^(%s*)[%*%-]%s+", "%1• ")
 		Marked = Marked:gsub("^&gt;%s?(.*)$", "▎ <i>%1</i>")
-		Marked = Markdown.Coded(Marked, true)
+		Marked = Markdown.Coded(Marked)
 
 		if Accent then
 			Marked = Markdown.Tokens(Marked, Accent, false, Known)
@@ -209,7 +215,7 @@ function Markdown.Build(Text: string, Size: number?, Accent: string?, Known: {[s
 	return table.concat(Lines, "\n")
 end
 
-function Markdown.Coded(Text: string, Flat: boolean?): string
+function Markdown.Coded(Text: string): string
 	const Spans: {string} = {}
 	const Held = Text:gsub("`(.-)`", function(Body: string): string
 		table.insert(Spans, Body)
@@ -218,7 +224,7 @@ function Markdown.Coded(Text: string, Flat: boolean?): string
 	end)
 
 	return (Markdown.Inline(Held):gsub("\2(%d+)\2", function(Index: string): string
-		return if Flat then `<font color="#\4A">{Spans[tonumber(Index) :: number]}</font>` else `<{Mono}>{Spans[tonumber(Index) :: number]}</font>`
+		return `<{Mono}>{Spans[tonumber(Index) :: number]}</font>`
 	end))
 end
 

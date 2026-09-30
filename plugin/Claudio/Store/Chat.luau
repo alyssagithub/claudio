@@ -3997,41 +3997,6 @@ function Chat.Send(Text: string, Quiet: string?)
 		return
 	end
 
-	if Text:lower():match("^%s*/apikey%s+clear%s*$") then
-		Chat.Draft("")
-		Chat.Say(if Client.SaveOpenCloudKey(nil) then "Removed the saved Open Cloud API key." else "Could not reach the bridge to remove the key.")
-
-		return
-	end
-
-	local Key: string? = nil
-
-	for Word in Text:gmatch("%S+") do
-		if #Word >= 100 and Word:match("^[%w%+/=_%-%.]+$") then
-			Key = Word
-		end
-	end
-
-	if Key then
-		Chat.Draft("")
-
-		if not Client.SaveOpenCloudKey(Key) then
-			Chat.Say("Could not reach the bridge to save that key, so nothing was sent. Try again once Claudio is connected.")
-
-			return
-		end
-
-		const Start, Finish = Text:find(Key, 1, true)
-
-		Text = ((`{Text:sub(1, (Start :: number) - 1)}[Open Cloud API key saved]{Text:sub((Finish :: number) + 1)}`):gsub("^%s*/apikey%s*", ""))
-
-		if not (Text:gsub("%[Open Cloud API key saved%]", "")):match("%S") then
-			Chat.Say("Saved your Open Cloud API key. Claude can use it through Claudio's opencloud tool without ever seeing it.")
-
-			return
-		end
-	end
-
 	if Text:lower():match("^%s*aun%s*$") then
 		Append({
 			Role = "user",

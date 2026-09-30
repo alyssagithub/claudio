@@ -297,6 +297,33 @@ return function()
 	task.spawn(Chat.LoadMcpServers)
 
 	const Open = Vide.source(Groups()[1])
+	const KeySaved = Vide.source(nil :: boolean?)
+	local KeyBox: TextBox
+
+	task.spawn(function()
+		const Ok, Result = Client.OpenCloudKeySaved()
+
+		KeySaved(if Ok and typeof(Result) == "table" then Result.saved == true else nil)
+	end)
+
+	const function TakeKey()
+		const Key = (KeyBox.Text:gsub("%s", ""))
+
+		if #Key < 40 then
+			return
+		end
+
+		KeyBox.Text = ""
+		KeyBox:ReleaseFocus()
+
+		task.spawn(function()
+			if Client.SaveOpenCloudKey(Key) then
+				KeySaved(true)
+			else
+				Chat.Say("Could not reach the bridge to save that key. Try again once Claudio is connected.")
+			end
+		end)
+	end
 	const PromptOpen = Vide.source(false)
 
 	const function Tab(Name: string, LayoutOrder: number)
@@ -548,6 +575,88 @@ return function()
 					end,
 					OnClick = function()
 						Settings.Set("WorkingFolder", "")
+					end,
+				},
+			},
+			Heading("Open Cloud API key", 7940),
+			Create "TextLabel" {
+				Name = "KeyNow",
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				BackgroundTransparency = 1,
+				TextColor3 = Theme.Colors.DimText,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+				TextWrapped = true,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				LayoutOrder = 7941,
+				Text = function()
+					const Saved = KeySaved()
+
+					if Saved == nil then
+						return "Lets Claude use Roblox's Open Cloud API, for game passes, products, badges and data stores. Paste a key below; it is saved on this computer and never shown to Claude."
+					end
+
+					return if Saved then "A key is saved. Paste a new one to replace it." else "No key saved. Paste one below; it is saved on this computer and never shown to Claude."
+				end,
+			},
+			Create "Frame" {
+				Name = "KeyActions",
+				Size = UDim2.new(1, 0, 0, 24),
+				BackgroundTransparency = 1,
+				LayoutOrder = 7942,
+
+				Create "UIListLayout" {
+					FillDirection = Enum.FillDirection.Horizontal,
+					VerticalAlignment = Enum.VerticalAlignment.Center,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 6),
+				},
+				Create "TextBox" {
+					Name = "Key",
+					Size = UDim2.new(0, 0, 1, 0),
+					BackgroundColor3 = Theme.Colors.Input,
+					TextColor3 = Theme.Colors.Text,
+					PlaceholderColor3 = Theme.Colors.DimText,
+					PlaceholderText = "Paste an API key",
+					TextSize = Settings.SmallText,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+					TextXAlignment = Enum.TextXAlignment.Left,
+					TextTruncate = Enum.TextTruncate.AtEnd,
+					ClearTextOnFocus = true,
+					Text = "",
+					LayoutOrder = 1,
+
+					Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
+					Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+					Create "UIPadding" {
+						PaddingLeft = UDim.new(0, 6),
+						PaddingRight = UDim.new(0, 6),
+					},
+					Create "UIStroke" {
+						Color = Theme.Colors.Border,
+						ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+					},
+					Vide.action(function(Object: TextBox)
+						KeyBox = Object
+						Vide.cleanup(Object:GetPropertyChangedSignal("Text"):Connect(TakeKey))
+						Vide.cleanup(Object.FocusLost:Connect(function()
+							Object.Text = ""
+						end))
+					end),
+				},
+				Button {
+					Text = "Remove",
+					LayoutOrder = 2,
+					Visible = function()
+						return KeySaved() == true
+					end,
+					OnClick = function()
+						task.spawn(function()
+							if Client.SaveOpenCloudKey(nil) then
+								KeySaved(false)
+							end
+						end)
 					end,
 				},
 			},

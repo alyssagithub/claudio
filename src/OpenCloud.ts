@@ -39,7 +39,7 @@ export async function CallOpenCloud(Call: OpenCloudCall): Promise<string> {
   const Key = OpenCloudKey();
 
   if (!Key) {
-    return "No Open Cloud API key is set. Tell the user one of these, so the key never reaches you: in the Claudio panel in Studio, or in a Claude Code chat once `claudio setup` or `claudio install-key-hook` has run, paste the key into the chat and Claudio saves it before the message is sent; anywhere else, run `claudio apikey` in a terminal and paste it there. Never ask them to paste it to you in a chat without one of those.";
+    return "No Open Cloud API key is set. Tell the user one of these, so the key never reaches you: paste it into the Open Cloud API key box in the Claudio panel's settings in Studio; in a Claude Code chat once `claudio setup` or `claudio install-key-hook` has run, paste it into the chat and Claudio saves it before the message is sent; or run `claudio apikey` in a terminal and paste it there. Never ask them to paste it to you in a chat without one of those.";
   }
 
   let Url: URL;

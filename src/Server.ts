@@ -23,7 +23,7 @@ import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListRel
 import { ArmClipboard, AskClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, RestoreFlashing, ShowToast, WriteClipboard } from "./Notify.js";
 import { GetModels, SupportsFastMode } from "./Models.js";
 import { OpenPath, ProbePaths, ReadPicture, SavePicture } from "./Shared.js";
-import { SaveOpenCloudKey } from "./OpenCloud.js";
+import { OpenCloudKey, SaveOpenCloudKey } from "./OpenCloud.js";
 import { Analyze, Warm } from "./Lint.js";
 import { DescribeReturn, StopWatchingReturn, WaitForReturn, WatchReturn } from "./Keys.js";
 
@@ -559,6 +559,11 @@ export function StartServer(Port: number) {
         }
 
         SendJson(Response, 200, {path: SavePicture(Width, Height, Body.pixels, Body.open === true)});
+        return;
+      }
+
+      if (Url.pathname === "/opencloud/key" && Request.method === "GET") {
+        SendJson(Response, 200, {saved: OpenCloudKey() !== null});
         return;
       }
 

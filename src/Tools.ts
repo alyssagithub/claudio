@@ -9,6 +9,7 @@ import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, Sourc
 import type { LogAnswer, ExecuteAnswer } from "./Ask.js";
 import { QuietFlash } from "./Notify.js";
 import { CallOpenCloud } from "./OpenCloud.js";
+import { PadInputs, PressPad } from "./Gamepad.js";
 
 const ExecuteDescription = [
   "Run Luau inside the open place and get back what it returned, what it printed, and where it failed.",
@@ -585,7 +586,8 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       Name: "input",
       Description: InputDescription,
       Schema: {
-        action: z.enum(["press", "click", "type", "key", "hover", "scroll", "drag"]).describe("What to send. click hits a point given by x and y instead of a path."),
+        action: z.enum(["press", "click", "type", "key", "hover", "scroll", "drag", "gamepad"]).describe("What to send. click hits a point given by x and y instead of a path. gamepad presses an input on a real emulated gamepad, through Studio's Controller Emulator panel."),
+        pad: z.enum(PadInputs).optional().describe("For gamepad: the button, d-pad direction or stick push to hold for hold seconds, 0.1 by default. The game sees a genuine connected gamepad, so GamepadEnabled, gamepad UI selection and gamepad bindings all respond. Start opens Roblox's own menu, which then takes all gamepad input until B closes it. Needs the user to have the Controller Emulator panel open and visible; the first press takes up to a minute while Claudio finds the panel."),
         window: z.boolean().optional().describe("For click: x and y are pixels in a capture of the Studio window, and the click is sent to that window as a real mouse click instead of simulated game input. This reaches CoreGui, such as purchase and prompt windows, which refuse simulated input, and works without a play session."),
         path: z.string().optional().describe("Full instance path of the GuiObject for press, hover, scroll and drag."),
         text: z.string().optional().describe("The text to type, for type."),
@@ -595,10 +597,10 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         x: z.number().optional().describe("For click, the point's x in AbsolutePosition space, or in window capture pixels with window. For drag, pixels to move sideways when there is no to path."),
         y: z.number().optional().describe("For click, the point's y. For drag, pixels to move down when there is no to path."),
         button: z.enum(["left", "right", "middle"]).optional().describe("Which mouse button a drag holds. Defaults to left."),
-        hold: z.number().optional().describe("Seconds to keep the button down at the end of a drag before releasing, up to 5."),
+        hold: z.number().optional().describe("Seconds to keep the button down at the end of a drag before releasing, or to hold a gamepad input, up to 5."),
         player: z.string().optional().describe("Which client to send it to: a player's name, or their number in join order starting at 1. Defaults to the first player."),
       },
-      Run: async (Input: { action: "press" | "click" | "type" | "key" | "hover" | "scroll" | "drag"; window?: boolean; path?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number; button?: "left" | "right" | "middle"; hold?: number; player?: string }) => {
+      Run: async (Input: { action: "press" | "click" | "type" | "key" | "hover" | "scroll" | "drag" | "gamepad"; pad?: string; window?: boolean; path?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number; button?: "left" | "right" | "middle"; hold?: number; player?: string }) => {
         if (Input.action === "type" && !Input.text) {
           return {content: [{
             type: "text",
@@ -617,6 +619,13 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
           return {content: [{
             type: "text",
             text: "A click needs x and y.",
+          }]};
+        }
+
+        if (Input.action === "gamepad") {
+          return {content: [{
+            type: "text",
+            text: Input.pad ? await PressPad(Input.pad, Input.hold ?? 0.1) : "A gamepad press needs pad, such as A, DPadUp or LeftStickUp.",
           }]};
         }
 

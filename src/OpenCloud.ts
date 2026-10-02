@@ -147,9 +147,20 @@ export async function CallOpenCloud(Given: OpenCloudCall): Promise<string> {
   }
 
   if (Response.status === 401 || Response.status === 403) {
-    const Needed = await ScopesFor(Method, Url.pathname);
+    const Listed = await ScopesFor(Method, Url.pathname);
+    const Writing = Method !== "GET" && Method !== "HEAD";
+    const Matching = Listed.filter((Scope) => Writing ? !/:read$/.test(Scope) : /:read$/.test(Scope));
+    const Needed = Matching.length > 0 ? Matching : Listed;
+    const Said = (Text.match(/"message"\s*:\s*"([^"]+)"/) || [])[1] || Text.trim().slice(0, 200);
 
-    Hint = Needed.length > 0
+    Hint = `
+Roblox said: "${Said}".`;
+
+    if (/not authenticated|invalid api key|unauthorized/i.test(Said)) {
+      Hint += " That usually means Roblox did not accept the key itself for this experience, not a missing permission: check the key has not expired, that this experience is in the key's list of experiences, and that any IP restriction on the key allows this computer.";
+    }
+
+    Hint += Needed.length > 0
       ? `\nThe key was refused. Tell the user this call needs the ${Needed.join(" or ")} permission${Needed.length === 1 ? "" : "s"}: on the Creator Dashboard, open their API key, add ${Needed.length === 1 ? "it" : "one of them"}, and make sure this experience is in the key's list, then try again.`
       : "\nThe key was refused for this call. It may lack the permission or the experience this needs, or have expired; the user can add them on the Creator Dashboard or paste a new key.";
   }

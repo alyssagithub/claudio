@@ -98,9 +98,11 @@ return function()
 		end)
 	end)
 
-	return Create "Frame" {
+	return Create "TextButton" {
 		Name = "ImageViewer",
 		Vide.action(Covers.Add),
+		Text = "",
+		AutoButtonColor = false,
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.fromRGB(24, 24, 26),
 		BackgroundTransparency = 0,

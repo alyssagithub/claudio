@@ -2,6 +2,7 @@
 const AssetService = game:GetService("AssetService")
 
 const Base64 = require(script.Parent.Base64)
+const Settings = require(script.Parent.Settings)
 
 const Pictures = {}
 
@@ -22,10 +23,26 @@ const Origins: {[EditableImage]: () -> (boolean, any)} = setmetatable({}, {__mod
 Pictures.Off = "EditableImage is turned off for this place, so Claudio cannot show or read pictures here. Turn on EditableImage in the Security tab of Game Settings to use them."
 
 function Pictures.Available(): boolean
-	if Allowed == nil then
-		Allowed = pcall(function()
-			AssetService:CreateEditableImage({Size = Vector2.one}):Destroy()
-		end)
+	if Allowed ~= nil then
+		return Allowed :: boolean
+	end
+
+	const Plugin = Settings.Plugin()
+	const Key = `Claudio_EditableImage_{game.PlaceId}`
+	const Remembered = if Plugin then Plugin:GetSetting(Key) else nil
+
+	if typeof(Remembered) == "boolean" then
+		Allowed = Remembered
+
+		return Remembered
+	end
+
+	Allowed = pcall(function()
+		AssetService:CreateEditableImage({Size = Vector2.one}):Destroy()
+	end)
+
+	if Plugin then
+		Plugin:SetSetting(Key, Allowed)
 	end
 
 	return Allowed :: boolean

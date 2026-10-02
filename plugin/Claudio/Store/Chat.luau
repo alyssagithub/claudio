@@ -1910,7 +1910,7 @@ const function Api(Input: any): any
 		}
 	end
 
-	const Class = Input.className
+	local Class = Input.className
 
 	if not Class or Class == "" then
 		const Names = {}
@@ -1924,9 +1924,25 @@ const function Api(Input: any): any
 		return {classes = Names}
 	end
 
-	const Known, Described = pcall(function(): any
+	if Class:find(".", 1, true) then
+		Input = table.clone(Input)
+		Input.member = Input.member or Class:match("%.(.+)$")
+		Class = Class:match("^([^%.]+)")
+	end
+
+	local Known, Described = pcall(function(): any
 		return Reflection:GetClass(Class, {})
 	end)
+
+	if not Known or typeof(Described) ~= "table" or Described.Name == nil then
+		const Listed, Properties = pcall(function(): any
+			return Reflection:GetPropertiesOfClass(Class, {})
+		end)
+
+		if Listed and typeof(Properties) == "table" and #Properties > 0 then
+			Known, Described = true, {Name = Class}
+		end
+	end
 
 	if not Known or typeof(Described) ~= "table" or Described.Name == nil then
 		return {error = `The engine does not know a class called "{Class}".`}

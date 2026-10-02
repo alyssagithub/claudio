@@ -64,7 +64,7 @@ const Definitions: {Definition} = {
 		Label = "Pick objects in playtests",
 		Detail = "Adds a picker to playtests. Puts a helper script in ServerScriptService while on",
 		Group = "Chat",
-		Default = true,
+		Default = false,
 	},
 	{
 		Key = "ClipboardPaste",
@@ -186,7 +186,7 @@ const Definitions: {Definition} = {
 		Label = "Keep Claudio docked in playtests",
 		Detail = "Turns on Studio's Load All Built-In Plugins in Test Mode, which also makes playtests start a little slower",
 		Group = "Appearance",
-		Default = false,
+		Default = true,
 		Studio = true,
 	},
 	{

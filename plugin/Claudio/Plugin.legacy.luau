@@ -45,8 +45,10 @@ const App = require(script.Parent.App.App)
 Settings.Load(plugin)
 
 if Playing and not RunMode then
-	Builder.Serve()
-	require(script.Parent.Runtime).Start(plugin)
+	task.defer(function()
+		Builder.Serve()
+		require(script.Parent.Runtime).Start(plugin)
+	end)
 end
 
 if not Playing then

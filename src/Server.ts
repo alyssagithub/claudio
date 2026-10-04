@@ -592,7 +592,7 @@ export function StartServer(Port: number) {
       }
 
       if (Request.method === "GET" && Url.pathname === "/drop/take") {
-        SendJson(Response, 200, {files: await TakeDropped(Url.searchParams.has("wait") ? 20000 : 0)});
+        SendJson(Response, 200, await TakeDropped(Url.searchParams.has("wait") ? 20000 : 0, Url.searchParams.get("seen") || "off"));
         return;
       }
 

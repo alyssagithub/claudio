@@ -9,6 +9,7 @@ const Script = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "s
 type Dropped = { path: string; name: string; data?: string; mediaType?: string };
 
 let Helper: ChildProcess | null = null;
+let Dragging = "off";
 const Waiting: Dropped[] = [];
 const Listeners = new Set<() => void>();
 
@@ -34,8 +35,13 @@ function Started(): ChildProcess | null {
   readline.createInterface({input: Made.stdout!}).on("line", (Line) => {
     const [Kind, ...Paths] = Line.split("\t");
 
-    if (Kind === "note") {
-      console.log(`Drop zone: ${Paths.join(" ")}`);
+    if (Kind === "drag") {
+      Dragging = Paths[0] || "off";
+
+      for (const Wake of [...Listeners]) {
+        Wake();
+      }
+
       return;
     }
 
@@ -43,7 +49,7 @@ function Started(): ChildProcess | null {
       return;
     }
 
-    console.log(`Drop zone: dropped ${Paths.length} file${Paths.length === 1 ? "" : "s"}`);
+    Dragging = "off";
 
     for (const Given of Paths) {
       if (!fs.existsSync(Given) || !fs.statSync(Given).isFile()) {
@@ -83,16 +89,16 @@ export function SetDropArea(Area: { x: number; y: number; width: number; height:
   Running.stdin!.write(Area ? `rel ${Math.round(Area.x)} ${Math.round(Area.y)} ${Math.round(Area.width)} ${Math.round(Area.height)}\n` : "off\n");
 }
 
-export function TakeDropped(Milliseconds: number): Promise<Dropped[]> {
-  if (Waiting.length > 0 || Milliseconds <= 0) {
-    return Promise.resolve(Waiting.splice(0));
+export function TakeDropped(Milliseconds: number, Seen: string): Promise<{ files: Dropped[]; dragging: string }> {
+  if (Waiting.length > 0 || Milliseconds <= 0 || Dragging !== Seen) {
+    return Promise.resolve({files: Waiting.splice(0), dragging: Dragging});
   }
 
   return new Promise((Resolve) => {
     const Wake = () => {
       clearTimeout(Timer);
       Listeners.delete(Wake);
-      Resolve(Waiting.splice(0));
+      Resolve({files: Waiting.splice(0), dragging: Dragging});
     };
     const Timer = setTimeout(Wake, Milliseconds);
 

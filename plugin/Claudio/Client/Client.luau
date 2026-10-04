@@ -500,8 +500,8 @@ function Client.SetDropArea(Point: Vector2?, Size: Vector2?): (boolean, any)
 	} else {})
 end
 
-function Client.TakeDropped(): (boolean, any)
-	return Http.Request("GET", `{BaseUrl()}/drop/take?wait=1`)
+function Client.TakeDropped(Seen: string): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/drop/take?wait=1&seen={Seen}`)
 end
 
 function Client.SaveAttachment(Name: string, Data: string): (boolean, any)

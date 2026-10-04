@@ -10,6 +10,7 @@ type Dropped = { path: string; name: string; data?: string; mediaType?: string }
 
 let Helper: ChildProcess | null = null;
 const Waiting: Dropped[] = [];
+const Listeners = new Set<() => void>();
 
 function Started(): ChildProcess | null {
   if (process.platform !== "win32") {
@@ -59,6 +60,10 @@ function Started(): ChildProcess | null {
         mediaType: Picture ? (Lower.endsWith(".png") ? "image/png" : "image/jpeg") : undefined,
       });
     }
+
+    for (const Wake of [...Listeners]) {
+      Wake();
+    }
   });
   Made.on("exit", Stop);
   Made.on("error", Stop);
@@ -78,8 +83,21 @@ export function SetDropArea(Area: { x: number; y: number; width: number; height:
   Running.stdin!.write(Area ? `rel ${Math.round(Area.x)} ${Math.round(Area.y)} ${Math.round(Area.width)} ${Math.round(Area.height)}\n` : "off\n");
 }
 
-export function TakeDropped(): Dropped[] {
-  return Waiting.splice(0);
+export function TakeDropped(Milliseconds: number): Promise<Dropped[]> {
+  if (Waiting.length > 0 || Milliseconds <= 0) {
+    return Promise.resolve(Waiting.splice(0));
+  }
+
+  return new Promise((Resolve) => {
+    const Wake = () => {
+      clearTimeout(Timer);
+      Listeners.delete(Wake);
+      Resolve(Waiting.splice(0));
+    };
+    const Timer = setTimeout(Wake, Milliseconds);
+
+    Listeners.add(Wake);
+  });
 }
 
 process.on("exit", () => {

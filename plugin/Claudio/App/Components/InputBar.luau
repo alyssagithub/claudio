@@ -108,7 +108,6 @@ return function()
 
 	task.spawn(function()
 		local Last = ""
-		local Since = 0
 
 		if Watching then
 			Client.SetDropArea()
@@ -141,18 +140,16 @@ return function()
 					Client.SetDropArea(Point, Size)
 				end
 			end
+		end
+	end)
 
-			Since += 1
-
-			if Since < 4 then
-				continue
-			end
-
-			Since = 0
-
+	task.spawn(function()
+		while Watching do
 			const Ok, Answer = Client.TakeDropped()
 
 			if not Ok or typeof(Answer) ~= "table" or typeof(Answer.files) ~= "table" then
+				task.wait(2)
+
 				continue
 			end
 

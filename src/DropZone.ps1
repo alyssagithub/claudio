@@ -8,6 +8,51 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 
+public class Outline : Form {
+  public string Words = "";
+
+  protected override bool ShowWithoutActivation { get { return true; } }
+
+  protected override CreateParams CreateParams {
+    get {
+      CreateParams Made = base.CreateParams;
+      Made.ExStyle |= 0x08000000 | 0x00000080 | 0x00000008;
+      return Made;
+    }
+  }
+
+  public Outline() {
+    FormBorderStyle = FormBorderStyle.None;
+    ShowInTaskbar = false;
+    TopMost = true;
+    StartPosition = FormStartPosition.Manual;
+    BackColor = Color.Magenta;
+    TransparencyKey = Color.Magenta;
+    AllowDrop = true;
+    DoubleBuffered = true;
+  }
+
+  protected override void OnPaint(PaintEventArgs Event) {
+    Graphics Canvas = Event.Graphics;
+    Color Accent = Color.FromArgb(51, 95, 255);
+
+    using (Pen Line = new Pen(Accent, 3)) {
+      Canvas.DrawRectangle(Line, 1, 1, Width - 3, Height - 3);
+    }
+
+    using (Font Type = new Font("Segoe UI Semibold", 10)) {
+      Size Measured = TextRenderer.MeasureText(Words, Type);
+      Rectangle Pill = new Rectangle((Width - Measured.Width - 28) / 2, Height - Measured.Height - 40, Measured.Width + 28, Measured.Height + 14);
+
+      using (SolidBrush Fill = new SolidBrush(Accent)) {
+        Canvas.FillRectangle(Fill, Pill);
+      }
+
+      TextRenderer.DrawText(Canvas, Words, Type, Pill, Color.White, Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+    }
+  }
+}
+
 public class DropZone : Form {
   [DllImport("user32.dll")] static extern short GetAsyncKeyState(int Key);
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr Window, out uint Owner);
@@ -22,7 +67,7 @@ public class DropZone : Form {
   public static Rectangle Area = Rectangle.Empty;
   public static Point Origin = Point.Empty;
   public static bool Known = false;
-  Label Hint;
+  Outline Ring = new Outline();
 
   protected override bool ShowWithoutActivation { get { return true; } }
 
@@ -39,17 +84,9 @@ public class DropZone : Form {
     ShowInTaskbar = false;
     TopMost = true;
     StartPosition = FormStartPosition.Manual;
-    BackColor = Color.FromArgb(30, 30, 34);
-    Opacity = 0.7;
+    BackColor = Color.Black;
+    Opacity = 0.01;
     AllowDrop = true;
-    Hint = new Label();
-    Hint.Dock = DockStyle.Fill;
-    Hint.TextAlign = ContentAlignment.MiddleCenter;
-    Hint.ForeColor = Color.White;
-    Hint.Font = new Font("Segoe UI", 11);
-    Hint.Text = "Drop files to attach them to Claudio";
-    Hint.AllowDrop = true;
-    Controls.Add(Hint);
 
     DragEventHandler Enter = (Sender, Event) => {
       string[] Paths = Event.Data.GetData(DataFormats.FileDrop) as string[];
@@ -80,8 +117,7 @@ public class DropZone : Form {
           return;
         }
 
-        Bounds = Panel;
-        Hint.Text = "Drop here to attach to Claudio";
+        Place(Panel, "Drop here to attach to Claudio");
       }
 
       Event.Effect = DragDropEffects.Copy;
@@ -98,14 +134,28 @@ public class DropZone : Form {
     };
 
     DragEnter += Enter;
-    Hint.DragEnter += Enter;
+    Ring.DragEnter += Enter;
     DragDrop += Dropped;
-    Hint.DragDrop += Dropped;
+    Ring.DragDrop += Dropped;
+    VisibleChanged += (Sender, Event) => {
+      if (Visible) {
+        Ring.Show();
+      } else {
+        Ring.Hide();
+      }
+    };
 
     System.Windows.Forms.Timer Watch = new System.Windows.Forms.Timer();
     Watch.Interval = 60;
     Watch.Tick += (Sender, Event) => Check();
     Watch.Start();
+  }
+
+  void Place(Rectangle Where, string Words) {
+    Bounds = Where;
+    Ring.Bounds = Where;
+    Ring.Words = Words;
+    Ring.Invalidate();
   }
 
   Rectangle PanelArea() {
@@ -159,8 +209,7 @@ public class DropZone : Form {
     Box Whole;
 
     GetWindowRect(Under, out Whole);
-    Bounds = new Rectangle(Whole.Left, Whole.Top, Whole.Right - Whole.Left, Whole.Bottom - Whole.Top);
-    Hint.Text = "Drop files anywhere to attach them to Claudio";
+    Place(new Rectangle(Whole.Left, Whole.Top, Whole.Right - Whole.Left, Whole.Bottom - Whole.Top), "Drop to attach to Claudio");
     Show();
     Console.Out.WriteLine("note\tshown over Studio at " + Bounds.ToString());
     Console.Out.Flush();

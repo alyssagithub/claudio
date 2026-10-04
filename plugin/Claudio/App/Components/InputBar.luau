@@ -110,6 +110,10 @@ return function()
 		local Last = ""
 		local Since = 0
 
+		if Watching then
+			Client.SetDropArea()
+		end
+
 		while Watching and task.wait(0.25) do
 			const Window = Chat.Window
 

@@ -10,7 +10,6 @@ using System.Windows.Forms;
 
 public class DropZone : Form {
   [DllImport("user32.dll")] static extern short GetAsyncKeyState(int Key);
-  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr Window, out uint Owner);
   [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point Where);
   [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr Window, uint Kind);
@@ -62,6 +61,9 @@ public class DropZone : Form {
       }
 
       bool ForStudio = false;
+
+      Console.Out.WriteLine("note\tdrag entered with " + Paths.Length + " file(s), first " + System.IO.Path.GetExtension(Paths[0]));
+      Console.Out.Flush();
 
       foreach (string Given in Paths) {
         if (Array.IndexOf(StudioTypes, System.IO.Path.GetExtension(Given).ToLowerInvariant()) >= 0) {
@@ -124,18 +126,6 @@ public class DropZone : Form {
     }
   }
 
-  bool StudioInFront() {
-    uint Owner;
-
-    GetWindowThreadProcessId(GetForegroundWindow(), out Owner);
-
-    try {
-      return Process.GetProcessById((int)Owner).ProcessName.StartsWith("RobloxStudio");
-    } catch {
-      return false;
-    }
-  }
-
   bool WasHeld = false;
   bool PressedOutside = false;
 
@@ -156,7 +146,7 @@ public class DropZone : Form {
       return;
     }
 
-    if (!Held || !PressedOutside || StudioInFront()) {
+    if (!Held || !PressedOutside) {
       return;
     }
 
@@ -172,6 +162,8 @@ public class DropZone : Form {
     Bounds = new Rectangle(Whole.Left, Whole.Top, Whole.Right - Whole.Left, Whole.Bottom - Whole.Top);
     Hint.Text = "Drop files anywhere to attach them to Claudio";
     Show();
+    Console.Out.WriteLine("note\tshown over Studio at " + Bounds.ToString());
+    Console.Out.Flush();
   }
 
   public static void Begin() {

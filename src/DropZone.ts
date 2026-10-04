@@ -33,9 +33,16 @@ function Started(): ChildProcess | null {
   readline.createInterface({input: Made.stdout!}).on("line", (Line) => {
     const [Kind, ...Paths] = Line.split("\t");
 
+    if (Kind === "note") {
+      console.log(`Drop zone: ${Paths.join(" ")}`);
+      return;
+    }
+
     if (Kind !== "drop") {
       return;
     }
+
+    console.log(`Drop zone: dropped ${Paths.length} file${Paths.length === 1 ? "" : "s"}`);
 
     for (const Given of Paths) {
       if (!fs.existsSync(Given) || !fs.statSync(Given).isFile()) {
@@ -62,7 +69,7 @@ function Started(): ChildProcess | null {
 }
 
 export function SetDropArea(Area: { x: number; y: number; width: number; height: number } | null) {
-  const Running = Area ? Started() : Helper;
+  const Running = Started();
 
   if (!Running) {
     return;

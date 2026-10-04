@@ -120,6 +120,60 @@ const function Centre(Target: GuiObject): Vector2
 	return Target.AbsolutePosition + Target.AbsoluteSize / 2 + game:GetService("GuiService"):GetGuiInset()
 end
 
+const function Reveal(Target: GuiObject): (string, string?)
+	const Scrolled = {}
+	local Ancestor = Target.Parent
+
+	while Ancestor and Ancestor ~= game do
+		if Ancestor:IsA("ScrollingFrame") then
+			const Frame = Ancestor :: ScrollingFrame
+			const Window = Frame.AbsoluteWindowSize
+			const Offset = Target.AbsolutePosition - Frame.AbsolutePosition
+			const Outside = Offset.X < 0 or Offset.Y < 0 or Offset.X + Target.AbsoluteSize.X > Window.X or Offset.Y + Target.AbsoluteSize.Y > Window.Y
+
+			if Outside then
+				const Room = (Frame.AbsoluteCanvasSize - Window):Max(Vector2.zero)
+				const Wanted = Frame.CanvasPosition + Offset + Target.AbsoluteSize / 2 - Window / 2
+
+				Frame.CanvasPosition = Vector2.new(math.clamp(Wanted.X, 0, Room.X), math.clamp(Wanted.Y, 0, Room.Y))
+				table.insert(Scrolled, Frame.Name)
+				task.wait()
+			end
+		end
+
+		Ancestor = Ancestor.Parent
+	end
+
+	const Middle = Target.AbsolutePosition + Target.AbsoluteSize / 2
+	Ancestor = Target.Parent
+
+	while Ancestor and Ancestor ~= game do
+		if Ancestor:IsA("GuiObject") and (Ancestor:IsA("ScrollingFrame") or (Ancestor :: GuiObject).ClipsDescendants) then
+			const Clip = Ancestor :: GuiObject
+			const Low = Clip.AbsolutePosition
+			const High = Low + (if Clip:IsA("ScrollingFrame") then (Clip :: ScrollingFrame).AbsoluteWindowSize else Clip.AbsoluteSize)
+
+			if Middle.X < Low.X or Middle.Y < Low.Y or Middle.X > High.X or Middle.Y > High.Y then
+				return "", `{Target.Name} is cut off by {Clip.Name}{if #Scrolled > 0 then " even after scrolling" else ""}, so a press would land on nothing. Scroll it into view first, or act on something visible.`
+			end
+		end
+
+		if Ancestor:IsA("LayerCollector") then
+			const Screen = if Ancestor:IsA("ScreenGui") then (Ancestor :: ScreenGui).AbsoluteSize else nil
+
+			if Screen and (Middle.X < 0 or Middle.Y < 0 or Middle.X > Screen.X or Middle.Y > Screen.Y) then
+				return "", `{Target.Name} is off the screen at {math.floor(Middle.X)}, {math.floor(Middle.Y)}, so a press would land on nothing.`
+			end
+
+			break
+		end
+
+		Ancestor = Ancestor.Parent
+	end
+
+	return if #Scrolled > 0 then ` Scrolled {table.concat(Scrolled, " and ")} first to bring it into view.` else "", nil
+end
+
 const function Where(Point: Vector2): string
 	const Shown = Point - game:GetService("GuiService"):GetGuiInset()
 
@@ -267,6 +321,12 @@ const function Interact(Body: string): any
 		return {error = Trouble}
 	end
 
+	const Note, Hidden = Reveal(Target)
+
+	if Hidden then
+		return {error = Hidden}
+	end
+
 	const Point = Centre(Target)
 
 	if Action == "press" then
@@ -280,7 +340,7 @@ const function Interact(Body: string): any
 			return {error = `The press was refused at {Where(Point)}: {tostring(Refused)}`}
 		end
 
-		return {text = `Pressed {Target.Name} at {Where(Point)}. Check the place to confirm what it did, because a press that lands on nothing still reports as sent.`}
+		return {text = `Pressed {Target.Name} at {Where(Point)}.{Note} Check the place to confirm what it did, because a press that lands on something covering it still reports as sent.`}
 	end
 
 	if Action == "hover" then

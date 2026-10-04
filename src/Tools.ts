@@ -218,6 +218,65 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
     return ` After three minutes only ${Session.Ready} of ${Clients} clients had finished loading and the server's player list has ${Session.Players || 0}. Check the place before relying on the rest.`;
   }
 
+  async function ReadHiddenProperties(Path: string, Names: string[] | undefined, Fresh: boolean): Promise<string> {
+    const File = path.join(process.env.LOCALAPPDATA || "", "Roblox", "server.rbxl");
+    const Age = fs.existsSync(File) ? Date.now() - fs.statSync(File).mtimeMs : Infinity;
+
+    if (Fresh || Age > 30 * 60 * 1000) {
+      if (await LiveSession()) {
+        return "A playtest is running, so Claudio cannot make a fresh copy of the place to read from. Stop it first, or leave fresh off to use the last copy if there is one.";
+      }
+
+      const Began = Date.now();
+
+      await Reach("execute", {readOnly: true, code: "task.spawn(function() pcall(function() game:GetService(\"StudioTestService\"):ExecuteMultiplayerTestAsync(0, {}) end) end) return true"});
+
+      while (Date.now() - Began < 120000 && !(fs.existsSync(File) && fs.statSync(File).mtimeMs > Began)) {
+        await new Promise((Resolve) => setTimeout(Resolve, 1000));
+      }
+
+      await new Promise((Resolve) => setTimeout(Resolve, 1500));
+      await (await import("./StudioPresence.js")).CloseTestProcesses();
+
+      if (!(fs.existsSync(File) && fs.statSync(File).mtimeMs > Began)) {
+        return "Studio did not write a copy of the place within two minutes, so the hidden properties could not be read.";
+      }
+    }
+
+    const { ReadHidden } = await import("./PlaceFile.js");
+    const Read = ReadHidden(File, Path);
+
+    if ("error" in Read) {
+      return Read.error;
+    }
+
+    const Wanted = Object.entries(Read.properties).filter(([Name]) => !Names || Names.some((Given) => Given.toLowerCase() === Name.toLowerCase()));
+    const Enums = Wanted.filter(([, Value]) => Value.kind === "enum").map(([Name, Value]) => [Name, Value.value]);
+    let Named: Record<string, string> = {};
+
+    if (Enums.length > 0) {
+      const Answer = await Reach("execute", {readOnly: true, code: `local Out = {}
+for _, Pair in game:GetService("HttpService"):JSONDecode(${JSON.stringify(JSON.stringify(Enums))}) do
+	for _, Kind in {Pair[1], (Pair[1]:gsub("%d+$", ""))} do
+		local Ok, Item = pcall(function() return (Enum :: any)[Kind]:FromValue(Pair[2]) end)
+		if Ok and Item then Out[Pair[1]] = tostring(Item) break end
+	end
+end
+return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown } | null;
+
+      try {
+        Named = JSON.parse(String(Answer && Answer.result));
+      } catch {
+        Named = {};
+      }
+    }
+
+    const Lines = Wanted.map(([Name, Value]) => `${Name} = ${Named[Name] || (Value.kind === "enum" ? `enum value ${Value.value}` : JSON.stringify(Value.value))}`);
+    const When = Math.round((Date.now() - fs.statSync(File).mtimeMs) / 60000);
+
+    return [`${Path}, read from a copy of the place made ${When <= 0 ? "just now" : `${When} minute${When === 1 ? "" : "s"} ago`}:`, ...Lines, ...(Lines.length === 0 ? ["No properties by those names."] : [])].join("\n");
+  }
+
   return [
     {
       Name: "instances",
@@ -243,6 +302,19 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
           depth: Input.depth,
           contains: Input.contains,
         })),
+      }]}),
+    },
+    {
+      Name: "hidden",
+      Description: "Read properties Roblox hides from plugins and scripts, which properties and execute cannot see: Workspace's streaming settings (StreamOutBehavior, StreamingTargetRadius, StreamingMinRadius, StreamingIntegrityMode, ModelStreamingBehavior), its physics, avatar and replication settings, Lighting.Technology, and hidden properties on any other instance. Use this instead of assuming what they are set to. Claudio reads them from a copy of the place that Studio writes when a test server starts. That copy is reused for 30 minutes unless fresh is true; making a new one briefly starts and stops a server-only test, which takes up to a minute and cannot happen while a playtest is running. Only the user can change these properties, in Studio's Properties panel.",
+      Schema: {
+        path: z.string().optional().describe("Full path of the instance, such as Workspace or Lighting. Workspace by default."),
+        names: z.array(z.string()).optional().describe("Only these properties. All of them by default."),
+        fresh: z.boolean().optional().describe("Make a new copy of the place first, to pick up changes the user made in the last 30 minutes."),
+      },
+      Run: async (Input: { path?: string; names?: string[]; fresh?: boolean }) => ({content: [{
+        type: "text",
+        text: await ReadHiddenProperties(Input.path || "Workspace", Input.names, Input.fresh === true),
       }]}),
     },
     {

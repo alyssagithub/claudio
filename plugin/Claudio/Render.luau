@@ -86,13 +86,7 @@ const function Parts(Object: Instance): {BasePart}
 	return Found
 end
 
-return function(Input: any, Resolve: (string) -> Instance?): any
-	const Object = if typeof(Input.path) == "string" then Resolve(Input.path) else nil
-
-	if not Object then
-		return {error = `Nothing at "{tostring(Input.path)}" to render.`}
-	end
-
+const function Draw(Input: any, Object: Instance, Name: string): any
 	const Own = Parts(Object)
 
 	if #Own == 0 then
@@ -381,6 +375,36 @@ return function(Input: any, Resolve: (string) -> Instance?): any
 		width = Result.size,
 		height = Result.size,
 		pixels = Result.pixels,
-		text = `{Result.size}x{Result.size} render of {Object:GetFullName()}, yaw {math.floor(math.deg(Yaw) + 0.5)}, pitch {math.floor(math.deg(Pitch) + 0.5)}, field of view {Field}, background {Background}{if Input.isolate == false then "" else ", others hidden"}`,
+		text = `{Result.size}x{Result.size} render of {Name}, yaw {math.floor(math.deg(Yaw) + 0.5)}, pitch {math.floor(math.deg(Pitch) + 0.5)}, field of view {Field}, background {Background}{if Input.isolate == false then "" else ", others hidden"}`,
 	}
+end
+
+return function(Input: any, Resolve: (string) -> Instance?): any
+	const Object = if typeof(Input.path) == "string" then Resolve(Input.path) else nil
+
+	if not Object then
+		return {error = `Nothing at "{tostring(Input.path)}" to render.`}
+	end
+
+	if Object:IsDescendantOf(workspace) then
+		return Draw(Input, Object, Object:GetFullName())
+	end
+
+	const Copy = Object:Clone()
+
+	if not Copy then
+		return {error = `{Object:GetFullName()} is outside Workspace, where nothing is drawn, and it cannot be copied there because Archivable is off. Move it into Workspace to render it.`}
+	end
+
+	Copy.Parent = workspace
+
+	const Ok, Result = pcall(Draw, Input, Copy, `{Object:GetFullName()} (drawn from a temporary copy in Workspace, since nothing outside Workspace renders)`)
+
+	Copy:Destroy()
+
+	if not Ok then
+		error(Result, 0)
+	end
+
+	return Result
 end

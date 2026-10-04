@@ -103,7 +103,9 @@ function App.New(CurrentPlugin: Plugin)
 			BackgroundTransparency = 0.85,
 			BorderSizePixel = 0,
 			ZIndex = 500,
-			Visible = Highlight,
+			Visible = function()
+				return Highlight() or Chat.Dragging() ~= "off"
+			end,
 
 			Vide.create "UIStroke" {
 				Color = Theme.Colors.Accent,

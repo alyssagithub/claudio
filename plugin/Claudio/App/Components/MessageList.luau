@@ -196,7 +196,9 @@ return function()
 						Chat.LoadEarlier()
 					end
 
-					while Ready() < Chat.Shown() do
+					const Deadline = os.clock() + 5
+
+					while Ready() < math.min(Chat.Shown(), #Chat.Messages()) and os.clock() < Deadline do
 						task.wait()
 					end
 

@@ -504,6 +504,10 @@ function Client.TakeDropped(Seen: string): (boolean, any)
 	return Http.Request("GET", `{BaseUrl()}/drop/take?wait=1&seen={Seen}`)
 end
 
+function Client.ConversationCost(Id: string): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/conversations/{Id}/cost`)
+end
+
 function Client.SaveAttachment(Name: string, Data: string): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/attachments`, {
 		name = Name,

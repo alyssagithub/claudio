@@ -200,12 +200,13 @@ return function()
 	end
 
 	const function GetChatCost(): (number, boolean, boolean)
-		local Total = 0
-		local Guessed = false
-		local Known = false
+		const Whole = Chat.WholeCost()
+		local Total = if Whole then Whole.cost else 0
+		local Guessed = Whole ~= nil and Whole.estimated
+		local Known = Whole ~= nil and Whole.reported
 
 		for _, Message in Chat.Messages() do
-			if not Message.Cost then
+			if not Message.Cost or (Whole and not Message.Fresh) then
 				continue
 			end
 

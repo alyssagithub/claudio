@@ -38,6 +38,7 @@ const Chat = {
 	Stopping = Vide.source(false),
 	Zoomed = Vide.source(nil :: EditableImage?),
 	Dragging = Vide.source("off"),
+	WholeCost = Vide.source(nil :: {cost: number, estimated: boolean, reported: boolean}?),
 	KnownPaths = Vide.source({} :: {[string]: string}),
 	FileMenu = Vide.source(nil :: {Path: string, Kind: string}?),
 	StreamingImages = Vide.source({} :: {EditableImage}),
@@ -2980,6 +2981,7 @@ const function Finish(Status: string, Text: string, State: Types.Turn?)
 		Failed = Status == "error",
 		Error = Trouble,
 		Cost = if State then State.cost else nil,
+		Fresh = true,
 		Prompt = Chat.CurrentPrompt,
 		Images = Chat.StreamingImages(),
 		Model = if State then State.model else nil,
@@ -3786,6 +3788,14 @@ function Chat.Open(Id: string)
 	Chat.Messages(Messages)
 	Chat.ConversationId(Conversation.id)
 	Chat.Title(Conversation.title)
+	Chat.WholeCost(nil)
+	task.spawn(function()
+		const Priced, Answer = Client.ConversationCost(Conversation.id)
+
+		if Priced and typeof(Answer) == "table" and typeof(Answer.cost) == "number" and Chat.ConversationId() == Conversation.id then
+			Chat.WholeCost(Answer)
+		end
+	end)
 	Chat.LoadChapters()
 	Chat.ListOpen(false)
 	Chat.TasksOpen(false)

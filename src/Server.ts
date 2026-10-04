@@ -263,6 +263,24 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     return;
   }
 
+  if (Request.method === "GET" && Id && Segments[2] === "cost") {
+    const Whole = GetConversation(Id);
+
+    if (!Whole) {
+      SendJson(Response, 404, {error: "No such chat"});
+      return;
+    }
+
+    const Priced = Whole.messages as { cost?: number; estimated?: boolean }[];
+
+    SendJson(Response, 200, {
+      cost: Priced.reduce((Sum, Message) => Sum + (Message.cost || 0), 0),
+      estimated: Priced.some((Message) => Message.cost && Message.estimated),
+      reported: Priced.some((Message) => Message.cost && !Message.estimated),
+    });
+    return;
+  }
+
   if (Request.method === "GET" && Id && Segments[2] === "exists") {
     SendJson(Response, 200, {exists: ConversationExists(Id)});
     return;

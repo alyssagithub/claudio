@@ -30,6 +30,7 @@ export type Piece = {
 }
 
 export type Message = {
+	Fresh: boolean?,
 	Role: "user" | "assistant",
 	Text: string,
 	Parts: {Piece}?,

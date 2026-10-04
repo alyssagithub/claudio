@@ -74,3 +74,9 @@ export function SetDropArea(Area: { x: number; y: number; width: number; height:
 export function TakeDropped(): Dropped[] {
   return Waiting.splice(0);
 }
+
+process.on("exit", () => {
+  if (Helper) {
+    Helper.kill();
+  }
+});

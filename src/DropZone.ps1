@@ -12,6 +12,12 @@ public class DropZone : Form {
   [DllImport("user32.dll")] static extern short GetAsyncKeyState(int Key);
   [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr Window, out uint Owner);
+  [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point Where);
+  [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr Window, uint Kind);
+  [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr Window, out Box Rect);
+  [StructLayout(LayoutKind.Sequential)] struct Box { public int Left, Top, Right, Bottom; }
+
+  static readonly string[] StudioTypes = { ".rbxm", ".rbxmx", ".rbxl", ".rbxlx", ".fbx", ".obj", ".gltf", ".glb", ".lua", ".luau" };
 
   public static readonly object Gate = new object();
   public static Rectangle Area = Rectangle.Empty;
@@ -35,7 +41,7 @@ public class DropZone : Form {
     TopMost = true;
     StartPosition = FormStartPosition.Manual;
     BackColor = Color.FromArgb(30, 30, 34);
-    Opacity = 0.85;
+    Opacity = 0.7;
     AllowDrop = true;
     Hint = new Label();
     Hint.Dock = DockStyle.Fill;
@@ -47,7 +53,36 @@ public class DropZone : Form {
     Controls.Add(Hint);
 
     DragEventHandler Enter = (Sender, Event) => {
-      Event.Effect = Event.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+      string[] Paths = Event.Data.GetData(DataFormats.FileDrop) as string[];
+
+      if (Paths == null || Paths.Length == 0) {
+        Event.Effect = DragDropEffects.None;
+        Hide();
+        return;
+      }
+
+      bool ForStudio = false;
+
+      foreach (string Given in Paths) {
+        if (Array.IndexOf(StudioTypes, System.IO.Path.GetExtension(Given).ToLowerInvariant()) >= 0) {
+          ForStudio = true;
+        }
+      }
+
+      if (ForStudio) {
+        Rectangle Panel = PanelArea();
+
+        if (Panel.Width == 0) {
+          Event.Effect = DragDropEffects.None;
+          Hide();
+          return;
+        }
+
+        Bounds = Panel;
+        Hint.Text = "Drop here to attach to Claudio";
+      }
+
+      Event.Effect = DragDropEffects.Copy;
     };
     DragEventHandler Dropped = (Sender, Event) => {
       string[] Paths = Event.Data.GetData(DataFormats.FileDrop) as string[];
@@ -71,6 +106,24 @@ public class DropZone : Form {
     Watch.Start();
   }
 
+  Rectangle PanelArea() {
+    lock (Gate) {
+      return Known ? new Rectangle(Origin.X + Area.X, Origin.Y + Area.Y, Area.Width, Area.Height) : Rectangle.Empty;
+    }
+  }
+
+  static bool IsStudio(IntPtr Window) {
+    uint Owner;
+
+    GetWindowThreadProcessId(Window, out Owner);
+
+    try {
+      return Process.GetProcessById((int)Owner).ProcessName.StartsWith("RobloxStudio");
+    } catch {
+      return false;
+    }
+  }
+
   bool StudioInFront() {
     uint Owner;
 
@@ -83,22 +136,42 @@ public class DropZone : Form {
     }
   }
 
+  bool WasHeld = false;
+  bool PressedOutside = false;
+
   void Check() {
-    Rectangle Panel;
-
-    lock (Gate) {
-      Panel = Known ? new Rectangle(Origin.X + Area.X, Origin.Y + Area.Y, Area.Width, Area.Height) : Rectangle.Empty;
-    }
-
     bool Held = (GetAsyncKeyState(0x01) & 0x8000) != 0;
-    bool Wanted = Panel.Width > 0 && Held && !StudioInFront() && Panel.Contains(Cursor.Position);
 
-    if (Wanted && !Visible) {
-      Bounds = Panel;
-      Show();
-    } else if (Visible && !Held) {
-      Hide();
+    if (Held && !WasHeld) {
+      PressedOutside = !IsStudio(GetAncestor(WindowFromPoint(Cursor.Position), 2));
     }
+
+    WasHeld = Held;
+
+    if (Visible) {
+      if (!Held) {
+        Hide();
+      }
+
+      return;
+    }
+
+    if (!Held || !PressedOutside || StudioInFront()) {
+      return;
+    }
+
+    IntPtr Under = GetAncestor(WindowFromPoint(Cursor.Position), 2);
+
+    if (Under == IntPtr.Zero || !IsStudio(Under)) {
+      return;
+    }
+
+    Box Whole;
+
+    GetWindowRect(Under, out Whole);
+    Bounds = new Rectangle(Whole.Left, Whole.Top, Whole.Right - Whole.Left, Whole.Bottom - Whole.Top);
+    Hint.Text = "Drop files anywhere to attach them to Claudio";
+    Show();
   }
 
   public static void Begin() {

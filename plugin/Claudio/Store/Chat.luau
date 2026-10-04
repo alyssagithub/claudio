@@ -2950,18 +2950,34 @@ const function Ended(Id: string): (number?, boolean)
 end
 
 const function Finish(Status: string, Text: string, State: Types.Turn?)
+	const Trouble = if Status == "error" then (if State and State.error then State.error else Text) else nil
+	const SignedOut = Trouble ~= nil and Format.IsSignedOut(Trouble)
+
+	if SignedOut then
+		const History = Chat.Messages()
+		local Kept = #History
+
+		while Kept > 0 and History[Kept].Role == "assistant" and Format.IsSignedOut(History[Kept].Text or "") do
+			Kept -= 1
+		end
+
+		if Kept < #History then
+			Chat.Messages(table.move(History, 1, Kept, 1, {}))
+		end
+	end
+
 	Append({
 		Role = "assistant",
-		Text = Text,
+		Text = if SignedOut then "" else Text,
 		Activity = if State then State.activity else nil,
 		Thinking = if State then State.thinking else nil,
-		Parts = if State then ReadParts(State.parts) else nil,
+		Parts = if State and not SignedOut then ReadParts(State.parts) else nil,
 		Calls = if State then State.calls else nil,
 		Edits = Watcher.GetTurnChanges(),
 		Tokens = if State then State.tokens else nil,
 		Milliseconds = if State then State.milliseconds else nil,
 		Failed = Status == "error",
-		Error = if Status == "error" then (if State and State.error then State.error else Text) else nil,
+		Error = Trouble,
 		Cost = if State then State.cost else nil,
 		Prompt = Chat.CurrentPrompt,
 		Images = Chat.StreamingImages(),
@@ -3559,9 +3575,18 @@ const function Loaded(Given: {any}): {Types.Message}
 	const Messages: {Types.Message} = {}
 
 	for _, Message in Given do
+		const SignedOut = Message.role ~= "user" and typeof(Message.text) == "string" and #Message.text < 300 and Format.IsSignedOut(Message.text)
+		const Previous = Messages[#Messages]
+
+		if SignedOut and Previous and Previous.Error == Message.text then
+			continue
+		end
+
 		table.insert(Messages, {
 			Role = if Message.role == "user" then "user" else "assistant",
-			Text = Message.text,
+			Text = if SignedOut then "" else Message.text,
+			Failed = if SignedOut then true else nil,
+			Error = if SignedOut then Message.text else nil,
 			Activity = Message.activity,
 			Parts = ReadParts(Message.parts),
 			Calls = Message.calls,

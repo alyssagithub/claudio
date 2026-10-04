@@ -2047,9 +2047,9 @@ let LastFolder: string | null = null;
 export function SignIn(): Promise<boolean> {
   return new Promise((Resolve) => {
     const [Program, Arguments] = process.platform === "win32"
-      ? ["cmd.exe", ["/c", "start", "\"Sign in to Claude\"", "/wait", "cmd", "/c", "claude auth login || pause"]]
+      ? ["cmd.exe", ["/c", "start \"Sign in to Claude\" /wait cmd /c \"claude auth login || pause\""]]
       : ["claude", ["auth", "login"]];
-    const Login = spawn(Program, Arguments, {windowsHide: false, stdio: "ignore"});
+    const Login = spawn(Program, Arguments, {windowsHide: false, windowsVerbatimArguments: true, stdio: "ignore"});
 
     Login.on("error", () => Resolve(false));
     Login.on("close", (Code) => {

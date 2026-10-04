@@ -1787,7 +1787,7 @@ return function(Props: Props)
 				},
 			},
 			Vide.show(function()
-				return Hovered() or (Props.Failed ~= nil and Props.Failed())
+				return Hovered() or (Props.Failed ~= nil and Props.Failed() and not Format.IsSignedOut(GetError()))
 			end, function()
 				return Create "Frame" {
 					Name = "Buttons",

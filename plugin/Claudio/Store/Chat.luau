@@ -3845,16 +3845,16 @@ function Chat.LoadEarlier()
 	end
 
 	if Chat.Partial() then
-		const Whole, Everything = Client.GetConversation(Id, nil, nil)
+		const Kept = #Chat.Messages()
+		const Whole, Everything = Client.GetConversation(Id, nil, Kept + 40)
 
 		if not Whole or Chat.ConversationId() ~= Id then
 			return
 		end
 
 		const All = Loaded(Everything.messages)
-		const Kept = #Chat.Messages()
 
-		Chat.Partial(false)
+		Chat.Partial(Everything.partial == true and #All > Kept)
 		Chat.Earlier((Everything.first or 1) - 1)
 		Chat.Shown(Chat.Shown() + Chat.Fits(All, math.max(0, #All - Kept)))
 		Chat.Messages(All)

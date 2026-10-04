@@ -235,8 +235,21 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
         await new Promise((Resolve) => setTimeout(Resolve, 1000));
       }
 
-      await new Promise((Resolve) => setTimeout(Resolve, 1500));
-      await (await import("./StudioPresence.js")).CloseTestProcesses();
+      const { CloseTestProcesses } = await import("./StudioPresence.js");
+      let Quiet = 0;
+
+      while (Date.now() - Began < 240000 && Quiet < 3) {
+        await new Promise((Resolve) => setTimeout(Resolve, 2000));
+
+        const Closed = await CloseTestProcesses();
+        const Status = await Reach("playtest", {action: "status"}) as { text?: string } | null;
+
+        Quiet = Closed === 0 && Status && Status.text && Status.text.startsWith("No playtest") ? Quiet + 1 : 0;
+      }
+
+      if (Quiet < 3) {
+        return "Read nothing: the server-only test Claudio started to copy the place would not close. Stop it from Studio's toolbar.";
+      }
 
       if (!(fs.existsSync(File) && fs.statSync(File).mtimeMs > Began)) {
         return "Studio did not write a copy of the place within two minutes, so the hidden properties could not be read.";

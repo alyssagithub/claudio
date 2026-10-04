@@ -56,7 +56,7 @@ export type Message = {
 }
 
 export type Chip = {
-	Kind: "instance" | "script" | "output" | "image" | "selection" | "runtime",
+	Kind: "instance" | "script" | "output" | "image" | "selection" | "runtime" | "file",
 	Label: string,
 	Token: string?,
 	Instance: Instance?,

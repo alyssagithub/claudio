@@ -491,6 +491,26 @@ function Client.SignIn(Start: boolean): (boolean, any)
 	return Http.Request(if Start then "POST" else "GET", `{BaseUrl()}/auth/login`)
 end
 
+function Client.SetDropArea(Point: Vector2?, Size: Vector2?): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/drop/area`, if Point and Size then {
+		x = Point.X,
+		y = Point.Y,
+		width = Size.X,
+		height = Size.Y,
+	} else {})
+end
+
+function Client.TakeDropped(): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/drop/take`)
+end
+
+function Client.SaveAttachment(Name: string, Data: string): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/attachments`, {
+		name = Name,
+		data = Data,
+	})
+end
+
 function Client.OpenUrl(Url: string): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/open-url`, {url = Url})
 end

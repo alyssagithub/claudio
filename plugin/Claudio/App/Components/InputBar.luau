@@ -97,6 +97,67 @@ return function()
 
 	Chat.Insert = Insert
 
+	local Watching = not game:GetService("RunService"):IsRunning()
+
+	Vide.cleanup(function()
+		if Watching then
+			Watching = false
+			task.spawn(Client.SetDropArea)
+		end
+	end)
+
+	task.spawn(function()
+		local Last = ""
+		local Since = 0
+
+		while Watching and task.wait(0.25) do
+			const Window = Chat.Window
+
+			if not Window then
+				continue
+			end
+
+			if not Window.Enabled then
+				if Last ~= "off" then
+					Last = "off"
+					Client.SetDropArea()
+				end
+
+				continue
+			end
+
+			const Point = Window:GetRelativeMousePosition()
+			const Size = Window.AbsoluteSize
+
+			if Point.X >= 0 and Point.Y >= 0 and Point.X <= Size.X and Point.Y <= Size.Y then
+				const Key = `{Point.X},{Point.Y},{Size.X},{Size.Y}`
+
+				if Key ~= Last then
+					Last = Key
+					Client.SetDropArea(Point, Size)
+				end
+			end
+
+			Since += 1
+
+			if Since < 4 then
+				continue
+			end
+
+			Since = 0
+
+			const Ok, Answer = Client.TakeDropped()
+
+			if not Ok or typeof(Answer) ~= "table" or typeof(Answer.files) ~= "table" then
+				continue
+			end
+
+			for _, File in Answer.files do
+				Insert(if typeof(File.data) == "string" then Context.AddImage(File.name, File.data, File.mediaType) else Context.AddFile(File.name, File.path))
+			end
+		end
+	end)
+
 	Vide.cleanup(function()
 		Chat.Insert = nil
 	end)

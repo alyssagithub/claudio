@@ -103,6 +103,7 @@ return function(Open: (boolean?) -> boolean, Insert: (string) -> ())
 			Row(Config.Icons.Output, "Output", 2, Context.AddOutput, Insert, Close),
 			Row(Config.Icons.Picture, "Image file", 3, Context.ImportImage, Insert, Close),
 			Row(Config.Icons.Selection, "Selected objects", 4, Context.AddSelection, Insert, Close),
+			Row(Config.Icons.File, "Files", 5, Context.ImportFiles, Insert, Close),
 		},
 	}
 end

@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import http from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { exec, execFile, spawn } from "node:child_process";
@@ -24,6 +25,7 @@ import { ArmClipboard, AskClipboard, DisarmClipboard, ReadClipboardImage, Regist
 import { GetModels, SupportsFastMode } from "./Models.js";
 import { OpenPath, ProbePaths, ReadPicture, SavePicture } from "./Shared.js";
 import { OpenCloudKey, SaveOpenCloudKey } from "./OpenCloud.js";
+import { SetDropArea, TakeDropped } from "./DropZone.js";
 import { Analyze, Warm } from "./Lint.js";
 import { DescribeReturn, StopWatchingReturn, WaitForReturn, WatchReturn } from "./Keys.js";
 
@@ -577,6 +579,37 @@ export function StartServer(Port: number) {
 
         SaveOpenCloudKey(Request.method === "POST" && Key !== "" ? Key : null);
         SendJson(Response, 200, {saved: Request.method === "POST" && Key !== ""});
+        return;
+      }
+
+      if (Request.method === "POST" && Url.pathname === "/drop/area") {
+        const Body = await ReadBody(Request);
+        const Given = [Body.x, Body.y, Body.width, Body.height];
+
+        SetDropArea(Given.every((Value) => typeof Value === "number" && Number.isFinite(Value)) ? {x: Body.x, y: Body.y, width: Body.width, height: Body.height} : null);
+        SendJson(Response, 200, {ok: true});
+        return;
+      }
+
+      if (Request.method === "GET" && Url.pathname === "/drop/take") {
+        SendJson(Response, 200, {files: TakeDropped()});
+        return;
+      }
+
+      if (Request.method === "POST" && Url.pathname === "/attachments") {
+        const Body = await ReadBody(Request);
+        const Name = typeof Body.name === "string" ? path.basename(Body.name).replace(/[<>:"|?*\u0000-\u001f]/g, "_").slice(0, 120) : "";
+
+        if (!Name || typeof Body.data !== "string") {
+          SendJson(Response, 400, {error: "An attachment needs a name and its contents."});
+          return;
+        }
+
+        const Folder = path.join(os.homedir(), ".claudio", "attachments", String(Date.now()));
+
+        fs.mkdirSync(Folder, {recursive: true});
+        fs.writeFileSync(path.join(Folder, Name), Buffer.from(Body.data, "base64"));
+        SendJson(Response, 200, {path: path.join(Folder, Name)});
         return;
       }
 

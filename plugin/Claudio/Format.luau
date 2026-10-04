@@ -121,6 +121,16 @@ function Format.IsLimit(Text: string): boolean
 		or Lower:find("out of credits", 1, true) ~= nil
 end
 
+function Format.IsSignedOut(Text: string): boolean
+	const Lower = Text:lower()
+
+	return Lower:find("authenticate", 1, true) ~= nil
+		or Lower:find("oauth", 1, true) ~= nil
+		or Lower:find("not logged in", 1, true) ~= nil
+		or Lower:find("/login", 1, true) ~= nil
+		or Lower:find("invalid api key", 1, true) ~= nil
+end
+
 function Format.ResetsAt(Text: string): string?
 	const Clock = Text:match("resets%s+at%s+([%d:]+%s*[AaPp][Mm])") or Text:match("resets%s+([%d:]+%s*[ap]m)")
 

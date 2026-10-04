@@ -487,6 +487,10 @@ function Client.SaveOpenCloudKey(Key: string?): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/opencloud/key`, {key = Key})
 end
 
+function Client.SignIn(Start: boolean): (boolean, any)
+	return Http.Request(if Start then "POST" else "GET", `{BaseUrl()}/auth/login`)
+end
+
 function Client.OpenUrl(Url: string): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/open-url`, {url = Url})
 end

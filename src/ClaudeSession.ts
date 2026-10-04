@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -2042,6 +2043,31 @@ function TakeSpare(Model: string, Effort: string | null) {
 }
 
 let LastFolder: string | null = null;
+
+export function SignIn(): Promise<boolean> {
+  return new Promise((Resolve) => {
+    const [Program, Arguments] = process.platform === "win32"
+      ? ["cmd.exe", ["/c", "start", "\"Sign in to Claude\"", "/wait", "cmd", "/c", "claude auth login || pause"]]
+      : ["claude", ["auth", "login"]];
+    const Login = spawn(Program, Arguments, {windowsHide: false, stdio: "ignore"});
+
+    Login.on("error", () => Resolve(false));
+    Login.on("close", (Code) => {
+      if (Code === 0) {
+        for (const Session of [...Sessions.values()].filter(Idle)) {
+          Session.Close();
+        }
+
+        if (Spare && !Spare.CurrentTurn) {
+          Spare.Close();
+          Spare = null;
+        }
+      }
+
+      Resolve(Code === 0);
+    });
+  });
+}
 
 export function LastUsedFolder() {
   return LastFolder;

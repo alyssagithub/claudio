@@ -55,6 +55,7 @@ return {
 		File = "file-box",
 		Right = "chevron-small-right",
 		Limit = "speedometer",
+		Warning = "triangle-exclamation",
 		Output = "rectangle-list",
 		Retry = "arrow-clockwise",
 		Send = "arrow-large-up",

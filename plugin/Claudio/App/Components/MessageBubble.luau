@@ -21,6 +21,7 @@ const Chevron = require(script.Parent.Chevron)
 const IconButton = require(script.Parent.IconButton)
 const Button = require(script.Parent.Button)
 const Limits = require(script.Parent.LimitCard)
+const SignInCard = require(script.Parent.SignInCard)
 
 const TextService = game:GetService("TextService")
 
@@ -1258,7 +1259,7 @@ return function(Props: Props)
 				AutoButtonColor = false,
 				LayoutOrder = 1000004,
 				Visible = function()
-					return GetError() ~= ""
+					return GetError() ~= "" and not Format.IsSignedOut(GetError())
 				end,
 				Activated = function()
 					Shown(not Shown())
@@ -1334,6 +1335,13 @@ return function(Props: Props)
 					},
 				},
 			},
+			Vide.show(function()
+				return Format.IsSignedOut(GetError())
+			end, function()
+				return SignInCard(function()
+					task.spawn(Chat.Continue, if Props.Prompt then Props.Prompt() else nil)
+				end, 1000005)
+			end),
 			Vide.show(function()
 				return Format.IsLimit(GetError())
 			end, function()

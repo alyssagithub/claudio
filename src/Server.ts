@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { exec, execFile, spawn } from "node:child_process";
 import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, MostScriptsToCheck, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
-import { GetLimits, GetBreakdown, PollUsage, RefreshConversationContext } from "./ClaudeSession.js";
+import { GetLimits, GetBreakdown, PollUsage, RefreshConversationContext, SignIn } from "./ClaudeSession.js";
 import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
@@ -478,6 +478,8 @@ export function StartServer(Port: number) {
     console.error("Unhandled rejection, the bridge is staying up: " + (Thrown && Thrown.stack ? Thrown.stack : Thrown));
   });
 
+  let Signing = "idle";
+
   const Server = http.createServer(async (Request, Response) => {
     const Url = new URL(Request.url as string, "http://127.0.0.1");
     const Segments = Url.pathname.split("/").filter(Boolean);
@@ -575,6 +577,18 @@ export function StartServer(Port: number) {
 
         SaveOpenCloudKey(Request.method === "POST" && Key !== "" ? Key : null);
         SendJson(Response, 200, {saved: Request.method === "POST" && Key !== ""});
+        return;
+      }
+
+      if (Url.pathname === "/auth/login" && (Request.method === "POST" || Request.method === "GET")) {
+        if (Request.method === "POST" && Signing !== "waiting") {
+          Signing = "waiting";
+          SignIn().then((Done) => {
+            Signing = Done ? "signed in" : "failed";
+          });
+        }
+
+        SendJson(Response, 200, {state: Signing});
         return;
       }
 

@@ -98,7 +98,6 @@ return function()
 	Chat.Insert = Insert
 
 	local Watching = not game:GetService("RunService"):IsRunning()
-	const Dragging = Vide.source("off")
 
 	Vide.cleanup(function()
 		if Watching then
@@ -146,7 +145,7 @@ return function()
 
 	task.spawn(function()
 		while Watching do
-			const Ok, Answer = Client.TakeDropped(Dragging())
+			const Ok, Answer = Client.TakeDropped(Chat.Dragging())
 
 			if not Ok or typeof(Answer) ~= "table" or typeof(Answer.files) ~= "table" then
 				task.wait(2)
@@ -155,7 +154,7 @@ return function()
 			end
 
 			if typeof(Answer.dragging) == "string" then
-				Dragging(Answer.dragging)
+				Chat.Dragging(Answer.dragging)
 			end
 
 			for _, File in Answer.files do
@@ -399,7 +398,7 @@ return function()
 			TextYAlignment = Enum.TextYAlignment.Top,
 			ZIndex = 2,
 			Text = function()
-				return Markdown.Tokens(Format.Escape(Chat.Draft()), Theme.Colors.Accent():ToHex(), true, Chat.KnownTokens())
+				return Markdown.Tokens(Format.Escape(Chat.Draft()), Theme.Colors.Accent():ToHex(), true, Chat.KnownTokens(), Theme.Colors.Input():ToHex())
 			end,
 		},
 	}
@@ -463,24 +462,6 @@ return function()
 		MentionSuggestions(),
 		Attachments(Remove),
 		AddMenu(AddOpen, Insert),
-		Create "TextLabel" {
-			Name = "DropHint",
-			Size = UDim2.fromScale(1, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundTransparency = 1,
-			TextColor3 = Theme.Colors.Accent,
-			TextSize = Settings.SmallText,
-			FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextWrapped = true,
-			LayoutOrder = 1,
-			Visible = function()
-				return Dragging() ~= "off"
-			end,
-			Text = function()
-				return if Dragging() == "panel" then "Drop on Claudio to attach, or anywhere else to give it to Studio" else "Drop anywhere to attach"
-			end,
-		},
 		Vide.action(function(Object: Frame)
 			const function Measure()
 				ModelPicker.BarHeight(Object.AbsoluteSize.Y)
@@ -498,14 +479,6 @@ return function()
 			LayoutOrder = 2,
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-			Create "UIStroke" {
-				Color = Theme.Colors.Accent,
-				Thickness = 2,
-				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-				Enabled = function()
-					return Dragging() ~= "off"
-				end,
-			},
 			Create "UIPadding" {
 				PaddingLeft = UDim.new(0, 8),
 				PaddingRight = UDim.new(0, 5),

@@ -25,6 +25,7 @@ const Picker = require(script.Parent.Parent.Parent.Picker)
 const DeleteDialog = require(script.Parent.Parent.Components.DeleteDialog)
 const RewindDialog = require(script.Parent.Parent.Components.RewindDialog)
 const ImageViewer = require(script.Parent.Parent.Components.ImageViewer)
+const DropScreen = require(script.Parent.Parent.Components.DropScreen)
 
 const Create = Vide.create
 
@@ -177,6 +178,7 @@ return function()
 		ModelPicker.EffortMenu(),
 		ModelPicker.EffortHelp(),
 		ImageViewer(),
+		DropScreen(),
 		ModelPicker.ModeMenu(),
 		DeleteDialog(),
 		RewindDialog(),

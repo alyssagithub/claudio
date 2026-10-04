@@ -115,7 +115,7 @@ function Markdown.Inline(Text: string): string
 	end))
 end
 
-function Markdown.Tokens(Text: string, Accent: string, Fade: boolean, Known: {[string]: boolean}?): string
+function Markdown.Tokens(Text: string, Accent: string, Fade: boolean, Known: {[string]: boolean}?, Backdrop: string?): string
 	const Pieces: {string} = {}
 	const Recognized: {[string]: boolean} = {}
 	local At = 1
@@ -133,7 +133,7 @@ function Markdown.Tokens(Text: string, Accent: string, Fade: boolean, Known: {[s
 	end
 
 	const function Marked(Body: string)
-		table.insert(Pieces, `<font color="#{Accent}">{Body}</font>`)
+		table.insert(Pieces, if Backdrop then `<mark color="#{Backdrop}" transparency="0"><font color="#{Accent}">{Body}</font></mark>` else `<font color="#{Accent}">{Body}</font>`)
 	end
 
 	while At <= #Text do

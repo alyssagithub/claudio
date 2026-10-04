@@ -37,6 +37,7 @@ const Chat = {
 	ApiRetry = Vide.source(nil :: Types.Retry?),
 	Stopping = Vide.source(false),
 	Zoomed = Vide.source(nil :: EditableImage?),
+	Dragging = Vide.source("off"),
 	KnownPaths = Vide.source({} :: {[string]: string}),
 	FileMenu = Vide.source(nil :: {Path: string, Kind: string}?),
 	StreamingImages = Vide.source({} :: {EditableImage}),

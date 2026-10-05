@@ -2534,7 +2534,7 @@ const function Execute(Input: any): any
 
 	while not Finished do
 		const Asked = Run ~= nil and Runs[Run] == "cancelling"
-		const Late = os.clock() > Deadline + 1
+		const Late = os.clock() > Deadline
 
 		if (Asked or Late) and coroutine.status(Worker) == "suspended" then
 			const Where = if Run then Waiting(Run) else ""

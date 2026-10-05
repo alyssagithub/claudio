@@ -151,6 +151,7 @@ const function Reset()
 	Generation += 1
 	KnownEnded = 0
 	Chat.Earlier(0)
+	Chat.Partial(false)
 
 	for _, Message in Chat.Messages() do
 		DestroyImages(Message.Images)

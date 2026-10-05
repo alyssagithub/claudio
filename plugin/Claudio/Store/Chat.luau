@@ -2287,7 +2287,7 @@ const function Execute(Input: any): any
 	const ChangeHistoryService = game:GetService("ChangeHistoryService")
 	const Said = {}
 
-	const Wrapped = `return function(plugin, breathe)\n{Code}\nend`
+	const Wrapped = `return function(plugin, breathe, __ClaudioPace)\n{require(script.Parent.Parent.Pacing).Insert(Code, "__ClaudioPace")}\nend`
 	local Source = Wrapped
 	local Offset = 1
 
@@ -2373,7 +2373,24 @@ const function Execute(Input: any): any
 		return Failed
 	end
 
-	const Ok, Result = xpcall(Made :: any, Trouble, Settings.Plugin(), Breathe)
+	const Limit = math.clamp(tonumber(Input.timeout) or 300, 1, 1800)
+	const Deadline = os.clock() + math.max(1, Limit - 2)
+	local Rested = os.clock()
+
+	const function Pace()
+		const Now = os.clock()
+
+		if Now > Deadline then
+			error(`Stopped after {Limit} seconds, the time limit for this call. Raise timeout if it really needs longer.`, 0)
+		end
+
+		if Now - Rested > 0.03 then
+			task.wait()
+			Rested = os.clock()
+		end
+	end
+
+	const Ok, Result = xpcall(Made :: any, Trouble, Settings.Plugin(), Breathe, Pace)
 
 	Finish()
 

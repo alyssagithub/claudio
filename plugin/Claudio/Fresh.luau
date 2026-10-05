@@ -25,6 +25,12 @@ const function Replace(Module: ModuleScript): ModuleScript
 	const Where = Module.Parent
 	const Copy = Module:Clone()
 
+	Copy:ClearAllChildren()
+
+	for _, Child in Module:GetChildren() do
+		Child.Parent = Copy
+	end
+
 	Known[Module] = nil
 	Module:Destroy()
 	Copy.Parent = Where
@@ -34,8 +40,6 @@ const function Replace(Module: ModuleScript): ModuleScript
 end
 
 function Fresh.Load(Module: ModuleScript): any
-	const Wanted = Module:GetFullName()
-
 	for Object, Before in table.clone(Known) do
 		Breathe()
 
@@ -44,13 +48,11 @@ function Fresh.Load(Module: ModuleScript): any
 		end
 	end
 
-	const Current = if Module.Parent then Module else require(script.Parent.Runtime.Scoped).Find(Wanted)
-
-	if not Current or not Current:IsA("ModuleScript") then
-		error(`{Wanted} is gone, so it cannot be loaded fresh.`)
+	if not Module.Parent then
+		error(`{Module.Name} was deleted, so it cannot be loaded fresh.`)
 	end
 
-	return (require :: any)(Replace(Current))
+	return (require :: any)(Replace(Module))
 end
 
 return Fresh

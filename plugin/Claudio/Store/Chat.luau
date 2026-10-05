@@ -801,9 +801,34 @@ const function LintPlace(Paths: {string}?, Exact: boolean?): any
 		return {error = `The analyzer could not run: {tostring(Result)}`}
 	end
 
+	if Wanted == Tree then
+		return {
+			checked = #Wanted,
+			scripts = Result.scripts,
+		}
+	end
+
+	const Asked = {}
+	const Elsewhere = {}
+
+	for _, Entry in Wanted do
+		Asked[Entry.path] = true
+	end
+
+	const Kept = {}
+
+	for _, Script in Result.scripts do
+		if Asked[Script.path] then
+			table.insert(Kept, Script)
+		else
+			table.insert(Elsewhere, Script.path)
+		end
+	end
+
 	return {
 		checked = #Wanted,
-		scripts = Result.scripts,
+		scripts = Kept,
+		elsewhere = Elsewhere,
 	}
 end
 

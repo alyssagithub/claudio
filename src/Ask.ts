@@ -223,7 +223,7 @@ export function ExecuteReport(Found: ExecuteAnswer) {
   return Parts.join("\n");
 }
 
-export type LintAnswer = { error?: string; scripts?: { path: string; lines?: string[] }[]; skipped?: string[] } | null;
+export type LintAnswer = { error?: string; scripts?: { path: string; lines?: string[] }[]; skipped?: string[]; elsewhere?: string[] } | null;
 
 export function LintReport(Found: LintAnswer) {
   if (!Found) {
@@ -239,6 +239,10 @@ export function LintReport(Found: LintAnswer) {
 
   if (Found.skipped && Found.skipped.length > 0) {
     Lines.push(`Could not check: ${Found.skipped.join(", ")}`);
+  }
+
+  if (Found.elsewhere && Found.elsewhere.length > 0) {
+    Lines.push(`Not shown: warnings in ${Found.elsewhere.length} script${Found.elsewhere.length === 1 ? "" : "s"} these depend on (${Found.elsewhere.slice(0, 10).join(", ")}${Found.elsewhere.length > 10 ? ", ..." : ""}). Lint those paths to see them.`);
   }
 
   return Lines.length > 0 ? Lines.join("\n") : "No warnings.";

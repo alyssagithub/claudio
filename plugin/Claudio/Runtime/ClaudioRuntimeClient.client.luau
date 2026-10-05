@@ -76,11 +76,11 @@ const function Find(Path: string): (GuiObject?, string?)
 			return nil, `Nothing at "{Path}".`
 		end
 
-		Object = (Object :: Instance):FindFirstChild(Step)
+		Object = if Step == "LocalPlayer" and (Object :: Instance):IsA("Players") then (Object :: Players).LocalPlayer else (Object :: Instance):FindFirstChild(Step)
 	end
 
 	if not Object or not Object:IsA("GuiObject") then
-		return nil, `Nothing usable at "{Path}". Give the full path to a GuiObject, such as Players.Someone.PlayerGui.Menu.Play.`
+		return nil, `Nothing usable at "{Path}". Give the full path to a GuiObject, such as Players.LocalPlayer.PlayerGui.Menu.Play.`
 	end
 
 	const Target = Object :: GuiObject

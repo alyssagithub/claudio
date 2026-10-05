@@ -636,9 +636,18 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         timeout: z.number().optional().describe("How long to wait, in seconds, when the code is expected to take a while. Five minutes by default, thirty at most."),
         player: z.string().optional().describe("Which client to run on when target is client: a player's name, or their number in join order starting at 1. Defaults to the first player."),
         within: z.string().optional().describe("Path of a ModuleScript to run inside: the code runs after a fresh copy of the module's body, above its final return, so its private locals and functions are in scope to call and test. The copy is separate, so the real module's state is untouched, and script refers to the copy. The module's top-level code runs first, so one that waits on something only present in a playtest will wait until the timeout in edit; set a short timeout or run it in a session."),
+        resultOf: z.string().optional().describe("Fetch the result of an earlier run that timed out, by the run name its timeout message gave. Pass any code, it is ignored."),
+        cancel: z.string().optional().describe("Stop an earlier run that is still going, by its run name. Pass any code, it is ignored."),
       },
-      Run: async (Input: { code: string; target?: "edit" | "server" | "client"; readOnly?: boolean; undoName?: string; timeout?: number; player?: string; within?: string }) => {
+      Run: async (Input: { code: string; target?: "edit" | "server" | "client"; readOnly?: boolean; undoName?: string; timeout?: number; player?: string; within?: string; resultOf?: string; cancel?: string }) => {
         const Where = Input.target || "edit";
+
+        if (Input.resultOf || Input.cancel) {
+          return {content: [{
+            type: "text",
+            text: ExecuteReport(await ReachIn(Where === "edit" ? "edit" : "server", "execute", {resultOf: Input.resultOf, cancel: Input.cancel, target: Where, player: Input.player}, 30)),
+          }]};
+        }
 
         if (Where !== "edit") {
           const Missing = await NeedsSession("No play session is reachable. Start one with the playtest tool, or from the toolbar, and give it a moment to connect.");
@@ -651,6 +660,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
           }
         }
 
+        const Run = Math.random().toString(36).slice(2, 10);
         const Sent = {
           code: Input.code,
           target: Where,
@@ -659,12 +669,14 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
           player: Input.player,
           within: Input.within,
           timeout: Input.timeout,
+          run: Run,
         };
         const Found: ExecuteAnswer = await ReachIn(Where === "edit" ? "edit" : "server", "execute", Sent, Input.timeout);
+        const TimedOut = Found && typeof Found.error === "string" && Found.error.includes("did not finish within");
 
         return {content: [{
           type: "text",
-          text: ExecuteReport(Found),
+          text: ExecuteReport(Found) + (TimedOut && Where === "edit" ? ` The code may still be running and changing the place, because it was inside a long call where Claudio cannot stop it. Run name "${Run}": call execute with cancel "${Run}" to stop it at its next loop, or resultOf "${Run}" to wait for what it returns.` : ""),
         }]};
       },
     },
@@ -1033,8 +1045,9 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         paths: z.array(z.string()).optional().describe("Instances to save. Give these to save, leave them out to load."),
         path: z.string().optional().describe("Where to put what is loaded, such as Workspace."),
         undoName: z.string().optional().describe("What the undo step should be called, when loading."),
+        services: z.array(z.string()).optional().describe("When loading a place file (.rbxl), which services to take, such as [\"Workspace\", \"ServerStorage\"]. Each comes in as a folder of that name holding its contents, since services themselves cannot be moved. All of them by default."),
       },
-      Run: async (Input: { file: string; folder?: string; name?: string; paths?: string[]; path?: string; undoName?: string }) => {
+      Run: async (Input: { file: string; folder?: string; name?: string; paths?: string[]; path?: string; undoName?: string; services?: string[] }) => {
         let Tree: DiskNode | undefined;
 
         if (Input.folder) {
@@ -1097,6 +1110,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
             base64: Body,
             path: Input.path,
             undoName: Input.undoName,
+            services: Input.services,
           }), "Studio did not say what happened."),
         }]};
       },

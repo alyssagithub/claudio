@@ -392,6 +392,47 @@ end
 const Seen: {[string]: string} = {}
 
 local Committed = 0
+const Done: {string} = {}
+
+type Step = {
+	Recording: string?,
+	Name: string,
+}
+
+const function StartStep(Kind: string, Name: string): Step
+	const ChangeHistoryService = game:GetService("ChangeHistoryService")
+	const Recording = ChangeHistoryService:TryBeginRecording(Kind, Name)
+
+	if not Recording then
+		ChangeHistoryService:SetWaypoint(`Before {Name}`)
+	end
+
+	return {
+		Recording = Recording,
+		Name = Name,
+	}
+end
+
+const function EndStep(Given: Step, Keep: boolean)
+	const ChangeHistoryService = game:GetService("ChangeHistoryService")
+
+	if Given.Recording then
+		ChangeHistoryService:FinishRecording(Given.Recording, if Keep then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel)
+	elseif Keep then
+		ChangeHistoryService:SetWaypoint(Given.Name)
+	end
+
+	if not Keep then
+		return
+	end
+
+	Committed += 1
+	table.insert(Done, Given.Name)
+
+	if #Done > 50 then
+		table.remove(Done, 1)
+	end
+end
 
 const function Fingerprint(Script: LuaSourceContainer): string
 	return game:GetService("EncodingService"):ComputeStringHash(Script.Source, Enum.HashAlgorithm.Sha256)
@@ -460,8 +501,7 @@ const function Source(Input: any): any
 		end
 	end
 
-	const ChangeHistoryService = game:GetService("ChangeHistoryService")
-	const Recording = ChangeHistoryService:TryBeginRecording("ClaudioSource", Input.undoName or `Claudio edited {Script.Name}`)
+	const Step = StartStep("ClaudioSource", Input.undoName or `Claudio edited {Script.Name}`)
 
 	const Ok, Trouble = pcall(function(): string
 		if Action == "set" then
@@ -501,9 +541,7 @@ const function Source(Input: any): any
 		return Script.Source
 	end)
 
-	if Recording then
-		ChangeHistoryService:FinishRecording(Recording, if Ok then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel)
-	end
+	EndStep(Step, Ok)
 
 	if not Ok then
 		return {error = tostring(Trouble)}
@@ -511,17 +549,13 @@ const function Source(Input: any): any
 
 	Remember(Script)
 
-	if Recording then
-		Committed += 1
-	end
-
 	const Added, Removed = Measured(Before, Script.Source)
 
 	return {
 		text = `{Path} is now {#string.split(Script.Source, "\n")} lines. +{Added} -{Removed}`,
 		added = Added,
 		removed = Removed,
-		undo = Recording ~= nil,
+		undo = true,
 	}
 end
 
@@ -567,7 +601,13 @@ const function Steps(Input: any): any
 	const CanRedo = ChangeHistoryService:GetCanRedo()
 
 	if Action == "status" then
-		return {text = `Undo available: {CanUndo}. Redo available: {CanRedo}.`}
+		const Recent = {}
+
+		for Index = #Done, math.max(1, #Done - 9), -1 do
+			table.insert(Recent, `{#Done - Index + 1}. {Done[Index]}`)
+		end
+
+		return {text = `Undo available: {CanUndo}. Redo available: {CanRedo}.{if #Recent > 0 then `\nClaudio's steps, newest first (undo takes the top one; edits you made yourself in between sit above them):\n{table.concat(Recent, "\n")}` else "\nClaudio has no recorded steps this session."}`}
 	end
 
 	if Action == "undo" then
@@ -577,7 +617,13 @@ const function Steps(Input: any): any
 
 		ChangeHistoryService:Undo()
 
-		return {text = "Undid one step."}
+		const Took = table.remove(Done)
+
+		if Took then
+			Committed -= 1
+		end
+
+		return {text = if Took then `Undid one step, most likely "{Took}".` else "Undid one step."}
 	end
 
 	if Action == "redo" then
@@ -615,6 +661,7 @@ const function Steps(Input: any): any
 
 			Committed -= 1
 			Steps += 1
+			table.remove(Done)
 		end
 
 		if Committed > At then
@@ -1366,23 +1413,52 @@ const function Rbxm(Input: any): any
 			return {error = `Studio could not read that rbxm: {tostring(Made)}`}
 		end
 
-		const ChangeHistoryService = game:GetService("ChangeHistoryService")
-		const Recording = ChangeHistoryService:TryBeginRecording("ClaudioRbxm", Input.undoName or "Claudio loaded an rbxm")
+		const Step = StartStep("ClaudioRbxm", Input.undoName or "Claudio loaded an rbxm")
 		const Names = {}
+		const Skipped = {}
+		const Wanted = if typeof(Input.services) == "table" and #Input.services > 0 then Input.services else nil
 
 		for _, Object in Made do
-			Object.Parent = Parent
+			const Found, Service = pcall(game.FindService, game, Object.ClassName)
 
-			table.insert(Names, Object.Name)
+			if not (Found and Service) then
+				Object.Parent = Parent
+				table.insert(Names, Object.Name)
+
+				continue
+			end
+
+			if Wanted and not table.find(Wanted, Object.Name) then
+				continue
+			end
+
+			const Holder = Instance.new("Folder")
+
+			Holder.Name = Object.Name
+
+			for _, Child in Object:GetChildren() do
+				if not pcall(function()
+					Child.Parent = Holder
+				end) then
+					table.insert(Skipped, `{Object.Name}.{Child.Name}`)
+				end
+			end
+
+			Holder.Parent = Parent
+			table.insert(Names, `{Object.Name} (as a folder)`)
 		end
 
-		if Recording then
-			ChangeHistoryService:FinishRecording(Recording, Enum.FinishRecordingOperation.Commit)
+		EndStep(Step, true)
 
-			Committed += 1
+		const Missing = {}
+
+		for _, Name in Wanted or {} do
+			if not table.find(Names, `{Name} (as a folder)`) then
+				table.insert(Missing, Name)
+			end
 		end
 
-		return {text = `Put {#Names} under {Parent:GetFullName()}: {table.concat(Names, ", ")}`}
+		return {text = `Put {#Names} under {Parent:GetFullName()}: {table.concat(Names, ", ")}{if #Skipped > 0 then `. Left out {#Skipped} that cannot be moved: {table.concat(Skipped, ", ", 1, math.min(#Skipped, 10))}` else ""}{if #Missing > 0 then `. Not in what Studio read from the file: {table.concat(Missing, ", ")}. Studio leaves Workspace out when it reads a place file, so Workspace cannot be loaded this way.` else ""}`}
 	end
 
 	const Wanted = {}
@@ -2163,8 +2239,7 @@ const function ReadPlace(Input: any): any
 end
 
 const function Modify(Input: any): any
-	const ChangeHistoryService = game:GetService("ChangeHistoryService")
-	const Recording = ChangeHistoryService:TryBeginRecording("ClaudioModify", Input.undoName or "Claudio changed the place")
+	const Step = StartStep("ClaudioModify", Input.undoName or "Claudio changed the place")
 
 	const Ok, Result = pcall(function(): any
 		const Action = Input.action
@@ -2255,13 +2330,7 @@ const function Modify(Input: any): any
 		return {error = `Claudio does not know the action "{tostring(Action)}".`}
 	end)
 
-	if Recording then
-		ChangeHistoryService:FinishRecording(Recording, if Ok and not (Result :: any).error then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel)
-
-		if Ok and not (Result :: any).error then
-			Committed += 1
-		end
-	end
+	EndStep(Step, Ok and not (Result :: any).error)
 
 	if not Ok then
 		return {error = tostring(Result)}
@@ -2269,14 +2338,48 @@ const function Modify(Input: any): any
 
 	const Answer = Result :: any
 
-	if Recording and not Answer.error then
+	if not Answer.error then
 		Answer.undo = true
 	end
 
 	return Answer
 end
 
+const Runs: {[string]: any} = {}
+const RunOrder: {string} = {}
+
 const function Execute(Input: any): any
+	if typeof(Input.cancel) == "string" then
+		if Runs[Input.cancel] ~= "running" then
+			return {error = if Runs[Input.cancel] == nil then `Claudio has no run called "{Input.cancel}".` else "That run already finished. Fetch what it returned with resultOf."}
+		end
+
+		Runs[Input.cancel] = "cancelling"
+
+		return {result = "Asked the run to stop. It stops at the start of its next loop turn; fetch resultOf to confirm. Code that is inside one long call, with no loop, only stops once that call returns."}
+	end
+
+	if typeof(Input.resultOf) == "string" then
+		const Kept = Runs[Input.resultOf]
+
+		if Kept == nil then
+			return {error = `Claudio has no run called "{Input.resultOf}". Results are kept for the last 20 runs since the plugin last loaded.`}
+		end
+
+		return if Kept == "running" or Kept == "cancelling" then {result = if Kept == "running" then "That run is still going and still able to change the place. Check again in a moment, or cancel it." else "That run is stopping."} else Kept
+	end
+
+	const Run = if typeof(Input.run) == "string" then Input.run else nil
+
+	if Run then
+		Runs[Run] = "running"
+		table.insert(RunOrder, Run)
+
+		if #RunOrder > 20 then
+			Runs[table.remove(RunOrder, 1) :: string] = nil
+		end
+	end
+
 	const Code = Input.code
 
 	if typeof(Code) ~= "string" or Code == "" then
@@ -2284,7 +2387,6 @@ const function Execute(Input: any): any
 	end
 
 	const LogService = game:GetService("LogService")
-	const ChangeHistoryService = game:GetService("ChangeHistoryService")
 	const Said = {}
 
 	const Wrapped = `return function(plugin, breathe, __ClaudioPace)\n{require(script.Parent.Parent.Pacing).Insert(Code, "__ClaudioPace")}\nend`
@@ -2324,11 +2426,7 @@ const function Execute(Input: any): any
 		end
 	end)
 
-	local Recording: string?
-
-	if Input.readOnly ~= true then
-		Recording = ChangeHistoryService:TryBeginRecording("ClaudioExecute", Input.undoName or "Claudio ran a script")
-	end
+	const Step = if Input.readOnly ~= true then StartStep("ClaudioExecute", Input.undoName or "Claudio ran a script") else nil
 
 	_G.ClaudioFresh = require(script.Parent.Parent.Fresh).Load
 
@@ -2360,14 +2458,18 @@ const function Execute(Input: any): any
 	if not Built then
 		Finish()
 
-		if Recording then
-			ChangeHistoryService:FinishRecording(Recording, Enum.FinishRecordingOperation.Cancel)
+		if Step then
+			EndStep(Step, false)
 		end
 
 		const Failed: {[string]: any} = {error = "That did not compile."}
 
 		if #Said > 0 then
 			Failed.output = Said
+		end
+
+		if Run then
+			Runs[Run] = Failed
 		end
 
 		return Failed
@@ -2379,6 +2481,10 @@ const function Execute(Input: any): any
 
 	const function Pace()
 		const Now = os.clock()
+
+		if Run and Runs[Run] == "cancelling" then
+			error("Cancelled on request before finishing.", 0)
+		end
 
 		if Now > Deadline then
 			error(`Stopped after {Limit} seconds, the time limit for this call. Raise timeout if it really needs longer.`, 0)
@@ -2394,12 +2500,8 @@ const function Execute(Input: any): any
 
 	Finish()
 
-	if Recording then
-		ChangeHistoryService:FinishRecording(Recording, Enum.FinishRecordingOperation.Commit)
-
-		if Ok then
-			Committed += 1
-		end
+	if Step then
+		EndStep(Step, true)
 	end
 
 	const Answer: {[string]: any} = {}
@@ -2448,8 +2550,12 @@ const function Execute(Input: any): any
 		Answer.output = Said
 	end
 
-	if Ok and Recording then
-		Answer.undo = true
+	if Step then
+		Answer.undo = Step.Name
+	end
+
+	if Run then
+		Runs[Run] = Answer
 	end
 
 	return Answer

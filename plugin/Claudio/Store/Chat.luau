@@ -251,28 +251,50 @@ const Places = {
 const function ScriptTree(): {any}
 	const Found = {}
 
+	const Added: {[Instance]: boolean} = {}
+
+	const function Add(Object: Instance)
+		if Added[Object] or Object == game or #Found >= 20000 then
+			return
+		end
+
+		Added[Object] = true
+
+		if Object.Parent and Object.Parent ~= game then
+			Add(Object.Parent)
+		end
+
+		const Parts = {}
+		local Step: Instance? = Object
+
+		while Step and Step ~= game do
+			table.insert(Parts, 1, Step.Name)
+			Step = Step.Parent
+		end
+
+		table.insert(Found, {
+			path = Object:GetFullName(),
+			parts = Parts,
+			className = Object.ClassName,
+			source = if Object:IsA("LuaSourceContainer") and Object.Source ~= "" then Object.Source else nil,
+		})
+	end
+
 	for _, Service in Places do
-		for _, Object in Service:GetDescendants() do
+		for _, Object in Service:QueryDescendants("LuaSourceContainer") do
+			Breathe()
+			Add(Object)
+		end
+	end
+
+	for Index = 2, #Places + 1 do
+		for _, Object in Places[if Index > #Places then 1 else Index]:GetDescendants() do
 			if #Found >= 20000 then
 				return Found
 			end
 
 			Breathe()
-
-			const Parts = {}
-			local Step: Instance? = Object
-
-			while Step and Step ~= game do
-				table.insert(Parts, 1, Step.Name)
-				Step = Step.Parent
-			end
-
-			table.insert(Found, {
-				path = Object:GetFullName(),
-				parts = Parts,
-				className = Object.ClassName,
-				source = if Object:IsA("LuaSourceContainer") and Object.Source ~= "" then Object.Source else nil,
-			})
+			Add(Object)
 		end
 	end
 

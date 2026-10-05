@@ -248,8 +248,22 @@ const function Layout(Box: TextBox, Width: number, Rich: string?): ({{number}}, 
 				Next = Ending
 			end
 
-			if Fit == From then
+			local Shown = Fit - 1
+
+			while Shown >= From and Text:sub(Shown, Shown) == " " do
+				Shown -= 1
+			end
+
+			if From >= Stop then
 				Fit = Stop
+			elseif Fit == From or Measure(From, Shown) > Width then
+				local Cut = From
+
+				while Cut < Stop and Measure(From, Cut) <= Width do
+					Cut += 1
+				end
+
+				Fit = math.max(Cut, From + 1)
 			end
 
 			table.insert(Rows, {

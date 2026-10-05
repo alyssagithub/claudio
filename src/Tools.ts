@@ -1144,10 +1144,13 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
     {
       Name: "lint",
       Description: LintDescription,
-      Schema: {paths: z.array(z.string()).optional().describe("Instance paths to check, such as ServerScriptService.Main. Omit to check the whole place.")},
-      Run: async (Input: { paths?: string[] }) => ({content: [{
+      Schema: {
+        paths: z.array(z.string()).optional().describe("Instance paths to check, such as ServerScriptService.Main. Each path also covers every script inside it. Omit to check the whole place."),
+        exact: z.boolean().optional().describe("Check only the scripts at exactly these paths, not the scripts inside them. Use it on a ModuleScript with many child modules to keep the report short."),
+      },
+      Run: async (Input: { paths?: string[]; exact?: boolean }) => ({content: [{
         type: "text",
-        text: LintReport(await Reach("lint", {paths: Input.paths || []})),
+        text: LintReport(await Reach("lint", {paths: Input.paths || [], exact: Input.exact === true})),
       }]}),
     },
   ];

@@ -203,9 +203,13 @@ return function()
 				end,
 				AnchorPoint = Vector2.new(1, 0),
 				Position = UDim2.fromScale(1, 0),
-				BackgroundColor3 = Theme.Colors.Accent,
+				BackgroundColor3 = function()
+					return if Chosen()[Label()] then Theme.Colors.Accent() else Theme.Colors.Input()
+				end,
 				BackgroundTransparency = function()
-					return if Chosen()[Label()] then 0 else 1
+					const Held = Current()
+
+					return if Chosen()[Label()] or (Held and Held.multiSelect) then 0 else 1
 				end,
 				TextColor3 = function()
 					return if Chosen()[Label()] then Theme.Colors.AccentText() else Theme.Colors.DimText()
@@ -228,7 +232,12 @@ return function()
 
 				Create "UICorner" {CornerRadius = UDim.new(0, 3)},
 				Create "UIStroke" {
-					Color = Theme.Colors.Border,
+					Color = function()
+						const Held = Current()
+
+						return if Held and Held.multiSelect then Theme.Colors.DimText() else Theme.Colors.Border()
+					end,
+					Thickness = 1.5,
 					Transparency = function()
 						return if Chosen()[Label()] then 1 else 0
 					end,
@@ -353,6 +362,21 @@ return function()
 					PaddingTop = UDim.new(0, 1),
 					PaddingBottom = UDim.new(0, 1),
 				},
+			},
+			Create "TextLabel" {
+				Name = "Many",
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+				TextColor3 = Theme.Colors.DimText,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+				LayoutOrder = 3,
+				Text = "Choose any",
+				Visible = function()
+					const Held = Current()
+
+					return Held ~= nil and Held.multiSelect == true
+				end,
 			},
 			IconButton {
 				Icon = Config.Icons.Down,

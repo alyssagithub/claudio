@@ -305,28 +305,11 @@ const Running: {[string]: boolean} = {}
 local Watching = false
 
 const function Resolve(Path: string): Instance?
-	local Object: Instance? = game
-
-	for Index, Step in string.split(Path, ".") do
-		if Index == 1 and (Step == "game" or Step == "Game") then
-			continue
-		end
-
-		if not Object then
-			return nil
-		end
-
-		const Service = if Object == game then pcall(game.GetService, game, Step) else false
-		local Next = (Object :: Instance):FindFirstChild(Step)
-
-		if not Next and Service then
-			Next = select(2, pcall(game.GetService, game, Step))
-		end
-
-		Object = Next
+	if Path == "game" or Path == "Game" then
+		return game
 	end
 
-	return Object
+	return (Navigate.Resolve(Path))
 end
 
 const function Sources(Root: Instance): {LuaSourceContainer}
@@ -770,7 +753,7 @@ const function Logs(Input: any): any
 	}
 end
 
-const function LintPlace(Paths: {string}?): any
+const function LintPlace(Paths: {string}?, Exact: boolean?): any
 	const Tree = ScriptTree()
 
 	if #Tree == 0 then
@@ -787,7 +770,7 @@ const function LintPlace(Paths: {string}?): any
 
 		for _, Entry in Tree do
 			for _, Path in Paths do
-				if Entry.path == Path or Entry.path:sub(1, #Path + 1) == `{Path}.` then
+				if Entry.path == Path or (not Exact and Entry.path:sub(1, #Path + 1) == `{Path}.`) then
 					table.insert(Wanted, Entry)
 
 					break
@@ -2370,6 +2353,25 @@ end
 
 const Runs: {[string]: any} = {}
 const RunOrder: {string} = {}
+const Workers: {[string]: thread} = {}
+
+const function Waiting(Run: string): string
+	const Worker = Workers[Run]
+
+	if not Worker or coroutine.status(Worker) ~= "suspended" then
+		return ""
+	end
+
+	const Lines = {}
+
+	for Line in debug.traceback(Worker):gmatch("[^\n]+") do
+		table.insert(Lines, (Line:gsub("[%w_%.]*ClaudioExecute:(%d+)", function(Digits: string): string
+			return `your code, line {(tonumber(Digits) or 2) - 1}`
+		end)))
+	end
+
+	return ` It is waiting at:\n{table.concat(Lines, "\n")}`
+end
 
 const function Execute(Input: any): any
 	if typeof(Input.cancel) == "string" then
@@ -2389,7 +2391,7 @@ const function Execute(Input: any): any
 			return {error = `Claudio has no run called "{Input.resultOf}". Results are kept for the last 20 runs since the plugin last loaded.`}
 		end
 
-		return if Kept == "running" or Kept == "cancelling" then {result = if Kept == "running" then "That run is still going and still able to change the place. Check again in a moment, or cancel it." else "That run is stopping."} else Kept
+		return if Kept == "running" or Kept == "cancelling" then {result = `{if Kept == "running" then "That run is still going and still able to change the place. Check again in a moment, or cancel it." else "That run is stopping."}{Waiting(Input.resultOf)}`} else Kept
 	end
 
 	const Run = if typeof(Input.run) == "string" then Input.run else nil
@@ -2519,7 +2521,40 @@ const function Execute(Input: any): any
 		end
 	end
 
-	const Ok, Result = xpcall(Made :: any, Trouble, Settings.Plugin(), Breathe, Pace)
+	local Ok, Result
+	local Finished = false
+	const Worker = task.spawn(function()
+		Ok, Result = xpcall(Made :: any, Trouble, Settings.Plugin(), Breathe, Pace)
+		Finished = true
+	end)
+
+	if Run then
+		Workers[Run] = Worker
+	end
+
+	while not Finished do
+		const Asked = Run ~= nil and Runs[Run] == "cancelling"
+		const Late = os.clock() > Deadline + 1
+
+		if (Asked or Late) and coroutine.status(Worker) == "suspended" then
+			const Where = if Run then Waiting(Run) else ""
+
+			task.cancel(Worker)
+			Ok = false
+			Result = {
+				Message = `{if Asked then "Cancelled" else `Stopped after {Limit} seconds, the time limit for this call,`} while it was waiting on something rather than running.{Where}`,
+				Trace = "",
+			}
+
+			break
+		end
+
+		task.wait(0.1)
+	end
+
+	if Run then
+		Workers[Run] = nil
+	end
 
 	Finish()
 
@@ -2619,7 +2654,7 @@ const function RunStudioJob(Job: any)
 			end
 
 			if Job.kind == "lint" then
-				return LintPlace(if Job.input then Job.input.paths else nil)
+				return LintPlace(if Job.input then Job.input.paths else nil, Job.input and Job.input.exact == true)
 			end
 
 			if Job.kind == "playtest" then

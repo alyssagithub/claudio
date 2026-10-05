@@ -24,18 +24,89 @@ const RootNames = {
 const Navigate = {}
 
 function Navigate.Resolve(Path: string): (Instance?, string?)
+	const Pieces: {{Name: string, Exact: boolean}} = {}
+	local At = 1
+	const Given = Path:gsub("^[Gg]ame%.", "")
+
+	while At <= #Given do
+		const Quote, Inside = Given:match("^%[([\"'])(.-)%1%]", At)
+
+		if Quote then
+			table.insert(Pieces, {
+				Name = Inside :: string,
+				Exact = true,
+			})
+			At += #(Inside :: string) + 4
+		else
+			const Name = Given:match("^[^%.%[]+", At)
+
+			if not Name then
+				At += 1
+
+				continue
+			end
+
+			table.insert(Pieces, {
+				Name = Name,
+				Exact = false,
+			})
+			At += #Name
+		end
+
+		if Given:sub(At, At) == "." then
+			At += 1
+		end
+	end
+
 	local Current: Instance = game
 	local Resolved = "game"
+	local Index = 1
 
-	for Name in Path:gsub("^game%.", ""):gmatch("[^%.]+") do
-		const Child = Current:FindFirstChild(Name)
+	while Index <= #Pieces do
+		local Child: Instance?
+		local Used = 1
+
+		if Pieces[Index].Exact then
+			Child = Current:FindFirstChild(Pieces[Index].Name)
+		else
+			local Last = Index
+
+			while Last < #Pieces and not Pieces[Last + 1].Exact do
+				Last += 1
+			end
+
+			for Stop = Last, Index, -1 do
+				const Names = {}
+
+				for Step = Index, Stop do
+					table.insert(Names, Pieces[Step].Name)
+				end
+
+				const Name = table.concat(Names, ".")
+
+				Child = Current:FindFirstChild(Name)
+
+				if not Child and Current == game and Stop == Index then
+					const Found, Service = pcall(game.GetService, game, Name)
+
+					Child = if Found then Service else nil
+				end
+
+				if Child then
+					Used = Stop - Index + 1
+
+					break
+				end
+			end
+		end
 
 		if not Child then
 			return nil, nil
 		end
 
 		Current = Child
-		Resolved = `{Resolved}.{Name}`
+		Resolved = `{Resolved}.{Child.Name}`
+		Index += Used
 	end
 
 	if Current == game then

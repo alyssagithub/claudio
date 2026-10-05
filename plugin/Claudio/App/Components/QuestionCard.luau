@@ -8,6 +8,7 @@ const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const Button = require(script.Parent.Button)
 const IconButton = require(script.Parent.IconButton)
+const Paragraph = require(script.Parent.Paragraph)
 
 const Create = Vide.create
 
@@ -376,23 +377,11 @@ return function()
 				Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
 			},
 		},
-		Create "TextLabel" {
-			Name = "Question",
-			Size = UDim2.fromScale(1, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundTransparency = 1,
-			TextColor3 = Theme.Colors.Text,
-			TextSize = Settings.TextSize,
-			FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextWrapped = true,
-			LayoutOrder = 2,
-			Text = function()
-				const Held = Current()
+		Paragraph(function()
+			const Held = Current()
 
-				return if Held then Held.question else ""
-			end,
-		},
+			return if Held then Held.question else ""
+		end, 2),
 		Vide.indexes(function()
 			const Held = Current()
 

@@ -1,58 +1,90 @@
 --!strict
-const EncodingService = game:GetService("EncodingService")
-
-const Breathe = require(script.Parent.Breathe)
-
 const Fresh = {}
 
-const Known: {[ModuleScript]: string} = {}
+const Copies: {Instance} = {}
 
-const function Hash(Module: ModuleScript): string
-	return EncodingService:ComputeStringHash(Module.Source, Enum.HashAlgorithm.Sha256)
-end
+const function Place(Object: Instance): number
+	local Count = 0
 
-function Fresh.Snapshot()
-	for _, Object in game:GetDescendants() do
-		Breathe()
+	for _, Sibling in (Object.Parent :: Instance):GetChildren() do
+		if Sibling.Name == Object.Name and Sibling.Archivable then
+			Count += 1
+		end
 
-		if Object:IsA("ModuleScript") then
-			Known[Object] = Hash(Object)
+		if Sibling == Object then
+			return Count
 		end
 	end
-end
 
-const function Replace(Module: ModuleScript): ModuleScript
-	const Where = Module.Parent
-	const Copy = Module:Clone()
-
-	Copy:ClearAllChildren()
-
-	for _, Child in Module:GetChildren() do
-		Child.Parent = Copy
-	end
-
-	Known[Module] = nil
-	Module:Destroy()
-	Copy.Parent = Where
-	Known[Copy] = Hash(Copy)
-
-	return Copy
+	return Count
 end
 
 function Fresh.Load(Module: ModuleScript): any
-	for Object, Before in table.clone(Known) do
-		Breathe()
+	if not Module:IsDescendantOf(game) or Module.Parent == game then
+		error(`{Module.Name} is not in the place, so it cannot be loaded fresh.`)
+	end
 
-		if Object ~= Module and Object.Parent and Hash(Object) ~= Before then
-			Replace(Object)
+	const Path: {Instance} = {}
+	local Step: Instance = Module
+
+	while Step.Parent ~= game do
+		if not Step.Archivable then
+			error(`{Step:GetFullName()} has Archivable off, so it cannot be copied to load fresh.`)
+		end
+
+		table.insert(Path, 1, Step)
+		Step = Step.Parent :: Instance
+	end
+
+	const Holder = Instance.new("Folder")
+
+	Holder.Name = Step.Name
+
+	for _, Child in Step:GetChildren() do
+		const Copy = if Child.Archivable then Child:Clone() else nil
+
+		if Copy then
+			Copy.Parent = Holder
 		end
 	end
 
-	if not Module.Parent then
-		error(`{Module.Name} was deleted, so it cannot be loaded fresh.`)
+	table.insert(Copies, Holder)
+
+	local Current: Instance = Holder
+
+	for _, Original in Path do
+		local Count = 0
+		local Found: Instance?
+		const Wanted = Place(Original)
+
+		for _, Child in Current:GetChildren() do
+			if Child.Name == Original.Name then
+				Count += 1
+
+				if Count == Wanted then
+					Found = Child
+
+					break
+				end
+			end
+		end
+
+		if not Found then
+			error(`Could not find the copy of {Original:GetFullName()}.`)
+		end
+
+		Current = Found
 	end
 
-	return (require :: any)(Replace(Module))
+	return (require :: any)(Current)
+end
+
+function Fresh.Clear()
+	for _, Holder in Copies do
+		Holder:Destroy()
+	end
+
+	table.clear(Copies)
 end
 
 return Fresh

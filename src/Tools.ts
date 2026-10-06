@@ -16,7 +16,7 @@ const ExecuteDescription = [
   "target picks where: edit is the editor and the default, server and client are the running play session and need one open.",
   "Changes are recorded as one undo step; pass readOnly when you only want to look.",
   "Set timeout in seconds when the code is expected to take a while, up to thirty minutes; it defaults to five minutes.",
-  "In edit, plugin is Claudio's own Plugin object, so plugin APIs and plugin-development harnesses work. Call _G.ClaudioFresh(module) to require past the cache; it also reloads every other module whose source changed since Studio opened, so edited dependencies are not stale.",
+  "In edit, plugin is Claudio's own Plugin object, so plugin APIs and plugin-development harnesses work. Call _G.ClaudioFresh(module) to require past the cache: it copies the module's whole service off to the side, outside the place, and requires the copy, so the module and everything it requires by relative path load fresh and the place is never touched. Requires through game:GetService inside it still reach the cached originals. The copy is discarded when your code finishes.",
   "Code runs on Studio's main thread and cannot be interrupted, so a loop that never yields freezes all of Studio, stalls every other call, and makes Studio offer to kill the plugin. Call breathe() inside any loop over many instances, scripts or lines; it yields only when the frame's time is used up, so calling it every iteration costs almost nothing.",
   "Never run patterns that start or end with a greedy class, such as [^\\n]*word[^\\n]*, over a whole script's source: their cost grows with the square of the line length. Split the source into lines with gmatch(\"[^\\n]+\") and test each with find(word, 1, true).",
 ].join(" ");
@@ -38,7 +38,7 @@ const PlaytestDescription = [
   "Always stop what you started.",
   "Check status first rather than assuming.",
   "start and players wait until the server and every client have loaded and can run code, up to three minutes, so the session is usable as soon as the call returns.",
-  "This runs without a player character, so LocalPlayer and PlayerGui are not available.",
+  "In run mode there is no player character, so LocalPlayer and PlayerGui are not available; play mode has a full character and PlayerGui.",
   "A multiplayer test opens a server and one client per player, each its own Studio process of a gigabyte or more, measured from the ones already running. Before starting one or adding players the tool checks they fit in free memory with room to spare, counting the page file, and refuses when they would not, because running out crashes the whole machine. Pass force only when the user asks for it.",
   "stop closes the test's own Studio windows from outside when the session does not answer, so a hung multiplayer test can always be stopped; the editor is never touched.",
 ].join(" ");
@@ -410,9 +410,10 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         className: z.string().optional().describe("Class to create."),
         name: z.string().optional().describe("Name to give it, for create and rename."),
         properties: z.record(z.any()).optional().describe("Property names and values, for set and create."),
+        attributes: z.record(z.union([z.string(), z.number(), z.boolean()])).optional().describe("Attribute names and values to set, for set."),
         undoName: z.string().optional().describe("What the undo step should be called."),
       },
-      Run: async (Input: { action: "set" | "create" | "delete" | "rename" | "reparent"; path?: string; parent?: string; className?: string; name?: string; properties?: Record<string, unknown>; undoName?: string }) => ({content: [{
+      Run: async (Input: { action: "set" | "create" | "delete" | "rename" | "reparent"; path?: string; parent?: string; className?: string; name?: string; properties?: Record<string, unknown>; attributes?: Record<string, string | number | boolean>; undoName?: string }) => ({content: [{
         type: "text",
         text: Said(await Reach("modify", Input),"Studio did not say what happened."),
       }]}),
@@ -1045,9 +1046,10 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         paths: z.array(z.string()).optional().describe("Instances to save. Give these to save, leave them out to load."),
         path: z.string().optional().describe("Where to put what is loaded, such as Workspace."),
         undoName: z.string().optional().describe("What the undo step should be called, when loading."),
+        compare: z.boolean().optional().describe("With file, compare instead of loading: lists what is in the file but missing from the place, and what only the place has, matched by position in the tree rather than by dotted paths. Services in a place file are compared to the real services; anything else is compared to the children of path, or game. Nothing is changed."),
         services: z.array(z.string()).optional().describe("When loading a place file (.rbxl), which services to take, such as [\"Workspace\", \"ServerStorage\"]. Each comes in as a folder of that name holding its contents, since services themselves cannot be moved. All of them by default."),
       },
-      Run: async (Input: { file: string; folder?: string; name?: string; paths?: string[]; path?: string; undoName?: string; services?: string[] }) => {
+      Run: async (Input: { file: string; folder?: string; name?: string; paths?: string[]; path?: string; undoName?: string; services?: string[]; compare?: boolean }) => {
         let Tree: DiskNode | undefined;
 
         if (Input.folder) {
@@ -1086,7 +1088,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
           }]};
         }
 
-        if (!Input.path) {
+        if (!Input.path && !Input.compare) {
           return {content: [{
             type: "text",
             text: "Give paths and a file to save, or a file and a path to load.",
@@ -1111,6 +1113,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
             path: Input.path,
             undoName: Input.undoName,
             services: Input.services,
+            compare: Input.compare,
           }), "Studio did not say what happened."),
         }]};
       },

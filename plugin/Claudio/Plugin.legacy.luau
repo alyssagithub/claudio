@@ -59,7 +59,6 @@ if not Playing then
 	end
 
 	Watcher.Start()
-	task.spawn(require(script.Parent.Fresh).Snapshot)
 end
 
 const Running = App.New(plugin)

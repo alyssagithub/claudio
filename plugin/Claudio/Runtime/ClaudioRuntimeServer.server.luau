@@ -48,13 +48,14 @@ Remote.OnServerEvent:Connect(function(Sender: Player, Id: any, Result: any)
 	Replies[Id] = if Result == nil then {error = "The client sent nothing back."} else Result
 end)
 
-const function AskClient(Player: Player, Kind: string, Body: string): any
+const function AskClient(Player: Player, Kind: string, Body: string, Seconds: number?): any
 	const Id = HttpService:GenerateGUID(false)
 
 	Asked[Id] = Player
 	Remote:FireClient(Player, Id, Kind, Body)
 
-	const Deadline = os.clock() + 20
+	const Limit = Seconds or 20
+	const Deadline = os.clock() + Limit
 
 	while Replies[Id] == nil and os.clock() < Deadline do
 		task.wait(0.1)
@@ -66,7 +67,7 @@ const function AskClient(Player: Player, Kind: string, Body: string): any
 	Replies[Id] = nil
 
 	if Answer == nil then
-		return {error = "The client didn't answer within 20 seconds. Claudio's client script may not have loaded."}
+		return {error = if Seconds then `Stopped waiting for the client after {Limit} seconds, the time limit for this call. Raise timeout if the code really needs longer.` else "The client didn't answer within 20 seconds. Claudio's client script may not have loaded."}
 	end
 
 	return Answer
@@ -400,10 +401,14 @@ task.spawn(function()
 					end
 
 					if Job.kind == "execute" and typeof(Job.input.within) == "string" then
-						return AskClient(Player, "scoped", HttpService:JSONEncode(Job.input))
+						return AskClient(Player, "scoped", HttpService:JSONEncode(Job.input), math.clamp(tonumber(Job.input.timeout) or 300, 1, 1800))
 					end
 
-					return AskClient(Player, if Job.kind == "input" then "input" else "execute", if Job.kind == "input" then HttpService:JSONEncode(Job.input) else Job.input.code)
+					if Job.kind == "input" then
+						return AskClient(Player, "input", HttpService:JSONEncode(Job.input))
+					end
+
+					return AskClient(Player, "execute", Job.input.code, math.clamp(tonumber(Job.input.timeout) or 300, 1, 1800))
 				end
 
 				return Run(Job.input.code, Job.input.within)

@@ -1444,6 +1444,95 @@ const function Rbxm(Input: any): any
 			return {error = `Studio could not read that rbxm: {tostring(Made)}`}
 		end
 
+		if Input.compare == true then
+			const Missing = {}
+			const Extra = {}
+			local Same = 0
+
+			const function Label(Above: string, Name: string): string
+				return if Name:find(".", 1, true) or Name:find("[", 1, true) then `{Above}["{Name}"]` else `{Above}.{Name}`
+			end
+
+			const function Pair(Children: {Instance}): {[Instance]: string}
+				const Seen = {}
+				const Keys = {}
+
+				for _, Child in Children do
+					Seen[Child.Name] = (Seen[Child.Name] or 0) + 1
+					Keys[Child] = `{Child.Name}#{Seen[Child.Name]}`
+				end
+
+				return Keys
+			end
+
+			const function Walk(FromFile: Instance, InPlace: Instance, Above: string)
+				Breathe()
+
+				const PlaceKeys = Pair(InPlace:GetChildren())
+				const ByKey = {}
+
+				for Child, Key in PlaceKeys do
+					ByKey[Key] = Child
+				end
+
+				for Child, Key in Pair(FromFile:GetChildren()) do
+					const Match = ByKey[Key]
+
+					ByKey[Key] = nil
+
+					if not Match then
+						table.insert(Missing, `{Label(Above, Child.Name)} ({Child.ClassName}, {#Child:GetDescendants()} inside)`)
+					elseif Match.ClassName ~= Child.ClassName then
+						table.insert(Missing, `{Label(Above, Child.Name)} is a {Child.ClassName} in the file but a {Match.ClassName} in the place`)
+					else
+						Same += 1
+						Walk(Child, Match, Label(Above, Child.Name))
+					end
+				end
+
+				for _, Child in ByKey do
+					table.insert(Extra, Label(Above, Child.Name))
+				end
+			end
+
+			const Root = if typeof(Input.path) == "string" and Input.path ~= "" then Resolve(Input.path) else game
+			const Wanted = if typeof(Input.services) == "table" and #Input.services > 0 then Input.services else nil
+
+			if not Root then
+				return {error = `Nothing at "{tostring(Input.path)}" to compare against.`}
+			end
+
+			for _, Object in Made do
+				const Found, Service = pcall(game.FindService, game, Object.ClassName)
+
+				if Found and Service then
+					if not Wanted or table.find(Wanted, Object.Name) then
+						Walk(Object, Service, Service.Name)
+					end
+
+					continue
+				end
+
+				const Match = Root:FindFirstChild(Object.Name)
+
+				if Match then
+					Walk(Object, Match, Match:GetFullName())
+				else
+					table.insert(Missing, `{Label(Root:GetFullName(), Object.Name)} ({Object.ClassName})`)
+				end
+			end
+
+			for _, Object in Made do
+				Object:Destroy()
+			end
+
+			const function Listed(Title: string, Lines: {string}): string
+				return if #Lines == 0 then "" else `\n{Title} ({#Lines}):\n{table.concat(Lines, "\n", 1, math.min(#Lines, 200))}{if #Lines > 200 then `\n...and {#Lines - 200} more` else ""}`
+			end
+
+			return {text = `Compared by position in the tree, matching children by name and order among same-named siblings. {Same} matched.{Listed("In the file but missing from the place", Missing)}{Listed("Only in the place", Extra)}`}
+		end
+
 		const Step = StartStep("ClaudioRbxm", Input.undoName or "Claudio loaded an rbxm")
 		const Names = {}
 		const Skipped = {}
@@ -2292,6 +2381,12 @@ const function Modify(Input: any): any
 				table.insert(Changed, if Applied then `{Name} set` else `{Name} refused: {tostring(Trouble)}`)
 			end
 
+			for Name, Value in Input.attributes or {} do
+				const Applied, Trouble = pcall(Object.SetAttribute, Object, Name, Value)
+
+				table.insert(Changed, if Applied then `attribute {Name} set` else `attribute {Name} refused: {tostring(Trouble)}`)
+			end
+
 			return {text = `{Object:GetFullName()}: {table.concat(Changed, ", ")}`}
 		end
 
@@ -2492,6 +2587,7 @@ const function Execute(Input: any): any
 		Listening:Disconnect()
 
 		_G.ClaudioFresh = nil
+		require(script.Parent.Parent.Fresh).Clear()
 	end
 
 	const function Trouble(Broke: any): any

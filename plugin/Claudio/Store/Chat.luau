@@ -2689,7 +2689,7 @@ const function Execute(Input: any): any
 		const Broke = Result :: any
 		const Message = tostring(Broke.Message)
 
-		Answer.error = Placed(Message)
+		Answer.error = `{Placed(Message)}{if Message:find("Incorrect number of return values", 1, true) then " The UpdateSourceAsync callback returned more than one value. That is usually `return Source:gsub(...)`, which also returns the match count; wrap it as `return (Source:gsub(...))`. Errors thrown inside the callback, such as a failed assert, come through with their own message." else ""}`
 
 		const Where = tonumber(Message:match("ClaudioExecute:(%d+)"))
 

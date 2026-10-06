@@ -287,6 +287,60 @@ const Built = new Map<string, { Stamp: string; Result: BuiltConversation }>();
 
 const Windows = [4 * 1024 * 1024, 16 * 1024 * 1024, 64 * 1024 * 1024];
 
+const ImageData = /"data":"[A-Za-z0-9+\/=]{256,}"/g;
+
+function EachLine(File: string, Start: number, Length: number, Visit: (Raw: string, At: number, Bytes: number) => void): number {
+  const Descriptor = fs.openSync(File, "r");
+  const Chunk = global.Buffer.alloc(8 * 1024 * 1024);
+  const Decoder = new TextDecoder();
+  let Offset = Start;
+  let Left = Length;
+  let Carried = "";
+  let Consumed = Start;
+
+  try {
+    while (Left > 0) {
+      const Got = fs.readSync(Descriptor, Chunk, 0, Math.min(Chunk.length, Left), Offset);
+
+      if (Got <= 0) {
+        break;
+      }
+
+      Offset += Got;
+      Left -= Got;
+
+      const Text = Carried + Decoder.decode(Chunk.subarray(0, Got), {stream: Left > 0});
+      const Ended = Text.lastIndexOf("\n");
+
+      if (Ended < 0) {
+        Carried = Text;
+        continue;
+      }
+
+      for (const Raw of Text.slice(0, Ended).split("\n")) {
+        const Bytes = global.Buffer.byteLength(Raw, "utf8");
+
+        Visit(Raw, Consumed, Bytes);
+        Consumed += Bytes + 1;
+      }
+
+      Carried = Text.slice(Ended + 1);
+    }
+  } finally {
+    fs.closeSync(Descriptor);
+  }
+
+  return Consumed;
+}
+
+function Light(Raw: string): TranscriptEntry | null {
+  try {
+    return JSON.parse(Raw.length > 4096 ? Raw.replace(ImageData, "\"data\":\"\"") : Raw) as TranscriptEntry;
+  } catch {
+    return null;
+  }
+}
+
 function ReadWindow(File: string, Bytes: number): TranscriptEntry[] | null {
   try {
     const Descriptor = fs.openSync(File, "r");
@@ -300,13 +354,7 @@ function ReadWindow(File: string, Bytes: number): TranscriptEntry[] | null {
     const Text = new TextDecoder().decode(Buffer);
     const Start = Length < Size ? Text.indexOf("\n") + 1 : 0;
 
-    return Text.slice(Start).split("\n").map((Raw) => {
-      try {
-        return JSON.parse(Raw) as TranscriptEntry;
-      } catch {
-        return null;
-      }
-    }).filter(Boolean) as TranscriptEntry[];
+    return Text.slice(Start).split("\n").map(Light).filter(Boolean) as TranscriptEntry[];
   } catch {
     return null;
   }
@@ -438,25 +486,20 @@ function ParseLines(File: string, MaxBytes?: number, From?: number): { Lines: Tr
       };
     }
 
-    const Buffer = new Uint8Array(Length);
-
-    fs.readSync(Descriptor, Buffer, 0, Length, Start);
     fs.closeSync(Descriptor);
 
-    const Text = new TextDecoder().decode(Buffer);
-    const Ended = Text.lastIndexOf("\n");
-    const Whole = Ended < 0 ? Text : Text.slice(0, Ended);
-    const Lines = Whole.split("\n").map((Raw) => {
-      try {
-        return JSON.parse(Raw) as TranscriptEntry;
-      } catch {
-        return null;
+    const Lines: TranscriptEntry[] = [];
+    const Read = EachLine(File, Start, Length, (Raw) => {
+      const Line = Light(Raw);
+
+      if (Line) {
+        Lines.push(Line);
       }
-    }).filter(Boolean) as TranscriptEntry[];
+    });
 
     return {
       Lines,
-      Read: Ended < 0 ? Start : Start + global.Buffer.byteLength(Whole, "utf8") + 1,
+      Read,
     };
   } catch {
     return null;
@@ -592,12 +635,64 @@ export function ListConversations(): Listing[] {
   return Summaries.sort((Left, Right) => (Number(Right.starred) - Number(Left.starred)) || (Right.updatedAt - Left.updatedAt));
 }
 
+const ImageSpots = new Map<string, { Size: number; Read: number; Spots: { At: number; Bytes: number; Index: number }[] }>();
+
+function ImageLine(Raw: string): TranscriptEntry | null {
+  try {
+    const Line = JSON.parse(Raw) as TranscriptEntry;
+
+    return !Line.isSidechain && Line.type === "user" && Line.message ? Line : null;
+  } catch {
+    return null;
+  }
+}
+
 export function GetConversationImage(Id: string, Wanted: number, Side?: number) {
   const File = FindFile(Id);
-  const Found = (File ? ReadLines(File) || [] : [])
-    .filter((Line) => !Line.isSidechain && Line.type === "user" && Line.message)
-    .flatMap((Line) => ImagesInContent(Line.message!.content));
-  const Image = Number.isInteger(Wanted) && Wanted !== 0 ? Found.at(Wanted > 0 ? Wanted - 1 : Wanted) : null;
+
+  if (!File || !Number.isInteger(Wanted) || Wanted === 0) {
+    return null;
+  }
+
+  const Size = fs.statSync(File).size;
+  const Known = ImageSpots.get(File);
+  const Index = Known && Known.Size <= Size ? Known : {Size: 0, Read: 0, Spots: []};
+
+  if (Index.Size < Size) {
+    Index.Read = EachLine(File, Index.Read, Size - Index.Read, (Raw, At, Bytes) => {
+      if (!Raw.includes("\"base64\"")) {
+        return;
+      }
+
+      const Line = ImageLine(Raw);
+      const Count = Line ? ImagesInContent(Line.message!.content).length : 0;
+
+      for (let Each = 0; Each < Count; Each++) {
+        Index.Spots.push({
+          At,
+          Bytes,
+          Index: Each,
+        });
+      }
+    });
+    Index.Size = Size;
+    ImageSpots.set(File, Index);
+  }
+
+  const Spot = Index.Spots.at(Wanted > 0 ? Wanted - 1 : Wanted);
+
+  if (!Spot) {
+    return null;
+  }
+
+  const Bytes = global.Buffer.alloc(Spot.Bytes);
+  const Descriptor = fs.openSync(File, "r");
+
+  fs.readSync(Descriptor, Bytes, 0, Spot.Bytes, Spot.At);
+  fs.closeSync(Descriptor);
+
+  const Line = ImageLine(Bytes.toString("utf8"));
+  const Image = Line ? ImagesInContent(Line.message!.content)[Spot.Index] : null;
 
   return Image ? DecodeImage(Image.mediaType, Image.data, Side) : null;
 }

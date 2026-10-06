@@ -515,10 +515,18 @@ end)
 
 const LoadDeadline = os.clock() + 180
 
-while not (game:IsLoaded() and Builder()) and os.clock() < LoadDeadline do
+while not Builder() and os.clock() < LoadDeadline do
 	task.wait(0.5)
 end
 
-if game:IsLoaded() and Builder() then
-	Remote:FireServer("ready")
+if not Builder() then
+	return
 end
+
+Remote:FireServer("ready")
+
+if not game:IsLoaded() then
+	game.Loaded:Wait()
+end
+
+Remote:FireServer("settled")

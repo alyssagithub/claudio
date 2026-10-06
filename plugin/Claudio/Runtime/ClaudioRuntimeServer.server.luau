@@ -28,14 +28,20 @@ Remote.Parent = ReplicatedStorage
 const Asked: {[string]: Player} = {}
 const Replies = {}
 const Loaded: {[Player]: boolean} = {}
+const Settled: {[Player]: boolean} = {}
 
 game:GetService("Players").PlayerRemoving:Connect(function(Player: Player)
 	Loaded[Player] = nil
+	Settled[Player] = nil
 end)
 
 Remote.OnServerEvent:Connect(function(Sender: Player, Id: any, Result: any)
-	if Id == "ready" then
+	if Id == "ready" or Id == "settled" then
 		Loaded[Sender] = true
+
+		if Id == "settled" then
+			Settled[Sender] = true
+		end
 
 		return
 	end
@@ -215,6 +221,7 @@ end
 task.spawn(function()
 	while RunService:IsRunning() and task.wait(1) do
 		local Ready = 0
+		local Games = 0
 
 		for Player in Loaded do
 			if Player.Parent then
@@ -222,7 +229,13 @@ task.spawn(function()
 			end
 		end
 
-		const Ok, Reply = Call("GET", `/studio/job?role=server&canRun={Builder() ~= nil}&clients={#game:GetService("Players"):GetPlayers()}&ready={Ready}`, nil)
+		for Player in Settled do
+			if Player.Parent then
+				Games += 1
+			end
+		end
+
+		const Ok, Reply = Call("GET", `/studio/job?role=server&canRun={Builder() ~= nil}&clients={#game:GetService("Players"):GetPlayers()}&ready={Ready}&games={Games}`, nil)
 
 		if Ok and Reply and Reply.job then
 			const Job = Reply.job

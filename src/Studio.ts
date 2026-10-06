@@ -66,6 +66,7 @@ const StartedAt = Date.now();
 let CanRun: boolean | null = null;
 let Clients: number | null = null;
 let Ready: number | null = null;
+let Settled: number | null = null;
 let PluginVersion: string | null = null;
 let BridgeVersion: string | null = null;
 let BridgeRoot: string | null = null;
@@ -77,7 +78,7 @@ export function Serving(Version: string, Root: string, Tools: number): void {
   ToolCount = Tools;
 }
 
-export function Seen(Role?: string | null, Able?: boolean, Attached?: number, Plugin?: string, Loaded?: number): void {
+export function Seen(Role?: string | null, Able?: boolean, Attached?: number, Plugin?: string, Loaded?: number, Games?: number): void {
   if (Role && !/^(edit|server|client(-\d+)?)$/.test(Role)) {
     return;
   }
@@ -96,15 +97,19 @@ export function Seen(Role?: string | null, Able?: boolean, Attached?: number, Pl
     Ready = Loaded;
   }
 
+  if (Games !== undefined) {
+    Settled = Games;
+  }
+
   if (Plugin !== undefined) {
     PluginVersion = Plugin;
   }
 }
 
-export function Take(Role?: string | null, Able?: boolean, Attached?: number, Plugin?: string, Loaded?: number) {
+export function Take(Role?: string | null, Able?: boolean, Attached?: number, Plugin?: string, Loaded?: number, Games?: number) {
   const Wanted = Role || "edit";
 
-  Seen(Wanted, Able, Attached, Plugin, Loaded);
+  Seen(Wanted, Able, Attached, Plugin, Loaded, Games);
 
   const At = Pending.findIndex((Job) => Job.Role === Wanted);
 
@@ -128,6 +133,7 @@ export function Presence() {
     canRun: CanRun,
     clients: Clients,
     ready: Ready,
+    settled: Settled,
     plugin: PluginVersion,
     bridge: BridgeVersion,
     from: BridgeRoot,

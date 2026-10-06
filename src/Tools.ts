@@ -107,7 +107,7 @@ export type Dependencies = {
   Reach: Reacher;
   ReachIn: ReacherIn;
   Presence: () => Promise<string>;
-  LiveSession: () => Promise<{Players: number | null, Ready: number, Able: boolean} | null>;
+  LiveSession: () => Promise<{Players: number | null, Ready: number, Settled?: number, Able: boolean} | null>;
 };
 
 export type ToolContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
@@ -199,7 +199,7 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
       const Session = await LiveSession();
 
       if (Session && Session.Able && Session.Ready >= Clients && (Clients === 0 || (Session.Players || 0) >= Clients)) {
-        return ` Everything loaded ${Math.round((Date.now() - Began) / 1000)}s later: the server${Clients === 0 ? "" : Clients === 1 ? " and the client" : ` and all ${Clients} clients`} can run code now, and the server's player list has ${Session.Players || 0} player${Session.Players === 1 ? "" : "s"} in it.`;
+        return ` Everything loaded ${Math.round((Date.now() - Began) / 1000)}s later: the server${Clients === 0 ? "" : Clients === 1 ? " and the client" : ` and all ${Clients} clients`} can run code now, and the server's player list has ${Session.Players || 0} player${Session.Players === 1 ? "" : "s"} in it.${Clients === 0 ? "" : (Session.Settled || 0) >= Clients ? " Every client has finished loading the game." : ` ${Session.Settled || 0} of ${Clients} client${Clients === 1 ? " has" : "s have"} finished loading the game (game:IsLoaded()); the rest are still streaming it in, so wait for that before relying on everything being there.`}`;
       }
 
       await new Promise((Resolve) => setTimeout(Resolve, 1000));

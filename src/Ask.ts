@@ -272,7 +272,7 @@ export function AskServerFor(Reach: Reacher, ReachIn: ReacherIn) {
       const { RuntimeLive, Presence } = await import("./Studio.js");
       const Now = Presence();
 
-      return RuntimeLive() ? {Players: typeof Now.clients === "number" ? Now.clients : null, Ready: Now.ready || 0, Able: Now.canRun === true} : null;
+      return RuntimeLive() ? {Players: typeof Now.clients === "number" ? Now.clients : null, Ready: Now.ready || 0, Settled: Now.settled || 0, Able: Now.canRun === true} : null;
     },
   });
 

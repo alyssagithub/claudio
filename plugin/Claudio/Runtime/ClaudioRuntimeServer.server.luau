@@ -80,6 +80,13 @@ const function AskClient(Player: Player, Kind: string, Body: string, Seconds: nu
 end
 
 const function Call(Method: string, Where: string, Body: any): (boolean, any)
+	if Body and typeof(Body.id) == "string" and not pcall(HttpService.JSONEncode, HttpService, Body) then
+		Body = {
+			id = Body.id,
+			result = {error = "The answer had text that is not valid UTF-8, often a string cut in the middle of a character such as • or an emoji, so it could not be sent. Use utf8 functions to cut strings, or return less."},
+		}
+	end
+
 	const Ok, Result = pcall(function()
 		return HttpService:RequestAsync({
 			Url = `{Base}{Where}`,

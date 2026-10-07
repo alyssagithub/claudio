@@ -198,10 +198,44 @@ function Client.TakeStudioJob(): (boolean, any)
 	return Http.Request("GET", `{BaseUrl()}/studio/job?plugin={Config.Version}`)
 end
 
+const function Repaired(Value: any): any
+	if typeof(Value) == "string" then
+		local Text = Value
+
+		for _ = 1, 10000 do
+			const Valid, Bad = utf8.len(Text)
+
+			if Valid then
+				break
+			end
+
+			const At = Bad :: number
+
+			Text = `{Text:sub(1, At - 1)}?{Text:sub(At + 1)}`
+		end
+
+		return Text
+	end
+
+	if typeof(Value) ~= "table" then
+		return Value
+	end
+
+	const Copy = {}
+
+	for Key, Inner in Value do
+		Copy[Repaired(Key)] = Repaired(Inner)
+	end
+
+	return Copy
+end
+
 function Client.AnswerStudio(JobId: string, Result: any): (boolean, any)
+	const Encodes = pcall(HttpService.JSONEncode, HttpService, Result)
+
 	return Http.Request("POST", `{BaseUrl()}/studio/job`, {
 		id = JobId,
-		result = Result,
+		result = if Encodes then Result else Repaired(Result),
 	})
 end
 

@@ -159,10 +159,11 @@ const function Reveal(Target: GuiObject): (string, string?)
 		end
 
 		if Ancestor:IsA("LayerCollector") then
-			const Screen = if Ancestor:IsA("ScreenGui") then (Ancestor :: ScreenGui).AbsoluteSize else nil
+			const OnScreen = Middle + game:GetService("GuiService"):GetGuiInset()
+			const Screen = if Ancestor:IsA("ScreenGui") and workspace.CurrentCamera then workspace.CurrentCamera.ViewportSize else nil
 
-			if Screen and (Middle.X < 0 or Middle.Y < 0 or Middle.X > Screen.X or Middle.Y > Screen.Y) then
-				return "", `{Target.Name} is off the screen at {math.floor(Middle.X)}, {math.floor(Middle.Y)}, so a press would land on nothing.`
+			if Screen and (OnScreen.X < 0 or OnScreen.Y < 0 or OnScreen.X > Screen.X or OnScreen.Y > Screen.Y) then
+				return "", `{Target.Name} is off the screen at {math.floor(OnScreen.X)}, {math.floor(OnScreen.Y)}, so a press would land on nothing.`
 			end
 
 			break
@@ -175,9 +176,7 @@ const function Reveal(Target: GuiObject): (string, string?)
 end
 
 const function Where(Point: Vector2): string
-	const Shown = Point - game:GetService("GuiService"):GetGuiInset()
-
-	return `{math.floor(Shown.X)}, {math.floor(Shown.Y)}`
+	return `{math.floor(Point.X)}, {math.floor(Point.Y)} on screen, as in a viewport capture`
 end
 
 const function Interact(Body: string): any
@@ -242,10 +241,10 @@ const function Interact(Body: string): any
 		const Y = tonumber(Input.y)
 
 		if not X or not Y then
-			return {error = "A click needs x and y, in the same space as AbsolutePosition."}
+			return {error = "A click needs x and y, in on-screen pixels as in a viewport capture."}
 		end
 
-		const Point = Vector2.new(X, Y) + game:GetService("GuiService"):GetGuiInset()
+		const Point = Vector2.new(X, Y)
 		const Sent, Refused = pcall(function()
 			Virtual:SendMousePosition(Point)
 			Virtual:SendMouseButton(Point, Button, true, 0)
@@ -330,14 +329,41 @@ const function Interact(Body: string): any
 	const Point = Centre(Target)
 
 	if Action == "press" then
-		const Sent, Refused = pcall(function()
-			Virtual:SendMouseButton(Point, Enum.UserInputType.MouseButton1, true, 0)
-			task.wait(0.05)
-			Virtual:SendMouseButton(Point, Enum.UserInputType.MouseButton1, false, 0)
-		end)
+		const Times = math.clamp(math.floor(tonumber(Input.times) or 1), 1, 100)
+		const Gap = math.clamp(tonumber(Input.gap) or 0.6, 0.05, 10)
+		local Spot = Point
+		local Done = 0
 
-		if not Sent then
-			return {error = `The press was refused at {Where(Point)}: {tostring(Refused)}`}
+		while true do
+			const Sent, Refused = pcall(function()
+				Virtual:SendMouseButton(Spot, Enum.UserInputType.MouseButton1, true, 0)
+				task.wait(0.05)
+				Virtual:SendMouseButton(Spot, Enum.UserInputType.MouseButton1, false, 0)
+			end)
+
+			if not Sent then
+				return {error = `The press was refused at {Where(Spot)} after {Done} press{if Done == 1 then "" else "es"}: {tostring(Refused)}`}
+			end
+
+			Done += 1
+
+			if Done >= Times then
+				break
+			end
+
+			task.wait(Gap)
+
+			const Again = Find(Input.path)
+
+			if not Again or select(2, Reveal(Again)) then
+				break
+			end
+
+			Spot = Centre(Again)
+		end
+
+		if Times > 1 then
+			return {text = `Pressed {Target.Name} {Done} time{if Done == 1 then "" else "s"}, {Gap}s apart, at {Where(Point)}{if Done < Times then ", then stopped because it was gone or hidden" else ""}.{Note} Check the place to confirm where it ended up.`}
 		end
 
 		return {text = `Pressed {Target.Name} at {Where(Point)}.{Note} Check the place to confirm what it did, because a press that lands on something covering it still reports as sent.`}
@@ -410,7 +436,7 @@ const function Interact(Body: string): any
 		return {error = `The drag from {Where(Point)} was refused: {tostring(Refused)}`}
 	end
 
-	return {text = `Dragged {Target.Name} from {Where(Point)} to {Where(Finish)}{if Hold > 0 then `, holding {Hold}s before releasing` else ""}. Positions are in the same space as AbsolutePosition.`}
+	return {text = `Dragged {Target.Name} from {Where(Point)} to {Where(Finish)}{if Hold > 0 then `, holding {Hold}s before releasing` else ""}.`}
 end
 
 const function Run(Code: string, Within: string?): any

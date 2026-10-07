@@ -39,7 +39,8 @@ return function()
 
 		const Mine = Token
 		const Width = Wide()
-		const Draft = Chat.Draft()
+		const Suggested = if Settings.Get("PromptSuggestions")() then Chat.Suggestion() else nil
+		const Draft = if Chat.Draft() == "" and Suggested then Suggested else Chat.Draft()
 		const Size = Settings.TextSize()
 
 		if Width <= 0 then

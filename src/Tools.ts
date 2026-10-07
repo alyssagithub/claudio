@@ -27,7 +27,7 @@ const InputDescription = [
   "press clicks the middle of a GuiObject, type sends text to whatever has keyboard focus, key presses and releases a KeyCode by name.",
   "hover moves the pointer onto a GuiObject, scroll turns the wheel over one, and drag holds the button from a GuiObject to another path or by an x and y offset.",
   "A right-button drag, or a drag with no path, holds the button with the cursor locked and sends real mouse movement, so InputChanged deltas and GetMouseDelta see it; use it to turn a camera.",
-  "Positions in answers are in the same space as AbsolutePosition, below the top bar. x and y are a relative move, so prefer to with a target path when dropping onto something. hold waits at the end before releasing, for drops that wait for the pointer to settle.",
+  "Positions in answers, and x and y for click, are on-screen pixels as in a viewport capture, so they include the top bar: AbsolutePosition plus GuiService:GetGuiInset(). x and y are a relative move, so prefer to with a target path when dropping onto something. hold waits at the end before releasing, for drops that wait for the pointer to settle.",
   "Needs a play session with a character.",
   "Input that reaches nothing still reports as sent, so check the place afterwards.",
   "Roblox refuses simulated input on CoreGui, such as purchase and prompt windows. Take a window capture and use click with window set to true and the capture's pixel coordinates; that sends a real click to the Studio window. Studio test purchases cost nothing.",
@@ -693,13 +693,15 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         key: z.string().optional().describe("KeyCode name to press and release, such as Return or E, for key."),
         amount: z.number().optional().describe("Wheel amount for scroll, negative scrolls down. Defaults to -1."),
         to: z.string().optional().describe("Full instance path to drag onto, for drag."),
-        x: z.number().optional().describe("For click, the point's x in AbsolutePosition space, or in window capture pixels with window. For drag, pixels to move sideways when there is no to path."),
+        times: z.number().optional().describe("For press, press up to this many times, gap seconds apart, stopping early once the element is gone or hidden. Use it to click through dialogue in one call. Up to 100."),
+        gap: z.number().optional().describe("For press with times, seconds between presses. 0.6 by default."),
+        x: z.number().optional().describe("For click, the point's x in on-screen pixels as in a viewport capture, or in window capture pixels with window. For drag, pixels to move sideways when there is no to path."),
         y: z.number().optional().describe("For click, the point's y. For drag, pixels to move down when there is no to path."),
         button: z.enum(["left", "right", "middle"]).optional().describe("Which mouse button a drag holds. Defaults to left."),
         hold: z.number().optional().describe("Seconds to keep the button down at the end of a drag before releasing, or to hold a gamepad input, up to 5."),
         player: z.string().optional().describe("Which client to send it to: a player's name, or their number in join order starting at 1. Defaults to the first player."),
       },
-      Run: async (Input: { action: "press" | "click" | "type" | "key" | "hover" | "scroll" | "drag" | "gamepad"; pad?: string; window?: boolean; path?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number; button?: "left" | "right" | "middle"; hold?: number; player?: string }) => {
+      Run: async (Input: { action: "press" | "click" | "type" | "key" | "hover" | "scroll" | "drag" | "gamepad"; pad?: string; window?: boolean; path?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number; button?: "left" | "right" | "middle"; hold?: number; player?: string; times?: number; gap?: number }) => {
         if (Input.action === "type" && !Input.text) {
           return {content: [{
             type: "text",
@@ -774,7 +776,9 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
             button: Input.button,
             hold: Input.hold,
             player: Input.player,
-          }), "Studio did not say what happened."),
+            times: Input.times,
+            gap: Input.gap,
+          }, Input.times ? 40 + Math.min(100, Input.times) * Math.min(10, Input.gap ?? 0.6) : undefined), "Studio did not say what happened."),
         }]};
       },
     },

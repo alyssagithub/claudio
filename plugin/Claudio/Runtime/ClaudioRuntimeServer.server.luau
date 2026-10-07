@@ -425,7 +425,7 @@ task.spawn(function()
 					end
 
 					if Job.kind == "input" then
-						return AskClient(Player, "input", HttpService:JSONEncode(Job.input))
+						return AskClient(Player, "input", HttpService:JSONEncode(Job.input), 20 + math.clamp(tonumber(Job.input.times) or 1, 1, 100) * math.clamp(tonumber(Job.input.gap) or 0.6, 0.05, 10))
 					end
 
 					return AskClient(Player, "execute", Job.input.code, math.clamp(tonumber(Job.input.timeout) or 300, 1, 1800))

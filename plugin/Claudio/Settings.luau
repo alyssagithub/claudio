@@ -255,6 +255,20 @@ const Settings = {
 	StudioStarted = {} :: {[string]: Vide.Source<any>},
 }
 
+const function RecordView(What: string)
+	const Earlier = CurrentPlugin:GetSetting(`{Prefix}TranscriptViewChanges`)
+	const Lines = if typeof(Earlier) == "string" and Earlier ~= "" then string.split(Earlier, "\n") else {}
+	const Where = if game:GetService("RunService"):IsEdit() then "editor" else "playtest"
+
+	table.insert(Lines, `{DateTime.now():ToIsoDate()} {Where} {What}`)
+
+	while #Lines > 10 do
+		table.remove(Lines, 1)
+	end
+
+	CurrentPlugin:SetSetting(`{Prefix}TranscriptViewChanges`, table.concat(Lines, "\n"))
+end
+
 function Settings.Load(PluginObject: Plugin)
 	CurrentPlugin = PluginObject
 
@@ -276,6 +290,13 @@ function Settings.Load(PluginObject: Plugin)
 		const Stored = Read(Key)
 
 		Sources[Key] = Vide.source(if Stored == nil then Default else Stored)
+	end
+
+	const Changes = Read("TranscriptViewChanges", true)
+	const Recorded = if typeof(Changes) == "string" then Changes:match("set to (%a+) by [^\n]*$") else nil
+
+	if Recorded and Recorded ~= Sources.TranscriptView() then
+		RecordView(`found {tostring(Sources.TranscriptView())} when loading, though the last change recorded here was to {Recorded}`)
 	end
 
 	if Sources.Mode() == "standard" then
@@ -324,6 +345,10 @@ function Settings.Fresh(Key: string): any
 end
 
 function Settings.Set(Key: string, Value: any)
+	if Key == "TranscriptView" and Sources[Key]() ~= Value then
+		RecordView(`set to {tostring(Value)} by {(debug.traceback("", 2):gsub("%s+", " "))}`)
+	end
+
 	Sources[Key](Value)
 
 	if Settings.StudioStarted[Key] then

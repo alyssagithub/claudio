@@ -197,7 +197,7 @@ const function Measurer(Box: TextBox, Found: {Style}): (number, number) -> numbe
 			const Style = Found[Start]
 			local Stop = Start
 
-			while Stop < To and Found[Stop + 1] == Style do
+			while Stop < To and Found[Stop + 1] and Found[Stop + 1].Font == Style.Font and Found[Stop + 1].Size == Style.Size do
 				Stop += 1
 			end
 

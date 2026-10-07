@@ -1,90 +1,66 @@
---!strict
+--!nocheck
+--!nolint DeprecatedApi
 const Fresh = {}
 
-const Copies: {Instance} = {}
+local Loaded: {[ModuleScript]: {any}} = {}
+const Loading: {[ModuleScript]: boolean} = {}
 
-const function Place(Object: Instance): number
-	local Count = 0
+local Load: (any) -> any
 
-	for _, Sibling in (Object.Parent :: Instance):GetChildren() do
-		if Sibling.Name == Object.Name and Sibling.Archivable then
-			Count += 1
-		end
-
-		if Sibling == Object then
-			return Count
-		end
+Load = function(Target: any): any
+	if typeof(Target) ~= "Instance" or not Target:IsA("ModuleScript") then
+		return require(Target)
 	end
 
-	return Count
+	const Held = Loaded[Target]
+
+	if Held then
+		return Held[1]
+	end
+
+	if Loading[Target] then
+		error(`{Target:GetFullName()} requires itself through a loop of modules, so it cannot finish loading.`, 2)
+	end
+
+	const Chunk, Problem = loadstring(Target.Source, `={Target:GetFullName()}`)
+
+	if not Chunk then
+		error(Problem, 2)
+	end
+
+	setfenv(Chunk, setmetatable({
+		script = Target,
+		require = Load,
+	}, {__index = getfenv(0)}))
+
+	Loading[Target] = true
+
+	const Results = table.pack(xpcall(Chunk, function(Trouble: any): any
+		return Trouble
+	end))
+
+	Loading[Target] = nil
+
+	if not Results[1] then
+		error(Results[2], 0)
+	end
+
+	if Results.n ~= 2 then
+		error(`{Target:GetFullName()} returned {Results.n - 1} values; a module must return exactly one.`, 2)
+	end
+
+	Loaded[Target] = {Results[2]}
+
+	return Results[2]
 end
 
 function Fresh.Load(Module: ModuleScript): any
-	if not Module:IsDescendantOf(game) or Module.Parent == game then
-		error(`{Module.Name} is not in the place, so it cannot be loaded fresh.`)
-	end
-
-	const Path: {Instance} = {}
-	local Step: Instance = Module
-
-	while Step.Parent ~= game do
-		if not Step.Archivable then
-			error(`{Step:GetFullName()} has Archivable off, so it cannot be copied to load fresh.`)
-		end
-
-		table.insert(Path, 1, Step)
-		Step = Step.Parent :: Instance
-	end
-
-	const Holder = Instance.new("Folder")
-
-	Holder.Name = Step.Name
-
-	for _, Child in Step:GetChildren() do
-		const Copy = if Child.Archivable then Child:Clone() else nil
-
-		if Copy then
-			Copy.Parent = Holder
-		end
-	end
-
-	table.insert(Copies, Holder)
-
-	local Current: Instance = Holder
-
-	for _, Original in Path do
-		local Count = 0
-		local Found: Instance?
-		const Wanted = Place(Original)
-
-		for _, Child in Current:GetChildren() do
-			if Child.Name == Original.Name then
-				Count += 1
-
-				if Count == Wanted then
-					Found = Child
-
-					break
-				end
-			end
-		end
-
-		if not Found then
-			error(`Could not find the copy of {Original:GetFullName()}.`)
-		end
-
-		Current = Found
-	end
-
-	return (require :: any)(Current)
+	return Load(Module)
 end
 
 function Fresh.Clear()
-	for _, Holder in Copies do
-		Holder:Destroy()
-	end
-
-	table.clear(Copies)
+	Loaded = {}
+	table.clear(Loading)
 end
 
 return Fresh

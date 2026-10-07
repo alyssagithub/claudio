@@ -19,6 +19,7 @@ const Base64 = require(script.Parent.Parent.Base64)
 const Breathe = require(script.Parent.Parent.Breathe)
 const Context = require(script.Parent.Context)
 const Navigate = require(script.Parent.Parent.Navigate)
+const Fresh = require(script.Parent.Parent.Fresh)
 
 local Generation = 0
 local Stopping = -1
@@ -2573,7 +2574,7 @@ const function Execute(Input: any): any
 
 	const Step = if Input.readOnly ~= true then StartStep("ClaudioExecute", Input.undoName or "Claudio ran a script") else nil
 
-	_G.ClaudioFresh = require(script.Parent.Parent.Fresh).Load
+	_G.ClaudioFresh = Fresh.Load
 
 	const Holder = Instance.new("ModuleScript")
 
@@ -2587,7 +2588,7 @@ const function Execute(Input: any): any
 		Listening:Disconnect()
 
 		_G.ClaudioFresh = nil
-		require(script.Parent.Parent.Fresh).Clear()
+		Fresh.Clear()
 	end
 
 	const function Trouble(Broke: any): any

@@ -19,7 +19,7 @@ function Scoped.Find(Path: string): Instance?
 	return Object
 end
 
-function Scoped.Splice(Path: string, Wrapped: string): (string?, number, string?)
+function Scoped.Splice(Path: string, Wrapped: string, Current: string?): (string?, number, string?)
 	const Module = Scoped.Find(Path)
 
 	if not Module or not Module:IsA("ModuleScript") then
@@ -27,7 +27,7 @@ function Scoped.Splice(Path: string, Wrapped: string): (string?, number, string?
 	end
 
 	const Read, Source = pcall(function(): string
-		return (Module :: any).Source
+		return Current or (Module :: any).Source
 	end)
 
 	if not Read then

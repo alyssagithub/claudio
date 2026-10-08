@@ -191,6 +191,17 @@ const function Interact(Body: string): any
 	const Action = tostring(Input.action)
 	const Virtual = ((game:GetService("UserInputService")) :: any):CreateVirtualInput()
 
+	if Action == "unmark" then
+		const Old = (game:GetService("Players").LocalPlayer :: Player):FindFirstChildOfClass("PlayerGui")
+		const Marker = if Old then Old:FindFirstChild("ClaudioCaptureMarker") else nil
+
+		if Marker then
+			Marker:Destroy()
+		end
+
+		return {text = "Unmarked."}
+	end
+
 	if Action == "type" then
 		if typeof(Input.text) ~= "string" or Input.text == "" then
 			return {error = "Typing needs text."}
@@ -328,6 +339,38 @@ const function Interact(Body: string): any
 
 	const Point = Centre(Target)
 
+	if Action == "mark" then
+		const Corner = Target.AbsolutePosition + game:GetService("GuiService"):GetGuiInset()
+		const Beside = Corner.X >= 16 and Corner.Y >= 8
+		const Gui = Instance.new("ScreenGui")
+
+		Gui.Name = "ClaudioCaptureMarker"
+		Gui.IgnoreGuiInset = true
+		Gui.ScreenInsets = Enum.ScreenInsets.None
+		Gui.DisplayOrder = 2147483647
+		Gui.ResetOnSpawn = false
+
+		for Index, Colour in {Color3.fromRGB(255, 0, 254), Color3.fromRGB(1, 255, 254)} do
+			const Square = Instance.new("Frame")
+
+			Square.BorderSizePixel = 0
+			Square.BackgroundColor3 = Colour
+			Square.Size = UDim2.fromOffset(8, 8)
+			Square.Position = UDim2.fromOffset(math.round(Corner.X) - (if Beside then 16 else 0) + (Index - 1) * 8, math.round(Corner.Y) - (if Beside then 8 else 0))
+			Square.Parent = Gui
+		end
+
+		Gui.Parent = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui")
+		game:GetService("RunService").RenderStepped:Wait()
+		game:GetService("RunService").RenderStepped:Wait()
+
+		return {
+			width = math.round(Target.AbsoluteSize.X),
+			height = math.round(Target.AbsoluteSize.Y),
+			beside = Beside,
+		}
+	end
+
 	if Action == "press" then
 		const Times = math.clamp(math.floor(tonumber(Input.times) or 1), 1, 100)
 		const Gap = math.clamp(tonumber(Input.gap) or 0.6, 0.05, 10)
@@ -439,7 +482,7 @@ const function Interact(Body: string): any
 	return {text = `Dragged {Target.Name} from {Where(Point)} to {Where(Finish)}{if Hold > 0 then `, holding {Hold}s before releasing` else ""}.`}
 end
 
-const function Run(Code: string, Within: string?): any
+const function Run(Code: string, Within: string?, Current: string?): any
 	const Said = {}
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
 		if #Said < 200 and Kind ~= Enum.MessageType.MessageInfo then
@@ -464,7 +507,7 @@ const function Run(Code: string, Within: string?): any
 		return Finish({error = "Claudio's plugin is not running inside this play session, so there is nothing to build the code with. Stop the playtest and start it again, and if that does not help, reinstall the plugin."})
 	end
 
-	const Payload = Making:Invoke("{{BuildKey}}", `return function(breathe)\n{Code}\nend`, Within)
+	const Payload = Making:Invoke("{{BuildKey}}", `return function(breathe)\n{Code}\nend`, Within, Current)
 
 	if typeof(Payload) == "string" then
 		return Finish({error = Payload})
@@ -530,7 +573,7 @@ Remote.OnClientEvent:Connect(function(Id: string, Kind: string, Body: string)
 		if Kind == "scoped" then
 			const Given = HttpService:JSONDecode(Body)
 
-			return Run(Given.code, Given.within)
+			return Run(Given.code, Given.within, Given.withinSource)
 		end
 
 		return Run(Body)

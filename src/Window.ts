@@ -40,7 +40,7 @@ function Same(Image: PNG, X: number, Y: number, Wanted: number[]): boolean {
   return R === Wanted[0] && G === Wanted[1] && B === Wanted[2];
 }
 
-export function CropToMarker(Data: string, Width: number, Height: number): CropResult {
+export function CropToMarker(Data: string, Width: number, Height: number, Beside = false): CropResult {
   const Image = PNG.sync.read(Buffer.from(Data, "base64"));
 
   for (let Y = 0; Y < Image.height - 8; Y += 1) {
@@ -49,14 +49,26 @@ export function CropToMarker(Data: string, Width: number, Height: number): CropR
         continue;
       }
 
-      const Wide = Math.min(Width, Image.width - X);
-      const Tall = Math.min(Height, Image.height - Y);
+      const Left = Beside ? X + 16 : X;
+      const Top = Beside ? Y + 8 : Y;
+      const Wide = Math.min(Width, Image.width - Left);
+      const Tall = Math.min(Height, Image.height - Top);
       const Out = new PNG({
         width: Wide,
         height: Tall,
       });
 
-      PNG.bitblt(Image, Out, X, Y, Wide, Tall, 0, 0);
+      PNG.bitblt(Image, Out, Left, Top, Wide, Tall, 0, 0);
+
+      if (Beside) {
+        return {
+          data: PNG.sync.write(Out).toString("base64"),
+          width: Wide,
+          height: Tall,
+          x: Left,
+          y: Top,
+        };
+      }
 
       const Under = Colour(Image, X, Math.min(Y + 8, Image.height - 1));
 

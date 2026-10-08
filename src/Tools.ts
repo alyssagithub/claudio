@@ -8,6 +8,7 @@ import { z } from "zod/v3";
 import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport } from "./Ask.js";
 import type { LogAnswer, ExecuteAnswer } from "./Ask.js";
 import { QuietFlash } from "./Notify.js";
+import { Enlarge } from "./Capture.js";
 import { CallOpenCloud } from "./OpenCloud.js";
 import { PadInputs, PressPad } from "./Gamepad.js";
 
@@ -485,6 +486,9 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         window: z.string().optional().describe("Part of a Studio window title to capture instead of the main one, for a panel floated out of Studio. Only for of window."),
         widget: z.string().optional().describe("Part of a plugin panel's title, such as Claudio. The window capture is cropped to that panel. Only for of window."),
         around: z.string().optional().describe("Instance to crop tightly around, such as Workspace.Model or a GuiObject path."),
+        element: z.string().optional().describe("During a playtest, a GuiObject on a player's screen to capture on its own, such as Players.LocalPlayer.PlayerGui.Menu.Avatar. Claudio marks it, captures the Studio window and crops to exactly that element. Pair it with zoom to inspect small UI."),
+        player: z.string().optional().describe("For element, which client: a player's name or their number in join order. The first player by default."),
+        zoom: z.number().optional().describe("Enlarge the picture by this whole number, up to 16, with sharp pixels, to look closely at something small. The result is capped at 2048 pixels on a side."),
         padding: z.number().optional().describe("Pixels of margin around it, 8 by default."),
         path: z.string().optional().describe("Instance to frame the camera on before shooting."),
         x: z.number().optional().describe("Left edge of the region, in pixels from the left of the Studio window."),
@@ -493,8 +497,18 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         height: z.number().optional().describe("Region height."),
         file: z.string().optional().describe("Also save the picture to this path as a PNG, for comparing pixels or keeping a record."),
       },
-      Run: async (Input: { of?: "viewport" | "window"; window?: string; widget?: string; around?: string; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
-        const Picture = (Data: string, Text: string): ToolAnswer => {
+      Run: async (Input: { of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
+        const Picture = (Given: string, Said: string): ToolAnswer => {
+          let Data = Given;
+          let Text = Said;
+
+          if (Input.zoom && Input.zoom > 1) {
+            const Bigger = Enlarge(Data, Math.min(16, Input.zoom));
+
+            Data = Bigger.data;
+            Text += `, enlarged to ${Bigger.width}x${Bigger.height}`;
+          }
+
           if (Input.file) {
             try {
               fs.writeFileSync(Input.file, Buffer.from(Data, "base64"));
@@ -516,6 +530,44 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
             },
           ]};
         };
+
+        if (Input.element) {
+          const { CaptureWindow, CropToMarker } = await import("./Window.js");
+          const Marked = await ReachIn("server", "input", {action: "mark", path: Input.element, player: Input.player}) as { error?: string; text?: string; width?: number; height?: number; beside?: boolean } | null;
+
+          if (!Marked || Marked.error || !Marked.width || !Marked.height) {
+            return {content: [{
+              type: "text",
+              text: (Marked && (Marked.error || Marked.text)) || "The play session did not answer.",
+            }]};
+          }
+
+          let Taken: { error?: string; data: string; title: string };
+
+          try {
+            Taken = await CaptureWindow(Input.window, {}) as typeof Taken;
+          } finally {
+            await ReachIn("server", "input", {action: "unmark", player: Input.player});
+          }
+
+          if (Taken.error) {
+            return {content: [{
+              type: "text",
+              text: Taken.error,
+            }]};
+          }
+
+          const Cropped = CropToMarker(Taken.data, Marked.width, Marked.height, Marked.beside === true) as { error?: string; data: string; width: number; height: number };
+
+          if (Cropped.error) {
+            return {content: [{
+              type: "text",
+              text: "The element was marked but the mark was not found in the window capture. The play session's view may be hidden behind another tab, or a playtest window other than the main one is showing it; give that window's title as window.",
+            }]};
+          }
+
+          return Picture(Cropped.data, `${Cropped.width}x${Cropped.height} of ${Input.element} in the play session`);
+        }
 
         if (Input.of === "window") {
           const { CaptureWindow, CropToMarker } = await import("./Window.js");
@@ -636,7 +688,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         undoName: z.string().optional().describe("What the undo step should be called, such as \"Rename the doors\"."),
         timeout: z.number().optional().describe("How long to wait, in seconds, when the code is expected to take a while. Five minutes by default, thirty at most."),
         player: z.string().optional().describe("Which client to run on when target is client: a player's name, or their number in join order starting at 1. Defaults to the first player."),
-        within: z.string().optional().describe("Path of a ModuleScript to run inside: the code runs after a fresh copy of the module's body, above its final return, so its private locals and functions are in scope to call and test. The copy is separate, so the real module's state is untouched, and script refers to the copy. The module's top-level code runs first, so one that waits on something only present in a playtest will wait until the timeout in edit; set a short timeout or run it in a session."),
+        within: z.string().optional().describe("Path of a ModuleScript to run inside: the code runs after a fresh copy of the module's body, above its final return, so its private locals and functions are in scope to call and test. In a play session the body comes from the editor's current source, so edits made since the playtest started are what runs. The copy is separate, so the real module's state is untouched, and script refers to the copy. The module's top-level code runs first, so one that waits on something only present in a playtest will wait until the timeout in edit; set a short timeout or run it in a session."),
         resultOf: z.string().optional().describe("Fetch the result of an earlier run that timed out, by the run name its timeout message gave. Pass any code, it is ignored."),
         cancel: z.string().optional().describe("Stop an earlier run that is still going, by its run name. Pass any code, it is ignored."),
       },
@@ -662,6 +714,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         }
 
         const Run = Math.random().toString(36).slice(2, 10);
+        const Current = Input.within && Where !== "edit" ? await Reach("execute", {readOnly: true, code: `local Module = require(plugin.Claudio.Navigate).Resolve(${JSON.stringify(Input.within)})\nreturn if Module and Module:IsA("ModuleScript") then Module.Source else nil`}) as { result?: unknown } | null : null;
         const Sent = {
           code: Input.code,
           target: Where,
@@ -669,6 +722,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
           undoName: Input.undoName,
           player: Input.player,
           within: Input.within,
+          withinSource: Current && typeof Current.result === "string" ? Current.result : undefined,
           timeout: Input.timeout,
           run: Run,
         };

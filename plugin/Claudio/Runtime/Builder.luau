@@ -22,7 +22,7 @@ function Builder.Serve()
 
 	Bindable.Name = Name
 
-	Bindable.OnInvoke = function(Given: any, Source: any, Within: any): any
+	Bindable.OnInvoke = function(Given: any, Source: any, Within: any, Current: any): any
 		const Key = Settings.Get("BuildKey")()
 
 		if Key == "" or Given ~= Key then
@@ -45,7 +45,7 @@ function Builder.Serve()
 		local Text = Source
 
 		if typeof(Within) == "string" and Within ~= "" then
-			const Spliced, _, Trouble = Scoped.Splice(Within, Source)
+			const Spliced, _, Trouble = Scoped.Splice(Within, Source, if typeof(Current) == "string" then Current else nil)
 
 			if not Spliced then
 				return Trouble

@@ -153,7 +153,7 @@ const function Explain(Trouble: string, Said: {string}): string
 	return Trouble
 end
 
-const function Run(Code: string, Within: string?): any
+const function Run(Code: string, Within: string?, Current: string?): any
 	const Said = {}
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
 		if #Said < 200 and Kind ~= Enum.MessageType.MessageInfo then
@@ -178,7 +178,7 @@ const function Run(Code: string, Within: string?): any
 		return Finish({error = "Claudio's plugin is not running inside this play session, so there is nothing to build the code with. Stop the playtest and start it again, and if that does not help, reinstall the plugin."})
 	end
 
-	const Payload = Making:Invoke(BuildKey, `return function(breathe)\n{Code}\nend`, Within)
+	const Payload = Making:Invoke(BuildKey, `return function(breathe)\n{Code}\nend`, Within, Current)
 
 	if typeof(Payload) == "string" then
 		return Finish({error = Payload})
@@ -431,7 +431,7 @@ task.spawn(function()
 					return AskClient(Player, "execute", Job.input.code, math.clamp(tonumber(Job.input.timeout) or 300, 1, 1800))
 				end
 
-				return Run(Job.input.code, Job.input.within)
+				return Run(Job.input.code, Job.input.within, Job.input.withinSource)
 			end)
 
 			if not (Done and Outcome == nil) then

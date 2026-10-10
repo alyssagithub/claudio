@@ -17,6 +17,13 @@ end
 
 script.Parent = nil
 
+task.spawn(function()
+	while RunService:IsRunning() do
+		ServerScriptService:SetAttribute("ClaudioRuntimeBeat", os.clock())
+		task.wait(1)
+	end
+end)
+
 const BuildKey = "{{BuildKey}}"
 const Base = `http://127.0.0.1:{tonumber("{{Port}}") or 47225}`
 
@@ -250,8 +257,6 @@ end
 
 task.spawn(function()
 	while RunService:IsRunning() and task.wait(1) do
-		ServerScriptService:SetAttribute("ClaudioRuntimeBeat", os.clock())
-
 		local Ready = 0
 		local Games = 0
 

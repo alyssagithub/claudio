@@ -99,10 +99,10 @@ function Runtime.Start(CurrentPlugin: Plugin)
 
 	if OnServer then
 		task.spawn(function()
-			while RunService:IsRunning() and task.wait(2) do
+			while task.wait(2) do
 				const Beat = ServerScriptService:GetAttribute("ClaudioRuntimeBeat")
 
-				if typeof(Beat) ~= "number" or os.clock() - Beat < 8 then
+				if not RunService:IsRunning() or typeof(Beat) ~= "number" or os.clock() - Beat < 8 then
 					continue
 				end
 

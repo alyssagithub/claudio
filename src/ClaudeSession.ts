@@ -21,10 +21,6 @@ import type { Asked, Breakdown, Call, CallStatus, ContentBlock, Content, JobAnsw
 const Turns = new Map<string, Turn>();
 const Sessions = new Map<string, Session>();
 const SessionAllowances = new Map<string, Set<string>>();
-const AllowedServers = AllowedTools
-  .filter((Name) => Name.startsWith("mcp__"))
-  .map((Name) => Name.split("__")[1]);
-
 function ReadCommandsCache() {
   try {
     return {
@@ -233,7 +229,7 @@ export function ReadMcpServers() {
     const Servers: Record<string, {command: string, args: string[], env?: Record<string, string>}> = {};
 
     for (const [Name, Definition] of Object.entries((Desktop.mcpServers || {}) as Record<string, {command?: string, args?: string[], env?: Record<string, string>}>)) {
-      if (!Definition.command || !AllowedServers.includes(Name)) {
+      if (!Definition.command) {
         continue;
       }
 

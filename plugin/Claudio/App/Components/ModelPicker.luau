@@ -587,7 +587,7 @@ function ModelPicker.Button()
 			Text = function()
 				const Model = CurrentModel()
 
-				return if Model then (GetTitle(Model):gsub(" %(Experimental%)", "")) else "Auto"
+				return if Model then (GetTitle(Model):gsub(" %(Experimental%)", "")) else Settings.Get("Model")()
 			end,
 		},
 		Icon {

@@ -8,6 +8,7 @@ import { ReportVersion } from "../src/Version.js";
 import { InstallStartup, RestartBridge, StopBridge, UninstallStartup } from "../src/Startup.js";
 import { AskForKey } from "../src/OpenCloud.js";
 import { RefreshReleased } from "../src/Models.js";
+import { RefreshStats } from "../src/Stats.js";
 import { execFile } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -58,6 +59,8 @@ if (Command === "setup") {
   UninstallStartup();
 } else if (Command === "restart") {
   RestartBridge(ChosenPort()).catch(Fail);
+} else if (Command === "stats") {
+  RefreshStats();
 } else if (Command === "models") {
   RefreshReleased().catch(Fail);
 } else if (Command === "apikey") {

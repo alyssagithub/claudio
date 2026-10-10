@@ -53,6 +53,10 @@ function Format.Clock(Seconds: number): string
 end
 
 function Format.Large(Value: number): string
+	if Value >= 1000000000 then
+		return `{(string.format("%.1f", Value / 1000000000):gsub("%.0$", ""))}B`
+	end
+
 	if Value >= 1000000 then
 		return `{(string.format("%.1f", Value / 1000000):gsub("%.0$", ""))}M`
 	end

@@ -323,6 +323,10 @@ function Client.Lint(Scripts: {any}, Tree: {any}): (boolean, any)
 	return false, "The analyzer took longer than five minutes."
 end
 
+function Client.GetStats(Range: string): (boolean, any)
+	return Http.Request("GET", `{BaseUrl()}/stats?range={Range}`)
+end
+
 function Client.GetModels(): (boolean, any)
 	const Ok, Result = Http.Request("GET", `{BaseUrl()}/models`)
 

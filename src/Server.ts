@@ -9,6 +9,7 @@ import { exec, execFile, spawn } from "node:child_process";
 import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, MostScriptsToCheck, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
 import { ReloadReleased } from "./Models.js";
+import { StatsAge, StatsFor } from "./Stats.js";
 import { GetLimits, GetBreakdown, PollUsage, RefreshConversationContext, SignIn } from "./ClaudeSession.js";
 import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
@@ -174,6 +175,7 @@ function PicturesFrom(Body: Record<string, any>): Picture[] {
 }
 
 const StartedAt = Date.now();
+let CountingStats = false;
 
 function TurnRequestFrom(Body: Record<string, any>, ConversationId: string | null): TurnRequest {
   return {
@@ -1046,6 +1048,22 @@ ${Text}`;
         }
 
         SendJson(Response, 200, {usable: Usable});
+        return;
+      }
+
+      if (Request.method === "GET" && Url.pathname === "/stats") {
+        if (!CountingStats && StatsAge() > 60000) {
+          CountingStats = true;
+          execFile(process.execPath, [process.argv[1], "stats"], {timeout: 600000, windowsHide: true}, (Trouble, _Output, Problem) => {
+            CountingStats = false;
+
+            if (Trouble) {
+              console.error(`Could not count usage stats: ${String(Problem || Trouble.message).trim().slice(0, 200)}`);
+            }
+          });
+        }
+
+        SendJson(Response, 200, {...StatsFor(Url.searchParams.get("range") || "all"), counting: CountingStats, ready: StatsAge() < Infinity});
         return;
       }
 

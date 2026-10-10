@@ -8,6 +8,7 @@ const Working = require(script.Parent.Working)
 const MessageBubble = require(script.Parent.MessageBubble)
 const PermissionCard = require(script.Parent.PermissionCard)
 const QueueBar = require(script.Parent.QueueBar)
+const StatsCard = require(script.Parent.StatsCard)
 
 const Tips = {
 	"Send another message while Claude is working and it waits its turn.",
@@ -286,6 +287,7 @@ return function()
 				return #Chat.Messages() == 0
 			end,
 		},
+		StatsCard(),
 		Create "TextLabel" {
 			Name = "Earlier",
 			Size = UDim2.fromScale(1, 0),

@@ -1031,7 +1031,7 @@ function AskQuestion(Session: Session, Questions: Question[]) {
   });
 }
 
-export function AnswerQuestion(Turn: Turn, QuestionId: string, Answers: unknown) {
+export function AnswerQuestion(Turn: Turn, QuestionId: string, Answers: Record<string, unknown> | null, Annotations?: unknown, Talk?: boolean) {
   const Asked = Turn.Question;
 
   if (!Asked || Asked.Id !== QuestionId) {
@@ -1040,7 +1040,7 @@ export function AnswerQuestion(Turn: Turn, QuestionId: string, Answers: unknown)
 
   Turn.Question = null;
   Publish(Turn, {});
-  Asked.Resolve(Answers);
+  Asked.Resolve(Answers === null && !Talk ? null : {Answers: Answers || {}, Annotations, Talk: Talk === true});
 
   return true;
 }
@@ -1944,18 +1944,23 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
               return {behavior: "deny", message: "This session has no way to approve that tool."};
             }
 
-            const Answers = await AskQuestion(Session, Input.questions as Question[]) as JobAnswer | null;
-            const Given = Answers && !Array.isArray(Answers) ? Object.fromEntries(Object.entries(Answers).filter(([, Value]) => typeof Value === "string" && Value !== "")) : {};
+            const Reply = await AskQuestion(Session, Input.questions as Question[]) as {Answers: JobAnswer, Annotations?: unknown, Talk: boolean} | null;
 
-            if (!Answers) {
-              return {behavior: "deny", message: "The user dismissed the question without answering. Stop and wait for their next message rather than guessing."};
+            if (!Reply) {
+              return {behavior: "deny", message: "User declined to answer questions. Stop and wait for their next message rather than guessing."};
             }
+
+            if (Reply.Talk) {
+              return {behavior: "deny", message: "The user chose to chat about this instead of picking an option. Stop here and wait: their next message is their answer."};
+            }
+
+            const Given = !Array.isArray(Reply.Answers) ? Object.fromEntries(Object.entries(Reply.Answers).filter(([, Value]) => typeof Value === "string" && Value !== "")) : {};
 
             if (Object.keys(Given).length === 0) {
-              return {behavior: "deny", message: "The user skipped the question without choosing anything. Do not guess an answer: carry on only with what does not depend on it, or stop and ask in plain text."};
+              return {behavior: "deny", message: "The user skipped the questions without choosing anything. Do not guess an answer: carry on only with what does not depend on it, or stop and ask in plain text."};
             }
 
-            return {behavior: "allow", updatedInput: {...Input, answers: Given}};
+            return {behavior: "allow", updatedInput: {...Input, answers: Given, ...(Reply.Annotations && typeof Reply.Annotations === "object" && !Array.isArray(Reply.Annotations) && Object.keys(Reply.Annotations).length > 0 ? {annotations: Reply.Annotations} : {})}};
           },
           supportedDialogKinds: ["refusal_fallback_prompt"],
           onUserDialog: async (Request) => {
@@ -1973,9 +1978,9 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
                 {label: `Retry on ${Offered.fallbackModel || "the fallback model"}`, description: "Sends the same message again on the fallback model and carries on from there."},
                 {label: "Stop here", description: "Ends this reply without switching models."},
               ],
-            }]) as JobAnswer | null;
+            }]) as {Answers: JobAnswer} | null;
 
-            return {behavior: "completed", result: Answers && String(Answers[Asked] || "").startsWith("Retry") ? "retry_fallback" : "cancelled"};
+            return {behavior: "completed", result: Answers && String(Answers.Answers[Asked] || "").startsWith("Retry") ? "retry_fallback" : "cancelled"};
           },
           hooks: {
             PreToolUse: [{

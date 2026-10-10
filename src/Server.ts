@@ -1130,9 +1130,9 @@ ${Text}`;
 
         if (Request.method === "POST" && Segments[2] === "answer") {
           const Given = await ReadBody(Request);
-          const Answers = Given.answers && typeof Given.answers === "object" ? Given.answers : null;
+          const Answers = Given.answers && typeof Given.answers === "object" && !Array.isArray(Given.answers) ? Given.answers : null;
 
-          SendJson(Response, AnswerQuestion(Turn, Given.id, Answers) ? 200 : 409, DescribeTurn(Turn));
+          SendJson(Response, AnswerQuestion(Turn, Given.id, Answers, Given.annotations, Given.talk === true) ? 200 : 409, DescribeTurn(Turn));
           return;
         }
 

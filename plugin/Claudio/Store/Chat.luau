@@ -4964,7 +4964,7 @@ function Chat.RemoveQueued(Index: number)
 	Chat.Draft(if Draft == "" then Entry.Display else `{Draft}\n{Entry.Display}`)
 end
 
-function Chat.Reply(Answers: {[string]: string}?)
+function Chat.Reply(Answers: {[string]: string}?, Annotations: {[string]: {[string]: string}}?, Talk: boolean?)
 	const Asked = Chat.Question()
 
 	if not Asked then
@@ -4980,7 +4980,7 @@ function Chat.Reply(Answers: {[string]: string}?)
 	const Answering = Chat.RequestId :: string
 
 	task.spawn(function()
-		const Ok = Client.AnswerQuestion(Answering, Asked.id, Answers)
+		const Ok = Client.AnswerQuestion(Answering, Asked.id, Answers, Annotations, Talk)
 
 		if Ok and Chat.Question() == Asked then
 			Chat.Question(nil)

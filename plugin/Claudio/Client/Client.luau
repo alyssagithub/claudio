@@ -187,10 +187,12 @@ function Client.AnswerPermission(RequestId: string, PermissionId: string, Allow:
 	})
 end
 
-function Client.AnswerQuestion(RequestId: string, QuestionId: string, Answers: {[string]: string}?): (boolean, any)
+function Client.AnswerQuestion(RequestId: string, QuestionId: string, Answers: {[string]: string}?, Annotations: {[string]: {[string]: string}}?, Talk: boolean?): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/turn/{RequestId}/answer`, {
 		id = QuestionId,
 		answers = Answers,
+		annotations = Annotations,
+		talk = Talk,
 	})
 end
 

@@ -6,7 +6,7 @@ import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { AllowedTools, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, EffortOrder, PlanInstructions, CommandsCacheFile, DesktopConfigPath, ExtraModels, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory, DeveloperUserIds } from "./Config.js";
-import { AddDesktopSession, ExtractContext, LatestContext, RecordCost, RememberOwnSession, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
+import { AddDesktopSession, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
@@ -520,6 +520,41 @@ export async function DiscoverCommands(Folder?: string | null) {
 }
 
 const NewLine = "\n";
+
+async function NameConversation(Id: string, Prompt: string) {
+  const Asked = StripContext(Prompt).trim();
+
+  if (Asked === "") {
+    return;
+  }
+
+  try {
+    for await (const Message of query({
+      prompt: `Write a title for a chat that starts with the message below: 3 to 6 words saying what it is about, in sentence case, with no quotes and no ending punctuation. Reply with the title only.\n\n<message>\n${Asked.slice(0, 4000)}\n</message>`,
+      options: {
+        cwd: WorkingDirectory,
+        model: "claude-haiku-4-5",
+        maxTurns: 1,
+        allowedTools: [],
+        mcpServers: {},
+        permissionMode: "dontAsk",
+        persistSession: false,
+      },
+    })) {
+      if (Message.type === "result") {
+        const Title = Message.subtype === "success" ? Message.result.replace(/["`*_#]/g, "").replace(/\s+/g, " ").replace(/[.!?:;,\s]+$/, "").trim().slice(0, 80) : "";
+
+        if (Title !== "") {
+          SetGeneratedTitle(Id, Title, Asked.replace(/\s+/g, " ").slice(0, 60));
+        }
+
+        return;
+      }
+    }
+  } catch (Error) {
+    console.error(`Could not name chat ${Id}: ${(Error as Error).message}`);
+  }
+}
 
 function TextOf(Content: Content | undefined): string {
   if (typeof Content === "string") {
@@ -1460,6 +1495,7 @@ function RouteMessage(Session: Session, Message: any) {
       SessionAllowances.delete(Turn.Id);
       RememberOwnSession(Message.session_id);
       AddDesktopSession(Message.session_id, Session.WorkingDirectory, StripContext(Turn.Prompt).replace(/\s+/g, " ").trim().slice(0, 60));
+      NameConversation(Message.session_id, Turn.Prompt);
     }
 
     Publish(Turn, {

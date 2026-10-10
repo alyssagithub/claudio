@@ -1238,6 +1238,25 @@ export function SetChapters(Id: string, Chapters: Chapter[]): Chapter[] {
   return Chapters;
 }
 
+export function SetGeneratedTitle(Id: string, Title: string, Placeholder: string) {
+  const File = FindFile(Id);
+
+  if (!File) {
+    return;
+  }
+
+  fs.appendFileSync(File, `${EndsCleanly(File) ? "" : "\n"}${JSON.stringify({
+    type: "ai-title",
+    aiTitle: Title,
+    sessionId: Id,
+  })}\n`);
+  UpdateDesktopSession(Id, (Session) => {
+    if (Session.title === Placeholder) {
+      Session.title = Title;
+    }
+  });
+}
+
 export function RenameConversation(Id: string, Title: string): boolean {
   const File = FindFile(Id);
 

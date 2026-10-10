@@ -8,7 +8,7 @@ import { z } from "zod/v3";
 import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport } from "./Ask.js";
 import type { LogAnswer, ExecuteAnswer } from "./Ask.js";
 import { QuietFlash } from "./Notify.js";
-import { Enlarge } from "./Capture.js";
+import { Enlarge, Guide } from "./Capture.js";
 import { CallOpenCloud } from "./OpenCloud.js";
 import { PadInputs, PressPad } from "./Gamepad.js";
 
@@ -489,6 +489,8 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         around: z.string().optional().describe("Instance to crop tightly around, such as Workspace.Model or a GuiObject path."),
         element: z.string().optional().describe("During a playtest, a GuiObject on a player's screen to capture on its own, such as Players.LocalPlayer.PlayerGui.Menu.Avatar. Claudio marks it, captures the Studio window and crops to exactly that element. Pair it with zoom to inspect small UI."),
         player: z.string().optional().describe("For element, which client: a player's name or their number in join order. The first player by default."),
+        frame: z.string().optional().describe("A target size or aspect for framing, such as 1920x1080 or 16:9. The largest centred area of that shape is outlined in yellow with rule-of-thirds lines and everything outside it is darkened, so you can see exactly what a thumbnail of that shape would contain. The picture keeps the viewport's own pixels; to render at a size bigger than the viewport, set it with the device tool's width and height first."),
+        crop: z.boolean().optional().describe("With frame, return only the framed area instead of the guides."),
         zoom: z.number().optional().describe("Enlarge the picture by this whole number, up to 16, with sharp pixels, to look closely at something small. The result is capped at 2048 pixels on a side."),
         padding: z.number().optional().describe("Pixels of margin around it, 8 by default."),
         path: z.string().optional().describe("Instance to frame the camera on before shooting."),
@@ -498,10 +500,28 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         height: z.number().optional().describe("Region height."),
         file: z.string().optional().describe("Also save the picture to this path as a PNG, for comparing pixels or keeping a record."),
       },
-      Run: async (Input: { of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
+      Run: async (Input: { of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
         const Picture = (Given: string, Said: string): ToolAnswer => {
           let Data = Given;
           let Text = Said;
+          const Shape = Input.frame ? Input.frame.match(/^\s*(\d+(?:\.\d+)?)\s*[x:×]\s*(\d+(?:\.\d+)?)\s*$/i) : null;
+
+          if (Input.frame && !Shape) {
+            Text += `, without a frame because "${Input.frame}" is not a size like 1920x1080 or an aspect like 16:9`;
+          }
+
+          if (Shape && Number(Shape[1]) > 0 && Number(Shape[2]) > 0) {
+            const Framed = Guide(Data, Number(Shape[1]), Number(Shape[2]), Input.crop === true);
+
+            Data = Framed.data;
+            Text += Input.crop
+              ? `, cropped to the centred ${Input.frame} area, ${Framed.width}x${Framed.height} at ${Framed.x}, ${Framed.y}`
+              : `, with the centred ${Input.frame} area outlined in yellow at ${Framed.x}, ${Framed.y}`;
+
+            if (Number(Shape[1]) >= 100 && Framed.scale > 1.01) {
+              Text += `. That area is only ${Input.crop ? Framed.width : Math.round(Number(Shape[1]) / Framed.scale)} pixels wide, so a ${Input.frame} thumbnail from it would be upscaled ${Framed.scale.toFixed(1)}x; set the viewport bigger with the device tool for a sharp one`;
+            }
+          }
 
           if (Input.zoom && Input.zoom > 1) {
             const Bigger = Enlarge(Data, Math.min(16, Input.zoom));

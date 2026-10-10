@@ -34,7 +34,18 @@ export type OpenCloudCall = {
   contentType?: string;
   form?: Record<string, string | number | boolean>;
   files?: Record<string, string>;
+  wait?: boolean;
 };
+
+function OperationUrl(Called: URL, Operation: string): URL {
+  const Segments = Called.pathname.split("/").filter(Boolean);
+  const First = Operation.replace(/^\//, "").split("/")[0];
+  const Match = Segments.indexOf(First);
+  const Version = Segments.findIndex((Segment) => /^v\d+(beta\d*)?$/.test(Segment));
+  const Kept = Match >= 0 ? Segments.slice(0, Match) : Segments.slice(0, Version + 1);
+
+  return new URL(`/${[...Kept, Operation.replace(/^\//, "")].join("/")}`, "https://apis.roblox.com");
+}
 
 function ConfirmSpend(Cost: number, Name: string): Promise<boolean> {
   if (process.platform !== "win32") {
@@ -133,9 +144,31 @@ export async function CallOpenCloud(Given: OpenCloudCall): Promise<string> {
   }
 
   let Text = await Response.text();
+  let Waited = "";
 
   try {
-    Text = JSON.stringify(JSON.parse(Text), null, 2);
+    let Parsed = JSON.parse(Text);
+    const Began = Date.now();
+
+    while (Call.wait && Response.ok && Parsed && typeof Parsed.path === "string" && Parsed.done === false && Date.now() - Began < 120000) {
+      const Polled = OperationUrl(Url, Parsed.path);
+
+      await new Promise((Resolve) => setTimeout(Resolve, Math.min(5000, 1000 + (Date.now() - Began) / 4)));
+
+      const Checked = await fetch(Polled, {
+        headers: {"x-api-key": Key},
+        signal: AbortSignal.timeout(60000),
+      });
+
+      Parsed = JSON.parse(await Checked.text());
+      Waited = `\nWaited ${Math.round((Date.now() - Began) / 1000)}s for the operation, polling GET ${Polled.pathname} -> ${Checked.status} ${Checked.statusText}${Parsed && Parsed.done === false ? ", and it was still not done after two minutes; poll that path again later" : ""}.`;
+
+      if (!Checked.ok) {
+        break;
+      }
+    }
+
+    Text = JSON.stringify(Parsed, null, 2);
   } catch {
     Text = Text.trim();
   }
@@ -165,7 +198,7 @@ Roblox said: "${Said}".`;
       : "\nThe key was refused for this call. It may lack the permission or the experience this needs, or have expired; the user can add them on the Creator Dashboard or paste a new key.";
   }
 
-  return `${Method} ${Url.pathname}${Url.search} -> ${Response.status} ${Response.statusText}${Hint}\n${Text.slice(0, MostCallText)}`;
+  return `${Method} ${Url.pathname}${Url.search} -> ${Response.status} ${Response.statusText}${Hint}${Waited}\n${Text.slice(0, MostCallText)}`;
 }
 
 export function AskForKey(): Promise<void> {

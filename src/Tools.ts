@@ -357,8 +357,9 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         contentType: z.string().optional().describe("Content type for a string body, such as application/octet-stream."),
         form: z.record(z.union([z.string(), z.number(), z.boolean()])).optional().describe("Send the body as multipart form fields instead, such as Name, Description and Price."),
         files: z.record(z.string()).optional().describe("Files to upload in the form, as field name to full local path, such as an icon PNG."),
+        wait: z.boolean().optional().describe("When the answer is a long-running operation (a path with done false, often a 202 from analytics queries, asset uploads or experiments), poll that operation until it is done, for up to two minutes, and return the finished result instead."),
       },
-      Run: async (Input: { method?: string; path: string; query?: Record<string, string | number | boolean>; body?: unknown; contentType?: string; form?: Record<string, string | number | boolean>; files?: Record<string, string> }) => ({content: [{
+      Run: async (Input: { method?: string; path: string; query?: Record<string, string | number | boolean>; body?: unknown; contentType?: string; form?: Record<string, string | number | boolean>; files?: Record<string, string>; wait?: boolean }) => ({content: [{
         type: "text",
         text: await CallOpenCloud(Input),
       }]}),

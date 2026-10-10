@@ -248,6 +248,7 @@ export type Health = {
 	name: string,
 	version: string,
 	protocolVersion: number,
+	startedAt: number?,
 	loggedIn: boolean,
 	loginDetail: string?,
 	mcpServers: {string},

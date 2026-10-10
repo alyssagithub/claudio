@@ -2869,6 +2869,7 @@ function Chat.WatchStudioJobs()
 	const Mounted = (script.Parent.Parent :: Instance).Name:match("Testing$") ~= nil
 	local Asked = 0
 	local Checked = 0
+	local BridgeStarted: number?
 	local FinishedChecked = 0
 	local FinishedAfter: number? = nil
 	local CheckingFinished = false
@@ -2961,6 +2962,18 @@ function Chat.WatchStudioJobs()
 			elseif Settings.Fresh("Chips") ~= SavedChips then
 				Context.Restore(Settings.Get("Chips")())
 				SavedChips = Context.Saved()
+			end
+
+			const Health = Connection.Health()
+
+			if Connection.Status() == "Connected" and Health and Health.startedAt ~= BridgeStarted then
+				const Open = Chat.ConversationId()
+
+				if BridgeStarted ~= nil and Open and Open ~= Gallery.Id then
+					task.spawn(Client.Warm, Open)
+				end
+
+				BridgeStarted = Health.startedAt
 			end
 
 			if Connection.Status() == "Connected" and os.clock() - Asked > 60 then

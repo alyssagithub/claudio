@@ -171,6 +171,8 @@ function PicturesFrom(Body: Record<string, any>): Picture[] {
     : [];
 }
 
+const StartedAt = Date.now();
+
 function TurnRequestFrom(Body: Record<string, any>, ConversationId: string | null): TurnRequest {
   return {
     Text: typeof Body.text === "string" ? Body.text : "",
@@ -537,6 +539,7 @@ export function StartServer(Port: number) {
           name: "claudio",
           version: Version,
           protocolVersion: ProtocolVersion,
+          startedAt: StartedAt,
           loggedIn: Login && Login.loggedIn,
           loginDetail: Login && Login.detail,
           mcpServers: Object.keys(ReadMcpServers()),

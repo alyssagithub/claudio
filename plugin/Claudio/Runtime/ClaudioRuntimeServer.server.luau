@@ -153,7 +153,7 @@ const function Explain(Trouble: string, Said: {string}): string
 	return Trouble
 end
 
-const function Run(Code: string, Within: string?, Current: string?): any
+const function Run(Code: string, Within: string?, Current: string?, Seconds: number?): any
 	const Said = {}
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
 		if #Said < 200 and Kind ~= Enum.MessageType.MessageInfo then
@@ -197,14 +197,37 @@ const function Run(Code: string, Within: string?, Current: string?): any
 	end
 
 	local LastYield = os.clock()
-	const Ok, Result = pcall(Body, function()
-		if os.clock() - LastYield < 0.008 then
-			return
-		end
+	local Stopped = false
+	local Outcome: {any}?
+	const Limit = Seconds or 300
+	const Worker = task.spawn(function()
+		Outcome = table.pack(pcall(Body, function()
+			if Stopped then
+				error("Stopped because the execute call ran out of time.", 0)
+			end
 
-		task.wait()
-		LastYield = os.clock()
+			if os.clock() - LastYield < 0.008 then
+				return
+			end
+
+			task.wait()
+			LastYield = os.clock()
+		end))
 	end)
+	const Deadline = os.clock() + Limit
+
+	while not Outcome and os.clock() < Deadline do
+		task.wait(0.1)
+	end
+
+	if not Outcome then
+		Stopped = true
+		pcall(task.cancel, Worker)
+
+		return Finish({error = `Stopped after {Limit} seconds, the time limit for this call, and cancelled the code so it does not keep running in the session. Anything it started itself with task.spawn, task.delay or connections keeps running.`})
+	end
+
+	const Ok, Result = Outcome[1], Outcome[2]
 
 	if not Ok then
 		return Finish({error = Placed(tostring(Result))})
@@ -433,7 +456,7 @@ task.spawn(function()
 					return AskClient(Player, "execute", Job.input.code, math.clamp(tonumber(Job.input.timeout) or 300, 1, 1800))
 				end
 
-				return Run(Job.input.code, Job.input.within, Job.input.withinSource)
+				return Run(Job.input.code, Job.input.within, Job.input.withinSource, math.clamp(tonumber(Job.input.timeout) or 300, 1, 1800))
 			end)
 
 			if not (Done and Outcome == nil) then

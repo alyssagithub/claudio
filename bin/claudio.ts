@@ -7,6 +7,10 @@ import { RunUninstall } from "../src/Uninstall.js";
 import { ReportVersion } from "../src/Version.js";
 import { InstallStartup, RestartBridge, StopBridge, UninstallStartup } from "../src/Startup.js";
 import { AskForKey } from "../src/OpenCloud.js";
+import { RefreshReleased } from "../src/Models.js";
+import { execFile } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const Arguments = process.argv.slice(2);
 const Command = Arguments[0];
@@ -54,12 +58,21 @@ if (Command === "setup") {
   UninstallStartup();
 } else if (Command === "restart") {
   RestartBridge(ChosenPort()).catch(Fail);
+} else if (Command === "models") {
+  RefreshReleased().catch(Fail);
 } else if (Command === "apikey") {
   AskForKey().catch(Fail);
 } else if (Command === "stop") {
   StopBridge(ChosenPort());
 } else if (Command === undefined || Command === "start" || Command === "--port") {
   StartServer(ChosenPort());
+  execFile("npm", ["update", "@anthropic-ai/claude-agent-sdk", "--no-audit", "--no-fund"], {
+    cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".."),
+    shell: true,
+    timeout: 300000,
+  }, (Trouble, Output) => {
+    console.log(Trouble ? `Could not update the Agent SDK, carrying on with the installed one: ${Trouble.message.trim().slice(0, 200)}` : `Checked the Agent SDK for updates${/changed|added/.test(Output) ? "; the update takes effect for new chats" : ""}.`);
+  });
 } else {
   console.error([
     "Usage:",

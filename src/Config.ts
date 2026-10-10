@@ -93,67 +93,6 @@ export function PriceFor(Model: string) {
 
   return Family ? ModelPrices[Family as keyof typeof ModelPrices] : null;
 }
-export const ExtraModels = [
-  {
-    value: "claude-haiku-5-5",
-    displayName: "Haiku 5.5",
-    replaces: "haiku",
-    contextWindow: 200000,
-    description: "Latest Haiku release · fastest for quick answers",
-  },
-  {
-    value: "claude-sonnet-5-5[1m]",
-    displayName: "Sonnet 5.5",
-    replaces: "sonnet",
-    contextWindow: 1000000,
-    description: "Latest Sonnet release · 1M context",
-  },
-  {
-    value: "claude-opus-5-5",
-    displayName: "Opus 5.5",
-    fast: true,
-    contextWindow: 1000000,
-    description: "Latest Opus release · 1M context",
-  },
-  {
-    value: "claude-opus-5",
-    displayName: "Opus 5",
-    fast: true,
-    contextWindow: 1000000,
-    description: "Earlier Opus release · 1M context",
-  },
-  {
-    value: "claude-fable-5",
-    displayName: "Fable 5",
-    contextWindow: 1000000,
-    description: "Earlier Fable release · 1M context",
-  },
-  {
-    value: "claude-opus-4-8",
-    displayName: "Opus 4.8",
-    fast: true,
-    contextWindow: 1000000,
-    description: "Earlier Opus release · 1M context",
-  },
-  {
-    value: "claude-opus-4-7",
-    displayName: "Opus 4.7",
-    contextWindow: 1000000,
-    description: "Earlier Opus release · 1M context",
-  },
-  {
-    value: "claude-opus-4-6",
-    displayName: "Opus 4.6",
-    contextWindow: 200000,
-    description: "Earlier Opus release · 200k context",
-  },
-  {
-    value: "claude-sonnet-4-6",
-    displayName: "Sonnet 4.6",
-    contextWindow: 200000,
-    description: "Earlier Sonnet release · 200k context",
-  },
-];
 export const SessionsRoot = path.join(os.homedir(), ".claude", "projects");
 export const DesktopSessionsRoot = path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), "Claude", "claude-code-sessions");
 export const OwnSessionsFile = path.join(os.homedir(), ".claudio", "sessions.json");

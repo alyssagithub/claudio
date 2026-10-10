@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { exec, execFile, spawn } from "node:child_process";
 import { AunId, DefaultMode, LongPollMilliseconds, MaxBodyBytes, MostScriptsToCheck, ProtocolVersion, Version, WorkingDirectory } from "./Config.js";
 import { SystemPromptFor } from "./Config.js";
+import { ReloadReleased } from "./Models.js";
 import { GetLimits, GetBreakdown, PollUsage, RefreshConversationContext, SignIn } from "./ClaudeSession.js";
 import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
@@ -1236,6 +1237,16 @@ ${Text}`;
     }).length + 1;
 
     Serving(Version, Root, Tools);
+    const FetchModels = () => execFile(process.execPath, [process.argv[1], "models"], {timeout: 60000}, (Trouble, Output, Problem) => {
+      if (Trouble || Problem) {
+        console.error(`Could not list Claude models: ${String(Problem || Trouble?.message).trim().slice(0, 200)}`);
+      }
+
+      ReloadReleased();
+    });
+
+    FetchModels();
+    setInterval(FetchModels, 6 * 60 * 60 * 1000).unref();
 
     console.log(`Claudio bridge listening on http://127.0.0.1:${Port}`);
     console.log(`Claudio ${Version} from ${Root}, serving ${Tools} tools`);

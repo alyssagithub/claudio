@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { AllowedTools, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, EffortOrder, PlanInstructions, CommandsCacheFile, DesktopConfigPath, ExtraModels, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory, DeveloperUserIds } from "./Config.js";
+import { AllowedTools, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, EffortOrder, PlanInstructions, CommandsCacheFile, DesktopConfigPath, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory, DeveloperUserIds } from "./Config.js";
 import { AddDesktopSession, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
@@ -90,7 +90,7 @@ function RememberWindow(Model: string, Size: number) {
 function WindowFor(Model: string, Used: number) {
   const Plain = Model.replace(/\[.*\]$/, "");
   const Known = Object.keys(ModelWindows).filter((Name) => Name.replace(/\[.*\]$/, "") === Plain).map((Name) => ModelWindows[Name]);
-  const Extra = ExtraModels.find((Entry) => Entry.value === Plain);
+  const Extra = GetModels().find((Entry) => Entry.value.replace(/\[.*\]$/, "") === Plain && Entry.contextWindow > 0);
   const Size = Known.length > 0 ? Math.max(...Known) : Extra ? Extra.contextWindow : GetModels().some((Entry) => {
     const Named = Entry.description.match(/^(\w+) (\d+)(?:\.(\d+))?/);
     const Full = Entry.value.startsWith("claude-") ? Entry.value.replace(/\[.*\]$/, "") : Named ? `claude-${Named[1]}-${Named[2]}${Named[3] ? `-${Named[3]}` : ""}`.toLowerCase() : "";
@@ -494,7 +494,7 @@ export function GetCommands(Folder?: string | null) {
 
 export async function DiscoverCommands(Folder?: string | null) {
   try {
-    for await (const Message of query({
+    const Asking = query({
       prompt: "Reply with the single word ready.",
       options: {
         cwd: Folder || WorkingDirectory,
@@ -506,10 +506,13 @@ export async function DiscoverCommands(Folder?: string | null) {
         permissionMode: "dontAsk",
         persistSession: false,
       },
-    })) {
+    });
+
+    for await (const Message of Asking) {
       if (Message.type === "system" && Message.subtype === "init") {
         RememberCommands(Message);
         RememberServers(Message);
+        RememberModels(await Asking.supportedModels().catch(() => []));
 
         return;
       }

@@ -16,33 +16,9 @@ function Attention.Closing(Text: string): string
 		end
 	end
 
-	if #Last <= 200 then
-		return Last
-	end
+	const First = (Last:match("^(.-[%.!?])%s") or Last) :: string
 
-	const Sentences = {}
-
-	for Sentence in (`{(Last:gsub("([%.!?])%s+", "%1\n"))}\n`):gmatch("([^\n]+)\n") do
-		table.insert(Sentences, (Sentence:match("^%s*(.-)%s*$") :: string))
-	end
-
-	local Kept = ""
-
-	for Index = #Sentences, 1, -1 do
-		const Sentence = Sentences[Index]
-
-		if #Kept + #Sentence + 1 > 200 then
-			break
-		end
-
-		Kept = if Kept == "" then Sentence else `{Sentence} {Kept}`
-	end
-
-	if Kept ~= "" then
-		return Kept
-	end
-
-	return `...{Last:sub(-197)}`
+	return if #First <= 200 then First else `{First:sub(1, 197)}...`
 end
 
 function Attention.NotifyElsewhere(Title: string, Text: string)

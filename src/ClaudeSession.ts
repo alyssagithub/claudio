@@ -1869,12 +1869,17 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
             }
 
             const Answers = await AskQuestion(Session, Input.questions as Question[]) as JobAnswer | null;
+            const Given = Answers && !Array.isArray(Answers) ? Object.fromEntries(Object.entries(Answers).filter(([, Value]) => typeof Value === "string" && Value !== "")) : {};
 
             if (!Answers) {
               return {behavior: "deny", message: "The user dismissed the question without answering. Stop and wait for their next message rather than guessing."};
             }
 
-            return {behavior: "allow", updatedInput: {...Input, answers: Answers}};
+            if (Object.keys(Given).length === 0) {
+              return {behavior: "deny", message: "The user skipped the question without choosing anything. Do not guess an answer: carry on only with what does not depend on it, or stop and ask in plain text."};
+            }
+
+            return {behavior: "allow", updatedInput: {...Input, answers: Given}};
           },
           supportedDialogKinds: ["refusal_fallback_prompt"],
           onUserDialog: async (Request) => {

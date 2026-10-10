@@ -490,6 +490,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         element: z.string().optional().describe("During a playtest, a GuiObject on a player's screen to capture on its own, such as Players.LocalPlayer.PlayerGui.Menu.Avatar. Claudio marks it, captures the Studio window and crops to exactly that element. Pair it with zoom to inspect small UI."),
         player: z.string().optional().describe("For element, which client: a player's name or their number in join order. The first player by default."),
         frame: z.string().optional().describe("A target size or aspect for framing, such as 1920x1080 or 16:9. The largest centred area of that shape is outlined in yellow with rule-of-thirds lines and everything outside it is darkened, so you can see exactly what a thumbnail of that shape would contain. A size such as 1920x1080 renders the viewport at exactly that resolution through the device emulator with actual-resolution scaling, then ends the simulation; an aspect such as 16:9, or a size while a simulation is already running, frames the viewport as it is."),
+        quality: z.number().optional().describe("Graphics level from 1 to 10 to render this capture at; 10 is the highest Studio offers, for thumbnails and other high quality renders. The user's own level is put back afterwards."),
         crop: z.boolean().optional().describe("With frame, return only the framed area instead of the guides."),
         zoom: z.number().optional().describe("Enlarge the picture by this whole number, up to 16, with sharp pixels, to look closely at something small. The result is capped at 2048 pixels on a side."),
         padding: z.number().optional().describe("Pixels of margin around it, 8 by default."),
@@ -500,7 +501,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         height: z.number().optional().describe("Region height."),
         file: z.string().optional().describe("Also save the picture to this path as a PNG, for comparing pixels or keeping a record."),
       },
-      Run: async (Input: { of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
+      Run: async (Input: { of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; quality?: number; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
         const Shape = Input.frame ? Input.frame.match(/^\s*(\d+(?:\.\d+)?)\s*[x:×]\s*(\d+(?:\.\d+)?)\s*$/i) : null;
         const Picture = (Given: string, Said: string): ToolAnswer => {
           let Data = Given;
@@ -660,7 +661,12 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         const Simulated = Sized && typeof Sized.text === "string" && Sized.text.startsWith("Nothing is being simulated")
           ? await Reach("device", {action: "set", device: "hd_1080", width: Math.round(Number(Shape![1])), height: Math.round(Number(Shape![2])), scaling: "ActualResolution"}) as { error?: string } | null
           : null;
+        const Graphics = Input.quality ? await Reach("quality", {level: Math.min(10, Math.max(1, Input.quality))}) as { text?: string; before?: string; error?: string } | null : null;
         let Shot: { error?: string; width: number; height: number; pixels: string; viewport: string; around?: string } | null;
+
+        if (Graphics && Graphics.before) {
+          await new Promise((Resolve) => setTimeout(Resolve, 1500));
+        }
 
         try {
           Shot = await Reach("shoot",{
@@ -675,10 +681,20 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
           if (Simulated && !Simulated.error) {
             await Reach("device", {action: "stop"});
           }
+
+          if (Graphics && Graphics.before) {
+            await Reach("quality", {restore: Graphics.before});
+          }
+        }
+
+        let Extra = "";
+
+        if (Input.quality && Shot && !Shot.error) {
+          Extra += Graphics && Graphics.before ? `, rendered at graphics level ${Math.min(10, Math.max(1, Input.quality))} and put back to ${Graphics.before}` : `, at the user's own graphics level because Studio refused the change (${(Graphics && Graphics.error) || "no answer"})`;
         }
 
         if (Sized && !(Simulated && !Simulated.error) && Shot && !Shot.error) {
-          Shot.viewport += Simulated ? `, because the device emulator refused ${Input.frame} (${Simulated.error})` : ", because a device simulation was already running and was left alone";
+          Extra += Simulated ? `, because the device emulator refused ${Input.frame} (${Simulated.error})` : ", because a device simulation was already running and was left alone";
         }
 
         if ((!Shot || Shot.error) && !Input.around && !(Input.width && Input.height)) {
@@ -714,7 +730,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
           }]};
         }
 
-        return Picture(Made.data, `${Shot.width}x${Shot.height} of the ${Shot.viewport} viewport${Shot.around ? `, cropped to ${Shot.around}` : ""}${Framed && Framed.framed ? `, framed on ${Framed.framed}` : ""}`);
+        return Picture(Made.data, `${Shot.width}x${Shot.height} of the ${Shot.viewport} viewport${Shot.around ? `, cropped to ${Shot.around}` : ""}${Extra}${Framed && Framed.framed ? `, framed on ${Framed.framed}` : ""}`);
       },
     },
     {

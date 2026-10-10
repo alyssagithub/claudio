@@ -32,7 +32,7 @@ function Builder.Serve()
 		if typeof(Source) == "table" and typeof(Source.quality) == "number" then
 			const Level = math.clamp(math.round(Source.quality), 1, 10)
 			const Rendered, Trouble = pcall(function()
-				(settings() :: any).Rendering.QualityLevel = (Enum.QualityLevel :: any)[`Level{string.format("%02d", math.clamp(Level * 2 - 1, 1, 21))}`]
+				(settings() :: any).Rendering.QualityLevel = (Enum.QualityLevel :: any)[`Level{string.format("%02d", math.clamp(math.round(1 + (Level - 1) * 20 / 9), 1, 21))}`]
 			end)
 
 			return if Rendered then {now = tostring((settings() :: any).Rendering.QualityLevel)} else {error = `Studio refused the graphics level: {tostring(Trouble)}`}

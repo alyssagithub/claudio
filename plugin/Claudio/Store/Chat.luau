@@ -2833,9 +2833,23 @@ const function RunStudioJob(Job: any)
 			end
 
 			if Job.kind == "quality" then
-				settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+				const Rendering = settings().Rendering
+				const Before = Rendering.QualityLevel.Name
 
-				return {text = "Studio's graphics level is back to automatic."}
+				if typeof(Job.input.level) == "number" then
+					Rendering.QualityLevel = (Enum.QualityLevel :: any)[`Level{string.format("%02d", math.clamp(math.round(1 + (Job.input.level - 1) * 20 / 9), 1, 21))}`]
+
+					return {
+						text = `Studio's graphics level is now {Rendering.QualityLevel.Name}.`,
+						before = Before,
+					}
+				end
+
+				const Wanted = if typeof(Job.input.restore) == "string" then (Enum.QualityLevel :: any)[Job.input.restore] else nil
+
+				Rendering.QualityLevel = Wanted or Enum.QualityLevel.Automatic
+
+				return {text = `Studio's graphics level is back to {Rendering.QualityLevel.Name}.`}
 			end
 
 			if Job.kind == "mark" then

@@ -104,6 +104,10 @@ const function Describe(Entry: Types.ToolCall, Running: boolean): string
 		return if Running then "Loading tools" else "Loaded tools"
 	end
 
+	if Name == "AskUserQuestion" then
+		return `{if Running then "Asking" else "Asked"} {Entry.input:match('"header":"([^"]+)"') or "a question"}`
+	end
+
 	if Name == "Compaction" then
 		const Before = tonumber(Changes.Field(Entry.input, "before"))
 		const After = tonumber(Changes.Field(Entry.input, "after"))
@@ -307,6 +311,10 @@ return function(Props: Props)
 			const Next = Starts[Index + 1]
 			const Given = if Next then (Output:sub(Start.At, Next.From - 1):match('^(.*)",%s*$')) else (Output:sub(Start.At):match('^(.*)"'))
 
+			if (Given or ""):find("[User dismissed", 1, true) == 1 then
+				return {}
+			end
+
 			table.insert(Pairs, {
 				Question = Start.Question,
 				Given = Given or "",
@@ -461,7 +469,8 @@ return function(Props: Props)
 					return #GetAnswers(Value()) > 0
 				end,
 
-				Create "UICorner" {CornerRadius = UDim.new(0, 6)},
+				Create "UICorner" {CornerRadius = UDim.new(0, 8)},
+				Create "UIStroke" {Color = Theme.Colors.Border},
 				Create "UIPadding" {
 					PaddingLeft = UDim.new(0, 10),
 					PaddingRight = UDim.new(0, 10),
@@ -471,7 +480,7 @@ return function(Props: Props)
 				Create "UIListLayout" {
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					HorizontalFlex = Enum.UIFlexAlignment.Fill,
-					Padding = UDim.new(0, 8),
+					Padding = UDim.new(0, 10),
 				},
 				Vide.indexes(function()
 					return GetAnswers(Value())
@@ -489,8 +498,8 @@ return function(Props: Props)
 							Size = UDim2.fromScale(1, 0),
 							AutomaticSize = Enum.AutomaticSize.Y,
 							BackgroundTransparency = 1,
-							TextColor3 = Theme.Colors.DimText,
-							TextSize = Settings.SmallText,
+							TextColor3 = Theme.Colors.Text,
+							TextSize = Settings.TextSize,
 							FontFace = Font.fromEnum(Enum.Font.BuilderSans),
 							TextXAlignment = Enum.TextXAlignment.Left,
 							TextWrapped = true,
@@ -506,7 +515,7 @@ return function(Props: Props)
 							BackgroundTransparency = 1,
 							TextColor3 = Theme.Colors.Text,
 							TextSize = Settings.TextSize,
-							FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
+							FontFace = Font.fromEnum(Enum.Font.BuilderSansBold),
 							TextXAlignment = Enum.TextXAlignment.Left,
 							TextWrapped = true,
 							LayoutOrder = 2,

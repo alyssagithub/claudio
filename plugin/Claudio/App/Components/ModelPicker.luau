@@ -553,10 +553,7 @@ function ModelPicker.Button()
 		AutoButtonColor = false,
 		LayoutOrder = 4,
 		Activated = function()
-			if #Chat.Models() == 0 then
-				task.spawn(Chat.LoadModels)
-			end
-
+			task.spawn(Chat.LoadModels)
 			Chat.EffortOpen(false)
 			Chat.ModeOpen(false)
 			Chat.PickerOpen(not Chat.PickerOpen())

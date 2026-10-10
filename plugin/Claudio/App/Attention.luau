@@ -16,11 +16,11 @@ function Attention.Closing(Text: string): string
 		end
 	end
 
-	if #Last <= 200 then
+	if #Last <= 1000 then
 		return Last
 	end
 
-	return `{(Last:sub(1, 197):match("^(.*%S)%s") or Last:sub(1, 197))}...`
+	return `{(Last:sub(1, 997):match("^(.*%S)%s") or Last:sub(1, 997))}...`
 end
 
 function Attention.NotifyElsewhere(Title: string, Text: string)

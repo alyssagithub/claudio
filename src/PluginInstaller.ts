@@ -106,23 +106,35 @@ export async function InstallPlugin(LocalPath?: string | null): Promise<void> {
   console.log(`Installed ${PluginFileName} from commit ${Commit.slice(0, 7)} to ${await DownloadPlugin(Commit)}`);
 }
 
-export function InstallCommit(Commit: string): Promise<void> {
+function Run(Program: string, Arguments: string[]): Promise<string> {
   return new Promise((Resolve, Reject) => {
-    execFile("npm", ["install", "-g", `github:${GitHubRepo}#${Commit}`, "--no-audit", "--no-fund"], {
-      shell: true,
+    execFile(Program, Arguments, {
+      shell: Program === "npm",
       timeout: 15 * 60 * 1000,
       windowsHide: true,
-    }, (Trouble, _Output, Problem) => {
+    }, (Trouble, Output, Problem) => {
       if (Trouble) {
-        Reject(new Error(`npm could not install commit ${Commit.slice(0, 7)}: ${String(Problem || Trouble.message).trim().slice(-400)}`));
+        Reject(new Error(String(Problem || Output || Trouble.message).trim().slice(-400)));
 
         return;
       }
 
-      DownloadPlugin(Commit).then(() => {
-        Remember(Commit);
-        Resolve();
-      }, Reject);
+      Resolve(String(Output).trim());
     });
   });
+}
+
+export async function InstallCommit(Commit: string): Promise<void> {
+  try {
+    await Run("npm", ["install", "-g", `https://codeload.github.com/${GitHubRepo}/tar.gz/${Commit}`, "--no-audit", "--no-fund"]);
+
+    const Installed = path.join((await Run("npm", ["root", "-g"])).split(/\r?\n/).pop() || "", "claudio");
+
+    await Run(process.execPath, [path.join(Installed, "node_modules", "typescript", "bin", "tsc"), "-p", Installed]);
+  } catch (Trouble) {
+    throw new Error(`Could not install commit ${Commit.slice(0, 7)}: ${(Trouble as Error).message}`);
+  }
+
+  await DownloadPlugin(Commit);
+  Remember(Commit);
 }

@@ -35,7 +35,7 @@ function Native([scriptblock]$Command) {
 }
 
 if ($IsMacOS -or $IsLinux) {
-    Fail "This one's Windows only. Elsewhere install Node.js and Git yourself, then: npm install -g github:alyssagithub/claudio && claudio setup"
+    Fail "This one's Windows only. Elsewhere install Node.js yourself, then: npm install -g github:alyssagithub/claudio && claudio setup"
 }
 
 Write-Host ""
@@ -67,20 +67,6 @@ if (Has "node") {
     }
 }
 
-if (-not (Has "git")) {
-    if (-not (Has "winget")) {
-        Fail "No Git, which npm needs to build Claudio from GitHub. Get it from https://git-scm.com, then run this again."
-    }
-
-    Write-Host "No Git, installing it."
-    Native { winget install --id Git.Git -e --accept-source-agreements --accept-package-agreements --silent }
-    RefreshPath
-
-    if (-not (Has "git")) {
-        Fail "Git installed but isn't on PATH yet. Open a new terminal and run this again."
-    }
-}
-
 try {
     $Latest = (Invoke-RestMethod "https://api.github.com/repos/alyssagithub/claudio/commits/main" -Headers @{
         "User-Agent"    = "claudio-installer"
@@ -90,11 +76,20 @@ try {
     Fail "Couldn't reach GitHub to find the newest version. Check your connection and run this again."
 }
 
-Write-Host "Building Claudio from the newest commit ($($Latest.Substring(0, 7))). Takes a minute."
-Native { & npm install -g "github:alyssagithub/claudio#$Latest" --no-audit --no-fund }
+$Package = "https://codeload.github.com/alyssagithub/claudio/tar.gz/$Latest"
+
+Write-Host "Installing Claudio from the newest commit ($($Latest.Substring(0, 7))). Takes a minute."
+Native { & npm install -g $Package --no-audit --no-fund }
 
 if ($LASTEXITCODE -ne 0) {
-    Fail "npm couldn't install it. Try a new terminal, or do it yourself: npm install -g github:alyssagithub/claudio#$Latest"
+    Fail "npm couldn't install it. Try a new terminal, or do it yourself: npm install -g $Package"
+}
+
+$Installed = Join-Path (& npm root -g) "claudio"
+Native { & node (Join-Path $Installed "node_modules\typescript\bin\tsc") -p $Installed }
+
+if ($LASTEXITCODE -ne 0) {
+    Fail "Claudio downloaded but could not be built. Run this again, or tell the author."
 }
 
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claudio" | Out-Null

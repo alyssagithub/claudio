@@ -1,7 +1,7 @@
 --!strict
 return {
 	Name = "Claudio",
-	Version = "1.7.0-beta",
+	Version = "1.7.0",
 	AskTools = {
 		AskUserQuestion = true,
 		mcp__claudio__ask = true,

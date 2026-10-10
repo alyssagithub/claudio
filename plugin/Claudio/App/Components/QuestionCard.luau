@@ -30,7 +30,6 @@ return function()
 	const Written = Vide.source({} :: {[string]: string})
 	const Notes = Vide.source({} :: {[string]: string})
 	const Noting = Vide.source(false)
-	const KeyBox = Vide.source(nil :: TextBox?)
 	const Wide = Vide.source(0)
 	const OtherBox = Vide.source(nil :: TextBox?)
 
@@ -160,17 +159,6 @@ return function()
 		Finish()
 	end
 
-	const function Listen()
-		task.defer(function()
-			const Box = KeyBox()
-			const Writing = OtherBox()
-
-			if Box and Chat.Question() and not (Writing and Writing:IsFocused()) and not Noting() then
-				Box:CaptureFocus()
-			end
-		end)
-	end
-
 	const function Take(Label: string)
 		const Held = Current()
 
@@ -220,35 +208,8 @@ return function()
 			Written({})
 			Notes({})
 			Noting(false)
-			Listen()
 		end)
 	end)
-
-	const function Press(Key: Enum.KeyCode)
-		if Key == Enum.KeyCode.Escape then
-			Decline()
-		elseif Key == Enum.KeyCode.Tab or Key == Enum.KeyCode.Right then
-			Go(Step() + 1)
-		elseif Key == Enum.KeyCode.Left then
-			Go(Step() - 1)
-		elseif Reviewing() then
-			if Key == Enum.KeyCode.Return then
-				Finish()
-			end
-		elseif Key == Enum.KeyCode.Up then
-			Focus(math.max(1, Focus() - 1))
-		elseif Key == Enum.KeyCode.Down then
-			Focus(math.min(#Rows(), Focus() + 1))
-		elseif Key == Enum.KeyCode.Return then
-			const Label = Rows()[Focus()]
-
-			if Label then
-				Take(Label)
-			end
-		elseif Key == Enum.KeyCode.N and Previewing() then
-			Noting(true)
-		end
-	end
 
 	const function Row(Index: number)
 		const Hovered = Vide.source(false)
@@ -292,7 +253,6 @@ return function()
 			Activated = function()
 				Focus(Index)
 				Take(Label())
-				Listen()
 			end,
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
@@ -430,8 +390,6 @@ return function()
 							if Entered then
 								Advance()
 							end
-
-							Listen()
 						end))
 					end),
 				},
@@ -486,7 +444,6 @@ return function()
 			Vide.action(Covers.Hover(Hovered)),
 			Activated = function()
 				Go(Index)
-				Listen()
 			end,
 
 			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
@@ -554,40 +511,6 @@ return function()
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				HorizontalFlex = Enum.UIFlexAlignment.Fill,
 				Padding = UDim.new(0, 6),
-			},
-			Create "TextBox" {
-				Name = "Keys",
-				Size = UDim2.fromOffset(0, 0),
-				BackgroundTransparency = 1,
-				TextTransparency = 1,
-				Text = "",
-				ClearTextOnFocus = true,
-				LayoutOrder = 0,
-				Vide.action(function(Box: TextBox)
-					KeyBox(Box)
-					Vide.cleanup(Box.InputBegan:Connect(function(Input: InputObject)
-						if Input.UserInputType == Enum.UserInputType.Keyboard then
-							Press(Input.KeyCode)
-						end
-					end))
-					Vide.cleanup(Box:GetPropertyChangedSignal("Text"):Connect(function()
-						if Box.Text == "" then
-							return
-						end
-
-						if Box.Text:lower():find("n", 1, true) and Previewing() then
-							Noting(true)
-						end
-
-						Box.Text = ""
-					end))
-					Vide.cleanup(Box.FocusLost:Connect(function(Entered: boolean)
-						if Entered then
-							Press(Enum.KeyCode.Return)
-							Listen()
-						end
-					end))
-				end),
 			},
 			Create "Frame" {
 				Name = "Heading",
@@ -766,7 +689,7 @@ return function()
 						Visible = function()
 							return not Noting()
 						end,
-						Text = "press n to add notes",
+						Text = "Add notes",
 						Activated = function()
 							Noting(true)
 						end,
@@ -821,7 +744,6 @@ return function()
 							end))
 							Vide.cleanup(Box.FocusLost:Connect(function()
 								Noting(false)
-								Listen()
 							end))
 						end),
 					},
@@ -886,27 +808,6 @@ return function()
 					VerticalAlignment = Enum.VerticalAlignment.Center,
 					SortOrder = Enum.SortOrder.LayoutOrder,
 					Padding = UDim.new(0, 6),
-				},
-				Create "TextLabel" {
-					Name = "Shortcuts",
-					Size = UDim2.fromScale(0, 0),
-					AutomaticSize = Enum.AutomaticSize.Y,
-					BackgroundTransparency = 1,
-					TextColor3 = Theme.Colors.DimText,
-					TextSize = Settings.SmallText,
-					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-					TextXAlignment = Enum.TextXAlignment.Left,
-					TextWrapped = true,
-					LayoutOrder = 0,
-					Text = function()
-						if Reviewing() then
-							return "enter submit · ←/→ switch · esc cancel"
-						end
-
-						return `↑/↓ navigate · enter select{if Previewing() then " · n add notes" else ""}{if #Asked() > 1 then " · tab switch questions" else ""} · esc cancel`
-					end,
-
-					Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
 				},
 				Button {
 					Text = "Cancel",

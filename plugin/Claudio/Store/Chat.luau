@@ -2837,7 +2837,7 @@ const function RunStudioJob(Job: any)
 				const Before = Rendering.QualityLevel.Name
 
 				if typeof(Job.input.level) == "number" then
-					Rendering.QualityLevel = (Enum.QualityLevel :: any)[`Level{string.format("%02d", math.clamp(math.round(1 + (Job.input.level - 1) * 20 / 9), 1, 21))}`]
+					Rendering.QualityLevel = (Enum.QualityLevel :: any)[`Level{string.format("%02d", math.clamp(math.round(Job.input.level), 1, 21))}`]
 
 					return {
 						text = `Studio's graphics level is now {Rendering.QualityLevel.Name}.`,

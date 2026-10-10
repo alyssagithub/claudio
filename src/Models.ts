@@ -95,6 +95,15 @@ function Merge() {
     Alias.extra = true;
   }
 
+  const Families = new Set<string>();
+
+  for (const Model of Models) {
+    const Family = (Model.displayName.match(/^[A-Za-z]+/) || [Model.value])[0].toLowerCase();
+
+    Model.extra = Families.has(Family) ? true : undefined;
+    Families.add(Family);
+  }
+
   try {
     fs.mkdirSync(path.dirname(ModelsCacheFile), {recursive: true});
     fs.writeFileSync(ModelsCacheFile, JSON.stringify(Models));

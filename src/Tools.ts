@@ -140,7 +140,27 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
   const { Reach, ReachIn, Presence, LiveSession } = Deps;
 
   async function NeedsSession(What: string): Promise<string | null> {
-    return (await LiveSession()) ? null : What;
+    if (await LiveSession()) {
+      return null;
+    }
+
+    const Status: { text?: string } | null = await Reach("playtest", {action: "status"});
+
+    if (!Status || typeof Status.text !== "string" || Status.text.startsWith("No playtest")) {
+      return What;
+    }
+
+    const Began = Date.now();
+
+    while (Date.now() - Began < 20000) {
+      await new Promise((Resolve) => setTimeout(Resolve, 1000));
+
+      if (await LiveSession()) {
+        return null;
+      }
+    }
+
+    return "A playtest is running, but its server has not checked in with Claudio for over 20 seconds, so nothing can run there. It is usually busy with a long task or stuck; stop the playtest and start it again.";
   }
 
   // Stop returns as soon as the session takes the request, but Studio needs a while to tear the playtest

@@ -105,7 +105,7 @@ return function()
 			table.insert(Labels, Written()[Question.question])
 		end
 
-		return table.concat(Labels, ", ")
+		return table.concat(Labels, ",")
 	end
 
 	const function Finish()

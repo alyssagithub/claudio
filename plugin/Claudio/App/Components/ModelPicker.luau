@@ -23,8 +23,16 @@ const EffortNames = {
 }
 
 const function CurrentModel(): Types.ModelInfo?
+	const Saved = Settings.Get("Model")()
+
 	for _, Model in Chat.Models() do
-		if Model.value == Settings.Get("Model")() then
+		if Model.value == Saved then
+			return Model
+		end
+	end
+
+	for _, Model in Chat.Models() do
+		if Model.value:gsub("%[1m%]$", "") == Saved:gsub("%[1m%]$", "") then
 			return Model
 		end
 	end

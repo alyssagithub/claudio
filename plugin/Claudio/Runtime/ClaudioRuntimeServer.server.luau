@@ -227,6 +227,8 @@ end
 
 task.spawn(function()
 	while RunService:IsRunning() and task.wait(1) do
+		ServerScriptService:SetAttribute("ClaudioRuntimeBeat", os.clock())
+
 		local Ready = 0
 		local Games = 0
 

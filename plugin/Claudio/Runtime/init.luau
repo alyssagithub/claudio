@@ -83,12 +83,37 @@ function Runtime.Start(CurrentPlugin: Plugin)
 	end
 
 	const Key = if OnServer then Client.PlaytestKey() or "" else ""
-	const Copy = (if OnServer then (script :: any).ClaudioRuntimeServer else (script :: any).ClaudioRuntimeClient):Clone()
 
-	Runtime.Fill(Copy, Key)
-	Copy.RunContext = if OnServer then Enum.RunContext.Server else Enum.RunContext.Client
-	Copy.Disabled = false
-	Copy.Parent = if OnServer then ServerScriptService else ReplicatedStorage
+	const function Launch(): Instance
+		const Copy = (if OnServer then (script :: any).ClaudioRuntimeServer else (script :: any).ClaudioRuntimeClient):Clone()
+
+		Runtime.Fill(Copy, Key)
+		Copy.RunContext = if OnServer then Enum.RunContext.Server else Enum.RunContext.Client
+		Copy.Disabled = false
+		Copy.Parent = if OnServer then ServerScriptService else ReplicatedStorage
+
+		return Copy
+	end
+
+	local Running = Launch()
+
+	if OnServer then
+		task.spawn(function()
+			while RunService:IsRunning() and task.wait(2) do
+				const Beat = ServerScriptService:GetAttribute("ClaudioRuntimeBeat")
+
+				if typeof(Beat) ~= "number" or os.clock() - Beat < 8 then
+					continue
+				end
+
+				warn("Claudio's play session agent stopped, most likely because code it ran hit Roblox's script time limit, so it was started again.")
+				Running:Destroy()
+				require(script.Builder).Serve()
+				ServerScriptService:SetAttribute("ClaudioRuntimeBeat", os.clock())
+				Running = Launch()
+			end
+		end)
+	end
 
 	if Key ~= "" then
 		CurrentPlugin.Unloading:Connect(function()

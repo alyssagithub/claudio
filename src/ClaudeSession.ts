@@ -1947,7 +1947,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
             const Reply = await AskQuestion(Session, Input.questions as Question[]) as {Answers: JobAnswer, Annotations?: unknown, Talk: boolean} | null;
 
             if (!Reply) {
-              return {behavior: "deny", message: "User declined to answer questions. Stop and wait for their next message rather than guessing."};
+              return {behavior: "allow", updatedInput: {...Input, answers: Object.fromEntries((Input.questions as Question[]).map((Asked) => [Asked.question, "[User dismissed — do not proceed, wait for next instruction]"]))}};
             }
 
             if (Reply.Talk) {

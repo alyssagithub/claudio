@@ -277,10 +277,15 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
 
     const Priced = Whole.messages as { cost?: number; estimated?: boolean }[];
 
+    const Estimated = Priced.reduce((Sum, Message) => Sum + (Message.estimated ? Message.cost || 0 : 0), 0);
+    const Reported = Priced.reduce((Sum, Message) => Sum + (Message.estimated ? 0 : Message.cost || 0), 0);
+
     SendJson(Response, 200, {
-      cost: Priced.reduce((Sum, Message) => Sum + (Message.cost || 0), 0),
-      estimated: Priced.some((Message) => Message.cost && Message.estimated),
-      reported: Priced.some((Message) => Message.cost && !Message.estimated),
+      cost: Estimated + Reported,
+      estimated: Estimated > 0,
+      reported: Reported > 0,
+      estimatedCost: Estimated,
+      reportedCost: Reported,
     });
     return;
   }

@@ -199,27 +199,24 @@ return function()
 		return Found
 	end
 
-	const function GetChatCost(): (number, boolean, boolean)
+	const function GetChatCost(): (number, number, number)
 		const Whole = Chat.WholeCost()
-		local Total = if Whole then Whole.cost else 0
-		local Guessed = Whole ~= nil and Whole.estimated
-		local Known = Whole ~= nil and Whole.reported
+		local Reported = if Whole then Whole.reportedCost or (if Whole.estimated then 0 else Whole.cost) else 0
+		local Estimated = if Whole then Whole.estimatedCost or (if Whole.estimated then Whole.cost else 0) else 0
 
 		for _, Message in Chat.Messages() do
 			if not Message.Cost or (Whole and not Message.Fresh) then
 				continue
 			end
 
-			Total += Message.Cost
-
 			if Message.Estimated then
-				Guessed = true
+				Estimated += Message.Cost
 			else
-				Known = true
+				Reported += Message.Cost
 			end
 		end
 
-		return Total, Guessed, Known
+		return Reported + Estimated, Reported, Estimated
 	end
 
 	const function GetContextText(): string
@@ -679,25 +676,28 @@ return function()
 			Line(function()
 				return "Cost of this chat"
 			end, function()
-				const Total, Guessed = GetChatCost()
+				const Total, _, Estimated = GetChatCost()
 
-				return Format.Cost(Total, Guessed)
+				return Format.Cost(Total, Estimated > 0)
 			end, true, 201),
 			Line(function()
-				const Total, Guessed, Known = GetChatCost()
+				const _, Reported = GetChatCost()
 
-				if Total == 0 then
-					return ""
-				end
-
-				if Guessed and Known then
-					return "Part reported by Claude, part estimated from tokens"
-				end
-
-				return if Guessed then "Estimated from tokens and model prices" else "Reported by Claude"
+				return if Reported > 0 then "Reported by Claude" else ""
 			end, function()
-				return ""
+				const _, Reported = GetChatCost()
+
+				return if Reported > 0 then Format.Cost(Reported) else ""
 			end, false, 202),
+			Line(function()
+				const _, _, Estimated = GetChatCost()
+
+				return if Estimated > 0 then "Estimated from tokens and model prices" else ""
+			end, function()
+				const _, _, Estimated = GetChatCost()
+
+				return if Estimated > 0 then Format.Cost(Estimated, true) else ""
+			end, false, 203),
 			Create "TextLabel" {
 				Name = "Empty",
 				Size = UDim2.fromScale(1, 0),

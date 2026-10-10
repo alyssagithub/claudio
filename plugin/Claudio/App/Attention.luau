@@ -16,9 +16,11 @@ function Attention.Closing(Text: string): string
 		end
 	end
 
-	const First = (Last:match("^(.-[%.!?])%s") or Last) :: string
+	if #Last <= 200 then
+		return Last
+	end
 
-	return if #First <= 200 then First else `{First:sub(1, 197)}...`
+	return `{(Last:sub(1, 197):match("^(.*%S)%s") or Last:sub(1, 197))}...`
 end
 
 function Attention.NotifyElsewhere(Title: string, Text: string)

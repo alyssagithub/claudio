@@ -18,6 +18,8 @@ type Stats = {
 	favoriteModel: string?,
 	models: {{name: string, tokens: number, input: number, output: number, messages: number}},
 	grid: {number},
+	gridMessages: {number},
+	gridEnd: string,
 	bars: {{date: string, models: {[string]: number}}},
 	counting: boolean,
 	ready: boolean,
@@ -75,6 +77,7 @@ return function()
 	const Found = Vide.source(nil :: Stats?)
 	const Wide = Vide.source(0)
 	const ChartWide = Vide.source(0)
+	const Square = Vide.source(0)
 	const Pointed = Vide.source(0)
 	local Asking = 0
 
@@ -240,6 +243,24 @@ return function()
 		return if Held then math.max(1, #Held.bars) else 1
 	end
 
+	const function SquareLabel(Index: number): string
+		const Held = Found()
+
+		if not Held then
+			return ""
+		end
+
+		const Year, Month, Day = Held.gridEnd:match("^(%d+)-(%d+)-(%d+)$")
+		const When = os.date("*t", os.time({
+			year = tonumber(Year) :: number,
+			month = tonumber(Month) :: number,
+			day = (tonumber(Day) :: number) - (#Held.grid - Index),
+			hour = 12,
+		})) :: {month: number, day: number}
+
+		return `{Months[When.month]} {When.day} — {Grouped(Held.gridMessages[Index] or 0)}`
+	end
+
 	const function Cell(): number
 		return math.max(4, math.floor((Wide() - (Weeks - 1) * 3) / Weeks))
 	end
@@ -366,6 +387,43 @@ return function()
 				end))
 			end),
 
+			Create "TextLabel" {
+				Name = "Tip",
+				AutomaticSize = Enum.AutomaticSize.XY,
+				AnchorPoint = Vector2.new(0.5, 1),
+				Position = function()
+					const Index = math.max(Square(), 1) - 1
+					const Column = Index // 7
+					const Row = Index % 7
+
+					return UDim2.fromOffset(math.clamp(Column * (Cell() + 3) + Cell() / 2, 50, math.max(50, Wide() - 50)), Row * (Cell() + 3) - 2)
+				end,
+				BackgroundColor3 = Theme.Colors.Background,
+				TextColor3 = Theme.Colors.Text,
+				TextSize = Settings.SmallText,
+				FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+				ZIndex = 5,
+				Visible = function()
+					return Square() > 0
+				end,
+				Text = function()
+					return if Square() > 0 then SquareLabel(Square()) else ""
+				end,
+
+				Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+				Create "UIStroke" {Color = Theme.Colors.Border},
+				Create "UIPadding" {
+					PaddingLeft = UDim.new(0, 6),
+					PaddingRight = UDim.new(0, 6),
+					PaddingTop = UDim.new(0, 3),
+					PaddingBottom = UDim.new(0, 3),
+				},
+			},
+			Create "Frame" {
+				Name = "Days",
+				Size = UDim2.fromScale(1, 1),
+				BackgroundTransparency = 1,
+
 			Create "UIGridLayout" {
 				CellSize = function()
 					return UDim2.fromOffset(Cell(), Cell())
@@ -380,6 +438,20 @@ return function()
 
 				return if Held then Held.grid else {}
 			end, function(Tokens: () -> number, Index: number)
+				const Hovered = Vide.source(false)
+
+				Vide.effect(function()
+					if Hovered() then
+						Vide.untrack(function()
+							Square(Index)
+						end)
+					elseif Vide.untrack(Square) == Index then
+						Vide.untrack(function()
+							Square(0)
+						end)
+					end
+				end)
+
 				return Create "Frame" {
 					Name = "Day",
 					BackgroundColor3 = function()
@@ -389,10 +461,12 @@ return function()
 						return if Tokens() > 0 then Shade(Tokens()) - 0.15 else 0.3
 					end,
 					LayoutOrder = Index,
+					Vide.action(Covers.Hover(Hovered)),
 
 					Create "UICorner" {CornerRadius = UDim.new(0, 2)},
 				}
 			end),
+			},
 		},
 		Create "Frame" {
 			Name = "Chart",

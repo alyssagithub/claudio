@@ -918,7 +918,18 @@ export function LastEndedAt(ConversationId: string): number {
   return Ended.get(ConversationId) || 0;
 }
 
-const Suggestions = new Map<string, string>();
+const SuggestionsFile = path.join(os.homedir(), ".claudio", "suggestions.json");
+const Suggestions = new Map<string, string>(Object.entries((() => {
+  try {
+    return JSON.parse(fs.readFileSync(SuggestionsFile, "utf8")) as Record<string, string>;
+  } catch {
+    return {};
+  }
+})()));
+
+function SaveSuggestions() {
+  SaveQuietly("SaveSuggestions", () => fs.writeFileSync(SuggestionsFile, JSON.stringify(Object.fromEntries([...Suggestions].slice(-200)))));
+}
 
 export function SuggestionFor(ConversationId: string): string | null {
   return Suggestions.get(ConversationId) || null;
@@ -1298,6 +1309,7 @@ function RouteMessage(Session: Session, Message: any) {
 
     if (Id && !Session.CurrentTurn && typeof Message.suggestion === "string" && Message.suggestion.trim() !== "") {
       Suggestions.set(Id, Message.suggestion.trim());
+      SaveSuggestions();
     }
 
     return;
@@ -2290,6 +2302,7 @@ export function StartTurn(Request: TurnRequest) {
 
   if (ConversationId) {
     Suggestions.delete(ConversationId);
+    SaveSuggestions();
   }
 
   const { Planning, Folder, Chosen } = Choose(Request);

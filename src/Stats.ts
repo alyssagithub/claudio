@@ -197,6 +197,7 @@ export function StatsFor(Range: string) {
   const Today = new Date();
   const Cutoff = Days > 0 ? LocalDay(new Date(Today.getFullYear(), Today.getMonth(), Today.getDate() - Days + 1)) : "";
   const PerDay: Record<string, number> = {};
+  const Sent: Record<string, number> = {};
   const Chart: Record<string, Record<string, number>> = {};
   const Hours: Record<string, number> = {};
   const Models: Record<string, {input: number; output: number; messages: number}> = {};
@@ -216,15 +217,16 @@ export function StatsFor(Range: string) {
       Messages += Day.n;
       Tokens += Day.t;
       PerDay[Key] = (PerDay[Key] || 0) + Day.t;
+      Sent[Key] = (Sent[Key] || 0) + Day.n;
 
-      for (const [Model, [Input, Output, Sent]] of Object.entries(Day.m)) {
+      for (const [Model, [Input, Output, Replies]] of Object.entries(Day.m)) {
         const Name = ModelName(Model);
         const Held = Models[Name] || (Models[Name] = {input: 0, output: 0, messages: 0});
         const Spent = Chart[Key] || (Chart[Key] = {});
 
         Held.input += Input;
         Held.output += Output;
-        Held.messages += Sent;
+        Held.messages += Replies;
         Spent[Name] = (Spent[Name] || 0) + Input + Output;
       }
     }
@@ -241,11 +243,15 @@ export function StatsFor(Range: string) {
   const Ranked = Object.entries(Models).map(([Name, Held]) => ({name: Name, tokens: Held.input + Held.output, ...Held})).filter((Model) => Model.tokens > 0).sort((Left, Right) => Right.tokens - Left.tokens);
   const Peak = Object.entries(Hours).sort((Left, Right) => Right[1] - Left[1])[0];
   const Grid: number[] = [];
+  const GridMessages: number[] = [];
   const First = Days > 0 ? Cutoff : (Object.keys(Chart).sort()[0] || LocalDay(Today));
   const Bars: {date: string; models: Record<string, number>}[] = [];
 
   for (let Back = 181; Back >= 0; Back -= 1) {
-    Grid.push(PerDay[LocalDay(new Date(Today.getFullYear(), Today.getMonth(), Today.getDate() - Back))] || 0);
+    const Key = LocalDay(new Date(Today.getFullYear(), Today.getMonth(), Today.getDate() - Back));
+
+    Grid.push(PerDay[Key] || 0);
+    GridMessages.push(Sent[Key] || 0);
   }
 
   for (let Step = new Date(`${First}T12:00:00`); LocalDay(Step) <= LocalDay(Today); Step = new Date(Step.getFullYear(), Step.getMonth(), Step.getDate() + 1, 12)) {
@@ -261,6 +267,8 @@ export function StatsFor(Range: string) {
     favoriteModel: Ranked[0] ? Ranked[0].name : null,
     models: Ranked,
     grid: Grid,
+    gridMessages: GridMessages,
+    gridEnd: LocalDay(Today),
     bars: Bars,
   };
 }

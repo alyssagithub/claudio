@@ -199,7 +199,9 @@ Roblox said: "${Said}".`;
   }
 
   if (!Response.ok && !Hint && (Text === "" || !/"message"\s*:\s*"[^"]/.test(Text))) {
-    Hint = `\nRoblox sent no explanation with this ${Response.status}. An empty or messageless error from Open Cloud usually means the request is shaped wrong, not that the service is down: check the method, that the body is JSON or form fields as this endpoint expects (game passes, developer products and badges take form fields), the content type, and the field names, against the endpoint's reference.`;
+    Hint = Response.status >= 500
+      ? `\nRoblox sent no explanation with this ${Response.status}, which means its server failed rather than that the request was refused. Retry in a little while, and if it keeps failing, report it. Only if the same request fails every time while a differently shaped one works is the request itself the likely cause.`
+      : `\nRoblox sent no explanation with this ${Response.status}. An empty or messageless ${Response.status} from Open Cloud usually means the request is shaped wrong: check the method, the path, that the body is JSON or form fields as this endpoint expects (game passes, developer products and badges take form fields), the content type, and the field names, against the endpoint's reference.`;
   }
 
   return `${Method} ${Url.pathname}${Url.search} -> ${Response.status} ${Response.statusText}${Hint}${Waited}\n${Text.slice(0, MostCallText)}`;

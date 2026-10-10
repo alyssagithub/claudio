@@ -95,6 +95,13 @@ export function PriceFor(Model: string) {
 }
 export const ExtraModels = [
   {
+    value: "claude-haiku-5-5",
+    displayName: "Haiku 5.5",
+    replaces: "haiku",
+    contextWindow: 200000,
+    description: "Latest Haiku release · fastest for quick answers",
+  },
+  {
     value: "claude-sonnet-5-5[1m]",
     displayName: "Sonnet 5.5",
     replaces: "sonnet",

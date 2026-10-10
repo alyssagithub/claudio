@@ -7,6 +7,9 @@ const Types = require(script.Parent.Parent.Parent.Types)
 const Theme = require(script.Parent.Parent.Theme)
 const Selectable = require(script.Parent.Selectable)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
+const ImageView = require(script.Parent.ImageView)
+
+const Create = Vide.create
 
 const function Escaped(Text: string): string
 	return (Text:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"))
@@ -47,38 +50,79 @@ return function(Text: () -> string, LayoutOrder: number, Live: boolean?)
 		return Found
 	end)
 
-	return Selectable {
-		Name = "Paragraph",
+	const Shown = Vide.derive(function(): {EditableImage}
+		const Found = {}
+		const Loaded = Chat.PathPictures()
+		const Paths = {}
+
+		for Path, Kind in Files() do
+			if Kind == "file" and (Path:lower():match("%.png$") or Path:lower():match("%.jpe?g$")) then
+				table.insert(Paths, Path)
+			end
+		end
+
+		table.sort(Paths, function(Left, Right)
+			return (Text():find(Left, 1, true) or 0) < (Text():find(Right, 1, true) or 0)
+		end)
+
+		for _, Path in Paths do
+			if Loaded[Path] == nil then
+				task.defer(Chat.LoadPicture, Path)
+			elseif Loaded[Path] then
+				table.insert(Found, Loaded[Path] :: EditableImage)
+			end
+		end
+
+		return Found
+	end)
+
+	return Create "Frame" {
+		Name = "ParagraphBlock",
+		Size = UDim2.fromScale(1, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
 		LayoutOrder = LayoutOrder,
-		Links = Links,
-		Urls = Urls,
-		Files = Files,
-		Text = function()
-			const Accent = Theme.Colors.Accent():ToHex()
-			local Rich = Markdown.Rich(Text(), Settings.TextSize(), Accent, Chat.KnownTokens())
-			const Paths = {}
 
-			for Path in Links() do
-				table.insert(Paths, Path)
-			end
+		Create "UIListLayout" {
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 6),
+		},
+		Vide.indexes(Shown, function(Image: () -> EditableImage, Index: number)
+			return ImageView(Image, 1 + Index)
+		end),
+		Selectable {
+			Name = "Paragraph",
+			LayoutOrder = 1,
+			Links = Links,
+			Urls = Urls,
+			Files = Files,
+			Text = function()
+				const Accent = Theme.Colors.Accent():ToHex()
+				local Rich = Markdown.Rich(Text(), Settings.TextSize(), Accent, Chat.KnownTokens())
+				const Paths = {}
 
-			for Path in Files() do
-				table.insert(Paths, Path)
-			end
+				for Path in Links() do
+					table.insert(Paths, Path)
+				end
 
-			table.sort(Paths, function(Left, Right)
-				return #Left > #Right
-			end)
+				for Path in Files() do
+					table.insert(Paths, Path)
+				end
 
-			for Index, Path in Paths do
-				Rich = Rich:gsub(Escaped(Path), `\1{Index}\1`)
-			end
+				table.sort(Paths, function(Left, Right)
+					return #Left > #Right
+				end)
 
-			return (Rich:gsub("\1(%d+)\1", function(Index: string): string
-				const Path = Paths[tonumber(Index) :: number]
+				for Index, Path in Paths do
+					Rich = Rich:gsub(Escaped(Path), `\1{Index}\1`)
+				end
 
-				return `<font color="#{Accent}"><u>{Path}</u></font>`
-			end))
-		end,
+				return (Rich:gsub("\1(%d+)\1", function(Index: string): string
+					const Path = Paths[tonumber(Index) :: number]
+
+					return `<font color="#{Accent}"><u>{Path}</u></font>`
+				end))
+			end,
+		},
 	}
 end

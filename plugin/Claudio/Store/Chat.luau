@@ -41,6 +41,7 @@ const Chat = {
 	Dragging = Vide.source("off"),
 	WholeCost = Vide.source(nil :: {cost: number, estimated: boolean, reported: boolean}?),
 	KnownPaths = Vide.source({} :: {[string]: string}),
+	PathPictures = Vide.source({} :: {[string]: EditableImage | false}),
 	FileMenu = Vide.source(nil :: {Path: string, Kind: string}?),
 	StreamingImages = Vide.source({} :: {EditableImage}),
 	Activity = Vide.source({} :: {string}),
@@ -4695,6 +4696,30 @@ function Chat.ProbePaths(Paths: {string})
 	end
 
 	Chat.KnownPaths(Known)
+end
+
+const LoadingPictures: {[string]: boolean} = {}
+
+function Chat.LoadPicture(Path: string)
+	if LoadingPictures[Path] or Chat.PathPictures()[Path] ~= nil then
+		return
+	end
+
+	LoadingPictures[Path] = true
+
+	const Ok, Result = Client.ReadPicture(Path, 1024)
+	const Built, Image = pcall(function(): EditableImage
+		assert(Ok and typeof(Result) == "table" and typeof(Result.pixels) == "string", "unreadable")
+
+		return Pictures.Tag(Pictures.Build(Result.width, Result.height, Result.pixels), function()
+			return Client.ReadPicture(Path, 2048)
+		end)
+	end)
+	const Known = table.clone(Chat.PathPictures())
+
+	Known[Path] = if Built then Image else false
+	Chat.PathPictures(Known)
+	LoadingPictures[Path] = nil
 end
 
 function Chat.ViewPicture(Path: string)

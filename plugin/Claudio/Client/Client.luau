@@ -360,13 +360,9 @@ function Client.CheckFolder(Path: string): boolean
 end
 
 function Client.GetVersions(): (boolean, any)
-	const Ok, Result = Http.Request("GET", `{BaseUrl()}/versions?plugin={Config.Version}`)
+	const Ok, Result = Http.Request("GET", `{BaseUrl()}/versions`)
 
 	return Checked(Ok, Result, Schemas.Versions)
-end
-
-function Client.InstallVersion(Version: string): (boolean, any)
-	return Http.Request("POST", `{BaseUrl()}/versions`, {version = Version})
 end
 
 function Client.GetMcpServers(): (boolean, any)

@@ -17,7 +17,7 @@ irm https://raw.githubusercontent.com/alyssagithub/claudio/main/install.ps1 | ie
 Or without the script:
 
 ```bash
-npm install -g https://github.com/alyssagithub/claudio/releases/latest/download/claudio.tgz
+npm install -g github:alyssagithub/claudio
 claudio setup
 ```
 
@@ -66,7 +66,7 @@ No Claudio button in the Plugins tab means Studio was open while it installed. R
 
 If you clicked no on the HTTP prompt, Studio won't ask you again. Plugins tab, Manage Plugins, allow it there.
 
-A new version breaking something can be rolled back from Settings → Plugin version, which lists every release.
+Claudio updates itself: the bridge checks the main branch every few hours, installs any newer commit, swaps in that commit's plugin, and restarts once nothing is mid tool call, continuing any reply it interrupted.
 
 Port 47225 being in use is usually another copy of the bridge. `claudio start --port 47300` and set the same number in Claudio's settings.
 

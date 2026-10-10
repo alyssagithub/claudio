@@ -165,18 +165,10 @@ return {
 		context = Typed.optional(Breakdown),
 	}),
 	Versions = Typed.table({
-		current = Typed.optional(Typed.string()),
 		bridge = Typed.optional(Typed.string()),
-		matched = Typed.optional(Typed.boolean()),
-		known = Typed.optional(Typed.boolean()),
-		latest = Typed.optional(Typed.string()),
-		newer = Typed.boolean(),
-		releases = Typed.array(Typed.table({
-			version = Typed.string(),
-			name = Typed.string(),
-			prerelease = Typed.boolean(),
-			notes = Typed.string(),
-		})),
+		commit = Typed.optional(Typed.string()),
+		installedAt = Typed.optional(Typed.string()),
+		checkout = Typed.boolean(),
 	}),
 	Conversations = Typed.table({conversations = Typed.array(Summary)}),
 	Conversation = Typed.table({

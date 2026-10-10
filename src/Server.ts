@@ -21,7 +21,8 @@ import { ConversationExists, DeleteConversation, GetChapters, GetSubagent, GetCo
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
 import { HandToken, IssuePlaytestKey, PlaytestKeyMatches, PlaytestLive, RevokePlaytestKey, TokenMatches } from "./Token.js";
-import { InstallBridge, InstallVersion, InstalledPluginVersion, IsNewer, ListReleases, LooksLikeVersion, NewestRelease } from "./PluginInstaller.js";
+import { Installed, IsCheckout } from "./PluginInstaller.js";
+import { StartAutoUpdate, TakePendingTurns } from "./AutoUpdate.js";
 import { ArmClipboard, AskClipboard, DisarmClipboard, ReadClipboardImage, RegisterToasts, RestoreFlashing, ShowToast, WriteClipboard } from "./Notify.js";
 import { GetModels, SupportsFastMode } from "./Models.js";
 import { OpenPath, ProbePaths, ReadPicture, SavePicture } from "./Shared.js";
@@ -1044,55 +1045,14 @@ ${Text}`;
       }
 
       if (Request.method === "GET" && Url.pathname === "/versions") {
-        const Found = await ListReleases();
-        const Newest = NewestRelease(Found);
-        const Asked = Url.searchParams.get("plugin");
-        const Plugin = LooksLikeVersion(Asked) ? Asked.trim().replace(/^v/, "") : InstalledPluginVersion();
+        const Here = Installed();
 
         SendJson(Response, 200, {
-          current: Plugin,
           bridge: Version,
-          matched: Plugin !== null && Plugin === Version,
-          known: Plugin !== null,
-          latest: Newest ? Newest.version : null,
-          newer: Boolean(Newest && Plugin && IsNewer(Newest.version, Plugin)),
-          bridgeNewer: Boolean(Newest && IsNewer(Newest.version, Version)),
-          releases: Found,
+          commit: Here ? Here.commit : null,
+          installedAt: Here ? Here.at : null,
+          checkout: IsCheckout(),
         });
-        return;
-      }
-
-      if (Request.method === "POST" && Url.pathname === "/versions") {
-        const Body = await ReadBody(Request);
-
-        if (!LooksLikeVersion(Body.version)) {
-          SendJson(Response, 400, {error: "That isn't a version number. Use one like 1.0.0."});
-          return;
-        }
-
-        const Version = Body.version.trim().replace(/^v/, "");
-
-        try {
-          const Commit = await InstallBridge(Version);
-          const Installed = await InstallVersion(Version);
-
-          const Restarter = spawn(process.execPath, [process.argv[1], "restart", "--port", String(Port)], {
-            detached: true,
-            stdio: "ignore",
-            windowsHide: true,
-          });
-
-          Restarter.on("error", (Error) => console.error("Could not restart onto the new version: " + Error.message));
-          Restarter.unref();
-          SendJson(Response, 200, {
-            installed: Installed,
-            commit: Commit,
-            restarting: true,
-          });
-        } catch (Error) {
-          SendJson(Response, 502, {error: (Error as Error).message});
-        }
-
         return;
       }
 
@@ -1247,6 +1207,16 @@ ${Text}`;
 
     FetchModels();
     setInterval(FetchModels, 6 * 60 * 60 * 1000).unref();
+    StartAutoUpdate(Port);
+
+    for (const Pending of TakePendingTurns()) {
+      if (!IsConversationBusy(Pending.conversationId)) {
+        StartTurn({
+          ...TurnRequestFrom({text: "Continue", model: Pending.model, effort: Pending.effort, mode: Pending.mode, outputStyle: Pending.outputStyle}, Pending.conversationId),
+          Images: [],
+        });
+      }
+    }
 
     console.log(`Claudio bridge listening on http://127.0.0.1:${Port}`);
     console.log(`Claudio ${Version} from ${Root}, serving ${Tools} tools`);

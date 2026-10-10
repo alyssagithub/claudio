@@ -934,6 +934,26 @@ export function ActiveTurnFor(ConversationId: string): Turn | null {
   return null;
 }
 
+export function ToolsRunning(): boolean {
+  for (const Turn of Turns.values()) {
+    if ((Turn.Status === "running" || Turn.Status === "cancelling") && Turn.Calls.some((Call) => Call.Status === "running" || Call.Status === "preparing")) {
+      return true;
+    }
+  }
+
+  return [...Sessions.values()].some((Session) => Session.Background.size > 0);
+}
+
+export function RunningTurns() {
+  return [...Turns.values()].filter((Turn) => Turn.Status === "running" && Turn.ConversationId).map((Turn) => ({
+    conversationId: Turn.ConversationId as string,
+    model: Turn.Model,
+    effort: Turn.Effort,
+    mode: Turn.Mode,
+    outputStyle: Turn.OutputStyle,
+  }));
+}
+
 export function IsConversationBusy(ConversationId: string | null) {
   for (const Turn of Turns.values()) {
     if (Turn.ConversationId === ConversationId && (Turn.Status === "running" || Turn.Status === "cancelling")) {

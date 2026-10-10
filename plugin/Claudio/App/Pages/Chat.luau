@@ -7,7 +7,6 @@ const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Context = require(script.Parent.Parent.Parent.Store.Context)
 const Theme = require(script.Parent.Parent.Theme)
 const StatusBar = require(script.Parent.Parent.Components.StatusBar)
-const UpdateBanner = require(script.Parent.Parent.Components.UpdateBanner)
 const MessageList = require(script.Parent.Parent.Components.MessageList)
 const InputBar = require(script.Parent.Parent.Components.InputBar)
 const ChatList = require(script.Parent.Parent.Components.ChatList)
@@ -92,7 +91,6 @@ return function()
 				HorizontalAlignment = Enum.HorizontalAlignment.Center,
 			},
 			StatusBar(),
-			UpdateBanner(),
 			Vide.switch(function()
 				if Chat.SettingsOpen() then
 					return "Settings"

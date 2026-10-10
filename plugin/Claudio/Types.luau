@@ -143,21 +143,11 @@ export type ToolCall = {
 	image: number?,
 }
 
-export type Release = {
-	version: string,
-	name: string,
-	prerelease: boolean,
-	notes: string,
-}
-
 export type Versions = {
-	current: string?,
 	bridge: string?,
-	matched: boolean?,
-	known: boolean?,
-	latest: string?,
-	newer: boolean,
-	releases: {Release},
+	commit: string?,
+	installedAt: string?,
+	checkout: boolean,
 }
 
 export type Tokens = {

@@ -879,7 +879,7 @@ return function()
 						end,
 					},
 				},
-				Heading("Plugin version", 7950),
+				Heading("Updates", 7950),
 				Create "TextLabel" {
 					Name = "VersionNote",
 					Size = UDim2.fromScale(1, 0),
@@ -895,130 +895,15 @@ return function()
 						const Found = Chat.Versions()
 
 						if not Found then
-							return "Connect to the bridge to see other versions."
+							return "Connect to the bridge to see which version is installed."
 						end
 
-						if #Found.releases == 0 then
-							return `You are on {Chat.Installed()}. No published releases were found.`
+						if Found.checkout then
+							return "Running from a git checkout, so Claudio does not update itself here."
 						end
 
-						const Running = Chat.Installed()
-
-						if Found.current ~= Running then
-							return `{Found.current} is installed and loads when you restart Studio. You are running {Running} until then.`
-						end
-
-						if Found.bridge and Found.bridge ~= Running then
-							return `The plugin is on {Running} and the bridge is on {Found.bridge}. Pick one below so they match.`
-						end
-
-						return `You are on {Running}. Pick another version to install. It loads after you restart Studio.`
+						return `Claudio updates itself from the newest commit on main. Installed: {if Found.commit then Found.commit:sub(1, 7) else "not recorded yet"}{if Found.installedAt then `, {Found.installedAt:sub(1, 10)}` else ""}.`
 					end,
-				},
-				Create "Frame" {
-					Name = "VersionPicker",
-					Size = UDim2.fromScale(1, 0),
-					AutomaticSize = Enum.AutomaticSize.Y,
-					BackgroundTransparency = 1,
-					LayoutOrder = 7952,
-
-					Create "UIListLayout" {
-						FillDirection = Enum.FillDirection.Horizontal,
-						VerticalAlignment = Enum.VerticalAlignment.Top,
-						SortOrder = Enum.SortOrder.LayoutOrder,
-						Padding = UDim.new(0, 6),
-					},
-					Create "Frame" {
-						Name = "Choice",
-						Size = UDim2.fromScale(0, 0),
-						AutomaticSize = Enum.AutomaticSize.Y,
-						BackgroundTransparency = 1,
-						LayoutOrder = 1,
-
-						Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
-						Create "UIListLayout" {
-							SortOrder = Enum.SortOrder.LayoutOrder,
-							HorizontalFlex = Enum.UIFlexAlignment.Fill,
-							Padding = UDim.new(0, 2),
-						},
-						Create "TextButton" {
-							Name = "Selected",
-							Size = UDim2.new(1, 0, 0, 26),
-							BackgroundColor3 = Theme.Colors.Input,
-							TextColor3 = Theme.Colors.Text,
-							TextSize = Settings.SmallText,
-							FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-							TextXAlignment = Enum.TextXAlignment.Left,
-							AutoButtonColor = false,
-							LayoutOrder = 1,
-							Text = function()
-								const Picked = Chat.VersionPick()
-
-								return `  {if Picked == "" then Chat.Installed() else Picked}{if Picked == "" or Picked == Chat.Installed() then "  · installed" else ""}`
-							end,
-							Activated = function()
-								Chat.VersionOpen(not Chat.VersionOpen())
-							end,
-
-							Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-							Create "TextLabel" {
-								Name = "Arrow",
-								AnchorPoint = Vector2.new(1, 0.5),
-								Position = UDim2.new(1, -8, 0.5, 0),
-								AutomaticSize = Enum.AutomaticSize.XY,
-								BackgroundTransparency = 1,
-								TextColor3 = Theme.Colors.DimText,
-								TextSize = Settings.SmallText,
-								FontFace = Config.IconFont,
-								Text = function()
-									return if Chat.VersionOpen() then Config.Icons.Up else Config.Icons.Down
-								end,
-							},
-						},
-						Vide.indexes(function()
-							const Found = Chat.Versions()
-
-							return if Found and Chat.VersionOpen() then Found.releases else {}
-						end, function(Release: () -> Types.Release, Index: number)
-							return Create "TextButton" {
-								Name = "Option",
-								Size = UDim2.new(1, 0, 0, 24),
-								BackgroundColor3 = Theme.Colors.Button,
-								TextColor3 = Theme.Colors.Text,
-								TextSize = Settings.SmallText,
-								FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-								TextXAlignment = Enum.TextXAlignment.Left,
-								AutoButtonColor = false,
-								LayoutOrder = 1 + Index,
-								Text = function()
-									const Entry = Release()
-
-									return `  {Entry.version}{if Entry.prerelease then " (pre-release)" else ""}{if Entry.version == Chat.Installed() then "  · installed" else ""}`
-								end,
-								Activated = function()
-									Chat.VersionPick(Release().version)
-									Chat.VersionOpen(false)
-								end,
-
-								Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-							}
-						end),
-					},
-					Button {
-						Text = function()
-							return if Chat.Updating() then "Working" else "Switch"
-						end,
-						Primary = true,
-						LayoutOrder = 2,
-						Visible = function()
-							const Picked = Chat.VersionPick()
-
-							return Picked ~= "" and Picked ~= Chat.Installed()
-						end,
-						OnClick = function()
-							task.spawn(Chat.InstallVersion, Chat.VersionPick())
-						end,
-					},
 				},
 				Heading("MCP servers", 7999),
 				Vide.indexes(Chat.McpServers, Server),

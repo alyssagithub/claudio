@@ -76,7 +76,7 @@ export async function RunSetup(LocalPath?: string | null): Promise<void> {
   try {
     await InstallPlugin(LocalPath);
   } catch (Error) {
-    Manual.push(`Install the plugin yourself: download Claudio.rbxm from the releases page and drop it in ${GetPluginsFolder()}`);
+    Manual.push(`Install the plugin yourself: download Claudio.rbxm from https://github.com/alyssagithub/claudio and drop it in ${GetPluginsFolder()}`);
     console.log(`Could not install the plugin automatically: ${(Error as NodeJS.ErrnoException).message}`);
   }
 

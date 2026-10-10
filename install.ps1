@@ -35,7 +35,7 @@ function Native([scriptblock]$Command) {
 }
 
 if ($IsMacOS -or $IsLinux) {
-    Fail "This one's Windows only. Elsewhere install Node.js yourself, then: npm install -g https://github.com/alyssagithub/claudio/releases/latest/download/claudio.tgz && claudio setup"
+    Fail "This one's Windows only. Elsewhere install Node.js and Git yourself, then: npm install -g github:alyssagithub/claudio && claudio setup"
 }
 
 Write-Host ""
@@ -67,42 +67,40 @@ if (Has "node") {
     }
 }
 
+if (-not (Has "git")) {
+    if (-not (Has "winget")) {
+        Fail "No Git, which npm needs to build Claudio from GitHub. Get it from https://git-scm.com, then run this again."
+    }
+
+    Write-Host "No Git, installing it."
+    Native { winget install --id Git.Git -e --accept-source-agreements --accept-package-agreements --silent }
+    RefreshPath
+
+    if (-not (Has "git")) {
+        Fail "Git installed but isn't on PATH yet. Open a new terminal and run this again."
+    }
+}
+
 try {
-    $Release = Invoke-RestMethod "https://api.github.com/repos/alyssagithub/claudio/releases/latest" -Headers @{
+    $Latest = (Invoke-RestMethod "https://api.github.com/repos/alyssagithub/claudio/commits/main" -Headers @{
         "User-Agent"    = "claudio-installer"
         "Cache-Control" = "no-cache"
-    }
+    }).sha
 } catch {
-    Fail "Couldn't reach GitHub to find the newest release. Check your connection and run this again."
+    Fail "Couldn't reach GitHub to find the newest version. Check your connection and run this again."
 }
 
-$Packed = $Release.assets | Where-Object { $_.name -eq "claudio.tgz" } | Select-Object -First 1
-
-if (-not $Packed) {
-    Fail "The newest release ($($Release.tag_name)) has no package attached. Try again later, or tell the author."
-}
-
-$Package = $Packed.browser_download_url
-$Latest = ""
-
-try {
-    $Latest = (Invoke-RestMethod "https://api.github.com/repos/alyssagithub/claudio/commits/$($Release.tag_name)" -Headers @{ "User-Agent" = "claudio-installer" }).sha
-} catch {
-}
-
-Write-Host "Installing Claudio."
-Native { & npm install -g $Package }
+Write-Host "Building Claudio from the newest commit ($($Latest.Substring(0, 7))). Takes a minute."
+Native { & npm install -g "github:alyssagithub/claudio#$Latest" --no-audit --no-fund }
 
 if ($LASTEXITCODE -ne 0) {
-    Fail "npm couldn't install it. Try a new terminal, or do it yourself: npm install -g $Package"
+    Fail "npm couldn't install it. Try a new terminal, or do it yourself: npm install -g github:alyssagithub/claudio#$Latest"
 }
 
-if ($Latest) {
-    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claudio" | Out-Null
-    $Record = [ordered]@{ commit = $Latest; at = (Get-Date).ToString("o") } | ConvertTo-Json
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claudio" | Out-Null
+$Record = [ordered]@{ commit = $Latest; at = (Get-Date).ToString("o") } | ConvertTo-Json
 
-    [System.IO.File]::WriteAllText("$env:USERPROFILE\.claudio\installed.json", $Record)
-}
+[System.IO.File]::WriteAllText("$env:USERPROFILE\.claudio\installed.json", $Record)
 
 RefreshPath
 

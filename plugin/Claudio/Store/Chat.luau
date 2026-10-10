@@ -9,7 +9,6 @@ const Gallery = require(script.Parent.Gallery)
 const Connection = require(script.Parent.Connection)
 const Error = require(script.Parent.Parent.Client.Error)
 const Format = require(script.Parent.Parent.Format)
-const Config = require(script.Parent.Parent.Config)
 const Changes = require(script.Parent.Parent.Changes)
 const Watcher = require(script.Parent.Parent.Watcher)
 const Settings = require(script.Parent.Parent.Settings)
@@ -90,15 +89,12 @@ const Chat = {
 	MenuPosition = Vide.source(Vector2.zero),
 	Confirming = Vide.source(nil :: string?),
 	Rewinding = Vide.source(nil :: number?),
-	VersionOpen = Vide.source(false),
-	VersionPick = Vide.source(""),
 	Renaming = Vide.source(nil :: string?),
 	ShowArchived = Vide.source(false),
 	ShowHidden = Vide.source(false),
 	Opened = Vide.source({} :: {[string]: boolean}),
 	Chapters = Vide.source({} :: {Types.Chapter}),
 	Versions = Vide.source(nil :: Types.Versions?),
-	Updating = Vide.source(false),
 	Shown = Vide.source(40),
 	Earlier = Vide.source(0),
 	Partial = Vide.source(false),
@@ -3686,70 +3682,6 @@ function Chat.CheckVersions()
 	Chat.Versions(Result)
 end
 
-const function Newer(Candidate: string, Than: string): boolean
-	const Left = string.split((Candidate:gsub("%-.*$", "")), ".")
-	const Right = string.split((Than:gsub("%-.*$", "")), ".")
-
-	for Index = 1, 3 do
-		const One = tonumber(Left[Index]) or 0
-		const Two = tonumber(Right[Index]) or 0
-
-		if One ~= Two then
-			return One > Two
-		end
-	end
-
-	return Than:find("-", 1, true) ~= nil and not Candidate:find("-", 1, true)
-end
-
-function Chat.Installed(): string
-	return Config.Version
-end
-
-function Chat.UpdateWanted(): boolean
-	const Found = Chat.Versions()
-
-	if not Found or not Found.latest or not Newer(Found.latest, Config.Version) then
-		return false
-	end
-
-	if Found.current == Found.latest then
-		return false
-	end
-
-	return Settings.Get("DeclinedVersion")() ~= Found.latest
-end
-
-function Chat.DeclineUpdate()
-	const Found = Chat.Versions()
-
-	if Found and Found.latest then
-		Settings.Set("DeclinedVersion", Found.latest)
-	end
-end
-
-function Chat.InstallVersion(Version: string)
-	if Chat.Updating() then
-		return
-	end
-
-	Chat.Updating(true)
-
-	const Ok, Result = Client.InstallVersion(Version)
-
-	Chat.Updating(false)
-
-	if not Ok then
-		Chat.Say(`Could not install {Version}: {Result}`)
-
-		return
-	end
-
-	Settings.Set("DeclinedVersion", "")
-	Chat.Say(`Installed {Version}. Restart Studio to load it.`)
-	task.spawn(Chat.CheckVersions)
-end
-
 function Chat.LoadMcpServers()
 	const Ok, Result = Client.GetMcpServers()
 
@@ -4281,8 +4213,6 @@ function Chat.New()
 	Chat.ListOpen(false)
 	Chat.TasksOpen(false)
 	Chat.SettingsOpen(false)
-	Chat.VersionOpen(false)
-	Chat.VersionPick("")
 	Context.Clear()
 end
 

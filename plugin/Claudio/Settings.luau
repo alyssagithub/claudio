@@ -234,7 +234,6 @@ const Hidden: {[string]: string | boolean} = {
 	Model = "opus[1m]",
 	Effort = "",
 	FastMode = false,
-	DeclinedVersion = "",
 	WorkingFolder = "",
 	FolderAsked = false,
 	LastChat = "",

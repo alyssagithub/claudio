@@ -1,77 +1,25 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { GitHubRepo, Version } from "./Config.js";
-
-const InstalledFile = path.join(os.homedir(), ".claudio", "installed.json");
-
-type InstalledRecord = {
-  commit: string;
-  at: number;
-};
-
-type CommitRecord = {
-  sha: string;
-  commit: {
-    message: string;
-    committer: {
-      date: string;
-    };
-  };
-};
-
-function Installed(): InstalledRecord | null {
-  try {
-    return JSON.parse(fs.readFileSync(InstalledFile, "utf8").replace(/^\uFEFF/, "")) as InstalledRecord;
-  } catch {
-    return null;
-  }
-}
-
-async function LatestCommit(): Promise<CommitRecord> {
-  const Response = await fetch(`https://api.github.com/repos/${GitHubRepo}/commits/main`, {
-    headers: {
-      "User-Agent": "claudio",
-      "Cache-Control": "no-cache",
-    },
-  });
-
-  if (!Response.ok) {
-    throw new Error(`GitHub answered ${Response.status}`);
-  }
-
-  return await Response.json() as CommitRecord;
-}
+import { Version } from "./Config.js";
+import { Installed, IsCheckout, LatestCommit } from "./PluginInstaller.js";
 
 export async function ReportVersion() {
   const Here = Installed();
 
   console.log(`Claudio ${Version}`);
 
-  if (Here && typeof Here.commit === "string") {
-    console.log(`Installed ${Here.commit.slice(0, 7)} on ${new Date(Here.at).toLocaleString()}`);
-  } else {
-    console.log("Can't check for updates: this copy was installed by hand. Reinstall with the installer to get update checks.");
+  if (IsCheckout()) {
+    console.log("Running from a git checkout, so it does not update itself. Pull and rebuild to change it.");
+    return;
   }
 
-  let Newest: CommitRecord;
+  console.log(Here ? `Installed commit ${Here.commit.slice(0, 7)} on ${new Date(Here.at).toLocaleString()}` : "No installed commit is recorded, so the next update check installs the newest one.");
 
   try {
-    Newest = await LatestCommit();
+    const Newest = await LatestCommit();
+
+    console.log(Here && Here.commit === Newest.sha
+      ? "Up to date with main."
+      : `Main is at ${Newest.sha.slice(0, 7)} (${Newest.commit.message.split("\n")[0]}). The bridge installs it by itself within a few hours, or straight away when it next starts.`);
   } catch (Error) {
-    console.log(`Could not check for a newer version: ${(Error as NodeJS.ErrnoException).message}`);
-    return;
+    console.log(`Could not check main: ${(Error as Error).message}`);
   }
-
-  const When = new Date(Newest.commit.committer.date).toLocaleString();
-
-  if (Here && Here.commit === Newest.sha) {
-    console.log(`Up to date. Newest is ${Newest.sha.slice(0, 7)} from ${When}.`);
-    return;
-  }
-
-  console.log(`\nA newer version is out: ${Newest.sha.slice(0, 7)} from ${When}`);
-  console.log(`  ${Newest.commit.message.split("\n")[0]}`);
-  console.log("\nGet it with:");
-  console.log("  irm https://raw.githubusercontent.com/alyssagithub/claudio/main/install.ps1 | iex");
 }

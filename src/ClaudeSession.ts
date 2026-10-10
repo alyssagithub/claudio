@@ -1756,6 +1756,23 @@ function RouteMessage(Session: Session, Message: any) {
     return;
   }
 
+  if (Turn.HandingOff && Turn.Status === "running" && !Limited) {
+    const Version = Turn.Version;
+
+    Turn.HandingOff = false;
+    setTimeout(() => {
+      if (Turn.Version !== Version || Session.CurrentTurn !== Turn) {
+        return;
+      }
+
+      Session.CurrentTurn = null;
+      Session.LastTurn = Turn;
+      FinishTurn(Turn, "done");
+    }, 20000);
+
+    return;
+  }
+
   Turn.Waiting = 0;
   Session.CurrentTurn = null;
   Session.LastTurn = Turn;
@@ -2386,6 +2403,21 @@ export function StartTurn(Request: TurnRequest) {
 
 export function GetTurn(Id: string) {
   return Turns.get(Id);
+}
+
+export function HandOff(Turn: Turn, Id: string): boolean {
+  const Session = Turn.Session;
+
+  if (Turn.Status !== "running" || !Session || !Session.Query || !Awaiting.has(Id)) {
+    return false;
+  }
+
+  Turn.HandingOff = true;
+  Session.Query.interrupt().catch(() => {
+    Turn.HandingOff = false;
+  });
+
+  return true;
 }
 
 export function CancelTurn(Turn: Turn) {

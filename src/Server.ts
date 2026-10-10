@@ -15,7 +15,7 @@ import type { Reacher, ReacherIn } from "./Tools.js";
 import type { Picture, TurnRequest } from "./Types.js";
 import { StudioProcesses } from "./StudioPresence.js";
 import { ReadBuiltInPlugins, SetBuiltInPlugins } from "./StudioSettings.js";
-import { ActiveTurnFor, AddToTurn, FinishedSince, SuggestionFor, ListTasks, TaskOutput, StopTask, ClearFinishedTasks, CancelQueued, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, WarmConversation, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { ActiveTurnFor, AddToTurn, HandOff, FinishedSince, SuggestionFor, ListTasks, TaskOutput, StopTask, ClearFinishedTasks, CancelQueued, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, WarmConversation, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetSubagent, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
@@ -1188,6 +1188,13 @@ ${Text}`;
 
           SendJson(Response, 200, Image);
           ReleaseImage(Turn, Wanted);
+          return;
+        }
+
+        if (Request.method === "POST" && Segments[2] === "handoff") {
+          const Given = await ReadBody(Request);
+
+          SendJson(Response, typeof Given.id === "string" && HandOff(Turn, Given.id) ? 200 : 409, DescribeTurn(Turn));
           return;
         }
 

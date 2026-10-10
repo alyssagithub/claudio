@@ -387,6 +387,10 @@ function Client.GetConversation(Id: string, Before: number?, Count: number?): (b
 	return Checked(Ok, Result, Schemas.Conversation)
 end
 
+function Client.HandOff(RequestId: string, Id: string): boolean
+	return (Http.Request("POST", `{BaseUrl()}/turn/{RequestId}/handoff`, {id = Id}))
+end
+
 function Client.CancelQueued(RequestId: string, Id: string): boolean
 	const Ok, Result = Http.Request("POST", `{BaseUrl()}/chat/cancel-queued`, {
 		requestId = RequestId,

@@ -4962,23 +4962,40 @@ function Chat.InterruptWith(Index: number)
 	end
 
 	if Entry.Sent then
-		Chat.Stop()
+		if not (Chat.RequestId and Entry.Id and Client.HandOff(Chat.RequestId, Entry.Id)) then
+			Chat.Stop()
+		end
 
 		return
 	end
 
-	Chat.Queue(Queue)
-
 	if Chat.Sending() and Chat.RequestId then
-		const Sent = Client.SendNow(Entry.Full, Chat.ConversationId(), Chat.RequestId, Entry.Images)
+		const Marked = table.clone(Entry)
+		const Held = table.clone(Chat.Queue() :: {Types.QueuedMessage})
 
-		if Sent then
-			DestroyImages(Entry.Previews)
+		Marked.Id = HttpService:GenerateGUID(false):lower()
+		Marked.Sent = true
+
+		for Position, Candidate in Held do
+			if Candidate == Entry then
+				Held[Position] = Marked
+			end
+		end
+
+		Chat.Queue(Held)
+
+		if Client.SendNow(Marked.Full, Chat.ConversationId(), Chat.RequestId, Marked.Images, Marked.Id) then
+			if not Client.HandOff(Chat.RequestId :: string, Marked.Id :: string) then
+				Chat.Stop()
+			end
 
 			return
 		end
 
+		Chat.Queue(Queue)
 		Chat.Stop()
+	else
+		Chat.Queue(Queue)
 	end
 
 	assert(Start)(Entry)

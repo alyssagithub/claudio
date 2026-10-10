@@ -208,7 +208,7 @@ export async function RefreshUsage(Session: Session) {
 
     const Fresh = new Map();
 
-    StoreWindow(Fresh, "five_hour", "5-hour limit", Windows.five_hour);
+    StoreWindow(Fresh, "five_hour", "Session limit", Windows.five_hour);
     StoreWindow(Fresh, "seven_day", "Weekly across all models", Windows.seven_day);
     StoreWindow(Fresh, "seven_day_opus", "Weekly on Opus", Windows.seven_day_opus);
     StoreWindow(Fresh, "seven_day_sonnet", "Weekly on Sonnet", Windows.seven_day_sonnet);

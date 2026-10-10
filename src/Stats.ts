@@ -9,7 +9,7 @@ const ImageData = /"data":"[A-Za-z0-9+\/=]{256,}"/g;
 type Day = {
   t: number;
   n: number;
-  m: Record<string, [number, number]>;
+  m: Record<string, [number, number, number]>;
 };
 
 type FileTotals = {
@@ -21,6 +21,7 @@ type FileTotals = {
 };
 
 type Cache = {
+  version?: number;
   files: Record<string, FileTotals>;
 };
 
@@ -46,9 +47,11 @@ function ListFiles(Folder: string, Depth = 0): string[] {
 
 function ReadCache(): Cache {
   try {
-    return JSON.parse(fs.readFileSync(CacheFile, "utf8")) as Cache;
+    const Held = JSON.parse(fs.readFileSync(CacheFile, "utf8")) as Cache;
+
+    return Held.version === 2 ? Held : {version: 2, files: {}};
   } catch {
-    return {files: {}};
+    return {version: 2, files: {}};
   }
 }
 
@@ -82,18 +85,20 @@ function Count(Totals: FileTotals, Raw: string) {
   const Key = LocalDay(When);
   const Today = Totals.days[Key] || (Totals.days[Key] = {t: 0, n: 0, m: {}});
   const Usage = (Line.message && Line.message.usage) || {};
-  const Tokens = (Usage.input_tokens || 0) + (Usage.output_tokens || 0) + (Usage.cache_creation_input_tokens || 0) + (Usage.cache_read_input_tokens || 0);
+  const Input = Usage.input_tokens || 0;
+  const Output = Usage.output_tokens || 0;
   const Model = Line.type === "assistant" && Line.message && Line.message.model && Line.message.model !== "<synthetic>" ? Line.message.model : null;
 
   Today.n += Totals.top ? 1 : 0;
-  Today.t += Tokens;
+  Today.t += Input + Output;
   Totals.start = Totals.start || [Key, When.getHours()];
 
   if (Model) {
-    const Held = Today.m[Model] || (Today.m[Model] = [0, 0]);
+    const Held = Today.m[Model] || (Today.m[Model] = [0, 0, 0]);
 
-    Held[0] += Tokens;
-    Held[1] += 1;
+    Held[0] += Input;
+    Held[1] += Output;
+    Held[2] += 1;
   }
 }
 
@@ -192,8 +197,9 @@ export function StatsFor(Range: string) {
   const Today = new Date();
   const Cutoff = Days > 0 ? LocalDay(new Date(Today.getFullYear(), Today.getMonth(), Today.getDate() - Days + 1)) : "";
   const PerDay: Record<string, number> = {};
+  const Chart: Record<string, Record<string, number>> = {};
   const Hours: Record<string, number> = {};
-  const Models: Record<string, {tokens: number; messages: number}> = {};
+  const Models: Record<string, {input: number; output: number; messages: number}> = {};
   let Sessions = 0;
   let Messages = 0;
   let Tokens = 0;
@@ -211,12 +217,15 @@ export function StatsFor(Range: string) {
       Tokens += Day.t;
       PerDay[Key] = (PerDay[Key] || 0) + Day.t;
 
-      for (const [Model, [Used, Sent]] of Object.entries(Day.m)) {
+      for (const [Model, [Input, Output, Sent]] of Object.entries(Day.m)) {
         const Name = ModelName(Model);
-        const Held = Models[Name] || (Models[Name] = {tokens: 0, messages: 0});
+        const Held = Models[Name] || (Models[Name] = {input: 0, output: 0, messages: 0});
+        const Spent = Chart[Key] || (Chart[Key] = {});
 
-        Held.tokens += Used;
+        Held.input += Input;
+        Held.output += Output;
         Held.messages += Sent;
+        Spent[Name] = (Spent[Name] || 0) + Input + Output;
       }
     }
 
@@ -229,12 +238,18 @@ export function StatsFor(Range: string) {
     }
   }
 
-  const Ranked = Object.entries(Models).map(([Name, Held]) => ({name: Name, ...Held})).sort((Left, Right) => Right.tokens - Left.tokens);
+  const Ranked = Object.entries(Models).map(([Name, Held]) => ({name: Name, tokens: Held.input + Held.output, ...Held})).filter((Model) => Model.tokens > 0).sort((Left, Right) => Right.tokens - Left.tokens);
   const Peak = Object.entries(Hours).sort((Left, Right) => Right[1] - Left[1])[0];
   const Grid: number[] = [];
+  const First = Days > 0 ? Cutoff : (Object.keys(Chart).sort()[0] || LocalDay(Today));
+  const Bars: {date: string; models: Record<string, number>}[] = [];
 
   for (let Back = 181; Back >= 0; Back -= 1) {
     Grid.push(PerDay[LocalDay(new Date(Today.getFullYear(), Today.getMonth(), Today.getDate() - Back))] || 0);
+  }
+
+  for (let Step = new Date(`${First}T12:00:00`); LocalDay(Step) <= LocalDay(Today); Step = new Date(Step.getFullYear(), Step.getMonth(), Step.getDate() + 1, 12)) {
+    Bars.push({date: LocalDay(Step), models: Chart[LocalDay(Step)] || {}});
   }
 
   return {
@@ -246,6 +261,6 @@ export function StatsFor(Range: string) {
     favoriteModel: Ranked[0] ? Ranked[0].name : null,
     models: Ranked,
     grid: Grid,
-    firstDay: LocalDay(new Date(Today.getFullYear(), Today.getMonth(), Today.getDate() - 181)),
+    bars: Bars,
   };
 }

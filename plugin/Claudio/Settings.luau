@@ -176,7 +176,7 @@ const Definitions: {Definition} = {
 		Default = "Context",
 		Options = {
 			"Context",
-			"5-hour usage",
+			"Session usage",
 			"Weekly usage",
 			"Weekly Fable usage",
 		},

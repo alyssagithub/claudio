@@ -16,6 +16,7 @@ const Create = Vide.create
 
 const Edge = 18
 const Kinds = {
+	["Session usage"] = "five_hour",
 	["5-hour usage"] = "five_hour",
 	["Weekly usage"] = "seven_day",
 }
@@ -413,7 +414,7 @@ return function()
 					const Parts: {string} = {}
 
 					if Limit then
-						const Name = (Limit.label or "5-hour limit"):gsub(" %- ", ", ")
+						const Name = (Limit.label or "Session limit"):gsub(" %- ", ", ")
 
 						table.insert(Parts, if Limit.utilization then `{math.round(Limit.utilization * 100)}% of {Name:lower()}` else Name)
 					end

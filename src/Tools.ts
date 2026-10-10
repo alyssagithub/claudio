@@ -489,7 +489,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         around: z.string().optional().describe("Instance to crop tightly around, such as Workspace.Model or a GuiObject path."),
         element: z.string().optional().describe("During a playtest, a GuiObject on a player's screen to capture on its own, such as Players.LocalPlayer.PlayerGui.Menu.Avatar. Claudio marks it, captures the Studio window and crops to exactly that element. Pair it with zoom to inspect small UI."),
         player: z.string().optional().describe("For element, which client: a player's name or their number in join order. The first player by default."),
-        frame: z.string().optional().describe("A target size or aspect for framing, such as 1920x1080 or 16:9. The largest centred area of that shape is outlined in yellow with rule-of-thirds lines and everything outside it is darkened, so you can see exactly what a thumbnail of that shape would contain. The picture keeps the viewport's own pixels; to render at a size bigger than the viewport, set it with the device tool's width and height first."),
+        frame: z.string().optional().describe("A target size or aspect for framing, such as 1920x1080 or 16:9. The largest centred area of that shape is outlined in yellow with rule-of-thirds lines and everything outside it is darkened, so you can see exactly what a thumbnail of that shape would contain. A size such as 1920x1080 renders the viewport at exactly that resolution through the device emulator with actual-resolution scaling, then ends the simulation; an aspect such as 16:9, or a size while a simulation is already running, frames the viewport as it is."),
         crop: z.boolean().optional().describe("With frame, return only the framed area instead of the guides."),
         zoom: z.number().optional().describe("Enlarge the picture by this whole number, up to 16, with sharp pixels, to look closely at something small. The result is capped at 2048 pixels on a side."),
         padding: z.number().optional().describe("Pixels of margin around it, 8 by default."),
@@ -501,10 +501,10 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         file: z.string().optional().describe("Also save the picture to this path as a PNG, for comparing pixels or keeping a record."),
       },
       Run: async (Input: { of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
+        const Shape = Input.frame ? Input.frame.match(/^\s*(\d+(?:\.\d+)?)\s*[x:×]\s*(\d+(?:\.\d+)?)\s*$/i) : null;
         const Picture = (Given: string, Said: string): ToolAnswer => {
           let Data = Given;
           let Text = Said;
-          const Shape = Input.frame ? Input.frame.match(/^\s*(\d+(?:\.\d+)?)\s*[x:×]\s*(\d+(?:\.\d+)?)\s*$/i) : null;
 
           if (Input.frame && !Shape) {
             Text += `, without a frame because "${Input.frame}" is not a size like 1920x1080 or an aspect like 16:9`;
@@ -654,14 +654,32 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
           }
         }
 
-        const Shot: { error?: string; width: number; height: number; pixels: string; viewport: string; around?: string } | null = await Reach("shoot",{
-          x: Input.x,
-          y: Input.y,
-          width: Input.width,
-          height: Input.height,
-          around: Input.around,
-          padding: Input.padding,
-        });
+        const Sized = Shape && Number(Shape[1]) >= 100 && Number(Shape[2]) >= 100 && Number(Shape[1]) <= 4096 && Number(Shape[2]) <= 4096 && !Input.around && !Input.width
+          ? await Reach("device", {action: "status"}) as { text?: string } | null
+          : null;
+        const Simulated = Sized && typeof Sized.text === "string" && Sized.text.startsWith("Nothing is being simulated")
+          ? await Reach("device", {action: "set", device: "hd_1080", width: Math.round(Number(Shape![1])), height: Math.round(Number(Shape![2])), scaling: "ActualResolution"}) as { error?: string } | null
+          : null;
+        let Shot: { error?: string; width: number; height: number; pixels: string; viewport: string; around?: string } | null;
+
+        try {
+          Shot = await Reach("shoot",{
+            x: Input.x,
+            y: Input.y,
+            width: Input.width,
+            height: Input.height,
+            around: Input.around,
+            padding: Input.padding,
+          });
+        } finally {
+          if (Simulated && !Simulated.error) {
+            await Reach("device", {action: "stop"});
+          }
+        }
+
+        if (Sized && !(Simulated && !Simulated.error) && Shot && !Shot.error) {
+          Shot.viewport += Simulated ? `, because the device emulator refused ${Input.frame} (${Simulated.error})` : ", because a device simulation was already running and was left alone";
+        }
 
         if ((!Shot || Shot.error) && !Input.around && !(Input.width && Input.height)) {
           const { CaptureWindow } = await import("./Window.js");

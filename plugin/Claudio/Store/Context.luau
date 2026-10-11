@@ -282,7 +282,22 @@ function Context.ImportFiles(): string?
 			continue
 		end
 
-		const Saved, Answer = Client.SaveAttachment(Name, Base64.Encode(File:GetBinaryContents()))
+		const Size = File.Size
+
+		if Size > 500 * 1024 * 1024 then
+			Context.Notice(`Could not attach {Name}: it is {math.round(Size / 1048576)} MB, and attachments can be at most 500 MB.`)
+
+			continue
+		end
+
+		const Big = Size > 8 * 1024 * 1024
+		const Saved, Answer = Client.SaveAttachment(Name, File:GetBinaryContents(), if Big then function(Share: number)
+			Context.Notice(`Attaching {Name}: {math.floor(Share * 100)}%`)
+		end else nil)
+
+		if Big and Saved then
+			Context.Notice(nil)
+		end
 
 		if Saved and typeof(Answer) == "table" and typeof(Answer.path) == "string" then
 			table.insert(Tokens, Context.AddFile(Name, Answer.path))

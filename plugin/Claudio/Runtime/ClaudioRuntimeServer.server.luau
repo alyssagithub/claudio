@@ -17,6 +17,14 @@ end
 
 script.Parent = nil
 
+-- The bridge gives up at the same time limit, so stop the code a little sooner: the reply then arrives in
+-- time and carries what the code printed before it was stopped, which shows whether it was slow or stuck.
+const function Within(Timeout: any): number
+	const Seconds = math.clamp(tonumber(Timeout) or 300, 1, 1800)
+
+	return math.max(1, Seconds - 3)
+end
+
 -- Which script raised each error, since the log history keeps only the text. Errors that never reach
 -- ScriptContext.Error came from Studio or an engine call rather than a script.
 const ErrorSources: {[string]: string} = {}
@@ -478,17 +486,17 @@ task.spawn(function()
 					end
 
 					if Job.kind == "execute" and typeof(Job.input.within) == "string" then
-						return AskClient(Player, "scoped", HttpService:JSONEncode(Job.input), math.clamp(tonumber(Job.input.timeout) or 300, 1, 1800))
+						return AskClient(Player, "scoped", HttpService:JSONEncode(Job.input), Within(Job.input.timeout))
 					end
 
 					if Job.kind == "input" then
 						return AskClient(Player, "input", HttpService:JSONEncode(Job.input), 20 + math.clamp(tonumber(Job.input.times) or 1, 1, 100) * math.clamp(tonumber(Job.input.gap) or 0.6, 0.05, 10))
 					end
 
-					return AskClient(Player, "execute", Job.input.code, math.clamp(tonumber(Job.input.timeout) or 300, 1, 1800))
+					return AskClient(Player, "execute", Job.input.code, Within(Job.input.timeout))
 				end
 
-				return Run(Job.input.code, Job.input.within, Job.input.withinSource, math.clamp(tonumber(Job.input.timeout) or 300, 1, 1800))
+				return Run(Job.input.code, Job.input.within, Job.input.withinSource, Within(Job.input.timeout))
 			end)
 
 			if not (Done and Outcome == nil) then

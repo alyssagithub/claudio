@@ -1,5 +1,6 @@
 --!strict
 const Http = require(script.Parent.Http)
+const Base64 = require(script.Parent.Parent.Base64)
 const Error = require(script.Parent.Error)
 const Config = require(script.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Settings)
@@ -551,11 +552,32 @@ function Client.ConversationCost(Id: string): (boolean, any)
 	return Http.Request("GET", `{BaseUrl()}/conversations/{Id}/cost`)
 end
 
-function Client.SaveAttachment(Name: string, Data: string): (boolean, any)
-	return Http.Request("POST", `{BaseUrl()}/attachments`, {
-		name = Name,
-		data = Data,
-	})
+-- Sends the file's raw bytes in parts of a few megabytes, since Studio cannot send one huge string. On
+-- Progress gets the share sent so far after each part.
+function Client.SaveAttachment(Name: string, Raw: string, Progress: ((number) -> ())?): (boolean, any)
+	const Part = 3 * 1024 * 1024
+	const Upload = game:GetService("HttpService"):GenerateGUID(false)
+	const Count = math.max(1, math.ceil(#Raw / Part))
+	local Ok, Answer = false, nil
+
+	for Index = 1, Count do
+		Ok, Answer = Http.Request("POST", `{BaseUrl()}/attachments`, {
+			name = Name,
+			data = Base64.Encode(Raw:sub((Index - 1) * Part + 1, Index * Part)),
+			upload = Upload,
+			last = Index == Count,
+		})
+
+		if not Ok then
+			return Ok, Answer
+		end
+
+		if Progress then
+			Progress(Index / Count)
+		end
+	end
+
+	return Ok, Answer
 end
 
 function Client.OpenUrl(Url: string): (boolean, any)

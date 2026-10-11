@@ -176,6 +176,7 @@ function PicturesFrom(Body: Record<string, any>): Picture[] {
 
 const StartedAt = Date.now();
 let CountingStats = false;
+const Uploads = new Map<string, string>();
 
 function TurnRequestFrom(Body: Record<string, any>, ConversationId: string | null): TurnRequest {
   return {
@@ -635,11 +636,27 @@ export function StartServer(Port: number) {
           return;
         }
 
+        // Big files arrive in parts, because Studio cannot send one string of a hundred megabytes. The
+        // first part makes the file and each later part with the same upload id is added to its end.
+        const Upload = typeof Body.upload === "string" && /^[\w-]{8,64}$/.test(Body.upload) ? Body.upload : null;
+        const Known = Upload ? Uploads.get(Upload) : undefined;
         const Folder = path.join(os.homedir(), ".claudio", "attachments", String(Date.now()));
+        const Target = Known || path.join(Folder, Name);
 
-        fs.mkdirSync(Folder, {recursive: true});
-        fs.writeFileSync(path.join(Folder, Name), Buffer.from(Body.data, "base64"));
-        SendJson(Response, 200, {path: path.join(Folder, Name)});
+        if (!Known) {
+          fs.mkdirSync(Folder, {recursive: true});
+          fs.writeFileSync(Target, Buffer.from(Body.data, "base64"));
+        } else {
+          fs.appendFileSync(Target, Buffer.from(Body.data, "base64"));
+        }
+
+        if (Upload && Body.last !== true) {
+          Uploads.set(Upload, Target);
+        } else if (Upload) {
+          Uploads.delete(Upload);
+        }
+
+        SendJson(Response, 200, {path: Target});
         return;
       }
 

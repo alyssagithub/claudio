@@ -8,7 +8,6 @@ const Types = require(script.Parent.Parent.Parent.Types)
 const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Config = require(script.Parent.Parent.Parent.Config)
 const Covers = require(script.Parent.Parent.Covers)
-const ModelPicker = require(script.Parent.ModelPicker)
 const Theme = require(script.Parent.Parent.Theme)
 const Icon = require(script.Parent.Icon)
 
@@ -112,7 +111,6 @@ return function()
 	const Shift = Vide.source(0)
 	const Rightmost = Vide.source(0)
 	const Room = Vide.source(220)
-	const Below = Vide.source(0)
 	const Waited = Vide.source(false)
 	local Waiting = 0
 
@@ -126,14 +124,6 @@ return function()
 		Shift(Row.AbsolutePosition.X - Object.AbsolutePosition.X)
 		Rightmost(Row.AbsolutePosition.X + Row.AbsoluteSize.X - Object.AbsolutePosition.X)
 		Room(math.max(160, Row.AbsoluteSize.X))
-
-		const Bar = Object:FindFirstAncestor("InputBar") :: GuiObject?
-
-		if not Bar then
-			return
-		end
-
-		Below(Bar.AbsolutePosition.Y + Bar.AbsoluteSize.Y - Object.AbsolutePosition.Y)
 	end
 
 	const function OnHover(Over: boolean)
@@ -434,9 +424,10 @@ return function()
 				return UDim2.fromOffset(Room(), 0)
 			end,
 			AutomaticSize = Enum.AutomaticSize.Y,
-			AnchorPoint = Vector2.new(0, 1),
+			-- Opens just above the ring, right-aligned with it, over the message box, and stops at the bar's left edge.
+			AnchorPoint = Vector2.new(1, 1),
 			Position = function()
-				return UDim2.new(0, Shift(), 0, Below() - ModelPicker.BarHeight() - 6)
+				return UDim2.new(1, math.max(0, Shift() + Room() - Edge), 0, -6)
 			end,
 			BackgroundColor3 = Theme.Colors.Background,
 			ZIndex = 30,

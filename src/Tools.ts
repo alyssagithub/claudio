@@ -98,7 +98,7 @@ async function Headroom(Clients: number, Starting: boolean): Promise<{ Refused: 
     };
   }
 
-  return {Warning: null, Refused: `Not starting that: ${Starting ? "a server and " : ""}${Clients} client${Clients === 1 ? "" : "s"} are ${Processes} Studio processes of about ${Gigabytes(Each)} GB each, plus room to spare, so about ${Gigabytes(Needed)} GB, and over 20 seconds of watching this machine had at most ${Gigabytes(Most)} GB free even counting the page file. Running out crashes the whole machine, not just Studio. Use fewer players, or pass force only if the user asks for it.`};
+  return {Warning: null, Refused: `Not starting that: ${Starting ? "a server and " : ""}${Clients} client${Clients === 1 ? "" : "s"} are ${Processes} Studio processes of about ${Gigabytes(Each)} GB each, plus room to spare, so about ${Gigabytes(Needed)} GB, and over 20 seconds of watching this machine had at most ${Gigabytes(Most)} GB free even counting the page file. Running out crashes the whole machine, not just Studio. Use fewer players, or pass force only if the user asks for it.${process.platform === "win32" ? " A larger page file also gives more room and costs only disk space: the user can raise it in sysdm.cpl, Advanced, Performance Settings, Advanced, Virtual memory, Change, with a fixed size of 16 GB or more, then restart Windows. Suggest that to them." : ""}`};
 }
 
 let QualityChanged = false;

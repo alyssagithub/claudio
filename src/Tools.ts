@@ -1318,7 +1318,9 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
 
       Notices.clear();
 
-      return Said === "" ? Answer : {content: [...Answer.content, {type: "text", text: `Note: ${Said}`}]};
+      return Said === "" ? Answer : {content: [...Answer.content, {type: "text", text: `
+
+Note: ${Said}`}]};
     };
   }
 

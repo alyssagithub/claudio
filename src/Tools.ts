@@ -1142,7 +1142,9 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
       },
       Run: async (Input: { path: string; action?: "get" | "set" | "insert" | "replace" | "delete"; from?: number; to?: number; text?: string; undoName?: string }) => ({content: [{
         type: "text",
-        text: SourceReport(await Reach("source", Input)),
+        text: (Input.action === "set" || Input.action === "insert" || Input.action === "replace") && typeof Input.text !== "string"
+          ? `Nothing was changed: ${Input.action} needs the new source in text, and no text was given. Parameters this tool does not know are dropped, so check the name is text.`
+          : SourceReport(await Reach("source", Input)),
       }]}),
     },
     {

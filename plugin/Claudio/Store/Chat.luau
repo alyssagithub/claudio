@@ -505,6 +505,10 @@ const function Source(Input: any): any
 		end
 	end
 
+	if (Action == "set" or Action == "insert" or Action == "replace") and typeof(Input.text) ~= "string" then
+		return {error = `Nothing was changed: {Action} needs the new source in text, and no text was given.`}
+	end
+
 	const Step = StartStep("ClaudioSource", Input.undoName or `Claudio edited {Script.Name}`)
 
 	const Ok, Trouble = pcall(function(): string

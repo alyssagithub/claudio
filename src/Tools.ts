@@ -137,7 +137,21 @@ function Said(Found: SaidAnswer, Missing: string): string {
 }
 
 export function StudioTools(Deps: Dependencies): StudioTool[] {
-  const { Reach, ReachIn, Presence, LiveSession } = Deps;
+  const { Presence, LiveSession } = Deps;
+  // The bridge adds a notice to an answer when another session is driving the same Studio, the plugin
+  // just reloaded, or a playtest was stopped from outside. Collect them so playtest and execute show them.
+  const Notices = new Set<string>();
+  const Heard = <Found,>(Found: Found): Found => {
+    const Said = Found && typeof Found === "object" ? (Found as { notice?: unknown }).notice : undefined;
+
+    if (typeof Said === "string" && Said !== "") {
+      Notices.add(Said);
+    }
+
+    return Found;
+  };
+  const Reach = (<Found,>(Kind: string, Input?: unknown, Timeout?: number) => Deps.Reach<Found>(Kind, Input, Timeout).then(Heard)) as Reacher;
+  const ReachIn = (<Found,>(Role: string, Kind: string, Input?: unknown, Timeout?: number) => Deps.ReachIn<Found>(Role, Kind, Input, Timeout).then(Heard)) as ReacherIn;
 
   async function NeedsSession(What: string): Promise<string | null> {
     if (await LiveSession()) {
@@ -311,7 +325,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
     return [`${Path}, read from a copy of the place made ${When <= 0 ? "just now" : `${When} minute${When === 1 ? "" : "s"} ago`}:`, ...Lines, ...(Lines.length === 0 ? ["No properties by those names."] : [])].join("\n");
   }
 
-  return [
+  const Tools: StudioTool[] = [
     {
       Name: "instances",
       Description: "Say whether Studio is open and whether the Claudio plugin has checked in. Ask this before assuming nothing is connected, and never open Studio yourself on the strength of an empty answer.",
@@ -1292,4 +1306,21 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
       }]}),
     },
   ];
+
+  for (const Tool of Tools.filter((Entry) => Entry.Name === "playtest" || Entry.Name === "execute")) {
+    const Run = Tool.Run;
+
+    Tool.Run = async (Input, Extra) => {
+      Notices.clear();
+
+      const Answer = await Run(Input, Extra);
+      const Said = [...Notices].join("\n");
+
+      Notices.clear();
+
+      return Said === "" ? Answer : {content: [...Answer.content, {type: "text", text: `Note: ${Said}`}]};
+    };
+  }
+
+  return Tools;
 }

@@ -56,6 +56,7 @@ async function Send<Found>(Role: string | undefined, Kind: string, Input: unknow
         input: Input,
         role: Role,
         timeout: Timeout,
+        owner: `mcp-${process.pid}`,
       }));
     });
 

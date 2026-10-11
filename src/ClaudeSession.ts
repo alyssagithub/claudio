@@ -6,11 +6,11 @@ import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { AllowedTools, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, EffortOrder, PlanInstructions, CommandsCacheFile, DesktopConfigPath, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory, DeveloperUserIds } from "./Config.js";
-import { AddDesktopSession, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
+import { AddDesktopSession, GetConversation, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
-import { Request as RequestStudio } from "./Studio.js";
+import { Request as RequestStudio, type Owner as StudioOwnerType } from "./Studio.js";
 import { ReadPluginSetting } from "./PluginSettings.js";
 import { MirrorSkills, MirrorSyncedSkills } from "./SyncedSkills.js";
 import { CountLines, EditedFile, ReadFileText } from "./Lines.js";
@@ -1842,6 +1842,23 @@ export function LadderBelow(Model: string): string[] {
   return Index >= 0 ? Ladder.slice(Index + 1) : Ladder.slice(Ladder.indexOf("opus"));
 }
 
+const OwnerIds = new WeakMap<Session, string>();
+
+function StudioOwner(Session: Session): StudioOwnerType {
+  if (!OwnerIds.has(Session)) {
+    OwnerIds.set(Session, Math.random().toString(36).slice(2, 10));
+  }
+
+  return {
+    Id: `chat-${Session.ConversationId || OwnerIds.get(Session)}`,
+    Name: () => {
+      const Title = Session.ConversationId ? GetConversation(Session.ConversationId, 1)?.title : null;
+
+      return Title ? `the Claudio chat "${Title}"` : "another Claudio chat";
+    },
+  };
+}
+
 function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string, Model: string, Effort: string | null, AskForTools: boolean, ExtraPrompt: boolean, FastMode: boolean, Planning: boolean, Mode: string, Bypass: boolean, OutputStyle: string, StepDown: boolean): Session {
   const Pending: unknown[] = [];
   let Wake: ((Value?: unknown) => void) | null = null;
@@ -2089,7 +2106,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
           },
           mcpServers: {
             ...ReadMcpServers(),
-            [AskServerName]: AskServerFor(((Kind, Input, Timeout) => RequestStudio(Kind, Input, JobLimit(Kind, Timeout))) as Reacher, ((Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, JobLimit(Kind, Timeout), Role)) as ReacherIn),
+            [AskServerName]: AskServerFor(((Kind, Input, Timeout) => RequestStudio(Kind, Input, JobLimit(Kind, Timeout), null, StudioOwner(Session))) as Reacher, ((Role, Kind, Input, Timeout) => RequestStudio(Kind, Input, JobLimit(Kind, Timeout), Role, StudioOwner(Session))) as ReacherIn),
           },
           systemPrompt: {
             type: "preset",

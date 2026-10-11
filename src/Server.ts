@@ -11,7 +11,7 @@ import { SystemPromptFor } from "./Config.js";
 import { ReloadReleased } from "./Models.js";
 import { StatsAge, StatsFor } from "./Stats.js";
 import { GetLimits, GetBreakdown, PollUsage, RefreshConversationContext, SignIn } from "./ClaudeSession.js";
-import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving } from "./Studio.js";
+import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving, Booted } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
 import type { Picture, TurnRequest } from "./Types.js";
@@ -852,7 +852,9 @@ ${Text}`;
         const Seconds = Number(Wanted.timeout);
         const Limit = Number.isFinite(Seconds) && Seconds > 0 ? Math.min(Seconds, 1800) * 1000 : (Wanted.kind === "execute" ? 300000 : undefined);
 
-        SendJson(Response, 200, await RequestStudio(Wanted.kind, Wanted.input || {}, Limit, Wanted.role));
+        const From = typeof Wanted.owner === "string" && Wanted.owner !== "" ? Wanted.owner.slice(0, 80) : null;
+
+        SendJson(Response, 200, await RequestStudio(Wanted.kind, Wanted.input || {}, Limit, Wanted.role, From ? {Id: From, Name: () => "a Claude Code session outside the Claudio panel"} : undefined));
         return;
       }
 
@@ -863,6 +865,8 @@ ${Text}`;
           const Plugin = Url.searchParams.get("plugin");
           const Loaded = Url.searchParams.get("ready");
           const Games = Url.searchParams.get("games");
+
+          Booted(Url.searchParams.get("boot"));
 
           SendJson(Response, 200, {job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true", Attached === null ? undefined : Number(Attached), Plugin || undefined, Loaded === null ? undefined : Number(Loaded), Games === null ? undefined : Number(Games))});
           return;

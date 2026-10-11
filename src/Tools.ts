@@ -473,6 +473,10 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         file: z.string().optional().describe("Where to save the PNG. Defaults to a file in the user's Claudio renders folder."),
       },
       Run: async (Input: { path: string; view?: string; yaw?: number; pitch?: number; distance?: number; fov?: number; size?: number; background?: string; isolate?: boolean; lighting?: string; file?: string }) => {
+        if (await LiveSession()) {
+          return {content: [{type: "text", text: "Nothing was rendered: a playtest is running, and render draws in the editor's viewport, which a running playtest takes over, so renders then time out or come back wrong. Stop the playtest and try again."}]};
+        }
+
         const Rendered: { error?: string; width: number; height: number; pixels: string; text: string } | null = await Reach("render", Input, 120);
 
         if (!Rendered || Rendered.error) {

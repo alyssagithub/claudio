@@ -42,7 +42,7 @@ export function PropertyReport(Found: PropertyAnswer) {
   const Parts = [`${Found.path} [${Found.className}]`, ...(Found.values || [])];
 
   if (Found.unreadable && Found.unreadable.length > 0) {
-    Parts.push(`Could not read: ${Found.unreadable.join(", ")}`);
+    Parts.push(`Could not read: ${Found.unreadable.join(", ")}. Roblox hides these from plugins and scripts; the hidden tool can read them, including Workspace's streaming settings.`);
   }
 
   return Parts.join("\n");

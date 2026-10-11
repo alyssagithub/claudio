@@ -1765,7 +1765,7 @@ const function Shoot(Input: any): any
 	end
 
 	if not Captured then
-		return {error = "Studio did not return a screenshot."}
+		return {error = "Studio's screenshot service did not answer. It can get stuck for the rest of a Studio session, in which case only restarting Studio brings it back; a running playtest also stops it."}
 	end
 
 	const Made, Image = pcall(function(): any

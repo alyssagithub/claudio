@@ -38,6 +38,47 @@ function Builder.Serve()
 			return if Rendered then {now = tostring((settings() :: any).Rendering.QualityLevel)} else {error = `Studio refused the graphics level: {tostring(Trouble)}`}
 		end
 
+		-- The script profiler needs plugin permission, which code run through the session agent does not have.
+		if typeof(Source) == "table" and typeof(Source.profile) == "number" then
+			const Profiler = game:GetService("ScriptProfilerService")
+			const Seconds = math.clamp(Source.profile, 1, 60)
+			local Data: string? = nil
+			const Listening = Profiler.OnNewData:Connect(function(...: any)
+				for _, Value in {...} do
+					if typeof(Value) == "string" then
+						Data = Value
+					end
+				end
+			end)
+			const Started, Trouble = pcall(function()
+				Profiler:ServerStart(if typeof(Source.frequency) == "number" then Source.frequency else nil)
+			end)
+
+			if not Started then
+				Listening:Disconnect()
+
+				return {error = `Studio refused to start the script profiler: {tostring(Trouble)}`}
+			end
+
+			task.wait(Seconds)
+			pcall(Profiler.ServerStop, Profiler)
+			pcall(Profiler.ServerRequestData, Profiler)
+
+			const Deadline = os.clock() + 10
+
+			while not Data and os.clock() < Deadline do
+				task.wait(0.1)
+			end
+
+			Listening:Disconnect()
+
+			if not Data then
+				return {error = "The script profiler ran but sent no data back."}
+			end
+
+			return {json = Data}
+		end
+
 		if typeof(Source) ~= "string" then
 			return nil
 		end

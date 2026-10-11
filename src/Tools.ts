@@ -5,7 +5,7 @@ import { ReadDiskTree } from "./DiskTree.js";
 import type { DiskNode } from "./DiskTree.js";
 import { execFile } from "node:child_process";
 import { z } from "zod/v3";
-import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport } from "./Ask.js";
+import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport, ProfileReport } from "./Ask.js";
 import type { LogAnswer, ExecuteAnswer } from "./Ask.js";
 import { QuietFlash } from "./Notify.js";
 import { Enlarge, Guide } from "./Capture.js";
@@ -473,7 +473,9 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         file: z.string().optional().describe("Where to save the PNG. Defaults to a file in the user's Claudio renders folder."),
       },
       Run: async (Input: { path: string; view?: string; yaw?: number; pitch?: number; distance?: number; fov?: number; size?: number; background?: string; isolate?: boolean; lighting?: string; file?: string }) => {
-        if (await LiveSession()) {
+        const Playing: { text?: string } | null = await LiveSession() ? {text: "running"} : await Reach("playtest", {action: "status"});
+
+        if (Playing && typeof Playing.text === "string" && !Playing.text.startsWith("No playtest")) {
           return {content: [{type: "text", text: "Nothing was rendered: a playtest is running, and render draws in the editor's viewport, which a running playtest takes over, so renders then time out or come back wrong. Stop the playtest and try again."}]};
         }
 
@@ -1095,13 +1097,27 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
     },
     {
       Name: "profile",
-      Description: "Measure what the place is spending. memory breaks live memory down by tag, largest first. Point it at the session with target when a playtest is running, because the editor and the session use separate memory.",
+      Description: "Measure what the place is spending. memory breaks live memory down by tag, largest first. scripts runs Roblox's script profiler on the play session's server for seconds and ranks the functions and scripts that used the most CPU, which is what an optimization review needs; it needs a running playtest. Point memory at the session with target when a playtest is running, because the editor and the session use separate memory.",
       Schema: {
-        action: z.enum(["memory"]).optional().describe("What to measure. Defaults to memory."),
+        action: z.enum(["memory", "scripts"]).optional().describe("What to measure. Defaults to memory."),
+        seconds: z.number().optional().describe("For scripts, how long to profile, 10 by default and 60 at most. Play the game meanwhile, or have it busy, so there is something to measure."),
         least: z.number().optional().describe("Leave out tags smaller than this many MB. One by default."),
         target: z.enum(["edit", "server"]).optional().describe("Whose memory to read. edit is the editor and the default."),
       },
-      Run: async (Input: { action?: "memory"; least?: number; target?: "edit" | "server" }) => {
+      Run: async (Input: { action?: "memory" | "scripts"; least?: number; target?: "edit" | "server"; seconds?: number }) => {
+        if (Input.action === "scripts") {
+          const Seconds = Math.min(Math.max(Input.seconds || 10, 1), 60);
+          const Waited = await NeedsSession("Profiling scripts needs a running playtest. Start one with the playtest tool first.");
+
+          if (Waited) {
+            return {content: [{type: "text", text: Waited}]};
+          }
+
+          const Profiled: { error?: string; json?: string } | null = await ReachIn("server", "scripts", {seconds: Seconds}, Seconds + 30);
+
+          return {content: [{type: "text", text: ProfileReport(Profiled, Seconds)}]};
+        }
+
         const Where = Input.target || "edit";
         const Sent = {least: Input.least};
         const Found: SaidAnswer = Where === "edit" ? await Reach("memory", Sent) : await ReachIn("server", "memory", Sent);
@@ -1324,9 +1340,18 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
 
       Notices.clear();
 
-      return Said === "" ? Answer : {content: [...Answer.content, {type: "text", text: `
+      if (Said === "") {
+        return Answer;
+      }
 
-Note: ${Said}`}]};
+      // Joined into the last text part, because clients show separate parts with nothing between them.
+      const Last = [...Answer.content].reverse().find((Part) => Part.type === "text") as { type: "text"; text: string } | undefined;
+
+      if (!Last) {
+        return {content: [...Answer.content, {type: "text", text: `Note: ${Said}`}]};
+      }
+
+      return {content: Answer.content.map((Part) => Part === Last ? {type: "text", text: `${Last.text}${String.fromCharCode(10, 10)}Note: ${Said}`} : Part)};
     };
   }
 

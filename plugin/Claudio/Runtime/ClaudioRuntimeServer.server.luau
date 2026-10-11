@@ -403,6 +403,16 @@ task.spawn(function()
 					}
 				end
 
+				if Job.kind == "scripts" then
+					const Making = Builder()
+
+					if not Making then
+						return {error = "Claudio's plugin is not running inside this play session, so the profiler cannot be started. Stop the playtest and start it again."}
+					end
+
+					return Making:Invoke(BuildKey, {profile = tonumber(Job.input.seconds) or 10})
+				end
+
 				if Job.kind == "memory" then
 					const Stats = game:GetService("Stats")
 

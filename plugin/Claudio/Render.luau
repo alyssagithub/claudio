@@ -33,6 +33,26 @@ const Corners = {
 
 type Change = {Object: Instance, Property: string, Value: any}
 
+-- Meshes and textures load on their own time, and a picture taken before they arrive shows the object
+-- without them, so wait for them first, but never more than ten seconds.
+const function Preload(Target: Instance)
+	local Done = false
+
+	task.spawn(function()
+		pcall(function()
+			game:GetService("ContentProvider"):PreloadAsync({Target})
+		end)
+
+		Done = true
+	end)
+
+	const Deadline = os.clock() + 10
+
+	while not Done and os.clock() < Deadline do
+		task.wait(0.05)
+	end
+end
+
 const function Settle()
 	RunService.PreRender:Wait()
 	RunService.Heartbeat:Wait()
@@ -60,7 +80,7 @@ const function Screenshot(): (EditableImage?, string?)
 	end
 
 	if not Taken then
-		return nil, "Studio did not return a screenshot."
+		return nil, "Studio's screenshot service did not answer. It can get stuck for the rest of a Studio session, in which case only restarting Studio brings it back; a running playtest also stops it."
 	end
 
 	const Made, Image = pcall(function(): any
@@ -387,6 +407,8 @@ return function(Input: any, Resolve: (string) -> Instance?): any
 	end
 
 	if Object:IsDescendantOf(workspace) then
+		Preload(Object)
+
 		return Draw(Input, Object, Object:GetFullName())
 	end
 
@@ -397,6 +419,7 @@ return function(Input: any, Resolve: (string) -> Instance?): any
 	end
 
 	Copy.Parent = workspace
+	Preload(Copy)
 
 	const Ok, Result = pcall(Draw, Input, Copy, `{Object:GetFullName()} (drawn from a temporary copy in Workspace, since nothing outside Workspace renders)`)
 

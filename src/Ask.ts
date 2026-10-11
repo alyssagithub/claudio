@@ -284,3 +284,64 @@ export function AskServerFor(Reach: Reacher, ReachIn: ReacherIn) {
     ],
   });
 }
+type ProfiledFunction = Record<string, unknown>;
+
+// Ranks what Roblox's script profiler recorded. Each function's total includes the functions it called,
+// so the per-script figure is each script's busiest function rather than a sum, which would count time twice.
+export function ProfileReport(Found: { error?: string; json?: string } | null, Seconds: number): string {
+  if (!Found) {
+    return "The play session did not answer.";
+  }
+
+  if (Found.error || !Found.json) {
+    return Found.error || "The profiler returned nothing.";
+  }
+
+  let Data: Record<string, unknown>;
+
+  try {
+    Data = JSON.parse(Found.json) as Record<string, unknown>;
+  } catch {
+    return `The profiler sent data Claudio could not read: ${Found.json.slice(0, 300)}`;
+  }
+
+  const Functions = (Array.isArray(Data.Functions) ? Data.Functions : []) as ProfiledFunction[];
+
+  if (Functions.length === 0) {
+    return `The profiler recorded no script activity in ${Seconds}s. Play the game or make it busy while it runs. Fields it sent: ${Object.keys(Data).join(", ")}.`;
+  }
+
+  const Time = (Entry: ProfiledFunction) => Number(Entry.TotalDuration ?? Entry.Duration ?? 0) || 0;
+  const Where = (Entry: ProfiledFunction) => String(Entry.Source ?? Entry.Script ?? "unknown script");
+  const Label = (Entry: ProfiledFunction) => `${String(Entry.Name || "anonymous")}${Entry.Line !== undefined ? ` (line ${Entry.Line})` : ""}`;
+  const Unit = (Value: number) => `${(Value / 1000).toFixed(1)} ms`;
+  // In a run-mode playtest the server shares Studio's own process, so plugins and engine code show up too.
+  // Keep the game's scripts, whose sources are paths inside the place, and total the rest on one line.
+  const Services = /^(Workspace|ServerScriptService|ServerStorage|ReplicatedStorage|ReplicatedFirst|StarterPlayer|StarterGui|StarterPack|Players|Lighting|SoundService|Teams|Chat|TextChatService)\./;
+  const Game = Functions.filter((Entry) => Services.test(Where(Entry)));
+  const Others = Functions.filter((Entry) => !Services.test(Where(Entry))).reduce((Most, Entry) => Math.max(Most, Time(Entry)), 0);
+  const Ranked = [...Game].sort((Left, Right) => Time(Right) - Time(Left));
+  const Scripts = new Map<string, number>();
+
+  if (Game.length === 0) {
+    return `None of the game's scripts used measurable CPU in ${Seconds}s; only Studio and plugins did (busiest ${Unit(Others)}). Play the game or make it busy while it runs, and use a play mode playtest rather than run mode to leave Studio's own work out.`;
+  }
+
+  for (const Entry of Game) {
+    Scripts.set(Where(Entry), Math.max(Scripts.get(Where(Entry)) || 0, Time(Entry)));
+  }
+
+  const Lines = [`Game script CPU on the server over ${Seconds}s. Times include the functions each one called.${Others > 0 ? ` Studio and plugins also ran, busiest at ${Unit(Others)}, and are left out.` : ""}`, "", "Scripts by their busiest function:"];
+
+  for (const [Name, Spent] of [...Scripts.entries()].sort((Left, Right) => Right[1] - Left[1]).slice(0, 15)) {
+    Lines.push(`  ${Unit(Spent)}  ${Name}`);
+  }
+
+  Lines.push("", "Busiest functions:");
+
+  for (const Entry of Ranked.slice(0, 20)) {
+    Lines.push(`  ${Unit(Time(Entry))}  ${Label(Entry)} in ${Where(Entry)}`);
+  }
+
+  return Lines.join("\n");
+}

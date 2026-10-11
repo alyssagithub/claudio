@@ -308,17 +308,51 @@ const function Pick(Model: () -> Types.ModelInfo, LayoutOrder: number, Inside: b
 	end)
 end
 
+-- The right edge of each popup's button, in screen pixels, so the popup opens above its own button.
+const Edges = {
+	ModelMenu = Vide.source(0),
+	EffortMenu = Vide.source(0),
+	ModeMenu = Vide.source(0),
+}
+
+const function TrackEdge(Popup: string)
+	return Vide.action(function(Button: GuiObject)
+		const function Measure()
+			Edges[Popup](Button.AbsolutePosition.X + Button.AbsoluteSize.X)
+		end
+
+		Measure()
+		Vide.cleanup(Button:GetPropertyChangedSignal("AbsolutePosition"):Connect(Measure))
+		Vide.cleanup(Button:GetPropertyChangedSignal("AbsoluteSize"):Connect(Measure))
+	end)
+end
+
+const function EdgeFor(Popup: string, Width: number, Left: number): number
+	return math.max(8 + Width, Edges[Popup]() - Left)
+end
+
 const function CreatePopup(Name: string, Width: number, Visible: () -> boolean, Across: number, Down: number, Children: {any})
+	const Left = Vide.source(0)
 	const Properties: {any} = {
 		Name = Name,
 		Vide.action(Covers.Add),
+		Vide.action(function(Popup: Frame)
+			const function Measure()
+				const Parent = Popup.Parent
+
+				Left(if Parent and Parent:IsA("GuiObject") then Parent.AbsolutePosition.X else 0)
+			end
+
+			Measure()
+			Vide.cleanup(Popup:GetPropertyChangedSignal("AbsolutePosition"):Connect(Measure))
+		end),
 		Size = function()
 			return UDim2.fromOffset(ScaleWidth(Width), 0)
 		end,
 		AutomaticSize = Enum.AutomaticSize.Y,
-		AnchorPoint = Vector2.new(0, 1),
+		AnchorPoint = Vector2.new(1, 1),
 		Position = function()
-			return UDim2.new(0, 8, 1, -ModelPicker.BarHeight() - 6)
+			return UDim2.new(0, EdgeFor(Name, ScaleWidth(Width), Left()), 1, -ModelPicker.BarHeight() - 6)
 		end,
 		ZIndex = 40,
 		BackgroundColor3 = Theme.Colors.Input,
@@ -551,6 +585,7 @@ function ModelPicker.Button()
 
 	return Create "TextButton" {
 		Name = "ModelButton",
+		TrackEdge("ModelMenu"),
 		AutomaticSize = Enum.AutomaticSize.XY,
 		Size = UDim2.fromScale(0, 0),
 		BackgroundColor3 = Theme.Colors.Button,
@@ -604,6 +639,7 @@ end
 function ModelPicker.ModeButton()
 	return Create "TextButton" {
 		Name = "ModeButton",
+		TrackEdge("ModeMenu"),
 		AutomaticSize = Enum.AutomaticSize.XY,
 		Size = UDim2.fromScale(0, 0),
 		BackgroundTransparency = 1,
@@ -732,6 +768,7 @@ function ModelPicker.EffortButton()
 
 	return Create "TextButton" {
 		Name = "EffortButton",
+		TrackEdge("EffortMenu"),
 		AutomaticSize = Enum.AutomaticSize.XY,
 		Size = UDim2.fromScale(0, 0),
 		BackgroundColor3 = Theme.Colors.Button,
@@ -770,9 +807,9 @@ function ModelPicker.EffortHelp()
 			return UDim2.fromOffset(ScaleWidth(168), 0)
 		end,
 		AutomaticSize = Enum.AutomaticSize.Y,
-		AnchorPoint = Vector2.new(0, 1),
+		AnchorPoint = Vector2.new(1, 1),
 		Position = function()
-			return UDim2.new(0, 8, 1, -ModelPicker.BarHeight() - 12 - MenuHeight())
+			return UDim2.new(0, EdgeFor("EffortMenu", ScaleWidth(168), 0), 1, -ModelPicker.BarHeight() - 12 - MenuHeight())
 		end,
 		BackgroundColor3 = Theme.Colors.Panel,
 		ZIndex = 200,

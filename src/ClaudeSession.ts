@@ -6,7 +6,7 @@ import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { AllowedTools, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, EffortOrder, PlanInstructions, CommandsCacheFile, DesktopConfigPath, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory, DeveloperUserIds } from "./Config.js";
-import { AddDesktopSession, GetConversation, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
+import { AddDesktopSession, ListConversations, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
@@ -1843,6 +1843,24 @@ export function LadderBelow(Model: string): string[] {
 }
 
 const OwnerIds = new WeakMap<Session, string>();
+let Titles: { At: number; Known: Map<string, string> } = {At: 0, Known: new Map()};
+
+// Titles come from the chat list, which reads only the start and end of each transcript, and are reused
+// for a minute. Loading the whole conversation for a title ran the bridge out of memory on huge chats.
+function TitleOf(Id: string): string | null {
+  if (Date.now() - Titles.At > 60000) {
+    try {
+      const Listed = ListConversations() as { conversations?: { id: string; title: string }[] } | { id: string; title: string }[];
+      const Entries = Array.isArray(Listed) ? Listed : Listed.conversations || [];
+
+      Titles = {At: Date.now(), Known: new Map(Entries.map((Entry) => [Entry.id, Entry.title]))};
+    } catch {
+      Titles = {At: Date.now(), Known: Titles.Known};
+    }
+  }
+
+  return Titles.Known.get(Id) || null;
+}
 
 function StudioOwner(Session: Session): StudioOwnerType {
   if (!OwnerIds.has(Session)) {
@@ -1852,7 +1870,7 @@ function StudioOwner(Session: Session): StudioOwnerType {
   return {
     Id: `chat-${Session.ConversationId || OwnerIds.get(Session)}`,
     Name: () => {
-      const Title = Session.ConversationId ? GetConversation(Session.ConversationId, 1)?.title : null;
+      const Title = Session.ConversationId ? TitleOf(Session.ConversationId) : null;
 
       return Title ? `the Claudio chat "${Title}"` : "another Claudio chat";
     },

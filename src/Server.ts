@@ -1226,7 +1226,8 @@ ${Text}`;
     console.error((Error as NodeJS.ErrnoException).code === "EADDRINUSE"
       ? `Port ${Port} is already in use. Is another Claudio bridge running? Use --port to pick another.`
       : `Could not listen on port ${Port}: ${Error.message}`);
-    process.exit(1);
+    // A clean exit, so the launcher's restart loop does not keep retrying while another bridge has the port.
+    process.exit((Error as NodeJS.ErrnoException).code === "EADDRINUSE" ? 0 : 1);
   });
 
   Server.listen(Port, "127.0.0.1", () => {

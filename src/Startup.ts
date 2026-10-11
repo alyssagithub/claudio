@@ -18,9 +18,25 @@ function VisualBasicString(Value: string): string {
 function WriteLauncher(Port?: number | null) {
   const CliPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "bin", "claudio.js");
   const Chosen = Port && Port !== DefaultPort ? ` --port ${Number(Port)}` : "";
-  const Command = `cmd /c ""${process.execPath}" "${CliPath}"${Chosen} >> "${LogFile}" 2>&1"`;
+  // The bridge runs inside a loop that starts it again a few seconds after it crashes, for example when the
+  // machine runs out of memory during a multiplayer test. A deliberate stop or restart exits cleanly and
+  // ends the loop.
+  const Looper = path.join(path.dirname(LogFile), "bridge-loop.cmd");
 
   fs.mkdirSync(path.dirname(LogFile), {recursive: true});
+  fs.writeFileSync(Looper, [
+    "@echo off",
+    ":again",
+    `"${process.execPath}" "${CliPath}"${Chosen} >> "${LogFile}" 2>&1`,
+    "if not errorlevel 1 exit /b",
+    `echo The bridge stopped unexpectedly, starting it again in 3 seconds. >> "${LogFile}"`,
+    "timeout /t 3 /nobreak >nul",
+    "goto again",
+    "",
+  ].join("\r\n"));
+
+  const Command = `cmd /c ""${Looper}""`;
+
   fs.writeFileSync(LauncherPath, [
     `Set Shell = CreateObject("WScript.Shell")`,
     `Shell.Run ${VisualBasicString(Command)}, 0, False`,
@@ -90,10 +106,12 @@ export async function RestartBridge(Port?: number | null): Promise<void> {
   }
 
   const Launcher = fs.readFileSync(LauncherPath, "utf8");
-  const Target = Launcher.match(/""([^"]+claudio\.js)""/);
+  const Looped = Launcher.match(/""([^"]+bridge-loop\.cmd)""/);
+  const Source = Looped && fs.existsSync(Looped[1]) ? fs.readFileSync(Looped[1], "utf8") : Launcher;
+  const Target = Source.match(/"([^"]+claudio\.js)"/);
 
   if (!Target || !fs.existsSync(Target[1])) {
-    const Kept = Launcher.match(/--port (\d+)/);
+    const Kept = Source.match(/--port (\d+)/);
 
     WriteLauncher(Port || (Kept ? Number(Kept[1]) : null));
     console.log("The startup launcher pointed at a Claudio that is no longer there, so it now points at this one.");

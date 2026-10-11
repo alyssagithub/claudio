@@ -149,12 +149,21 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
   const { Presence, LiveSession } = Deps;
   // The bridge adds a notice to an answer when another session is driving the same Studio, the plugin
   // just reloaded, or a playtest was stopped from outside. Collect them so playtest and execute show them.
-  const Notices = new Set<string>();
+  // Keyed by the note with its numbers taken out, so a tool that polls many times, such as playtest stop
+  // waiting for edit mode, shows each note once, with the newest timings.
+  const Notices = new Map<string, string>();
+  const Note = (Said: string) => {
+    for (const Line of Said.split("\n")) {
+      if (Line.trim() !== "") {
+        Notices.set(Line.replace(/\d+/g, "#"), Line);
+      }
+    }
+  };
   const Heard = <Found,>(Found: Found): Found => {
     const Said = Found && typeof Found === "object" ? (Found as { notice?: unknown }).notice : undefined;
 
     if (typeof Said === "string" && Said !== "") {
-      Notices.add(Said);
+      Note(Said);
     }
 
     return Found;
@@ -987,7 +996,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         const Refused = Checked ? Checked.Refused : null;
 
         if (Checked && Checked.Warning) {
-          Notices.add(Checked.Warning);
+          Note(Checked.Warning);
         }
 
         if (Refused) {
@@ -1348,7 +1357,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
       Notices.clear();
 
       const Answer = await Run(Input, Extra);
-      const Said = [...Notices].join("\n");
+      const Said = [...Notices.values()].join("\n");
 
       Notices.clear();
 

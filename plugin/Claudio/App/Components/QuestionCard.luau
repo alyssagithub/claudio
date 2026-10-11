@@ -13,6 +13,15 @@ const Create = Vide.create
 
 const Other = "Other"
 
+-- What has been answered so far, kept outside the card so that the same question handed over again, as
+-- happens when a playtest ends, or the card being built again, keeps the answers in progress.
+local Kept: {Id: string?, Step: number, Picked: {[string]: {[string]: boolean}}, Written: {[string]: string}} = {
+	Id = nil,
+	Step = 1,
+	Picked = {},
+	Written = {},
+}
+
 return function()
 	const Step = Vide.source(1)
 	const Picked = Vide.source({} :: {[string]: {[string]: boolean}})
@@ -20,13 +29,41 @@ return function()
 	const Shut = Vide.source(false)
 
 	Vide.effect(function()
-		Chat.Question()
+		const Held = Chat.Question()
 
 		Vide.untrack(function()
+			const Id = if Held then Held.id else nil
+
+			-- The question can vanish for a moment, such as while a playtest ends, before coming back.
+			if Id == nil then
+				return
+			end
+
+			if Id == Kept.Id then
+				Step(math.clamp(Kept.Step, 1, math.max(1, #Held.questions)))
+				Picked(Kept.Picked)
+				Written(Kept.Written)
+
+				return
+			end
+
+			Kept = {Id = Id, Step = 1, Picked = {}, Written = {}}
 			Step(1)
 			Picked({})
 			Written({})
 			Shut(false)
+		end)
+	end)
+
+	Vide.effect(function()
+		const Now = {Step = Step(), Picked = Picked(), Written = Written()}
+
+		Vide.untrack(function()
+			if Kept.Id then
+				Kept.Step = Now.Step
+				Kept.Picked = Now.Picked
+				Kept.Written = Now.Written
+			end
 		end)
 	end)
 

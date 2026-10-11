@@ -34,6 +34,7 @@ const Client = {}
 
 -- Changes every time the plugin loads, so the bridge can tell a reload apart from a long quiet spell.
 const Boot = game:GetService("HttpService"):GenerateGUID(false)
+const Testing = (script.Parent.Parent :: Instance).Name:match("Testing$") ~= nil
 
 function Client.Connect(): boolean
 	Connection.Status("Connecting")
@@ -201,7 +202,8 @@ function Client.AnswerQuestion(RequestId: string, QuestionId: string, Answers: {
 end
 
 function Client.TakeStudioJob(): (boolean, any)
-	return Http.Request("GET", `{BaseUrl()}/studio/job?plugin={Config.Version}&boot={Boot}`)
+	-- The testing copy leaves the boot out, so mounting it is not reported as the plugin reloading.
+	return Http.Request("GET", `{BaseUrl()}/studio/job?plugin={Config.Version}{if Testing then "" else `&boot={Boot}`}`)
 end
 
 const function Repaired(Value: any): any

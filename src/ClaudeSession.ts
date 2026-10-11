@@ -1619,6 +1619,18 @@ function RouteMessage(Session: Session, Message: any) {
   }
 
   if (Message.type === "assistant") {
+    const Asked = (Message.message && Message.message.usage) as { input_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
+
+    // The latest request's prompt is the conversation's real size. The usage on the turn's result is added
+    // up over every request in the turn, so a long run of tool calls made it read many times the window.
+    if (Asked && !Message.parent_tool_use_id) {
+      Turn.Usage = {
+        ...Turn.Usage,
+        Input: Asked.input_tokens || 0,
+        Cached: (Asked.cache_read_input_tokens || 0) + (Asked.cache_creation_input_tokens || 0),
+      };
+    }
+
     const Content = Blocks(Message);
     const Committed = Content.filter((Block) => Block.type === "text").map((Block) => Block.text).join("");
     const Thought = Content.filter((Block) => Block.type === "thinking").map((Block) => Block.thinking).join(NewLine);
@@ -1757,10 +1769,11 @@ function RouteMessage(Session: Session, Message: any) {
   Session.Spent = Spent;
 
   if (Message.usage) {
+    // Only the output total comes from here; input and cache stay as the latest request reported them.
     Turn.Usage = {
-      Input: Message.usage.input_tokens || Turn.Usage.Input,
+      Input: Turn.Usage.Input || Message.usage.input_tokens || 0,
       Output: Message.usage.output_tokens || Turn.Usage.Output,
-      Cached: Message.usage.cache_read_input_tokens || Turn.Usage.Cached,
+      Cached: Turn.Usage.Cached || Message.usage.cache_read_input_tokens || 0,
     };
   }
 

@@ -18,7 +18,7 @@ const function Row(IconName: string, Label: string, LayoutOrder: number, Add: ()
 		Size = UDim2.new(1, 0, 0, 24),
 		BackgroundColor3 = Theme.Colors.Button,
 		BackgroundTransparency = function()
-			return if Hovered() then 0 else 1
+			return if Hovered() then 0.2 else 1
 		end,
 		Text = "",
 		AutoButtonColor = false,
@@ -50,7 +50,7 @@ const function Row(IconName: string, Label: string, LayoutOrder: number, Add: ()
 		Icon {
 			Name = IconName,
 			Size = Settings.SmallText,
-			Colour = Theme.Colors.DimText,
+			Colour = Theme.Colors.Text,
 			LayoutOrder = 1,
 		},
 		Create "TextLabel" {
@@ -85,9 +85,9 @@ return function(Open: (boolean?) -> boolean, Insert: (string) -> ())
 			Name = "Options",
 			Size = UDim2.fromOffset(200, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundColor3 = Theme.Colors.Panel,
+			BackgroundColor3 = Theme.Colors.Input,
 
-			Create "UICorner" {CornerRadius = UDim.new(0, 6)},
+			Create "UICorner" {CornerRadius = UDim.new(0, 8)},
 			Create "UIStroke" {Color = Theme.Colors.Border},
 			Create "UIPadding" {
 				PaddingLeft = UDim.new(0, 3),

@@ -37,7 +37,7 @@ function Overrides(): string {
 
 function Run(Command: string, Args: string[], Options?: { cwd?: string }): Promise<Outcome> {
   return new Promise<Outcome>((Resolve) => {
-    execFile(Command, Args, { timeout: 30000, maxBuffer: 8 * 1024 * 1024, ...Options }, (Error, Output, Errors) => {
+    execFile(Command, Args, { timeout: 120000, maxBuffer: 8 * 1024 * 1024, ...Options }, (Error, Output, Errors) => {
       const Stopped = Error && (Error.killed || Error.signal || Error.code === "ENOBUFS");
 
       Resolve({

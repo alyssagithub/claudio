@@ -134,7 +134,59 @@ return function()
 		Finish()
 	end
 
-	const function Row(Label: () -> string, Detail: () -> string, Order: number, Number: () -> number)
+	const function Writing(): Instance
+		return Create "TextBox" {
+			Name = "Written",
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = Theme.Colors.Background,
+			TextColor3 = Theme.Colors.Text,
+			PlaceholderText = "Type your own answer here",
+			PlaceholderColor3 = Theme.Colors.DimText,
+			TextSize = Settings.SmallText,
+			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextWrapped = true,
+			ClearTextOnFocus = false,
+			LayoutOrder = 3,
+			Visible = function()
+				return not Shut()
+			end,
+			Text = function()
+				const Held = Current()
+
+				return if Held then Written()[Held.question] or "" else ""
+			end,
+
+			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
+			Create "UIPadding" {
+				PaddingLeft = UDim.new(0, 6),
+				PaddingRight = UDim.new(0, 6),
+				PaddingTop = UDim.new(0, 4),
+				PaddingBottom = UDim.new(0, 4),
+			},
+			Vide.action(function(Box: TextBox)
+				Vide.cleanup(Box:GetPropertyChangedSignal("Text"):Connect(function()
+					const Held = Current()
+
+					if not Held then
+						return
+					end
+
+					const Board = table.clone(Written())
+
+					Board[Held.question] = Box.Text
+					Written(Board)
+
+					if Box.Text:match("%S") and not Chosen()[Other] then
+						Take(Other)
+					end
+				end))
+			end),
+		}
+	end
+
+	const function Row(Label: () -> string, Detail: () -> string, Order: number, Number: () -> number, Extra: Instance?)
 		const Hovered = Vide.source(false)
 
 		return Create "TextButton" {
@@ -170,6 +222,8 @@ return function()
 				end,
 				AutomaticSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
+
+				Extra,
 
 				Create "UIListLayout" {SortOrder = Enum.SortOrder.LayoutOrder},
 				Create "TextLabel" {
@@ -280,7 +334,7 @@ return function()
 		end,
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 6)},
-		Create "UIStroke" {Color = Theme.Colors.Accent},
+		Create "UIStroke" {Color = Theme.Colors.Border},
 		Create "UIPadding" {
 			PaddingLeft = UDim.new(0, 10),
 			PaddingRight = UDim.new(0, 10),
@@ -299,12 +353,7 @@ return function()
 			BackgroundTransparency = 1,
 			LayoutOrder = 1,
 
-			Create "UIListLayout" {
-				FillDirection = Enum.FillDirection.Horizontal,
-				VerticalAlignment = Enum.VerticalAlignment.Top,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, 6),
-			},
+			-- Placed by hand rather than with a row layout, which stops the wrapped question from growing taller.
 			Create "TextLabel" {
 				Name = "Counter",
 				AutomaticSize = Enum.AutomaticSize.XY,
@@ -329,23 +378,41 @@ return function()
 					PaddingBottom = UDim.new(0, 1),
 				},
 			},
-			IconButton {
-				Icon = Config.Icons.Down,
-				LayoutOrder = 4,
-				Size = Settings.SmallText,
-				OnClick = function()
-					Shut(not Shut())
-				end,
-			},
-			IconButton {
-				Icon = Config.Icons.Close,
-				LayoutOrder = 5,
-				Size = Settings.SmallText,
-				OnClick = Dismiss,
+			Create "Frame" {
+				Name = "Buttons",
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.XY,
+				BackgroundTransparency = 1,
+
+				Create "UIListLayout" {
+					FillDirection = Enum.FillDirection.Horizontal,
+					SortOrder = Enum.SortOrder.LayoutOrder,
+					Padding = UDim.new(0, 6),
+				},
+				IconButton {
+					Icon = Config.Icons.Down,
+					LayoutOrder = 1,
+					Size = Settings.SmallText,
+					OnClick = function()
+						Shut(not Shut())
+					end,
+				},
+				IconButton {
+					Icon = Config.Icons.Close,
+					LayoutOrder = 2,
+					Size = Settings.SmallText,
+					OnClick = Dismiss,
+				},
 			},
 			Create "TextLabel" {
 				Name = "Question",
-				Size = UDim2.fromScale(0, 0),
+				Position = function()
+					return UDim2.fromOffset(if #Asked() > 1 then 32 else 0, 0)
+				end,
+				Size = function()
+					return UDim2.new(1, -(if #Asked() > 1 then 32 else 0) - 2 * (Settings.SmallText() + 10), 0, 0)
+				end,
 				AutomaticSize = Enum.AutomaticSize.Y,
 				BackgroundTransparency = 1,
 				TextColor3 = Theme.Colors.Text,
@@ -359,8 +426,6 @@ return function()
 
 					return if Held then Held.question else ""
 				end,
-
-				Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Fill},
 			},
 		},
 		Vide.indexes(function()
@@ -384,56 +449,7 @@ return function()
 			const Held = Current()
 
 			return if Held then #Held.options + 1 else 1
-		end),
-		Create "TextBox" {
-			Name = "Written",
-			Size = UDim2.fromScale(1, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundColor3 = Theme.Colors.Input,
-			TextColor3 = Theme.Colors.Text,
-			PlaceholderText = "Type your own answer here",
-			PlaceholderColor3 = Theme.Colors.DimText,
-			TextSize = Settings.SmallText,
-			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-			TextXAlignment = Enum.TextXAlignment.Left,
-			TextWrapped = true,
-			ClearTextOnFocus = false,
-			LayoutOrder = 91,
-			Visible = function()
-				return not Shut()
-			end,
-			Text = function()
-				const Held = Current()
-
-				return if Held then Written()[Held.question] or "" else ""
-			end,
-
-			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-			Create "UIPadding" {
-				PaddingLeft = UDim.new(0, 6),
-				PaddingRight = UDim.new(0, 6),
-				PaddingTop = UDim.new(0, 4),
-				PaddingBottom = UDim.new(0, 4),
-			},
-			Vide.action(function(Box: TextBox)
-				Vide.cleanup(Box:GetPropertyChangedSignal("Text"):Connect(function()
-					const Held = Current()
-
-					if not Held then
-						return
-					end
-
-					const Board = table.clone(Written())
-
-					Board[Held.question] = Box.Text
-					Written(Board)
-
-					if Box.Text:match("%S") and not Chosen()[Other] then
-						Take(Other)
-					end
-				end))
-			end),
-		},
+		end, Writing()),
 		Create "Frame" {
 			Name = "Choices",
 			Size = UDim2.fromScale(1, 0),
@@ -474,28 +490,26 @@ return function()
 				LayoutOrder = 3,
 				OnClick = Advance,
 			},
-			Button {
-				Text = function()
-					return if Step() < #Asked() then "Next" else "Submit"
-				end,
-				Primary = true,
-				LayoutOrder = 4,
-				Visible = Ready,
-				OnClick = Advance,
-			},
-			Create "TextLabel" {
-				Name = "NotReady",
+			Create "TextButton" {
+				Name = "Next",
 				AutomaticSize = Enum.AutomaticSize.XY,
-				BackgroundColor3 = Theme.Colors.Button,
-				TextColor3 = Theme.Colors.DimText,
+				BackgroundColor3 = function()
+					return if Ready() then Theme.Colors.Text() else Theme.Colors.Button()
+				end,
+				TextColor3 = function()
+					return if Ready() then Theme.Colors.Background() else Theme.Colors.DimText()
+				end,
 				TextSize = Settings.SmallText,
 				FontFace = Font.fromEnum(Enum.Font.BuilderSansMedium),
-				LayoutOrder = 5,
-				Visible = function()
-					return not Ready()
-				end,
+				AutoButtonColor = false,
+				LayoutOrder = 4,
 				Text = function()
 					return if Step() < #Asked() then "Next" else "Submit"
+				end,
+				Activated = function()
+					if Ready() then
+						Advance()
+					end
 				end,
 
 				Create "UICorner" {CornerRadius = UDim.new(0, 4)},

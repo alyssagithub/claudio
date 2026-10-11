@@ -613,8 +613,32 @@ return function(Props: Props)
 						LayoutOrder = 2,
 					},
 				},
+				Create "TextLabel" {
+					Name = "Questions",
+					Size = UDim2.fromScale(1, 0),
+					AutomaticSize = Enum.AutomaticSize.Y,
+					BackgroundTransparency = 1,
+					TextColor3 = Theme.Colors.Text,
+					TextSize = Settings.SmallText,
+					FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+					TextWrapped = true,
+					TextXAlignment = Enum.TextXAlignment.Left,
+					LayoutOrder = 2,
+					Visible = function()
+						return Open() and Config.AskTools[Value().name] == true
+					end,
+					Text = function()
+						const Lines = {}
+
+						for Question in Value().input:gmatch('"question":"(.-)","header"') do
+							table.insert(Lines, (Question:gsub('\\"', '"')))
+						end
+
+						return table.concat(Lines, "\n")
+					end,
+				},
 				Vide.indexes(function()
-					return if Open() and Value().status ~= "preparing" then Fields(Value().input) else {}
+					return if Open() and Value().status ~= "preparing" and not Config.AskTools[Value().name] then Fields(Value().input) else {}
 				end, function(Pair: () -> {Key: string, Value: string}, Order: number)
 					const function IsCode(): boolean
 						return CodeFields[Pair().Key] == true or Pair().Value:find("\n") ~= nil

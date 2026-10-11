@@ -8,6 +8,8 @@ if not plugin then
 	return
 end
 
+require(script.Parent.Origins).Start()
+
 const Builder = require(script.Parent.Runtime.Builder)
 
 if Playing and RunService:IsServer() then

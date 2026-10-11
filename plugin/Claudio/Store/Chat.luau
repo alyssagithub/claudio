@@ -6,6 +6,7 @@ const HttpService = game:GetService("HttpService")
 const Vide = require(script.Parent.Parent.Packages.vide)
 const Types = require(script.Parent.Parent.Types)
 const Gallery = require(script.Parent.Gallery)
+const Origins = require(script.Parent.Parent.Origins)
 const Connection = require(script.Parent.Connection)
 const Error = require(script.Parent.Parent.Client.Error)
 const Format = require(script.Parent.Parent.Format)
@@ -739,7 +740,9 @@ const function Logs(Input: any): any
 			continue
 		end
 
-		table.insert(Kept, `{Kind}: {if #Message > 400 then `{Message:sub(1, 400)} [cut]` else Message}`)
+		const Origin = if Kind == "error" then Origins.Label(Message, Entry.timestamp) else nil
+
+		table.insert(Kept, `{Kind}: {if #Message > 400 then `{Message:sub(1, 400)} [cut]` else Message}{if Origin then ` ({Origin})` else ""}`)
 	end
 
 	const Lines = {}

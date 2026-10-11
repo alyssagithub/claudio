@@ -17,6 +17,28 @@ end
 
 script.Parent = nil
 
+-- Which script raised each error, since the log history keeps only the text. Errors that never reach
+-- ScriptContext.Error came from Studio or an engine call rather than a script.
+const ErrorSources: {[string]: string} = {}
+const ErrorOrder: {string} = {}
+const WatchingSince = os.time()
+
+game:GetService("ScriptContext").Error:Connect(function(Message: string, Stack: string, Source: Instance?)
+	if not ErrorSources[Message] then
+		table.insert(ErrorOrder, Message)
+
+		if #ErrorOrder > 300 then
+			ErrorSources[table.remove(ErrorOrder, 1) :: string] = nil
+		end
+	end
+
+	const First = Stack:match("^%s*([^\n]+)")
+
+	ErrorSources[Message] = if not Source then (if First then `from code with no script, at {First}` else "from code with no script")
+		elseif Source:IsDescendantOf(game) then `from {Source:GetFullName()}`
+		else `from the plugin {Source:GetFullName()}`
+end)
+
 task.spawn(function()
 	while RunService:IsRunning() do
 		ServerScriptService:SetAttribute("ClaudioRuntimeBeat", os.clock())
@@ -352,7 +374,12 @@ task.spawn(function()
 							continue
 						end
 
-						table.insert(Kept, `{Kind}: {if #Message > 400 then `{Message:sub(1, 400)} [cut]` else Message}`)
+						const Origin = if Kind ~= "error" then nil
+							elseif ErrorSources[Message] then ErrorSources[Message]
+							elseif Entry.timestamp <= WatchingSince then "source unknown, it was logged before Claudio started watching"
+							else "not raised by any script, so it came from Studio or an engine call, often a plugin's, not game code"
+
+						table.insert(Kept, `{Kind}: {if #Message > 400 then `{Message:sub(1, 400)} [cut]` else Message}{if Origin then ` ({Origin})` else ""}`)
 					end
 
 					const Lines = {}

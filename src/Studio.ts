@@ -19,7 +19,7 @@ export type Owner = { Id: string; Name: () => string };
 const Users = new Map<string, { Name: () => string; At: number }>();
 const Boots = new Set<string>();
 let ReloadedAt = 0;
-const Playtest = { By: "", Since: 0, Live: false };
+const Playtest = { By: "", Since: 0, Live: false, Players: 0, Most: 0 };
 
 function Ago(At: number): string {
   const Seconds = Math.max(1, Math.round((Date.now() - At) / 1000));
@@ -55,6 +55,13 @@ function Notice(Kind: string, Input: unknown, Who?: Owner): string | null {
     }
   }
 
+  // A multiplayer test can lose a client window without anything saying so; compare against what was asked for.
+  if (Playtest.Players > 0 && RuntimeLive() && Date.now() - Playtest.Since > 45000 && typeof Clients === "number" && Clients < Playtest.Players) {
+    Notes.push(Playtest.Most > Clients
+      ? `Only ${Clients} of the ${Playtest.Players} players asked for are still in the test: a client window closed or crashed since. Results that need every player may be missing some.`
+      : `Only ${Clients} of the ${Playtest.Players} players asked for joined the test: a client window failed to load. Results that need every player may be missing some.`);
+  }
+
   if (ReloadedAt > 0 && Date.now() - ReloadedAt < 180000) {
     Notes.push(`Claudio's plugin reloaded ${Ago(ReloadedAt)}, which ends any playtest that was running then.`);
   }
@@ -72,9 +79,13 @@ function Track(Kind: string, Input: unknown, Who?: Owner) {
   const Action = Input && typeof Input === "object" ? (Input as { action?: unknown }).action : undefined;
 
   if (Kind === "playtest" && Action === "start") {
+    const Asked = Input && typeof Input === "object" ? Input as { mode?: unknown; players?: unknown } : {};
+
     Playtest.By = Who.Id;
     Playtest.Since = Date.now();
     Playtest.Live = false;
+    Playtest.Players = Asked.mode === "multiplayer" ? Math.max(1, Number(Asked.players) || 1) : 0;
+    Playtest.Most = 0;
   } else if (Kind === "playtest" && Action === "stop") {
     Playtest.By = "";
   }
@@ -176,6 +187,10 @@ export function Seen(Role?: string | null, Able?: boolean, Attached?: number, Pl
 
   if (Role === "server" && Playtest.By !== "") {
     Playtest.Live = true;
+  }
+
+  if (Role === "server" && typeof Attached === "number") {
+    Playtest.Most = Math.max(Playtest.Most, Attached);
   }
 
   if (Able !== undefined) {

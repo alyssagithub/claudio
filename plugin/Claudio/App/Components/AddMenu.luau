@@ -3,7 +3,6 @@ const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Config = require(script.Parent.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Parent.Settings)
 const Context = require(script.Parent.Parent.Parent.Store.Context)
-const Chat = require(script.Parent.Parent.Parent.Store.Chat)
 const Covers = require(script.Parent.Parent.Covers)
 const Theme = require(script.Parent.Parent.Theme)
 const Icon = require(script.Parent.Icon)
@@ -15,7 +14,7 @@ const function Row(IconName: string, Label: string, LayoutOrder: number, Add: ()
 
 	return Create "TextButton" {
 		Name = "Option",
-		Size = UDim2.new(1, 0, 0, 24),
+		Size = UDim2.new(1, 0, 0, 21),
 		BackgroundColor3 = Theme.Colors.Button,
 		BackgroundTransparency = function()
 			return if Hovered() then 0.2 else 1
@@ -38,14 +37,14 @@ const function Row(IconName: string, Label: string, LayoutOrder: number, Add: ()
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
 		Create "UIPadding" {
-			PaddingLeft = UDim.new(0, 8),
-			PaddingRight = UDim.new(0, 8),
+			PaddingLeft = UDim.new(0, 6),
+			PaddingRight = UDim.new(0, 6),
 		},
 		Create "UIListLayout" {
 			FillDirection = Enum.FillDirection.Horizontal,
 			VerticalAlignment = Enum.VerticalAlignment.Center,
 			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 8),
+			Padding = UDim.new(0, 6),
 		},
 		Icon {
 			Name = IconName,
@@ -75,15 +74,21 @@ return function(Open: (boolean?) -> boolean, Insert: (string) -> ())
 	return Create "Frame" {
 		Name = "AddMenu",
 		Vide.action(Covers.Add),
+		-- Takes no room in the input bar, so the menu floats over the message box above the add button.
 		Size = UDim2.fromScale(1, 0),
-		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		LayoutOrder = 1,
+		LayoutOrder = 4,
+		ZIndex = 20,
 		Visible = Open,
 
 		Create "Frame" {
 			Name = "Options",
-			Size = UDim2.fromOffset(200, 0),
+			AnchorPoint = Vector2.new(0, 1),
+			Position = function()
+				return UDim2.fromOffset(0, -(Settings.TextSize() + 18))
+			end,
+			ZIndex = 20,
+			Size = UDim2.fromOffset(165, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundColor3 = Theme.Colors.Input,
 
@@ -98,17 +103,12 @@ return function(Open: (boolean?) -> boolean, Insert: (string) -> ())
 			Create "UIListLayout" {
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				HorizontalFlex = Enum.UIFlexAlignment.Fill,
-				Padding = UDim.new(0, 2),
+				Padding = UDim.new(0, 0),
 			},
 			Row(Config.Icons.File, "Add files or photos", 1, Context.ImportFiles, Insert, Close),
 			Row(Config.Icons.Script, "Add editor script", 2, Context.AddOpenScript, Insert, Close),
 			Row(Config.Icons.Selection, "Add selected objects", 3, Context.AddSelection, Insert, Close),
 			Row(Config.Icons.Output, "Add output", 4, Context.AddOutput, Insert, Close),
-			Row(Config.Icons.Command, "Slash commands", 5, function(): string?
-				Chat.Draft("/")
-
-				return nil
-			end, Insert, Close),
 		},
 	}
 end

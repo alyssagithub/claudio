@@ -35,6 +35,21 @@ type Change = {Object: Instance, Property: string, Value: any}
 
 -- Meshes and textures load on their own time, and a picture taken before they arrive shows the object
 -- without them, so wait for them first, but never more than ten seconds.
+-- Waits for the signal to fire, or for the given seconds to pass, whichever comes first.
+const function Within(Signal: RBXScriptSignal, Seconds: number)
+	local Fired = false
+	const Connection = Signal:Once(function()
+		Fired = true
+	end)
+	const Deadline = os.clock() + Seconds
+
+	while not Fired and os.clock() < Deadline do
+		task.wait()
+	end
+
+	Connection:Disconnect()
+end
+
 const function Preload(Target: Instance)
 	local Done = false
 
@@ -54,10 +69,11 @@ const function Preload(Target: Instance)
 end
 
 const function Settle()
-	RunService.PreRender:Wait()
-	RunService.Heartbeat:Wait()
-	RunService.PreRender:Wait()
-	RunService.Heartbeat:Wait()
+	-- Frames are only drawn while the editor's viewport is on screen, so never wait for one without a limit.
+	for _ = 1, 2 do
+		Within(RunService.PreRender, 2)
+		Within(RunService.Heartbeat, 2)
+	end
 end
 
 const function Screenshot(): (EditableImage?, string?)
@@ -211,7 +227,15 @@ const function Draw(Input: any, Object: Instance, Name: string): any
 		end
 	end
 
+	local Restored = false
+
 	const function Restore()
+		if Restored then
+			return
+		end
+
+		Restored = true
+
 		for Index = #Changes, 1, -1 do
 			const Change = Changes[Index]
 
@@ -240,6 +264,10 @@ const function Draw(Input: any, Object: Instance, Name: string): any
 
 		Selection:Set(Chosen)
 	end
+
+	-- If the render hangs past the bridge's limit, put the camera and everything else back anyway, so the
+	-- editor is never left with a camera the user cannot move.
+	task.delay(100, Restore)
 
 	const Ok, Result = pcall(function(): any
 		Selection:Set({})

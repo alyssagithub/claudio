@@ -27,6 +27,14 @@ function Pictures.Available(): boolean
 		return Allowed :: boolean
 	end
 
+	-- A playtest refuses EditableImage unless the place allows it, and even a guarded test prints an
+	-- unattributed error into the game's output, so the panel never draws pictures in a play session.
+	if not game:GetService("RunService"):IsEdit() then
+		Allowed = false
+
+		return false
+	end
+
 	const Plugin = Settings.Plugin()
 	const Key = `Claudio_EditableImage_{game.PlaceId}`
 	const Remembered = if Plugin then Plugin:GetSetting(Key) else nil

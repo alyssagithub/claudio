@@ -46,9 +46,9 @@ const PlaytestDescription = [
   "stop closes the test's own Studio windows from outside when the session does not answer, so a hung multiplayer test can always be stopped; the editor is never touched.",
 ].join(" ");
 
-function StudioMemory(): Promise<{Editor: number, Test: number, Room: number}> {
+function StudioMemory(): Promise<{Editor: number, Test: number, Room: number, Ram: number}> {
   const [Program, Arguments, Scale] = process.platform === "win32"
-    ? ["powershell", ["-NoProfile", "-Command", "\"$((Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Sort-Object PrivateMemorySize64 -Descending | ForEach-Object { $_.PrivateMemorySize64 }) -join ',') $((Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory * 1024)\""], 1]
+    ? ["powershell", ["-NoProfile", "-Command", "\"$((Get-Process RobloxStudioBeta -ErrorAction SilentlyContinue | Sort-Object PrivateMemorySize64 -Descending | ForEach-Object { $_.PrivateMemorySize64 }) -join ',') $((Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory * 1024) $((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory * 1024)\""], 1]
     : ["sh", ["-c", "echo $(ps -axo rss,comm | grep -i RobloxStudio | sort -rn | awk '{print $1}' | paste -sd, -) 0"], 1024];
 
   return new Promise((Resolve) => {
@@ -57,41 +57,48 @@ function StudioMemory(): Promise<{Editor: number, Test: number, Room: number}> {
       timeout: 8000,
       windowsHide: true,
     }, (Trouble, Said) => {
-      const [Sizes, Room] = String(Said || "").trim().split(/\s+/);
+      const [Sizes, Room, Ram] = String(Said || "").trim().split(/\s+/);
       const Each = String(Sizes || "").split(",").map(Number).filter((Size) => Size > 0).map((Size) => Size * (Scale as number));
 
       Resolve({
         Editor: Trouble ? 0 : Each[0] || 0,
         Test: Trouble ? 0 : Math.max(0, ...Each.slice(1)),
         Room: Trouble || !Number(Room) ? os.freemem() : Number(Room),
+        Ram: Trouble || !Number(Ram) ? os.freemem() : Number(Ram),
       });
     });
   });
 }
 
-async function Headroom(Clients: number, Starting: boolean): Promise<string | null> {
+// Each test window is estimated from a running test process, or else as three quarters of the editor,
+// which matches what test windows have used in practice; the old quarter of the editor was far too low.
+// Room counts the page file, so a test can be allowed and still run mostly from disk; that gets a warning.
+async function Headroom(Clients: number, Starting: boolean): Promise<{ Refused: string | null; Warning: string | null }> {
   const Gigabyte = 1024 * 1024 * 1024;
   const Processes = Clients + (Starting ? 1 : 0);
   const Gigabytes = (Bytes: number) => (Bytes / Gigabyte).toFixed(1);
   const Began = Date.now();
   let Measured = await StudioMemory();
-  let Each = Math.max(1.2 * Gigabyte, Measured.Test || Measured.Editor * 0.25);
+  let Each = Math.max(1.5 * Gigabyte, Measured.Test || Measured.Editor * 0.75);
   let Needed = Processes * Each + 0.5 * Gigabyte;
   let Most = Measured.Room;
 
   while (Measured.Room < Needed && Date.now() - Began < 20000) {
     await new Promise((Resolve) => setTimeout(Resolve, 2000));
     Measured = await StudioMemory();
-    Each = Math.max(1.2 * Gigabyte, Measured.Test || Measured.Editor * 0.25);
+    Each = Math.max(1.5 * Gigabyte, Measured.Test || Measured.Editor * 0.75);
     Needed = Processes * Each + 0.5 * Gigabyte;
     Most = Math.max(Most, Measured.Room);
   }
 
   if (Measured.Room >= Needed) {
-    return null;
+    return {
+      Refused: null,
+      Warning: Measured.Ram < Needed ? `This test needs about ${Gigabytes(Needed)} GB but only ${Gigabytes(Measured.Ram)} GB of RAM is free, so most of it runs from the page file on disk and will be slow. Closing other apps first would help.` : null,
+    };
   }
 
-  return `Not starting that: ${Starting ? "a server and " : ""}${Clients} client${Clients === 1 ? "" : "s"} are ${Processes} Studio processes of about ${Gigabytes(Each)} GB each, plus room to spare, so about ${Gigabytes(Needed)} GB, and over 20 seconds of watching this machine had at most ${Gigabytes(Most)} GB free even counting the page file. Running out crashes the whole machine, not just Studio. Use fewer players, or pass force only if the user asks for it.`;
+  return {Warning: null, Refused: `Not starting that: ${Starting ? "a server and " : ""}${Clients} client${Clients === 1 ? "" : "s"} are ${Processes} Studio processes of about ${Gigabytes(Each)} GB each, plus room to spare, so about ${Gigabytes(Needed)} GB, and over 20 seconds of watching this machine had at most ${Gigabytes(Most)} GB free even counting the page file. Running out crashes the whole machine, not just Studio. Use fewer players, or pass force only if the user asks for it.`};
 }
 
 let QualityChanged = false;
@@ -976,7 +983,12 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         }
         const Reachable = await LiveSession();
         const Adding = Input.action === "players" ? Math.max(1, Math.floor(Input.players || 1)) : (Input.action === "start" && Input.mode === "multiplayer" ? Math.max(2, Math.floor(Input.players || 2)) : 0);
-        const Refused = Adding > 0 && Input.force !== true ? await Headroom(Adding, Input.action === "start") : null;
+        const Checked = Adding > 0 && Input.force !== true ? await Headroom(Adding, Input.action === "start") : null;
+        const Refused = Checked ? Checked.Refused : null;
+
+        if (Checked && Checked.Warning) {
+          Notices.add(Checked.Warning);
+        }
 
         if (Refused) {
           return {content: [{

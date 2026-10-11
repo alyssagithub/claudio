@@ -53,6 +53,7 @@ return {
 		Script = "square-code",
 		Instance = "cube-vertexes",
 		File = "file-box",
+		Command = "square-slash",
 		Right = "chevron-small-right",
 		Limit = "speedometer",
 		Warning = "triangle-exclamation",

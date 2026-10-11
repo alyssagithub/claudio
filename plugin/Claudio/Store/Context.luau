@@ -294,22 +294,6 @@ function Context.ImportFiles(): string?
 	return if #Tokens > 0 then table.concat(Tokens, " ") else nil
 end
 
-function Context.ImportImage(): string?
-	const Ok, File = pcall(StudioService.PromptImportFile, StudioService, {
-		"png",
-		"jpg",
-		"jpeg",
-	} :: {any})
-
-	if not Ok or not File then
-		return nil
-	end
-
-	const Name = (File :: File).Name
-
-	return Context.AddImage(Name, Base64.Encode((File :: File):GetBinaryContents()), if Name:lower():match("%.png$") then "image/png" else "image/jpeg")
-end
-
 function Context.Remove(Token: string)
 	const Chips = {}
 

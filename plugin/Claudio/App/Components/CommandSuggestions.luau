@@ -32,27 +32,17 @@ const function Matches(): {Types.Command}
 end
 
 const function Row(Command: () -> Types.Command, Index: number)
-	const Hovered = Vide.source(false)
-
 	return Create "TextButton" {
 		Name = "Suggestion",
 		Size = UDim2.fromScale(1, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundColor3 = Theme.Colors.Button,
-		TextColor3 = Theme.Colors.ButtonText,
-		TextSize = Settings.TextSize,
-		FontFace = Font.fromEnum(Enum.Font.Code),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextWrapped = true,
+		Text = "",
 		AutoButtonColor = true,
 		LayoutOrder = Index,
-		Text = function()
-			return `/{Command().name}`
-		end,
 		Activated = function()
 			Chat.Draft(`/{Command().name} `)
 		end,
-		Vide.action(Covers.Hover(Hovered)),
 
 		Create "UICorner" {CornerRadius = UDim.new(0, 4)},
 		Create "UIPadding" {
@@ -61,39 +51,39 @@ const function Row(Command: () -> Types.Command, Index: number)
 			PaddingTop = UDim.new(0, 4),
 			PaddingBottom = UDim.new(0, 4),
 		},
+		Create "UIListLayout" {SortOrder = Enum.SortOrder.LayoutOrder},
 		Create "TextLabel" {
-			Name = "Tooltip",
-			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.new(1, 0, 0.5, 0),
-			AutomaticSize = Enum.AutomaticSize.XY,
-			BackgroundColor3 = Theme.Colors.Background,
-			BackgroundTransparency = 0,
-			TextColor3 = Theme.Colors.Text,
+			Name = "Name",
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			TextColor3 = Theme.Colors.ButtonText,
+			TextSize = Settings.TextSize,
+			FontFace = Font.fromEnum(Enum.Font.Code),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextWrapped = true,
+			LayoutOrder = 1,
+			Text = function()
+				return `/{Command().name}`
+			end,
+		},
+		Create "TextLabel" {
+			Name = "Detail",
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1,
+			TextColor3 = Theme.Colors.DimText,
 			TextSize = Settings.SmallText,
 			FontFace = Font.fromEnum(Enum.Font.BuilderSans),
-			TextWrapped = true,
 			TextXAlignment = Enum.TextXAlignment.Left,
-			ZIndex = 50,
+			TextWrapped = true,
+			LayoutOrder = 2,
 			Visible = function()
-				return Hovered() and Command().description ~= ""
+				return Command().description ~= ""
 			end,
 			Text = function()
 				return Command().description
 			end,
-
-			Create "UISizeConstraint" {MaxSize = Vector2.new(220, math.huge)},
-			Create "UICorner" {CornerRadius = UDim.new(0, 4)},
-			Create "UIStroke" {
-				Color = Theme.Colors.DimText,
-				Transparency = 0.6,
-				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			},
-			Create "UIPadding" {
-				PaddingLeft = UDim.new(0, 6),
-				PaddingRight = UDim.new(0, 6),
-				PaddingTop = UDim.new(0, 3),
-				PaddingBottom = UDim.new(0, 3),
-			},
 		},
 	}
 end

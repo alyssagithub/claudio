@@ -308,17 +308,18 @@ const function Pick(Model: () -> Types.ModelInfo, LayoutOrder: number, Inside: b
 	end)
 end
 
--- The right edge of each popup's button, in screen pixels, so the popup opens above its own button.
+-- The top right corner of each popup's button, in screen pixels, so the popup opens just above its own
+-- button and over the message box, as the Claude desktop app's do.
 const Edges = {
-	ModelMenu = Vide.source(0),
-	EffortMenu = Vide.source(0),
-	ModeMenu = Vide.source(0),
+	ModelMenu = Vide.source(Vector2.zero),
+	EffortMenu = Vide.source(Vector2.zero),
+	ModeMenu = Vide.source(Vector2.zero),
 }
 
 const function TrackEdge(Popup: string)
 	return Vide.action(function(Button: GuiObject)
 		const function Measure()
-			Edges[Popup](Button.AbsolutePosition.X + Button.AbsoluteSize.X)
+			Edges[Popup](Vector2.new(Button.AbsolutePosition.X + Button.AbsoluteSize.X, Button.AbsolutePosition.Y))
 		end
 
 		Measure()
@@ -327,32 +328,38 @@ const function TrackEdge(Popup: string)
 	end)
 end
 
-const function EdgeFor(Popup: string, Width: number, Left: number): number
-	return math.max(8 + Width, Edges[Popup]() - Left)
+const function Above(Popup: string, Width: number, Origin: Vector2, Gap: number): UDim2
+	const Corner = Edges[Popup]()
+
+	return UDim2.fromOffset(math.max(8 + Width, Corner.X - Origin.X), Corner.Y - Origin.Y - Gap)
+end
+
+const function TrackOrigin(Origin: (Vector2) -> ())
+	return Vide.action(function(Popup: GuiObject)
+		const function Measure()
+			const Parent = Popup.Parent
+
+			Origin(if Parent and Parent:IsA("GuiObject") then Parent.AbsolutePosition else Vector2.zero)
+		end
+
+		Measure()
+		Vide.cleanup(Popup:GetPropertyChangedSignal("AbsolutePosition"):Connect(Measure))
+	end)
 end
 
 const function CreatePopup(Name: string, Width: number, Visible: () -> boolean, Across: number, Down: number, Children: {any})
-	const Left = Vide.source(0)
+	const Origin = Vide.source(Vector2.zero)
 	const Properties: {any} = {
 		Name = Name,
 		Vide.action(Covers.Add),
-		Vide.action(function(Popup: Frame)
-			const function Measure()
-				const Parent = Popup.Parent
-
-				Left(if Parent and Parent:IsA("GuiObject") then Parent.AbsolutePosition.X else 0)
-			end
-
-			Measure()
-			Vide.cleanup(Popup:GetPropertyChangedSignal("AbsolutePosition"):Connect(Measure))
-		end),
+		TrackOrigin(Origin),
 		Size = function()
 			return UDim2.fromOffset(ScaleWidth(Width), 0)
 		end,
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(1, 1),
 		Position = function()
-			return UDim2.new(0, EdgeFor(Name, ScaleWidth(Width), Left()), 1, -ModelPicker.BarHeight() - 6)
+			return Above(Name, ScaleWidth(Width), Origin(), 6)
 		end,
 		ZIndex = 40,
 		BackgroundColor3 = Theme.Colors.Input,
@@ -800,8 +807,11 @@ function ModelPicker.EffortButton()
 end
 
 function ModelPicker.EffortHelp()
+	const BubbleOrigin = Vide.source(Vector2.zero)
+
 	return Create "Frame" {
 		Name = "Bubble",
+		TrackOrigin(BubbleOrigin),
 		Vide.action(Covers.Add),
 		Size = function()
 			return UDim2.fromOffset(ScaleWidth(168), 0)
@@ -809,7 +819,7 @@ function ModelPicker.EffortHelp()
 		AutomaticSize = Enum.AutomaticSize.Y,
 		AnchorPoint = Vector2.new(1, 1),
 		Position = function()
-			return UDim2.new(0, EdgeFor("EffortMenu", ScaleWidth(168), 0), 1, -ModelPicker.BarHeight() - 12 - MenuHeight())
+			return Above("EffortMenu", ScaleWidth(168), BubbleOrigin(), 12 + MenuHeight())
 		end,
 		BackgroundColor3 = Theme.Colors.Panel,
 		ZIndex = 200,

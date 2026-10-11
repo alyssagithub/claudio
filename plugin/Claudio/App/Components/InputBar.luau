@@ -29,6 +29,7 @@ return function()
 	local Marker = ""
 
 	const AddOpen = Vide.source(false)
+	const AddSize = Vide.source(Vector2.new(20, 20))
 	const Wide = Vide.source(0)
 	const Tall = Vide.source(Line)
 
@@ -462,7 +463,6 @@ return function()
 		CommandSuggestions(),
 		MentionSuggestions(),
 		Attachments(Remove),
-		AddMenu(AddOpen, Insert),
 		Vide.action(function(Object: Frame)
 			const function Measure()
 				ModelPicker.BarHeight(Object.AbsoluteSize.Y)
@@ -508,15 +508,35 @@ return function()
 				Padding = UDim.new(0, 8),
 				Wraps = true,
 			},
-			IconButton {
-				Icon = Config.Icons.Add,
-				LayoutOrder = 0,
-				OnClick = function()
-					Chat.PickerOpen(false)
-					Chat.EffortOpen(false)
-					Chat.ModeOpen(false)
-					AddOpen(not AddOpen())
+			Create "Frame" {
+				Name = "Adding",
+				Size = function()
+					return UDim2.fromOffset(AddSize().X, AddSize().Y)
 				end,
+				BackgroundTransparency = 1,
+				LayoutOrder = 0,
+				-- Sized to the button alone, so the floating menu inside does not stretch the row.
+				Vide.action(function(Holder: Frame)
+					const Plus = Holder:FindFirstChildWhichIsA("GuiButton")
+
+					if Plus then
+						AddSize(Plus.AbsoluteSize)
+						Vide.cleanup(Plus:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+							AddSize(Plus.AbsoluteSize)
+						end))
+					end
+				end),
+
+				IconButton {
+					Icon = Config.Icons.Add,
+					OnClick = function()
+						Chat.PickerOpen(false)
+						Chat.EffortOpen(false)
+						Chat.ModeOpen(false)
+						AddOpen(not AddOpen())
+					end,
+				},
+				AddMenu(AddOpen, Insert),
 			},
 			ModelPicker.ModeButton(),
 			ModelPicker.Button(),

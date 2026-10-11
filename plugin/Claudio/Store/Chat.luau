@@ -1427,9 +1427,10 @@ const function Rbxm(Input: any): any
 	const EncodingService = game:GetService("EncodingService")
 
 	if Input.base64 then
-		const Parent = Resolve(Input.path)
+		-- Comparing needs no destination, so only loading insists on one.
+		const Parent = if typeof(Input.path) == "string" and Input.path ~= "" then Resolve(Input.path) else nil
 
-		if not Parent then
+		if not Parent and Input.compare ~= true then
 			return {error = `Nothing at "{tostring(Input.path)}" to put it under.`}
 		end
 
@@ -1527,8 +1528,10 @@ const function Rbxm(Input: any): any
 				end
 			end
 
+			-- Some services read from a place file have locked children and refuse to be destroyed; they are
+			-- outside the place and go away on their own.
 			for _, Object in Made do
-				Object:Destroy()
+				pcall(Object.Destroy, Object)
 			end
 
 			const function Listed(Title: string, Lines: {string}): string
@@ -1544,16 +1547,19 @@ const function Rbxm(Input: any): any
 		const Wanted = if typeof(Input.services) == "table" and #Input.services > 0 then Input.services else nil
 
 		for _, Object in Made do
-			const Found, Service = pcall(game.FindService, game, Object.ClassName)
-
-			if not (Found and Service) then
-				Object.Parent = Parent
-				table.insert(Names, Object.Name)
-
+			-- Filter first: a place file is all services, and some, such as DataStoreService, do not exist in
+			-- the editor yet, so FindService misses them and moving them fails.
+			if Wanted and not table.find(Wanted, Object.Name) then
 				continue
 			end
 
-			if Wanted and not table.find(Wanted, Object.Name) then
+			const Found, Service = pcall(game.FindService, game, Object.ClassName)
+
+			if not (Found and Service) and pcall(function()
+				Object.Parent = Parent
+			end) then
+				table.insert(Names, Object.Name)
+
 				continue
 			end
 
@@ -1583,7 +1589,7 @@ const function Rbxm(Input: any): any
 			end
 		end
 
-		return {text = `Put {#Names} under {Parent:GetFullName()}: {table.concat(Names, ", ")}{if #Skipped > 0 then `. Left out {#Skipped} that cannot be moved: {table.concat(Skipped, ", ", 1, math.min(#Skipped, 10))}` else ""}{if #Missing > 0 then `. Not in what Studio read from the file: {table.concat(Missing, ", ")}. Studio leaves Workspace out when it reads a place file, so Workspace cannot be loaded this way.` else ""}`}
+		return {text = `Put {#Names} under {(Parent :: Instance):GetFullName()}: {table.concat(Names, ", ")}{if #Skipped > 0 then `. Left out {#Skipped} that cannot be moved: {table.concat(Skipped, ", ", 1, math.min(#Skipped, 10))}` else ""}{if #Missing > 0 then `. Not in what Studio read from the file: {table.concat(Missing, ", ")}. Studio leaves Workspace out when it reads a place file, so Workspace cannot be loaded this way.` else ""}`}
 	end
 
 	const Wanted = {}

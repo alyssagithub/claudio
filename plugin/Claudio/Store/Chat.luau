@@ -2785,6 +2785,12 @@ const function RunStudioJob(Job: any)
 				return Logs(Job.input)
 			end
 
+			if Job.kind == "video" then
+				const Video = require(script.Parent.Parent.Video)
+
+				return if Job.input and Job.input.action == "stop" then Video.Stop() else Video.Start()
+			end
+
 			if Job.kind == "lint" then
 				return LintPlace(if Job.input then Job.input.paths else nil, Job.input and Job.input.exact == true)
 			end

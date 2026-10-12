@@ -1337,6 +1337,103 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
       },
     },
     {
+      Name: "record",
+      Description: "Record what the game shows for a few seconds and get the frames back as one grid image, for checking animations, effects, tweens and anything else that moves. In a playtest it records the first player's screen, otherwise the editor's viewport, which must be visible. Give code to start the motion at the moment recording begins, such as loading and playing an animation on a rig; it runs where the recording happens, the client in a playtest. The clip is kept, so pass its path as clip with from and to to look closer at part of it without recording again. Frames are about 24 per second apart at most, so the very fastest movements can fall between them.",
+      Schema: {
+        seconds: z.number().optional().describe("How long to record, 2 by default, 10 at most."),
+        frames: z.number().optional().describe("How many frames to show, 12 by default, 24 at most, spread evenly over the clip or the from to range."),
+        code: z.string().optional().describe("Luau to run as soon as recording starts, to set off the motion. Runs on the client in a playtest, in the editor otherwise."),
+        player: z.string().optional().describe("In a playtest, whose screen to record: a player's name or their number in join order. The first player by default."),
+        clip: z.string().optional().describe("Path of an earlier recording to take frames from instead of recording again."),
+        from: z.number().optional().describe("Seconds into the clip to start the frames at. 0 by default."),
+        to: z.number().optional().describe("Seconds into the clip to end the frames at. The end of the clip by default."),
+      },
+      Run: async (Input: { seconds?: number; frames?: number; code?: string; player?: string; clip?: string; from?: number; to?: number }) => {
+        const { KeepClip, PullFrames, ClipLength, Sheet } = await import("./Record.js");
+        const Say = (Text: string) => ({content: [{type: "text" as const, text: Text}]});
+        const Count = Math.min(Math.max(Math.round(Input.frames || 12), 2), 24);
+        const Notes: string[] = [];
+        let Clip = Input.clip;
+        let Where = "an earlier recording";
+
+        if (process.platform !== "win32") {
+          return Say("Recording only works on Windows for now, because the frames are read with Windows' own video decoder.");
+        }
+
+        if (Clip && !fs.existsSync(Clip)) {
+          return Say(`No recording at ${Clip}. Recordings live in the user's .claudio/recordings folder, and only the twenty newest are kept.`);
+        }
+
+        if (!Clip) {
+          const Playing = await LiveSession();
+          const Seconds = Math.min(Math.max(Input.seconds || 2, 0.5), 10);
+          const Began = Date.now();
+          const Video = (Action: string) => (Playing ? ReachIn("server", "video", {action: Action, player: Input.player}, 40) : Reach("video", {action: Action}, 40)) as Promise<{ error?: string } | null>;
+
+          Where = Playing ? "player's screen" : "editor's viewport";
+
+          const Started = await Video("start");
+
+          if (!Started || Started.error) {
+            return Say(Started ? Started.error as string : "Studio did not answer the request to start recording.");
+          }
+
+          const Execute = Tools.find((Tool) => Tool.Name === "execute");
+          const Trigger = Input.code && Execute ? Execute.Run({code: Input.code, target: Playing ? "client" : "edit", player: Input.player, undoName: "Claudio started a recording", timeout: Seconds + 20}) : null;
+
+          await new Promise((Resolve) => setTimeout(Resolve, Seconds * 1000));
+
+          const Stopped = await Video("stop");
+          const Triggered = Trigger ? await Promise.race([Trigger, new Promise<null>((Resolve) => setTimeout(() => Resolve(null), 5000))]) : null;
+
+          if (Trigger) {
+            const Said = Triggered ? Triggered.content.filter((Part) => Part.type === "text").map((Part) => (Part as { text: string }).text).join(" ").trim() : "";
+
+            Notes.push(Triggered ? `The code said: ${Said.slice(0, 600) || "nothing"}` : "The code was still running when recording stopped.");
+          }
+
+          if (!Stopped || Stopped.error) {
+            return Say(`${Stopped ? Stopped.error : "Studio did not answer the request to stop recording."}${Notes.length > 0 ? ` ${Notes.join(" ")}` : ""}`);
+          }
+
+          Clip = KeepClip(Began) || undefined;
+
+          if (!Clip) {
+            return Say("Studio said it saved the recording, but no new clip appeared in its capture folder.");
+          }
+        }
+
+        let Length: number;
+
+        try {
+          Length = await ClipLength(Clip);
+        } catch (Trouble) {
+          return Say(`Windows could not read the recording at ${Clip}: ${(Trouble as Error).message}`);
+        }
+
+        const From = Math.min(Math.max(Input.from || 0, 0), Length);
+        const To = Math.min(Math.max(Input.to ?? Length, From), Length);
+        const Times = Array.from({length: Count}, (_, Index) => From + (To - From) * Index / (Count - 1));
+        const Found = await PullFrames(Clip, Times).catch((Trouble: Error) => Trouble);
+
+        if (Found instanceof Error || Found.Files.length === 0) {
+          return Say(`Windows could not take frames from ${Clip}${Found instanceof Error ? `: ${Found.message}` : "."}`);
+        }
+
+        const Picture = Sheet(Found.Files);
+        const Text = [
+          `Recorded ${Length.toFixed(2)}s of the ${Where}, kept at ${Clip}.`,
+          `${Found.Files.length} frames, read left to right then top to bottom, at ${Times.slice(0, Found.Files.length).map((At) => `${At.toFixed(2)}s`).join(", ")}.`,
+          ...Notes,
+        ].join(" ");
+
+        return {content: [
+          {type: "image" as const, data: Picture.toString("base64"), mimeType: "image/png"},
+          {type: "text" as const, text: Text},
+        ]};
+      },
+    },
+    {
       Name: "lint",
       Description: LintDescription,
       Schema: {

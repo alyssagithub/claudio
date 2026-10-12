@@ -554,10 +554,63 @@ const function Run(Code: string, Within: string?, Current: string?): any
 	return Finish(Answer)
 end
 
+-- The record tool's video capture, kept here because this script cannot reach the plugin's own modules.
+local Recording: {Done: boolean, Result: string?}? = nil
+
+const function Record(Action: string): any
+	const CaptureService = game:GetService("CaptureService")
+
+	if Action ~= "stop" then
+		const State = {Done = false, Result = nil :: string?}
+		const Ok, Started = pcall(function(): any
+			return CaptureService:StartVideoCaptureAsync(function(Result: any)
+				State.Result = tostring(Result)
+				State.Done = true
+			end, {})
+		end)
+
+		if not Ok or Started ~= Enum.VideoCaptureStartedResult.Success then
+			return {error = `Studio would not start recording: {tostring(Started)}`}
+		end
+
+		Recording = State
+
+		return {text = "Recording."}
+	end
+
+	const State = Recording
+
+	if not State then
+		return {error = "Nothing is being recorded."}
+	end
+
+	pcall(function()
+		CaptureService:StopVideoCapture()
+	end)
+
+	const Deadline = os.clock() + 15
+
+	while not State.Done and os.clock() < Deadline do
+		task.wait(0.1)
+	end
+
+	Recording = nil
+
+	if State.Result ~= tostring(Enum.VideoCaptureResult.Success) then
+		return {error = `Studio could not save the recording: {tostring(State.Result)}`}
+	end
+
+	return {text = "Saved."}
+end
+
 Remote.OnClientEvent:Connect(function(Id: string, Kind: string, Body: string)
 	const Ok, Result = pcall(function(): any
 		if Kind == "input" then
 			return Interact(Body)
+		end
+
+		if Kind == "video" then
+			return Record(Body)
 		end
 
 		if Kind == "quality" then

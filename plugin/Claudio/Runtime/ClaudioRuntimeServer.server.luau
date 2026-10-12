@@ -457,11 +457,11 @@ task.spawn(function()
 					return {text = `{string.format("%.1f", Stats:GetTotalMemoryUsageMb())}MB total, in MB: {table.concat(Lines, ", ")}`}
 				end
 
-				if Job.kind ~= "execute" and Job.kind ~= "input" and Job.kind ~= "quality" then
+				if Job.kind ~= "execute" and Job.kind ~= "input" and Job.kind ~= "quality" and Job.kind ~= "video" then
 					return {error = `Claudio does not handle "{tostring(Job.kind)}" in a playtest.`}
 				end
 
-				if Job.kind == "input" or Job.kind == "quality" or Job.input.target == "client" then
+				if Job.kind == "input" or Job.kind == "quality" or Job.kind == "video" or Job.input.target == "client" then
 					const Everyone = game:GetService("Players"):GetPlayers()
 					const Wanted = Job.input.player
 
@@ -493,6 +493,10 @@ task.spawn(function()
 
 					if Job.kind == "quality" then
 						return AskClient(Player, "quality", tostring(Job.input.level))
+					end
+
+					if Job.kind == "video" then
+						return AskClient(Player, "video", tostring(Job.input.action), 30)
 					end
 
 					if Job.kind == "execute" and typeof(Job.input.within) == "string" then

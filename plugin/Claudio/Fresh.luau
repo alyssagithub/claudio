@@ -1,11 +1,26 @@
 --!nocheck
 --!nolint DeprecatedApi
+const Pacing = require(script.Parent.Pacing)
+
 const Fresh = {}
 
 local Loaded: {[ModuleScript]: {any}} = {}
 const Loading: {[ModuleScript]: boolean} = {}
 
 local Load: (any, Instance?) -> any
+local Rested = os.clock()
+
+-- Modules loaded here run on Studio's main thread like execute code does, so their loops get the same
+-- pauses execute inserts; without them a long simulation inside a module froze Studio until it offered
+-- to stop the plugin. A loop that cannot yield, such as inside a sort comparator, just carries on.
+const function Pace()
+	if os.clock() - Rested < 0.03 or not coroutine.isyieldable() then
+		return
+	end
+
+	task.wait()
+	Rested = os.clock()
+end
 
 -- Follows a require-by-string path, such as "./_Index/roblox_testez@0.4.1/testez" in a Wally link module,
 -- from the module that asked. Roblox's own require cannot do this for code loaded here, because it only
@@ -81,7 +96,7 @@ Load = function(Target: any, From: Instance?): any
 		error(`{Target:GetFullName()} requires itself through a loop of modules, so it cannot finish loading.`, 2)
 	end
 
-	const Chunk, Problem = loadstring(Target.Source, `={Target:GetFullName()}`)
+	const Chunk, Problem = loadstring(Pacing.Insert(Target.Source, "__ClaudioPace"), `={Target:GetFullName()}`)
 
 	if not Chunk then
 		error(Problem, 2)
@@ -89,6 +104,7 @@ Load = function(Target: any, From: Instance?): any
 
 	setfenv(Chunk, setmetatable({
 		script = Target,
+		__ClaudioPace = Pace,
 		require = function(Wanted: any): any
 			return Load(Wanted, Target)
 		end,

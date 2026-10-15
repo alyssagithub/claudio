@@ -896,7 +896,6 @@ ${Text}`;
         if (Request.method === "GET") {
           const Able = Url.searchParams.get("canRun");
           const Attached = Url.searchParams.get("clients");
-          const Plugin = Url.searchParams.get("plugin");
           const Loaded = Url.searchParams.get("ready");
           const Games = Url.searchParams.get("games");
 
@@ -906,7 +905,7 @@ ${Text}`;
             NoteOpenChat(String(Url.searchParams.get("chat")));
           }
 
-          SendJson(Response, 200, {job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true", Attached === null ? undefined : Number(Attached), Plugin || undefined, Loaded === null ? undefined : Number(Loaded), Games === null ? undefined : Number(Games))});
+          SendJson(Response, 200, {job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true", Attached === null ? undefined : Number(Attached), Loaded === null ? undefined : Number(Loaded), Games === null ? undefined : Number(Games))});
           return;
         }
 

@@ -209,7 +209,7 @@ function Client.TakeStudioJob(): (boolean, any)
 	-- The open chat rides along, so the bridge knows which chat to keep warm and that Studio is still there.
 	const Open = if Client.OpenChat then Client.OpenChat() else nil
 
-	return Http.Request("GET", `{BaseUrl()}/studio/job?plugin={Config.Version}{if Testing then "" else `&boot={Boot}{if Open then `&chat={Open}` else ""}`}`)
+	return Http.Request("GET", `{BaseUrl()}/studio/job{if Testing then "" else `?boot={Boot}{if Open then `&chat={Open}` else ""}`}`)
 end
 
 const function Repaired(Value: any): any

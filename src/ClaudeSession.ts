@@ -6,7 +6,8 @@ import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { AllowedTools, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, EffortOrder, PlanInstructions, CommandsCacheFile, DesktopConfigPath, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory, DeveloperUserIds } from "./Config.js";
-import { AddDesktopSession, ListConversations, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
+import { AddDesktopSession, FindFile, ListConversations, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
+import { TrimOldResults } from "./Trim.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
@@ -952,6 +953,28 @@ function WarmFor(Id: string): number {
   const Context = Last.Read + Last.Wrote;
 
   return Math.min(19, Math.floor(1.9 * Context / (0.1 * Context + 2 * Last.Wrote))) * 60 * 60 * 1000;
+}
+
+// The cache lasts an hour after the chat last used it, either by a message or by a warming refresh. Once it
+// has gone, resuming writes the whole chat to the cache again, so leaving old pictures and log dumps out
+// first only makes that cheaper. While the cache is warm nothing is touched, since changing earlier
+// messages would throw the warm cache away.
+async function TrimIfCold(Id: string | null) {
+  const File = Id ? FindFile(Id) : null;
+
+  if (!Id || !File || Date.now() - Math.max(fs.statSync(File).mtimeMs, Pinged.get(Id) || 0) < 65 * 60 * 1000) {
+    return;
+  }
+
+  try {
+    const Trimmed = await TrimOldResults(File);
+
+    if (Trimmed.Pictures + Trimmed.Logs > 0) {
+      console.log(`Resuming ${Id} after its cache expired, so left out ${Trimmed.Pictures} old pictures and ${Trimmed.Logs} old log dumps.`);
+    }
+  } catch (Trouble) {
+    console.error(`Could not trim ${Id} before resuming: ${(Trouble as Error).message}`);
+  }
 }
 
 export function NoteOpenChat(Id: string) {
@@ -2100,6 +2123,8 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
 
   const Run = async () => {
     try {
+      await TrimIfCold(Ping ? null : ConversationId);
+
       Session.Query = query({
         prompt: Input(),
         options: {

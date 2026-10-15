@@ -23,7 +23,7 @@ before: ${Before}${After ? `
 after: ${After}` : ""}`;
 }
 
-function FindFile(Id: string): string | null {
+export function FindFile(Id: string): string | null {
   if (!fs.existsSync(SessionsRoot)) {
     return null;
   }

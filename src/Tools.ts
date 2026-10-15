@@ -8,7 +8,7 @@ import { z } from "zod/v3";
 import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport, ProfileReport } from "./Ask.js";
 import type { LogAnswer, ExecuteAnswer } from "./Ask.js";
 import { QuietFlash } from "./Notify.js";
-import { Enlarge, Guide, Shrink } from "./Capture.js";
+import { Changed, Cut, Enlarge, Guide, Shrink } from "./Capture.js";
 import { CallOpenCloud } from "./OpenCloud.js";
 import { PadInputs, PressPad } from "./Gamepad.js";
 
@@ -16,6 +16,7 @@ const ExecuteDescription = [
   "Run Luau inside the open place and get back what it returned, what it printed, and where it failed.",
   "target picks where: edit is the editor and the default, server and client are the running play session and need one open.",
   "Changes are recorded as one undo step; pass readOnly when you only want to look.",
+  "Steps that do not depend on each other's results belong in one call that returns a table of everything, which saves a round trip per step; split them only when a later step needs you to look at an earlier result first.",
   "Session code runs with game script permissions, not the engine's: it cannot call functions Roblox keeps for itself, such as firing PromptGamePassPurchaseFinished or other MarketplaceService events, or reading CoreGui. Those fail with \"lacking capability RobloxScript\", which is correct engine behaviour, not a bug in the game, so test purchase handling by calling the game's own handler instead.",
   "When a play session run hits its timeout, the reply includes everything it printed before it was stopped, so print progress in long runs to see how far they got.",
   "Set timeout in seconds when the code is expected to take a while, up to thirty minutes; it defaults to five minutes.",
@@ -23,6 +24,9 @@ const ExecuteDescription = [
   "Code runs on Studio's main thread and cannot be interrupted, so a loop that never yields freezes all of Studio, stalls every other call, and makes Studio offer to kill the plugin. Call breathe() inside any loop over many instances, scripts or lines; it yields only when the frame's time is used up, so calling it every iteration costs almost nothing.",
   "Never run patterns that start or end with a greedy class, such as [^\\n]*word[^\\n]*, over a whole script's source: their cost grows with the square of the line length. Split the source into lines with gmatch(\"[^\\n]+\") and test each with find(word, 1, true).",
 ].join(" ");
+
+// The last few captures by their settings, at full size, for the capture tool's changes option.
+const Captures = new Map<string, string>();
 
 const InputDescription = [
   "Send input to the running playtest: press, type, key, hover, scroll or drag.",
@@ -558,13 +562,44 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         width: z.number().optional().describe("Region width. Give width and height together to crop."),
         height: z.number().optional().describe("Region height."),
         file: z.string().optional().describe("Also save the picture to this path as a PNG, for comparing pixels or keeping a record. The file is always at full size."),
+        changes: z.boolean().optional().describe("Compare with the last capture taken with the same settings and return only the part that changed, or just say nothing changed. Use it when checking the result of a small change, such as after a click or an edit, to avoid paying for the whole picture again. Coordinates in the reply are in the full picture. When most of the picture changed, or there is no earlier capture to compare with, the whole picture comes back as usual."),
         full: z.boolean().optional().describe("Return the picture at full size, one image pixel per screen pixel. By default a picture longer than 1024 pixels on a side is shrunk to save context, and the reply says how to scale its coordinates; pass full when you need exact pixel positions, such as for the input tool, layout measurements or reading tiny text."),
       },
-      Run: async (Input: { full?: boolean; of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; quality?: number; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
+      Run: async (Input: { changes?: boolean; full?: boolean; of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; quality?: number; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
         const Shape = Input.frame ? Input.frame.match(/^\s*(\d+(?:\.\d+)?)\s*[x:×]\s*(\d+(?:\.\d+)?)\s*$/i) : null;
         const Picture = (Given: string, Said: string): ToolAnswer => {
           let Data = Given;
           let Text = Said;
+          const Key = JSON.stringify({...Input, changes: undefined, full: undefined, file: undefined, zoom: undefined});
+          const Before = Captures.get(Key);
+
+          Captures.delete(Key);
+          Captures.set(Key, Given);
+
+          for (const Old of [...Captures.keys()].slice(0, Math.max(0, Captures.size - 8))) {
+            Captures.delete(Old);
+          }
+
+          if (Input.changes === true) {
+            const Difference = Before ? Changed(Before, Given) : "none";
+
+            if (Difference === null) {
+              return {content: [{type: "text", text: `${Said}. Nothing changed since the last capture with these settings.`}]};
+            }
+
+            if (Difference === "none" || Difference === "size") {
+              Text += Difference === "none" ? ". There was no earlier capture with these settings to compare with, so this is the whole picture" : ". The size changed since the last capture, so this is the whole picture";
+            } else if (Difference.share > 0.5) {
+              Text += `. Most of the picture changed (${Math.round(Difference.share * 100)}%), so this is the whole picture`;
+            } else {
+              const Left = Math.max(0, Difference.x - 8);
+              const Top = Math.max(0, Difference.y - 8);
+              const Image = Shrink(Given, 1e9);
+
+              Data = Cut(Given, Left, Top, Math.min(Image.width - Left, Difference.width + 16), Math.min(Image.height - Top, Difference.height + 16));
+              Text += `. Only the area at ${Difference.x}, ${Difference.y}, ${Difference.width}x${Difference.height} changed since the last capture with these settings; shown is that area with a little margin, starting at ${Left}, ${Top} in the full picture`;
+            }
+          }
 
           if (Input.frame && !Shape) {
             Text += `, without a frame because "${Input.frame}" is not a size like 1920x1080 or an aspect like 16:9`;
@@ -851,10 +886,11 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         };
         const Found: ExecuteAnswer = await ReachIn(Where === "edit" ? "edit" : "server", "execute", Sent, Input.timeout);
         const TimedOut = Found && typeof Found.error === "string" && Found.error.includes("did not finish within");
+        const Unknown = Found && typeof Found.error === "string" && !TimedOut ? await Promise.race([import("./Lint.js").then((Lint) => Lint.UnknownGlobals(Input.code)).catch(() => [] as string[]), new Promise<string[]>((Resolve) => setTimeout(() => Resolve([]), 15000))]) : [];
 
         return {content: [{
           type: "text",
-          text: ExecuteReport(Found) + (TimedOut && Where === "edit" ? ` The code may still be running and changing the place, because it was inside a long call where Claudio cannot stop it. Run name "${Run}": call execute with cancel "${Run}" to stop it at its next loop, or resultOf "${Run}" to wait for what it returns.` : ""),
+          text: ExecuteReport(Found) + (Unknown.length > 0 ? ` These names are not defined anywhere, which is often the cause: ${Unknown.join(", ")}.` : "") + (TimedOut && Where === "edit" ? ` The code may still be running and changing the place, because it was inside a long call where Claudio cannot stop it. Run name "${Run}": call execute with cancel "${Run}" to stop it at its next loop, or resultOf "${Run}" to wait for what it returns.` : ""),
         }]};
       },
     },

@@ -125,3 +125,50 @@ export function Shrink(Data: string, Longest: number): { data: string; width: nu
 
   return {data: PNG.sync.write(Out).toString("base64"), width: Out.width, height: Out.height, scale: Scale};
 }
+
+// Compares two pictures of the same size and returns the smallest box holding every pixel that changed by
+// more than a little, so noise such as dithering does not count. Null when nothing changed.
+export function Changed(Before: string, After: string): { x: number; y: number; width: number; height: number; share: number } | null | "size" {
+  const Old = PNG.sync.read(Buffer.from(Before, "base64"));
+  const New = PNG.sync.read(Buffer.from(After, "base64"));
+
+  if (Old.width !== New.width || Old.height !== New.height) {
+    return "size";
+  }
+
+  let Left = New.width;
+  let Top = New.height;
+  let Right = -1;
+  let Bottom = -1;
+
+  for (let Y = 0; Y < New.height; Y += 1) {
+    for (let X = 0; X < New.width; X += 1) {
+      const At = (Y * New.width + X) * 4;
+
+      if (Math.abs(Old.data[At] - New.data[At]) + Math.abs(Old.data[At + 1] - New.data[At + 1]) + Math.abs(Old.data[At + 2] - New.data[At + 2]) > 48) {
+        Left = Math.min(Left, X);
+        Top = Math.min(Top, Y);
+        Right = Math.max(Right, X);
+        Bottom = Math.max(Bottom, Y);
+      }
+    }
+  }
+
+  if (Right < 0) {
+    return null;
+  }
+
+  const Width = Right - Left + 1;
+  const Height = Bottom - Top + 1;
+
+  return {x: Left, y: Top, width: Width, height: Height, share: Width * Height / (New.width * New.height)};
+}
+
+export function Cut(Data: string, X: number, Y: number, Width: number, Height: number): string {
+  const Image = PNG.sync.read(Buffer.from(Data, "base64"));
+  const Out = new PNG({width: Width, height: Height});
+
+  PNG.bitblt(Image, Out, X, Y, Width, Height, 0, 0);
+
+  return PNG.sync.write(Out).toString("base64");
+}

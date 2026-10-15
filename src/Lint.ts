@@ -527,3 +527,27 @@ export async function Warm(): Promise<void> {
     await Flags(Analyzer);
   }
 }
+// Names the execute code uses that exist nowhere, such as a misspelt local, so a failed run can say which
+// name was wrong. Only run after a failure, so a run that works costs nothing and the analyzer never piles up
+// in memory. The names execute itself passes in are left out.
+export async function UnknownGlobals(Code: string): Promise<string[]> {
+  const Analyzer = await Prepared();
+
+  if (!Analyzer) {
+    return [];
+  }
+
+  const Folder = fs.mkdtempSync(path.join(os.tmpdir(), "claudio-check-"));
+
+  try {
+    fs.writeFileSync(path.join(Folder, "code.luau"), Code);
+
+    const Outcome = await Run(Analyzer, ["analyze", `--definitions=${Definitions()}`, "code.luau"], {cwd: Folder});
+
+    return [...Outcome.Text.matchAll(/\((\d+),\d+\): TypeError: Unknown global '([^']+)'/g)]
+      .filter((Found) => !["plugin", "breathe", "__ClaudioPace"].includes(Found[2]))
+      .map((Found) => `line ${Found[1]}: ${Found[2]}`);
+  } finally {
+    fs.rmSync(Folder, {recursive: true, force: true});
+  }
+}

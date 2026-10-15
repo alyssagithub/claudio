@@ -17,7 +17,7 @@ import type { Reacher, ReacherIn } from "./Tools.js";
 import type { Picture, TurnRequest } from "./Types.js";
 import { StudioProcesses } from "./StudioPresence.js";
 import { ReadBuiltInPlugins, SetBuiltInPlugins } from "./StudioSettings.js";
-import { ActiveTurnFor, AddToTurn, HandOff, FinishedSince, SuggestionFor, ListTasks, TaskOutput, StopTask, ClearFinishedTasks, CancelQueued, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, WarmConversation, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
+import { NoteOpenChat, WarmChat, WarmingState, ActiveTurnFor, AddToTurn, HandOff, FinishedSince, SuggestionFor, ListTasks, TaskOutput, StopTask, ClearFinishedTasks, CancelQueued, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, WarmConversation, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
 import { ConversationExists, DeleteConversation, GetChapters, GetSubagent, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
@@ -885,6 +885,10 @@ ${Text}`;
 
           Booted(Url.searchParams.get("boot"));
 
+          if (Url.searchParams.get("chat")) {
+            NoteOpenChat(String(Url.searchParams.get("chat")));
+          }
+
           SendJson(Response, 200, {job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true", Attached === null ? undefined : Number(Attached), Plugin || undefined, Loaded === null ? undefined : Number(Loaded), Games === null ? undefined : Number(Games))});
           return;
         }
@@ -1147,6 +1151,13 @@ ${Text}`;
         return;
       }
 
+      if (Request.method === "POST" && Url.pathname === "/cache/warm") {
+        const Body = await ReadBody(Request);
+
+        SendJson(Response, 200, {result: typeof Body.conversation === "string" ? await WarmChat(Body.conversation, true) : "Give the chat as conversation."});
+        return;
+      }
+
       if (Request.method === "GET" && Url.pathname === "/chat/active") {
         const Wanted = Url.searchParams.get("conversation") || "";
         const Turn = ActiveTurnFor(Wanted);
@@ -1155,6 +1166,7 @@ ${Text}`;
           turn: Turn ? DescribeTurn(Turn) : null,
           endedAt: LastEndedAt(Wanted),
           suggestion: SuggestionFor(Wanted),
+          cacheWarming: WarmingState(Wanted),
         });
         return;
       }

@@ -698,6 +698,7 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
 
   if (Turn.ConversationId) {
     Ended.set(Turn.ConversationId, Date.now());
+    Remembered.set(Turn.ConversationId, [Turn.WorkingDirectory, Turn.Session ? Turn.Session.Model : Turn.Model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode, Turn.Planning, Turn.Mode, Turn.Bypass, Turn.OutputStyle, Turn.StepDown]);
     Finished.push({conversationId: Turn.ConversationId, endedAt: Date.now(), status: Status, text: (Error && Status === "error" ? Error : Text).slice(-600)});
     Finished.splice(0, Math.max(0, Finished.length - 50));
     SaveQuietly("FinishTurn", () => UpdateDesktopSession(Turn.ConversationId!, (Session) => {
@@ -912,6 +913,111 @@ const Finished: FinishedTurn[] = [];
 
 export function FinishedSince(Since: number): FinishedTurn[] {
   return Finished.filter((Entry) => Entry.endedAt > Since);
+}
+
+type SessionSettings = [string, string, string | null, boolean, boolean, boolean, boolean, string, boolean, string, boolean];
+
+// The settings each chat's last turn ran with, because the warming request must match them exactly: any
+// difference in model, instructions or tools makes it write a whole new cache instead of refreshing it.
+const Remembered = new Map<string, SessionSettings>();
+const Pinged = new Map<string, number>();
+const Missed = new Set<string>();
+let OpenChat = { Id: "", At: 0 };
+
+// What each chat's latest request read from the cache and wrote to it. Some chats rewrite a block of their
+// prompt on every request, real messages included, so a refresh is judged against what the chat itself does.
+const Requests = new Map<string, { Read: number; Wrote: number }>();
+const RefreshAfter = 55 * 60 * 1000;
+
+// The cache lasts an hour. A refresh re-reads it at a tenth of the input price and rewrites the chat's
+// changing block at twice the price, while a cold return writes the whole context again at twice the price
+// instead of reading it. Refreshing hourly stays cheaper than a cold return for this many hours, capped at
+// nineteen, the limit for a chat with no changing block at all.
+function WarmFor(Id: string): number {
+  const Last = Requests.get(Id);
+
+  if (!Last) {
+    return 0;
+  }
+
+  const Context = Last.Read + Last.Wrote;
+
+  return Math.min(19, Math.floor(1.9 * Context / (0.1 * Context + 2 * Last.Wrote))) * 60 * 60 * 1000;
+}
+
+export function NoteOpenChat(Id: string) {
+  OpenChat = {Id, At: Date.now()};
+}
+
+// Refreshes the chat's cache now when Forced, otherwise only when the open chat is due. Returns what happened.
+export async function WarmChat(Id: string, Forced = false): Promise<string> {
+  const LastReal = Ended.get(Id) || 0;
+  const Settings = Remembered.get(Id);
+
+  if (!Settings) {
+    return "No turn has finished in that chat since the bridge started, so its settings are not known yet.";
+  }
+
+  if (!Forced && (Id !== OpenChat.Id || Date.now() - OpenChat.At > 60000 || ReadPluginSetting("KeepCacheWarm") === false || Missed.has(Id))) {
+    return "not due";
+  }
+
+  if (IsConversationBusy(Id) || (!Forced && (Date.now() - LastReal > WarmFor(Id) || Date.now() - Math.max(LastReal, Pinged.get(Id) || 0) < RefreshAfter))) {
+    return "not due";
+  }
+
+  const Before = Requests.get(Id) || {Read: 0, Wrote: 0};
+
+  Pinged.set(Id, Date.now());
+
+  const Usage = await new Promise<Record<string, number> | null>((Resolve) => {
+    const Copy = OpenSession(Id, ...Settings, (Message) => {
+      if (Message.type !== "result") {
+        return;
+      }
+
+      Copy.Close();
+      Resolve((Message.usage || null) as Record<string, number> | null);
+    });
+
+    Copy.Send(UserMessage("Reply with the single word OK.", [], crypto.randomUUID()));
+    setTimeout(() => {
+      Copy.Close();
+      Resolve(null);
+    }, 120000).unref();
+  });
+
+  const Read = Usage ? Usage.cache_read_input_tokens || 0 : 0;
+  const Wrote = Usage ? Usage.cache_creation_input_tokens || 0 : 0;
+
+  // A refresh that writes far more than the chat's own last message did is not matching the real prompt,
+  // so it is rewriting the cache rather than refreshing it.
+  if (!Usage || Wrote > Before.Wrote * 2 + 20000) {
+    const Said = `Stopped keeping ${Id}'s prompt cache warm: the refresh ${Usage ? `wrote ${Wrote} tokens of new cache where the chat's last message wrote ${Before.Wrote}` : "got no answer"}, so it is not refreshing the real cache.`;
+
+    Missed.add(Id);
+    console.error(Said);
+
+    return Said;
+  }
+
+  Requests.set(Id, {Read, Wrote});
+  console.log(`Kept ${Id}'s prompt cache warm: read ${Read} cached tokens, wrote ${Wrote}.`);
+
+  return `Refreshed: read ${Read} cached tokens and wrote ${Wrote}.`;
+}
+
+setInterval(() => {
+  WarmChat(OpenChat.Id).catch((Trouble) => console.error(`Could not keep the prompt cache warm: ${(Trouble as Error).message}`));
+}, 60000).unref();
+
+export function WarmingState(Id: string): { warming: boolean; until: number } {
+  const LastReal = Ended.get(Id) || 0;
+
+  return {
+    warming: ReadPluginSetting("KeepCacheWarm") !== false && Remembered.has(Id) && !Missed.has(Id) && LastReal > 0 && Date.now() - LastReal < WarmFor(Id),
+    until: LastReal + WarmFor(Id),
+  };
 }
 
 export function LastEndedAt(ConversationId: string): number {
@@ -1624,6 +1730,10 @@ function RouteMessage(Session: Session, Message: any) {
     // The latest request's prompt is the conversation's real size. The usage on the turn's result is added
     // up over every request in the turn, so a long run of tool calls made it read many times the window.
     if (Asked && !Message.parent_tool_use_id) {
+      if (Session.ConversationId) {
+        Requests.set(Session.ConversationId, {Read: Asked.cache_read_input_tokens || 0, Wrote: Asked.cache_creation_input_tokens || 0});
+      }
+
       Turn.Usage = {
         ...Turn.Usage,
         Input: Asked.input_tokens || 0,
@@ -1890,13 +2000,15 @@ function StudioOwner(Session: Session): StudioOwnerType {
   };
 }
 
-function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string, Model: string, Effort: string | null, AskForTools: boolean, ExtraPrompt: boolean, FastMode: boolean, Planning: boolean, Mode: string, Bypass: boolean, OutputStyle: string, StepDown: boolean): Session {
+// Ping, when given, makes a throwaway session for keeping the prompt cache warm: it branches off the chat
+// without saving anything, is never registered as the chat's session, and hands its messages to Ping.
+function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string, Model: string, Effort: string | null, AskForTools: boolean, ExtraPrompt: boolean, FastMode: boolean, Planning: boolean, Mode: string, Bypass: boolean, OutputStyle: string, StepDown: boolean, Ping?: (Message: SdkMessage) => void): Session {
   const Pending: unknown[] = [];
   let Wake: ((Value?: unknown) => void) | null = null;
   let Ended = false;
 
   const Session: Session = {
-    Key: ConversationId || `pending-${Math.random().toString(36).slice(2, 10)}`,
+    Key: Ping ? `ping-${Math.random().toString(36).slice(2, 10)}` : ConversationId || `pending-${Math.random().toString(36).slice(2, 10)}`,
     ConversationId,
     Model,
     Effort,
@@ -1970,7 +2082,9 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
     }
   }
 
-  Sessions.set(Session.Key, Session);
+  if (!Ping) {
+    Sessions.set(Session.Key, Session);
+  }
 
   const Run = async () => {
     try {
@@ -1978,6 +2092,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
         prompt: Input(),
         options: {
           resume: ConversationId || undefined,
+          ...(Ping ? {forkSession: true, persistSession: false} : {}),
           model: Model,
           effort: (Effort || undefined) as EffortLevel | undefined,
           cwd: TurnWorkingDirectory,
@@ -2148,6 +2263,11 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
       });
 
       for await (const Message of Session.Query) {
+        if (Ping) {
+          Ping(Message as SdkMessage);
+          continue;
+        }
+
         RouteMessage(Session, Message);
       }
 

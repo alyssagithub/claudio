@@ -40,6 +40,7 @@ const Chat = {
 	Zoomed = Vide.source(nil :: EditableImage?),
 	Dragging = Vide.source("off"),
 	WholeCost = Vide.source(nil :: {cost: number, estimated: boolean, reported: boolean, estimatedCost: number?, reportedCost: number?}?),
+	CacheWarming = Vide.source(nil :: {warming: boolean, ["until"]: number}?),
 	KnownPaths = Vide.source({} :: {[string]: string}),
 	PathPictures = Vide.source({} :: {[string]: EditableImage | false}),
 	FileMenu = Vide.source(nil :: {Path: string, Kind: string}?),
@@ -3292,6 +3293,7 @@ const function Ended(Id: string): (number?, boolean)
 
 	if Chat.ConversationId() == Id and not Chat.Sending() then
 		Chat.Suggestion(if typeof(Result.suggestion) == "string" then Result.suggestion else nil)
+		Chat.CacheWarming(if typeof(Result.cacheWarming) == "table" then Result.cacheWarming else nil)
 	end
 
 	return if typeof(Result.endedAt) == "number" then Result.endedAt else 0, typeof(Result.turn) == "table"
@@ -5046,6 +5048,10 @@ function Chat.Unload()
 	Chat.Sending(false)
 	Watcher.Stop()
 	Reset()
+end
+
+Client.OpenChat = function(): string?
+	return Chat.ConversationId()
 end
 
 return Chat

@@ -144,6 +144,13 @@ const Definitions: {Definition} = {
 		Default = true,
 	},
 	{
+		Key = "KeepCacheWarm",
+		Label = "Keep the open chat's cache warm",
+		Detail = "While Studio is open, refreshes the open chat's cache about once an hour so your next message stays fast and cheap. Stops 19 hours after your last message, where it stops paying for itself",
+		Group = "Claude",
+		Default = true,
+	},
+	{
 		Key = "OutputStyle",
 		Label = "Output style",
 		Detail = "How Claude writes its replies. Same styles as the desktop app",

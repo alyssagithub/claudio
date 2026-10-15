@@ -32,6 +32,9 @@ end
 
 const Client = {}
 
+-- Set by the chat store, so the regular check-in can say which chat is open.
+Client.OpenChat = nil :: (() -> string?)?
+
 -- Changes every time the plugin loads, so the bridge can tell a reload apart from a long quiet spell.
 const Boot = game:GetService("HttpService"):GenerateGUID(false)
 const Testing = (script.Parent.Parent :: Instance).Name:match("Testing$") ~= nil
@@ -203,7 +206,10 @@ end
 
 function Client.TakeStudioJob(): (boolean, any)
 	-- The testing copy leaves the boot out, so mounting it is not reported as the plugin reloading.
-	return Http.Request("GET", `{BaseUrl()}/studio/job?plugin={Config.Version}{if Testing then "" else `&boot={Boot}`}`)
+	-- The open chat rides along, so the bridge knows which chat to keep warm and that Studio is still there.
+	const Open = if Client.OpenChat then Client.OpenChat() else nil
+
+	return Http.Request("GET", `{BaseUrl()}/studio/job?plugin={Config.Version}{if Testing then "" else `&boot={Boot}{if Open then `&chat={Open}` else ""}`}`)
 end
 
 const function Repaired(Value: any): any

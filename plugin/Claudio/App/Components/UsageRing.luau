@@ -690,6 +690,13 @@ return function()
 
 				return if Estimated > 0 then Format.Cost(Estimated, true) else ""
 			end, false, 203),
+			Line(function()
+				const Warm = Chat.CacheWarming()
+
+				return if Warm and Warm.warming then `Keeping this chat's cache warm until {os.date("%H:%M", math.floor(Warm["until"] / 1000))}` else ""
+			end, function()
+				return ""
+			end, false, 204),
 			Create "TextLabel" {
 				Name = "Empty",
 				Size = UDim2.fromScale(1, 0),

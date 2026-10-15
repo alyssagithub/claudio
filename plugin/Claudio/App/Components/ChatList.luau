@@ -485,7 +485,7 @@ return function()
 			Chat.ShowArchived(not Chat.ShowArchived())
 		end, Any("archived")),
 		Choice(function()
-			return if Chat.ShowHidden() then "Hide hidden" else "Show hidden"
+			return if Chat.ShowHidden() then "Hide hidden items" else "Show hidden items"
 		end, 1000001, function()
 			Chat.ShowHidden(not Chat.ShowHidden())
 		end, Any("hidden")),

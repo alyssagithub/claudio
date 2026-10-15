@@ -88,3 +88,40 @@ export function EncodePixels(Width: number, Height: number, Base64Pixels: string
 
   return {data: PNG.sync.write(Image).toString("base64")};
 }
+// Shrinks a picture so its longer side is at most Longest pixels, averaging the pixels each output pixel
+// covers so small text stays readable. Returns it unchanged when it already fits.
+export function Shrink(Data: string, Longest: number): { data: string; width: number; height: number; scale: number } {
+  const Image = PNG.sync.read(Buffer.from(Data, "base64"));
+  const Scale = Math.max(Image.width, Image.height) / Longest;
+
+  if (Scale <= 1) {
+    return {data: Data, width: Image.width, height: Image.height, scale: 1};
+  }
+
+  const Out = new PNG({width: Math.round(Image.width / Scale), height: Math.round(Image.height / Scale)});
+
+  for (let Y = 0; Y < Out.height; Y += 1) {
+    for (let X = 0; X < Out.width; X += 1) {
+      const Totals = [0, 0, 0, 0];
+      let Count = 0;
+
+      for (let FromY = Math.floor(Y * Scale); FromY < Math.min(Image.height, Math.floor((Y + 1) * Scale)); FromY += 1) {
+        for (let FromX = Math.floor(X * Scale); FromX < Math.min(Image.width, Math.floor((X + 1) * Scale)); FromX += 1) {
+          const At = (FromY * Image.width + FromX) * 4;
+
+          for (let Channel = 0; Channel < 4; Channel += 1) {
+            Totals[Channel] += Image.data[At + Channel];
+          }
+
+          Count += 1;
+        }
+      }
+
+      for (let Channel = 0; Channel < 4; Channel += 1) {
+        Out.data[(Y * Out.width + X) * 4 + Channel] = Totals[Channel] / Math.max(1, Count);
+      }
+    }
+  }
+
+  return {data: PNG.sync.write(Out).toString("base64"), width: Out.width, height: Out.height, scale: Scale};
+}

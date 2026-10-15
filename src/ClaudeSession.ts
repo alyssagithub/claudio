@@ -2113,6 +2113,16 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
           promptSuggestions: true,
           env: {...process.env, CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: "true"},
           extraArgs: {"replay-user-messages": null},
+          // Searching only needs to find and quote, so the search helper runs on the small model while
+          // helpers that edit, judge or design keep the chat's own model.
+          agents: {
+            Explore: {
+              description: "Fast read-only search helper for finding code, files, instances or text across many places when you only need where things are and short excerpts, not edits or judgement. Say how thorough to be. Runs on a small, cheap model, so give anything that needs reasoning about correctness, design or review to general-purpose instead.",
+              prompt: "You are a read-only search helper. Find what you were asked for using search and read tools, reading only the parts of files you need. Never change files, instances or settings. Reply with what you found: exact paths, line numbers or instance paths, and short quoted excerpts, plus anything you looked for and could not find. Keep the reply short and factual, without advice.",
+              model: "haiku",
+              disallowedTools: ["Edit", "Write", "NotebookEdit", "Agent", "mcp__claudio__modify", "mcp__claudio__source", "mcp__claudio__playtest", "mcp__claudio__input", "mcp__claudio__rbxm", "mcp__claudio__select"],
+            },
+          },
           settings: {
             fastMode: FastMode === true,
             todoFeatureEnabled: true,

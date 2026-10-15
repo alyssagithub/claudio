@@ -8,7 +8,7 @@ import { z } from "zod/v3";
 import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport, ProfileReport } from "./Ask.js";
 import type { LogAnswer, ExecuteAnswer } from "./Ask.js";
 import { QuietFlash } from "./Notify.js";
-import { Enlarge, Guide } from "./Capture.js";
+import { Enlarge, Guide, Shrink } from "./Capture.js";
 import { CallOpenCloud } from "./OpenCloud.js";
 import { PadInputs, PressPad } from "./Gamepad.js";
 
@@ -557,9 +557,10 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         y: z.number().optional().describe("Top edge of the region."),
         width: z.number().optional().describe("Region width. Give width and height together to crop."),
         height: z.number().optional().describe("Region height."),
-        file: z.string().optional().describe("Also save the picture to this path as a PNG, for comparing pixels or keeping a record."),
+        file: z.string().optional().describe("Also save the picture to this path as a PNG, for comparing pixels or keeping a record. The file is always at full size."),
+        full: z.boolean().optional().describe("Return the picture at full size, one image pixel per screen pixel. By default a picture longer than 1024 pixels on a side is shrunk to save context, and the reply says how to scale its coordinates; pass full when you need exact pixel positions, such as for the input tool, layout measurements or reading tiny text."),
       },
-      Run: async (Input: { of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; quality?: number; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
+      Run: async (Input: { full?: boolean; of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; quality?: number; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
         const Shape = Input.frame ? Input.frame.match(/^\s*(\d+(?:\.\d+)?)\s*[x:×]\s*(\d+(?:\.\d+)?)\s*$/i) : null;
         const Picture = (Given: string, Said: string): ToolAnswer => {
           let Data = Given;
@@ -595,6 +596,15 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
               Text += `, saved to ${Input.file}`;
             } catch (Trouble) {
               Text += `, but could not save to ${Input.file}: ${(Trouble as Error).message}`;
+            }
+          }
+
+          if (Input.full !== true && !(Input.zoom && Input.zoom > 1)) {
+            const Smaller = Shrink(Data, 1024);
+
+            if (Smaller.scale > 1) {
+              Data = Smaller.data;
+              Text += `. Shown shrunk to ${Smaller.width}x${Smaller.height} to save context, so multiply positions in this picture by ${Smaller.scale.toFixed(3)} to get real pixels, or capture again with full for exact pixels`;
             }
           }
 

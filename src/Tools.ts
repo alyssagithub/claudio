@@ -1447,6 +1447,34 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
     },
   ];
 
+  // A very long result costs its full length in every later request of the chat, so past about eight
+  // thousand tokens the reply keeps its start and end and the whole text goes to a file Claude can read.
+  for (const Tool of Tools) {
+    const Run = Tool.Run;
+
+    Tool.Run = async (Input, Extra) => {
+      const Answer = await Run(Input, Extra);
+
+      return {content: Answer.content.map((Part) => {
+        if (Part.type !== "text" || Part.text.length <= 32000) {
+          return Part;
+        }
+
+        const Folder = path.join(os.homedir(), ".claudio", "outputs");
+        const File = path.join(Folder, `${Tool.Name}-${new Date().toISOString().replace(/[:.]/g, "-")}.txt`);
+
+        fs.mkdirSync(Folder, {recursive: true});
+        fs.writeFileSync(File, Part.text);
+
+        for (const Name of fs.readdirSync(Folder).sort().reverse().slice(50)) {
+          fs.rmSync(path.join(Folder, Name), {force: true});
+        }
+
+        return {type: "text", text: `${Part.text.slice(0, 24000)}\n\n[${Part.text.length - 30000} characters left out here. The whole result is at ${File}; read that file for the rest.]\n\n${Part.text.slice(-6000)}`};
+      })};
+    };
+  }
+
   for (const Tool of Tools.filter((Entry) => Entry.Name === "playtest" || Entry.Name === "execute")) {
     const Run = Tool.Run;
 

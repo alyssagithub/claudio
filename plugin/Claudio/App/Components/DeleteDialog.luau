@@ -21,6 +21,10 @@ const function Title(): string
 end
 
 return function()
+	-- Sized from the list rather than AutomaticSize, which measured the wrapped body before the panel had a
+	-- width and grew taller than the window, pushing the text off screen.
+	const Content = Vide.source(0)
+
 	return Create "Frame" {
 		Name = "DeleteDialog",
 		Vide.action(Covers.Add),
@@ -47,8 +51,9 @@ return function()
 			Name = "Panel",
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.new(1, -32, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = function()
+				return UDim2.new(1, -32, 0, Content() + 28)
+			end,
 			BackgroundColor3 = Theme.Colors.Panel,
 			ZIndex = 201,
 
@@ -65,6 +70,13 @@ return function()
 				SortOrder = Enum.SortOrder.LayoutOrder,
 				HorizontalFlex = Enum.UIFlexAlignment.Fill,
 				Padding = UDim.new(0, 8),
+
+				Vide.action(function(Layout: UIListLayout)
+					Content(Layout.AbsoluteContentSize.Y)
+					Vide.cleanup(Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+						Content(Layout.AbsoluteContentSize.Y)
+					end))
+				end),
 			},
 			Create "TextLabel" {
 				Name = "Heading",

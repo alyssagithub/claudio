@@ -18,7 +18,7 @@ import type { Picture, TurnRequest } from "./Types.js";
 import { StudioProcesses } from "./StudioPresence.js";
 import { ReadBuiltInPlugins, SetBuiltInPlugins } from "./StudioSettings.js";
 import { QuietTurn, NoteOpenChat, WarmChat, WarmingState, ActiveTurnFor, AddToTurn, HandOff, FinishedSince, SuggestionFor, ListTasks, TaskOutput, StopTask, ClearFinishedTasks, CancelQueued, ApplyStyleEverywhere, CloseConversation, LastEndedAt, LastUsedFolder, AbortAllTurns, AnswerPermission, AnswerQuestion, CancelTurn, DescribeTurn, DiscoverCommands, WarmConversation, ForkConversation, GetCommands, GetMcpServers, GetTurn, IsConversationBusy, KeepSpareWarm, ReadMcpServers, ReleaseImage, StartTurn, WaitForChange } from "./ClaudeSession.js";
-import { ConversationExists, DeleteConversation, GetChapters, GetSubagent, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
+import { ConversationExists, DeleteConversation, GetChapters, GetSubagent, GetConversation, GetConversationImage, ListConversations, RenameConversation, SetChapters, SetChatHidden, SetConversationFlag, SetFolderHidden } from "./Conversations.js";
 import { DecodeImage } from "./Images.js";
 import { AvatarFor } from "./EasterEgg.js";
 import { HandToken, IssuePlaytestKey, PlaytestKeyMatches, PlaytestLive, RevokePlaytestKey, TokenMatches } from "./Token.js";
@@ -253,6 +253,17 @@ async function HandleConversations(Request: IncomingMessage, Response: ServerRes
     SetFolderHidden(Folder, Body.value === true);
     SendJson(Response, 200, {
       folder: Folder,
+      hidden: Body.value === true,
+    });
+    return;
+  }
+
+  if (Request.method === "POST" && Id && Id !== "folder" && Segments[2] === "hidden") {
+    const Body = await ReadBody(Request);
+
+    SetChatHidden(Id, Body.value === true);
+    SendJson(Response, 200, {
+      id: Id,
       hidden: Body.value === true,
     });
     return;

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { ChaptersFile, CostsFile, DesktopSessionsRoot, HiddenFoldersFile, MostCallText, OwnSessionsFile, PriceFor, SessionsRoot } from "./Config.js";
+import { ChaptersFile, CostsFile, DesktopSessionsRoot, HiddenChatsFile, HiddenFoldersFile, MostCallText, OwnSessionsFile, PriceFor, SessionsRoot } from "./Config.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import type { Chapter, Content, ContentBlock, Part, StoredCall, StoredMessage, Tokens, TranscriptLine } from "./Types.js";
 
@@ -15,7 +15,7 @@ type CostStore = Record<string, number[] | Record<string, number>>;
 
 type BuiltConversation = { id: string; title: string; project: string | null; source: string; workingDirectory: string | null; messages: StoredMessage[]; partial: boolean };
 
-type Listing = { id: string; title: string; project: string; folder: string | null; source: string; starred: boolean; archived: boolean; hidden: boolean; createdAt: number; updatedAt: number };
+type Listing = { id: string; title: string; project: string; folder: string | null; source: string; starred: boolean; archived: boolean; hidden: boolean; chatHidden: boolean; createdAt: number; updatedAt: number };
 
 export function CompactionInput(Trigger: string, Before: number, After?: number | null): string {
   return `trigger: ${Trigger}
@@ -575,6 +575,23 @@ export function SetFolderHidden(Folder: string, Hidden: boolean) {
   fs.writeFileSync(HiddenFoldersFile, JSON.stringify(Kept, null, 2));
 }
 
+function ReadHiddenChats(): string[] {
+  const Stored = ReadJson<unknown>(HiddenChatsFile);
+
+  return Array.isArray(Stored) ? Stored.filter((Entry): Entry is string => typeof Entry === "string") : [];
+}
+
+export function SetChatHidden(Id: string, Hidden: boolean) {
+  const Kept = ReadHiddenChats().filter((Entry) => Entry !== Id);
+
+  if (Hidden) {
+    Kept.push(Id);
+  }
+
+  fs.mkdirSync(path.dirname(HiddenChatsFile), {recursive: true});
+  fs.writeFileSync(HiddenChatsFile, JSON.stringify(Kept, null, 2));
+}
+
 export function ListConversations(): Listing[] {
   if (!fs.existsSync(SessionsRoot)) {
     return [];
@@ -583,6 +600,7 @@ export function ListConversations(): Listing[] {
   const Desktop = ReadDesktopSessions();
   const Own = ReadOwnSessions();
   const Hidden = ReadHiddenFolders();
+  const HiddenChats = new Set(ReadHiddenChats());
   const Deletable = DesktopSessionsFolder() !== null && Object.keys(Desktop).length > 0;
   const Summaries: Listing[] = [];
 
@@ -625,7 +643,8 @@ export function ListConversations(): Listing[] {
         source: Desktop[Id] ? "desktop" : "claudio",
         starred: Boolean(Desktop[Id] && Desktop[Id].starred),
         archived: Boolean(Desktop[Id] && Desktop[Id].archived),
-        hidden: WorkingDirectory !== null && Hidden.some((Entry) => SameFolder(Entry, WorkingDirectory)),
+        hidden: HiddenChats.has(Id) || (WorkingDirectory !== null && Hidden.some((Entry) => SameFolder(Entry, WorkingDirectory))),
+        chatHidden: HiddenChats.has(Id),
         createdAt: StartedAt(Lines, File),
         updatedAt: EndedAt(Lines, File),
       });

@@ -4269,6 +4269,20 @@ function Chat.SetFlag(Id: string, Flag: string, Value: boolean)
 	Chat.Refresh()
 end
 
+function Chat.SetChatHidden(Id: string, Value: boolean)
+	Chat.MenuFor(nil)
+
+	const Ok, Result = Client.SetChatHidden(Id, Value)
+
+	if not Ok then
+		Chat.Say(`Could not update that chat: {Result}`)
+
+		return
+	end
+
+	Chat.Refresh()
+end
+
 function Chat.SetFolderHidden(Folder: string, Value: boolean)
 	Chat.MenuFolder(nil)
 

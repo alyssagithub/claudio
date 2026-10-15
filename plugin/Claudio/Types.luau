@@ -256,6 +256,7 @@ export type ConversationSummary = {
 	starred: boolean?,
 	archived: boolean?,
 	hidden: boolean?,
+	chatHidden: boolean?,
 	createdAt: number,
 	updatedAt: number,
 }

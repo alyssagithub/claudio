@@ -461,6 +461,10 @@ function Client.RenameConversation(Id: string, Title: string): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/conversations/{Id}/title`, {title = Title})
 end
 
+function Client.SetChatHidden(Id: string, Value: boolean): (boolean, any)
+	return Http.Request("POST", `{BaseUrl()}/conversations/{Id}/hidden`, {value = Value})
+end
+
 function Client.SetFolderHidden(Folder: string, Value: boolean): (boolean, any)
 	return Http.Request("POST", `{BaseUrl()}/conversations/folder/hidden`, {
 		folder = Folder,

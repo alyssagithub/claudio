@@ -329,8 +329,21 @@ return function()
 				Toggle("archived")
 			end),
 			Item(function()
+				const Summary = Chosen()
+
+				return if Summary and Summary.chatHidden then "Show in Claudio" else "Hide from Claudio"
+			end, 6, false, function()
+				const Summary = Chosen()
+
+				if not Summary then
+					return
+				end
+
+				task.spawn(Chat.SetChatHidden, Summary.id, not Summary.chatHidden)
+			end),
+			Item(function()
 				return "Delete"
-			end, 6, true, Delete),
+			end, 7, true, Delete),
 		},
 	}
 end

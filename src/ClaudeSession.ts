@@ -699,12 +699,14 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
   if (Turn.ConversationId) {
     Ended.set(Turn.ConversationId, Date.now());
     Remembered.set(Turn.ConversationId, [Turn.WorkingDirectory, Turn.Session ? Turn.Session.Model : Turn.Model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode, Turn.Planning, Turn.Mode, Turn.Bypass, Turn.OutputStyle, Turn.StepDown]);
-    Finished.push({conversationId: Turn.ConversationId, endedAt: Date.now(), status: Status, text: (Error && Status === "error" ? Error : Text).slice(-600)});
-    Finished.splice(0, Math.max(0, Finished.length - 50));
-    SaveQuietly("FinishTurn", () => UpdateDesktopSession(Turn.ConversationId!, (Session) => {
-      Session.lastActivityAt = Date.now();
-      Session.completedTurns = ((Session.completedTurns as number) || 0) + 1;
-    }));
+    if (!Quiet.has(Turn.Id)) {
+      Finished.push({conversationId: Turn.ConversationId, endedAt: Date.now(), status: Status, text: (Error && Status === "error" ? Error : Text).slice(-600)});
+      Finished.splice(0, Math.max(0, Finished.length - 50));
+      SaveQuietly("FinishTurn", () => UpdateDesktopSession(Turn.ConversationId!, (Session) => {
+        Session.lastActivityAt = Date.now();
+        Session.completedTurns = ((Session.completedTurns as number) || 0) + 1;
+      }));
+    }
   }
 
   for (const Permission of Turn.Permissions.splice(0)) {
@@ -910,6 +912,13 @@ type FinishedTurn = { conversationId: string; endedAt: number; status: string; t
 
 // Recently finished turns, so the plugin can tell you about chats you are not looking at.
 const Finished: FinishedTurn[] = [];
+
+// Turns started for testing, which must not notify anyone or appear in the Claude desktop app.
+const Quiet = new Set<string>();
+
+export function QuietTurn(Id: string) {
+  Quiet.add(Id);
+}
 
 export function FinishedSince(Since: number): FinishedTurn[] {
   return Finished.filter((Entry) => Entry.endedAt > Since);
@@ -1635,8 +1644,11 @@ function RouteMessage(Session: Session, Message: any) {
       SessionAllowances.set(Session.Key, SessionAllowances.get(Turn.Id) || new Set());
       SessionAllowances.delete(Turn.Id);
       RememberOwnSession(Message.session_id);
-      AddDesktopSession(Message.session_id, Session.WorkingDirectory, StripContext(Turn.Prompt).replace(/\s+/g, " ").trim().slice(0, 60));
-      NameConversation(Message.session_id, Turn.Prompt);
+
+      if (!Quiet.has(Turn.Id)) {
+        AddDesktopSession(Message.session_id, Session.WorkingDirectory, StripContext(Turn.Prompt).replace(/\s+/g, " ").trim().slice(0, 60));
+        NameConversation(Message.session_id, Turn.Prompt);
+      }
     }
 
     Publish(Turn, {

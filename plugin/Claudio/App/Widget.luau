@@ -12,7 +12,7 @@ function Widget.Create(CurrentPlugin: Plugin): DockWidgetPluginGui
 	end
 
 	Created.Name = Config.WidgetId
-	Created.Title = `{Config.Name} v{Config.Version}`
+	Created.Title = Config.Name
 	Created.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 	return Created

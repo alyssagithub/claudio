@@ -571,6 +571,7 @@ return function(Props: Props)
 						Name = "Summary",
 						AutomaticSize = Enum.AutomaticSize.XY,
 						BackgroundTransparency = 1,
+						TextTruncate = Enum.TextTruncate.AtEnd,
 						TextColor3 = function()
 							return if Value().status == "error" and not IsCommand(Value().name) and Value().name ~= "TaskNotification" then Theme.Colors.Error() else Theme.Colors.Text()
 						end,
@@ -601,6 +602,7 @@ return function(Props: Props)
 						end,
 
 						Gradient,
+						Create "UIFlexItem" {FlexMode = Enum.UIFlexMode.Shrink},
 					},
 					Chevron {
 						Angle = function()
@@ -659,7 +661,8 @@ return function(Props: Props)
 								return true
 							end
 
-							return Pair().Key ~= "description" and Pair().Key ~= "command"
+							-- The description is already the header, and the time limit says nothing about what ran.
+							return Pair().Key ~= "description" and Pair().Key ~= "timeout"
 						end,
 
 						Create "UIListLayout" {

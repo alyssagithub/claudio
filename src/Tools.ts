@@ -1386,6 +1386,8 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
       Name: "record",
       Description: "Record what the game shows for a few seconds and get the frames back as one grid image, for checking animations, effects, tweens and anything else that moves. In a playtest it records the first player's screen, otherwise the editor's viewport, which must be visible. Give code to start the motion at the moment recording begins, such as loading and playing an animation on a rig; it runs where the recording happens, the client in a playtest. The clip is kept, so pass its path as clip with from and to to look closer at part of it without recording again. Frames are about 24 per second apart at most, so the very fastest movements can fall between them.",
       Schema: {
+        of: z.enum(["viewport", "window"]).optional().describe("viewport, the default, records the 3D view with Studio's own video capture, which leaves out ScreenGuis. window records the whole Studio window as the user sees it, interface included, at about 15 frames a second; use it for anything on a ScreenGui. A window recording is not kept, so clip does not apply to it."),
+        region: z.object({x: z.number(), y: z.number(), width: z.number(), height: z.number()}).optional().describe("For window, record only this part of the Studio window, in the same pixels as a full window capture, such as the game view, so small interface text stays readable."),
         seconds: z.number().optional().describe("How long to record, 2 by default, 10 at most."),
         frames: z.number().optional().describe("How many frames to show, 12 by default, 24 at most, spread evenly over the clip or the from to range."),
         code: z.string().optional().describe("Luau to run as soon as recording starts, to set off the motion. Runs on the client in a playtest, in the editor otherwise."),
@@ -1394,7 +1396,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         from: z.number().optional().describe("Seconds into the clip to start the frames at. 0 by default."),
         to: z.number().optional().describe("Seconds into the clip to end the frames at. The end of the clip by default."),
       },
-      Run: async (Input: { seconds?: number; frames?: number; code?: string; player?: string; clip?: string; from?: number; to?: number }) => {
+      Run: async (Input: { of?: "viewport" | "window"; region?: { x: number; y: number; width: number; height: number }; seconds?: number; frames?: number; code?: string; player?: string; clip?: string; from?: number; to?: number }) => {
         const { KeepClip, PullFrames, ClipLength, Sheet } = await import("./Record.js");
         const Say = (Text: string) => ({content: [{type: "text" as const, text: Text}]});
         const Count = Math.min(Math.max(Math.round(Input.frames || 12), 2), 24);
@@ -1404,6 +1406,47 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
 
         if (process.platform !== "win32") {
           return Say("Recording only works on Windows for now, because the frames are read with Windows' own video decoder.");
+        }
+
+        if (Input.of === "window") {
+          const { BurstWindow } = await import("./Window.js");
+          const Playing = await LiveSession();
+          const Seconds = Math.min(Math.max(Input.seconds || 2, 0.5), 10);
+          const Execute = Tools.find((Tool) => Tool.Name === "execute");
+          let Trigger: Promise<ToolAnswer> | null = null;
+          const Burst = await BurstWindow(null, Seconds * 1000, Input.region || {}, () => {
+            Trigger = Input.code && Execute ? Execute.Run({code: Input.code, target: Playing ? "client" : "edit", player: Input.player, undoName: "Claudio started a recording", timeout: Seconds + 20}) as Promise<ToolAnswer> : null;
+          });
+
+          if (Burst.error) {
+            return Say(Burst.error);
+          }
+
+          const Last = Burst.Frames[Burst.Frames.length - 1].At / 1000;
+          const From = Math.min(Math.max(Input.from || 0, 0), Last);
+          const To = Math.min(Math.max(Input.to ?? Last, From), Last);
+          const Picked = Array.from({length: Count}, (_, Index) => {
+            const Wanted = (From + (To - From) * Index / (Count - 1)) * 1000;
+
+            return Burst.Frames.reduce((Best, Frame) => Math.abs(Frame.At - Wanted) < Math.abs(Best.At - Wanted) ? Frame : Best);
+          });
+          const Unique = [...new Set(Picked)];
+
+          for (const Frame of Burst.Frames.filter((Frame) => !Unique.includes(Frame))) {
+            fs.rmSync(Frame.File, {force: true});
+          }
+
+          const Triggered = Trigger ? await Promise.race([Trigger as Promise<ToolAnswer>, new Promise<null>((Resolve) => setTimeout(() => Resolve(null), 5000))]) : null;
+          const Said = Triggered ? Triggered.content.filter((Part) => Part.type === "text").map((Part) => (Part as { text: string }).text).join(" ").trim() : "";
+
+          return {content: [
+            {type: "image" as const, data: Sheet(Unique.map((Frame) => Frame.File)).toString("base64"), mimeType: "image/png"},
+            {type: "text" as const, text: [
+              `Recorded ${Last.toFixed(2)}s of the Studio window, ${Burst.Frames.length} frames in all.`,
+              `${Unique.length} shown, read left to right then top to bottom, at ${Unique.map((Frame) => `${(Frame.At / 1000).toFixed(2)}s`).join(", ")}.`,
+              ...(Input.code ? [Triggered ? `The code said: ${Said.slice(0, 600) || "nothing"}` : "The code was still running when recording stopped."] : []),
+            ].join(" ")},
+          ]};
         }
 
         if (Clip && !fs.existsSync(Clip)) {

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { PNG } from "pngjs";
 
 type CropResult = {
@@ -309,6 +309,80 @@ export function CaptureWindow(Title: string | null | undefined, Crop: CropBox): 
         height: Number(Height),
         title: Named,
       });
+    });
+  });
+}
+// The same window search as a capture, then frames saved as fast as Windows draws them for the given time,
+// from one process so startup is paid once. Says READY before the first frame, then FRAME|ms|file per frame.
+const BurstScript = Script.slice(0, Script.indexOf("$Width = $Rect.Right")) + `
+$Width = $Rect.Right - $Rect.Left
+$Height = $Rect.Bottom - $Rect.Top
+$Bitmap = New-Object System.Drawing.Bitmap $Width, $Height
+$Codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq 'image/jpeg' }
+$Quality = New-Object System.Drawing.Imaging.EncoderParameters 1
+$Quality.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter ([System.Drawing.Imaging.Encoder]::Quality), 85L
+$Clock = [System.Diagnostics.Stopwatch]::StartNew()
+Write-Output 'READY'
+$Index = 0
+while ($Clock.ElapsedMilliseconds -lt [int]$env:CLAUDIO_BURST_MS) {
+  $At = $Clock.ElapsedMilliseconds
+  $Graphics = [System.Drawing.Graphics]::FromImage($Bitmap)
+  $Context = $Graphics.GetHdc()
+  [void][Shot]::PrintWindow($Found, $Context, 2)
+  $Graphics.ReleaseHdc($Context)
+  $Graphics.Dispose()
+  $File = Join-Path $env:CLAUDIO_BURST_FOLDER ('frame_{0:D4}.jpg' -f $Index)
+  $W = [int]$env:CLAUDIO_CROP_W; $H = [int]$env:CLAUDIO_CROP_H
+  if ($W -gt 0 -and $H -gt 0) {
+    $X = [Math]::Max(0, [Math]::Min([int]$env:CLAUDIO_CROP_X, $Width - 1)); $Y = [Math]::Max(0, [Math]::Min([int]$env:CLAUDIO_CROP_Y, $Height - 1))
+    $Part = $Bitmap.Clone((New-Object System.Drawing.Rectangle $X, $Y, ([Math]::Min($W, $Width - $X)), ([Math]::Min($H, $Height - $Y))), $Bitmap.PixelFormat)
+    $Part.Save($File, $Codec, $Quality)
+    $Part.Dispose()
+  } else {
+    $Bitmap.Save($File, $Codec, $Quality)
+  }
+  Write-Output ('FRAME|' + $At + '|' + $File)
+  $Index += 1
+}
+$Bitmap.Dispose()
+`;
+
+export function BurstWindow(Title: string | null | undefined, Milliseconds: number, Crop: CropBox, OnReady: () => void): Promise<{ error?: string; Frames: { At: number; File: string }[] }> {
+  const Folder = fs.mkdtempSync(path.join(os.tmpdir(), "claudio-burst-"));
+  const Frames: { At: number; File: string }[] = [];
+
+  return new Promise((Resolve) => {
+    const Child = spawn("powershell", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", BurstScript], {
+      windowsHide: true,
+      env: {...process.env, CLAUDIO_WINDOW_TITLE: Title || "", CLAUDIO_BURST_MS: String(Math.round(Milliseconds)), CLAUDIO_BURST_FOLDER: Folder, CLAUDIO_CROP_X: String(Crop.x || 0), CLAUDIO_CROP_Y: String(Crop.y || 0), CLAUDIO_CROP_W: String(Crop.width || 0), CLAUDIO_CROP_H: String(Crop.height || 0)},
+    });
+    let Carried = "";
+    let Failed = "";
+    const Limit = setTimeout(() => Child.kill(), Milliseconds + 30000);
+
+    Child.stdout.on("data", (Chunk: Buffer) => {
+      const Lines = (Carried + Chunk.toString()).split(/\r?\n/);
+
+      Carried = Lines.pop() || "";
+
+      for (const Line of Lines) {
+        if (Line === "READY") {
+          OnReady();
+        } else if (Line.startsWith("FRAME|")) {
+          const [, At, File] = Line.split("|");
+
+          Frames.push({At: Number(At), File});
+        } else if (Line.startsWith("NONE|")) {
+          Failed = Title ? `No Studio window has "${Title}" in its title.` : "No Roblox Studio window is open.";
+        }
+      }
+    });
+    Child.stderr.on("data", (Chunk: Buffer) => {
+      Failed ||= Chunk.toString().trim().slice(0, 300);
+    });
+    Child.on("close", () => {
+      clearTimeout(Limit);
+      Resolve(Frames.length > 0 ? {Frames} : {error: Failed || "The window recording produced no frames.", Frames});
     });
   });
 }

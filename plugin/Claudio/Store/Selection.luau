@@ -333,7 +333,19 @@ function Selection.IndexAt(Box: TextBox, Point: Vector2, Rich: string?): number
 	const From, Fit = Row[1], Row[2]
 	local Best = From
 
+	-- Only character starts are places to land: measuring partway through a character such as a bullet
+	-- draws a wide junk glyph, which put clicks on the word after it back at the bullet.
+	const function Starts(Index: number): boolean
+		const Byte = Text:byte(Index)
+
+		return Byte == nil or Byte < 0x80 or Byte >= 0xC0
+	end
+
 	for Index = From, Fit do
+		if not Starts(Index) then
+			continue
+		end
+
 		if Measure(From, Index - 1) > X then
 			break
 		end
@@ -341,14 +353,20 @@ function Selection.IndexAt(Box: TextBox, Point: Vector2, Rich: string?): number
 		Best = Index
 	end
 
-	if Best >= Fit or Best <= From then
+	if Best >= Fit then
 		return math.min(Best, #Text + 1)
 	end
 
-	const Before = Measure(From, Best - 1)
-	const After = Measure(From, Best)
+	local Next = Best + 1
 
-	return math.min(if X - Before > After - X then Best + 1 else Best, #Text + 1)
+	while Next < Fit and not Starts(Next) do
+		Next += 1
+	end
+
+	const Before = Measure(From, Best - 1)
+	const After = Measure(From, Next - 1)
+
+	return math.min(if X - Before > After - X then Next else Best, #Text + 1)
 end
 
 function Selection.Word(Box: TextBox, At: number): (number, number)

@@ -1284,10 +1284,11 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         paths: z.array(z.string()).optional().describe("Instances to save. Give these to save, leave them out to load."),
         path: z.string().optional().describe("Where to put what is loaded, such as Workspace."),
         undoName: z.string().optional().describe("What the undo step should be called, when loading."),
+        replace: z.boolean().optional().describe("When loading, first remove anything already under path with the same name as what is loaded, so repeated loads replace the earlier copy instead of piling up copies."),
         compare: z.boolean().optional().describe("With file, compare instead of loading: lists what is in the file but missing from the place, and what only the place has, matched by position in the tree rather than by dotted paths. Services in a place file are compared to the real services; anything else is compared to the children of path, or game. Nothing is changed."),
         services: z.array(z.string()).optional().describe("When loading a place file (.rbxl), which services to take, such as [\"Workspace\", \"ServerStorage\"]. Each comes in as a folder of that name holding its contents, since services themselves cannot be moved. All of them by default."),
       },
-      Run: async (Input: { file: string; folder?: string; name?: string; paths?: string[]; path?: string; undoName?: string; services?: string[]; compare?: boolean }) => {
+      Run: async (Input: { file: string; folder?: string; name?: string; paths?: string[]; path?: string; undoName?: string; services?: string[]; compare?: boolean; replace?: boolean }) => {
         let Tree: DiskNode | undefined;
 
         if (Input.folder) {
@@ -1352,6 +1353,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
             undoName: Input.undoName,
             services: Input.services,
             compare: Input.compare,
+            replace: Input.replace,
           }), "Studio did not say what happened."),
         }]};
       },

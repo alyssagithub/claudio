@@ -4,7 +4,7 @@ const Pacing = require(script.Parent.Pacing)
 
 const Fresh = {}
 
-local Loaded: {[ModuleScript]: {any}} = {}
+local Loaded: {[ModuleScript]: {Value: any, Source: string}} = {}
 const Loading: {[ModuleScript]: boolean} = {}
 
 local Load: (any, Instance?) -> any
@@ -86,10 +86,12 @@ Load = function(Target: any, From: Instance?): any
 		return require(Target)
 	end
 
+	-- Reused only while the source is unchanged, so editing a module and loading it again in the same call
+	-- runs the new source.
 	const Held = Loaded[Target]
 
-	if Held then
-		return Held[1]
+	if Held and Held.Source == Target.Source then
+		return Held.Value
 	end
 
 	if Loading[Target] then
@@ -126,7 +128,7 @@ Load = function(Target: any, From: Instance?): any
 		error(`{Target:GetFullName()} returned {Results.n - 1} values; a module must return exactly one.`, 2)
 	end
 
-	Loaded[Target] = {Results[2]}
+	Loaded[Target] = {Value = Results[2], Source = Target.Source}
 
 	return Results[2]
 end

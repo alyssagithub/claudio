@@ -21,6 +21,9 @@ const Assets: Record<string, string> = {
 
 const Ignored = /Key 'Source' not found in external type 'LuaSourceContainer'/;
 
+// TestEZ gives its .spec scripts these as globals, so they are not mistakes there.
+const TestGlobals = /Unknown global '(describe|it|expect|beforeAll|afterAll|beforeEach|afterEach|FOCUS|SKIP|fit|fdescribe|xit|xdescribe|describeFOCUS|describeSKIP|itFOCUS|itSKIP|itFIXME)'/;
+
 let Ready: Promise<string | null> | null = null;
 
 function Binary(): string {
@@ -507,7 +510,8 @@ async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]
     }
 
     const Unique = [...Lines].sort((Left, Right) => Number(Left.match(/\d+/)![0]) - Number(Right.match(/\d+/)![0]));
-    const Kept = Raw === true ? Unique : Unique.filter((Line) => !Ignored.test(Line));
+    const Spec = /.spec$/.test(Script);
+    const Kept = (Raw === true ? Unique : Unique.filter((Line) => !Ignored.test(Line))).filter((Line) => !Spec || !TestGlobals.test(Line));
 
     if (Kept.length > 0) {
       Report.push({

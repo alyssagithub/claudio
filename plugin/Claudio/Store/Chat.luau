@@ -1545,6 +1545,22 @@ const function Rbxm(Input: any): any
 		const Step = StartStep("ClaudioRbxm", Input.undoName or "Claudio loaded an rbxm")
 		const Names = {}
 		const Skipped = {}
+		local Replaced = 0
+
+		-- With replace, an earlier copy of the same name is removed first, so repeated loads do not pile up
+		-- copies that a later FindFirstChild could pick the wrong one of.
+		const function Clear(Name: string)
+			if Input.replace ~= true then
+				return
+			end
+
+			for _, Old in (Parent :: Instance):GetChildren() do
+				if Old.Name == Name then
+					Old:Destroy()
+					Replaced += 1
+				end
+			end
+		end
 		const Wanted = if typeof(Input.services) == "table" and #Input.services > 0 then Input.services else nil
 
 		for _, Object in Made do
@@ -1555,6 +1571,10 @@ const function Rbxm(Input: any): any
 			end
 
 			const Found, Service = pcall(game.FindService, game, Object.ClassName)
+
+			if not (Found and Service) then
+				Clear(Object.Name)
+			end
 
 			if not (Found and Service) and pcall(function()
 				Object.Parent = Parent
@@ -1576,6 +1596,7 @@ const function Rbxm(Input: any): any
 				end
 			end
 
+			Clear(Holder.Name)
 			Holder.Parent = Parent
 			table.insert(Names, `{Object.Name} (as a folder)`)
 		end
@@ -1590,7 +1611,7 @@ const function Rbxm(Input: any): any
 			end
 		end
 
-		return {text = `Put {#Names} under {(Parent :: Instance):GetFullName()}: {table.concat(Names, ", ")}{if #Skipped > 0 then `. Left out {#Skipped} that cannot be moved: {table.concat(Skipped, ", ", 1, math.min(#Skipped, 10))}` else ""}{if #Missing > 0 then `. Not in what Studio read from the file: {table.concat(Missing, ", ")}. Studio leaves Workspace out when it reads a place file, so Workspace cannot be loaded this way.` else ""}`}
+		return {text = `Put {#Names} under {(Parent :: Instance):GetFullName()}{if Replaced > 0 then `, replacing {Replaced} earlier {if Replaced == 1 then "copy" else "copies"}` else ""}: {table.concat(Names, ", ")}{if #Skipped > 0 then `. Left out {#Skipped} that cannot be moved: {table.concat(Skipped, ", ", 1, math.min(#Skipped, 10))}` else ""}{if #Missing > 0 then `. Not in what Studio read from the file: {table.concat(Missing, ", ")}. Studio leaves Workspace out when it reads a place file, so Workspace cannot be loaded this way.` else ""}`}
 	end
 
 	const Wanted = {}
@@ -3156,6 +3177,7 @@ end
 const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, string, Types.Turn?)
 	local Version = -1
 	local Fetched = 0
+	local Unreadable = 0
 
 	const Pending: {[number]: boolean} = {}
 
@@ -3166,9 +3188,31 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 			return "cancelled", "", nil
 		end
 
+		-- An update that does not match what the panel expects is skipped rather than ending the turn, which
+		-- used to leave a long error on the reply and the panel showing a turn that had long since finished.
+		const Problem = if Polled then nil else tostring(State)
+
+		if Problem and Problem:find("^The bridge sent something unexpected") then
+			Unreadable += 1
+
+			if Unreadable == 1 then
+				warn(`Claudio skipped a reply update it could not read: {Problem:sub(1, 400)}`)
+			end
+
+			if Unreadable < 30 then
+				task.wait(1)
+
+				continue
+			end
+
+			return "error", "Claudio could not read this reply's progress, so it stopped following it. Reopen the chat to see where it got to.", nil
+		end
+
 		if not Polled then
 			return "error", `Lost contact with the bridge: {State}. Check it's running, then send again.`, nil
 		end
+
+		Unreadable = 0
 
 		Version = State.version
 		Chat.StreamingText(State.text or "")

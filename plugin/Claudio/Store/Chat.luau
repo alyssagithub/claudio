@@ -1697,6 +1697,50 @@ const function Changed(Input: any): any
 	return {lines = Lines}
 end
 
+const Corners = {
+	Vector3.new(-1, -1, -1),
+	Vector3.new(-1, -1, 1),
+	Vector3.new(-1, 1, -1),
+	Vector3.new(-1, 1, 1),
+	Vector3.new(1, -1, -1),
+	Vector3.new(1, -1, 1),
+	Vector3.new(1, 1, -1),
+	Vector3.new(1, 1, 1),
+}
+
+-- The box around a part, a model, or anything else holding parts such as a folder, for framing and cropping.
+const function Bounds(Object: Instance): (CFrame?, Vector3?)
+	if Object:IsA("Model") then
+		return (Object :: Model):GetBoundingBox()
+	end
+
+	if Object:IsA("BasePart") then
+		return (Object :: BasePart).CFrame, (Object :: BasePart).Size
+	end
+
+	local Low = Vector3.one * math.huge
+	local High = -Vector3.one * math.huge
+
+	for _, Part in Object:GetDescendants() do
+		if not Part:IsA("BasePart") then
+			continue
+		end
+
+		for _, Corner in Corners do
+			const Point = Part.CFrame:PointToWorldSpace(Part.Size * Corner / 2)
+
+			Low = Low:Min(Point)
+			High = High:Max(Point)
+		end
+	end
+
+	if Low.X == math.huge then
+		return nil, nil
+	end
+
+	return CFrame.new((Low + High) / 2), High - Low
+end
+
 const function ScreenBounds(Object: Instance, Viewport: Vector2): any
 	if Object:IsA("GuiObject") then
 		const Shown = Object :: GuiObject
@@ -1715,22 +1759,13 @@ const function ScreenBounds(Object: Instance, Viewport: Vector2): any
 		}
 	end
 
-	local Half: Vector3
-	local Frame: CFrame
+	const Frame, Size = Bounds(Object)
 
-	if Object:IsA("Model") then
-		const Box, Size = (Object :: Model):GetBoundingBox()
-
-		Frame = Box
-		Half = Size / 2
-	elseif Object:IsA("BasePart") then
-		const Part = Object :: BasePart
-
-		Frame = Part.CFrame
-		Half = Part.Size / 2
-	else
-		return {error = `{Object.Name} is neither a GuiObject nor something with a position, so there is nothing to crop to.`}
+	if not Frame or not Size then
+		return {error = `{Object.Name} is neither a GuiObject nor something with parts in it, so there is nothing to crop to.`}
 	end
+
+	const Half = Size / 2
 
 	const Camera = workspace.CurrentCamera
 	local Left, Top = math.huge, math.huge
@@ -1975,25 +2010,19 @@ const function Frame(Input: any): any
 			}
 		end
 
-		const Model = if Object:IsA("Model") then Object :: Model else nil
-		local Middle: Vector3
-		local Reach: number
+		const Box, Size = Bounds(Object)
 
-		if Model then
-			const Box, Size = Model:GetBoundingBox()
-
-			Middle = Box.Position
-			Reach = Size.Magnitude
-		elseif Object:IsA("BasePart") then
-			Middle = (Object :: BasePart).Position
-			Reach = (Object :: BasePart).Size.Magnitude
-		else
-			return {error = `{Object.Name} is not something with a position, so the camera cannot frame it.`}
+		if not Box or not Size then
+			return {error = `{Object.Name} has no parts in it, so the camera has nothing to frame.`}
 		end
 
-		const Away = math.max(Reach, 1) / (2 * math.tan(math.rad(Camera.FieldOfView / 2))) * 1.6
+		const Middle = Box.Position
+		const Reach = Size.Magnitude
 
-		Camera.CFrame = CFrame.lookAt(Middle + Vector3.new(Away, Away * 0.5, Away), Middle)
+		-- Close enough that the whole target just fits the view, so a crop around it keeps plenty of pixels.
+		const Away = math.max(Reach, 1) / 2 / math.sin(math.rad(Camera.FieldOfView / 2)) * 1.05
+
+		Camera.CFrame = CFrame.lookAt(Middle + Vector3.new(1, 0.5, 1).Unit * Away, Middle)
 
 		task.wait(0.2)
 

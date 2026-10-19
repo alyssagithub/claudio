@@ -150,7 +150,12 @@ function Raw(Kind: string, Input: unknown, Timeout?: number | null, Role?: strin
 
       if (Index >= 0) {
         Pending.splice(Index, 1);
-        Give({error: "Studio did not pick this up. Check the plugin is connected and a place is open."});
+        // A Studio that checked in shortly before is connected but busy, usually still inside earlier code.
+        const Last = Heard.get(Role || "edit") || 0;
+
+        Give({error: Date.now() - Last < 180000 && Date.now() - Last > 5000
+          ? `Studio did not pick this up: it last checked in ${Math.round((Date.now() - Last) / 1000)}s ago and has been busy since, most likely still running earlier code inside one long call. Try again once that finishes.`
+          : "Studio did not pick this up. Check the plugin is connected and a place is open."});
 
         return;
       }

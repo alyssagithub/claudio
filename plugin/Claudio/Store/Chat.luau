@@ -2536,6 +2536,8 @@ end
 const Runs: {[string]: any} = {}
 const RunOrder: {string} = {}
 const Workers: {[string]: thread} = {}
+-- What each run has printed so far and when it began, so asking after a run that is still going shows progress.
+const RunLogs: {[string]: {Said: {string}, Started: number}} = {}
 
 const function Waiting(Run: string): string
 	const Worker = Workers[Run]
@@ -2573,7 +2575,14 @@ const function Execute(Input: any): any
 			return {error = `Claudio has no run called "{Input.resultOf}". Results are kept for the last 20 runs since the plugin last loaded.`}
 		end
 
-		return if Kept == "running" or Kept == "cancelling" then {result = `{if Kept == "running" then "That run is still going and still able to change the place. Check again in a moment, or cancel it." else "That run is stopping."}{Waiting(Input.resultOf)}`} else Kept
+		if Kept ~= "running" and Kept ~= "cancelling" then
+			return Kept
+		end
+
+		const Log = RunLogs[Input.resultOf]
+		const Progress = if Log then ` It has been running for {math.floor(os.clock() - Log.Started)}s{if #Log.Said > 0 then ` and last printed:\n{table.concat(Log.Said, "\n", math.max(1, #Log.Said - 9))}` else ", and has printed nothing yet; print progress in long loops to see how far it gets"}.` else ""
+
+		return {result = `{if Kept == "running" then "That run is still going and still able to change the place. Check again in a moment, or cancel it." else "That run is stopping."}{Progress}{Waiting(Input.resultOf)}`}
 	end
 
 	const Run = if typeof(Input.run) == "string" then Input.run else nil
@@ -2583,7 +2592,10 @@ const function Execute(Input: any): any
 		table.insert(RunOrder, Run)
 
 		if #RunOrder > 20 then
-			Runs[table.remove(RunOrder, 1) :: string] = nil
+			const Oldest = table.remove(RunOrder, 1) :: string
+
+			Runs[Oldest] = nil
+			RunLogs[Oldest] = nil
 		end
 	end
 
@@ -2617,6 +2629,10 @@ const function Execute(Input: any): any
 
 			return if Line < 1 then `the module, line {Line + Offset - 1}: ` else `line {Line}: `
 		end))
+	end
+
+	if Run then
+		RunLogs[Run] = {Said = Said, Started = os.clock()}
 	end
 
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)

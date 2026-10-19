@@ -856,7 +856,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         if (Input.resultOf || Input.cancel) {
           return {content: [{
             type: "text",
-            text: ExecuteReport(await ReachIn(Where === "edit" ? "edit" : "server", "execute", {resultOf: Input.resultOf, cancel: Input.cancel, target: Where, player: Input.player}, 30)),
+            text: ExecuteReport(await ReachIn(Where === "edit" ? "edit" : "server", "execute", {resultOf: Input.resultOf, cancel: Input.cancel, target: Where, player: Input.player}, 120)),
           }]};
         }
 

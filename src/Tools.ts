@@ -743,6 +743,85 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
           return Picture(Cropped.data, `${Cropped.width}x${Cropped.height} of the "${Marked.title}" panel, at ${Cropped.x}, ${Cropped.y} in the window "${Taken.title}"`);
         }
 
+        // During a playtest the editor's viewport is not drawn, so the shot is taken on the player's client with
+        // Studio's own screenshot, which it saves as a PNG in its capture folder, and read from there.
+        if (!Input.path && !Input.quality && process.platform === "win32" && await LiveSession()) {
+          const Folder = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "Roblox", "tmp-capture-storage");
+          const Began = Date.now();
+          const Taken = await ReachIn("server", "execute", {target: "client", player: Input.player, readOnly: true, timeout: 30, code: `local Got
+local Started = os.clock()
+game:GetService("CaptureService"):CaptureScreenshot(function(Content) Got = Content end)
+while not Got and os.clock() - Started < 10 do task.wait(0.05) end
+local Bounds
+local Target = ${JSON.stringify(Input.around || "")}
+if Target ~= "" then
+	local Object = game
+	for Name in Target:gsub("^[Gg]ame%.", ""):gmatch("[^%.]+") do
+		Object = if Object == game then game:FindFirstChild(Name) or game:GetService(Name) else Object:FindFirstChild(Name)
+		if not Object then break end
+	end
+	if Object and Object:IsA("GuiObject") then
+		local Inset = game:GetService("GuiService"):GetGuiInset()
+		Bounds = {Object.AbsolutePosition.X + Inset.X, Object.AbsolutePosition.Y + Inset.Y, Object.AbsolutePosition.X + Inset.X + Object.AbsoluteSize.X, Object.AbsolutePosition.Y + Inset.Y + Object.AbsoluteSize.Y}
+	elseif Object and (Object:IsA("BasePart") or Object:IsA("Model")) then
+		local Frame, Size
+		if Object:IsA("Model") then Frame, Size = Object:GetBoundingBox() else Frame, Size = Object.CFrame, Object.Size end
+		local Camera = workspace.CurrentCamera
+		local Left, Top, Right, Bottom = math.huge, math.huge, -math.huge, -math.huge
+		for _, X in {-1, 1} do for _, Y in {-1, 1} do for _, Z in {-1, 1} do
+			local Point = Camera:WorldToViewportPoint(Frame:PointToWorldSpace(Size * Vector3.new(X, Y, Z) / 2))
+			Left, Top, Right, Bottom = math.min(Left, Point.X), math.min(Top, Point.Y), math.max(Right, Point.X), math.max(Bottom, Point.Y)
+		end end end
+		Bounds = {Left, Top, Right, Bottom}
+	end
+end
+return {shot = Got and tostring(Got) or nil, bounds = Bounds}`}, 40) as { error?: string; result?: unknown } | null;
+          // Session code hands tables back as JSON text.
+          const Found = (() => {
+            try {
+              return (typeof Taken?.result === "string" ? JSON.parse(Taken.result) : Taken?.result) as { shot?: string; bounds?: number[] } | undefined;
+            } catch {
+              return undefined;
+            }
+          })();
+          let Saved: string | null = null;
+
+          for (let Waited = 0; Waited < 20 && !Saved && Found && Found.shot; Waited += 1) {
+            Saved = fs.readdirSync(Folder).map((Name) => path.join(Folder, Name)).filter((File) => fs.statSync(File).mtimeMs >= Began - 1000).sort((Left, Right) => fs.statSync(Right).mtimeMs - fs.statSync(Left).mtimeMs)[0] || null;
+
+            if (!Saved) {
+              await new Promise((Resolve) => setTimeout(Resolve, 250));
+            }
+          }
+
+          if (Saved) {
+            let Data = fs.readFileSync(Saved).toString("base64");
+            const { PNG } = await import("pngjs");
+            const Size = PNG.sync.read(Buffer.from(Data, "base64"));
+            const Bounds = Found && Found.bounds;
+            let Said = `${Size.width}x${Size.height} of the player's screen in the playtest`;
+            const Region = Bounds
+              ? {x: Bounds[0] - (Input.padding ?? 8), y: Bounds[1] - (Input.padding ?? 8), width: Bounds[2] - Bounds[0] + 2 * (Input.padding ?? 8), height: Bounds[3] - Bounds[1] + 2 * (Input.padding ?? 8)}
+              : Input.width && Input.height ? {x: Input.x || 0, y: Input.y || 0, width: Input.width, height: Input.height} : null;
+
+            if (Input.around && !Bounds) {
+              Said += `, not cropped because ${Input.around} is not a part, model or GuiObject on that client`;
+            }
+
+            if (Region) {
+              const Left = Math.max(0, Math.min(Size.width - 1, Math.round(Region.x)));
+              const Top = Math.max(0, Math.min(Size.height - 1, Math.round(Region.y)));
+              const Wide = Math.max(1, Math.min(Size.width - Left, Math.round(Region.width)));
+              const Tall = Math.max(1, Math.min(Size.height - Top, Math.round(Region.height)));
+
+              Data = Cut(Data, Left, Top, Wide, Tall);
+              Said += `, cropped to ${Wide}x${Tall} at ${Left}, ${Top}${Input.around ? ` around ${Input.around}` : ""}`;
+            }
+
+            return Picture(Data, Said);
+          }
+        }
+
         const { EncodePixels } = await import("./Capture.js");
 
         let Framed: { error?: string; framed?: string; restore?: boolean } | null = null;

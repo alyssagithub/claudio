@@ -676,6 +676,27 @@ function SaveQuietly(Where: string, Save: () => void) {
   }
 }
 
+// How long each chat's transcript was when Claudio last finished a turn in it. A chat continued somewhere else,
+// such as the Claude desktop app, grows its transcript without Claudio's open session seeing those messages,
+// so a longer file means the session has to be opened again from the file.
+const KnownSizes = new Map<string, number>();
+
+function TranscriptSize(Id: string): number {
+  const File = FindFile(Id);
+
+  try {
+    return File ? fs.statSync(File).size : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function RememberSize(Id: string) {
+  KnownSizes.set(Id, TranscriptSize(Id));
+  // Claude Code finishes writing a turn shortly after reporting it done, so take the size again a moment later.
+  setTimeout(() => KnownSizes.set(Id, TranscriptSize(Id)), 5000).unref();
+}
+
 function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
   if (Turn.Status !== "running" && Turn.Status !== "cancelling") {
     return;
@@ -698,6 +719,7 @@ function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
   }
 
   if (Turn.ConversationId) {
+    RememberSize(Turn.ConversationId);
     Ended.set(Turn.ConversationId, Date.now());
     Remembered.set(Turn.ConversationId, [Turn.WorkingDirectory, Turn.Session ? Turn.Session.Model : Turn.Model, Turn.Effort, Turn.AskForTools, Turn.ExtraPrompt, Turn.FastMode, Turn.Planning, Turn.Mode, Turn.Bypass, Turn.OutputStyle, Turn.StepDown]);
     if (!Quiet.has(Turn.Id)) {
@@ -2575,10 +2597,11 @@ export function StartTurn(Request: TurnRequest) {
   LastFolder = Turn.WorkingDirectory;
 
   const Warm = ConversationId ? Sessions.get(ConversationId) : TakeSpare(Chosen.model, Chosen.effort);
-  const Fits = Warm && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory && Warm.Planning === Turn.Planning && Warm.Mode === PermissionModeFor(Turn.Mode, Turn.Bypass);
+  const Outside = Boolean(ConversationId && Warm && KnownSizes.has(ConversationId) && TranscriptSize(ConversationId) > (KnownSizes.get(ConversationId) || 0));
+  const Fits = Warm && !Outside && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory && Warm.Planning === Turn.Planning && Warm.Mode === PermissionModeFor(Turn.Mode, Turn.Bypass);
   // Closing a session also stops its background agents, so while any are working the chat keeps its session
   // even when a setting changed, rather than losing that work.
-  const Busy = !Fits && Warm && !Warm.CurrentTurn && !Warm.Ended && Warm.Background.size > 0;
+  const Busy = !Fits && !Outside && Warm && !Warm.CurrentTurn && !Warm.Ended && Warm.Background.size > 0;
   const Reusable = Fits || Busy;
 
   if (Busy) {
@@ -2587,6 +2610,7 @@ export function StartTurn(Request: TurnRequest) {
 
   if (Warm && !Reusable) {
     const Reasons = [
+      Outside && "continued outside Claudio since",
       Warm.CurrentTurn && "busy",
       Warm.Ended && "ended",
       EffortRank(Chosen.effort) > EffortRank(Warm.Effort) && `effort ${Warm.Effort || "none"} under ${Chosen.effort || "none"}`,

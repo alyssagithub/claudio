@@ -14,6 +14,59 @@ const Icon = require(script.Parent.Icon)
 const Create = Vide.create
 
 const Edge = 18
+
+-- The same early warnings Claude Code gives: a limit counts as running ahead of pace once this share of it is
+-- used while no more than this share of its window has passed.
+const Paces = {
+	five_hour = {
+		Window = 5 * 60 * 60,
+		Thresholds = {
+			{Used = 0.9, Passed = 0.72},
+		},
+	},
+	seven_day = {
+		Window = 7 * 24 * 60 * 60,
+		Thresholds = {
+			{Used = 0.75, Passed = 0.6},
+			{Used = 0.5, Passed = 0.35},
+			{Used = 0.25, Passed = 0.15},
+		},
+	},
+}
+
+-- How a limit is going at the pace used so far in its window: whether it is ahead of pace, and when it would
+-- run out if that pace keeps up.
+const function Pace(Limit: Types.Limit): (string, boolean)
+	const Rules: {Window: number, Thresholds: {{Used: number, Passed: number}}}? = if Limit.kind == "five_hour" then Paces.five_hour elseif Limit.kind:find("^seven_day") then Paces.seven_day else nil
+	const Used = Limit.utilization
+
+	if not Rules or not Used or not Limit.resetsAt or Used <= 0 then
+		return "", false
+	end
+
+	const Now = os.time()
+	const Elapsed = Rules.Window - (Limit.resetsAt - Now)
+
+	if Elapsed <= 0 or Used >= 1 then
+		return "", false
+	end
+
+	local Ahead = false
+
+	for _, Rule in Rules.Thresholds do
+		if Used >= Rule.Used and Elapsed / Rules.Window <= Rule.Passed then
+			Ahead = true
+		end
+	end
+
+	const Empty = Now + (1 - Used) * Elapsed / Used
+
+	if Empty >= Limit.resetsAt then
+		return "At this pace it lasts until it resets", false
+	end
+
+	return `{if Ahead then "Ahead of pace: at" else "At"} this pace it runs out {(Format.Until(math.floor(Empty)):gsub("^Resets ", ""))}, before it resets`, Ahead
+end
 const Kinds = {
 	["Session usage"] = "five_hour",
 	["5-hour usage"] = "five_hour",
@@ -651,6 +704,28 @@ return function()
 
 							Create "UICorner" {CornerRadius = UDim.new(1, 0)},
 						},
+					},
+					Create "TextLabel" {
+						Name = "Pace",
+						Size = UDim2.fromScale(1, 0),
+						AutomaticSize = Enum.AutomaticSize.Y,
+						BackgroundTransparency = 1,
+						TextSize = Settings.SmallText,
+						FontFace = Font.fromEnum(Enum.Font.BuilderSans),
+						TextXAlignment = Enum.TextXAlignment.Left,
+						TextWrapped = true,
+						LayoutOrder = 3,
+						TextColor3 = function()
+							const _, Ahead = Pace(Limit())
+
+							return if Ahead then Color3.fromRGB(214, 158, 46) else Theme.Colors.DimText()
+						end,
+						Visible = function()
+							return (Pace(Limit())) ~= ""
+						end,
+						Text = function()
+							return (Pace(Limit()))
+						end,
 					},
 				}
 			end),

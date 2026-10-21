@@ -213,7 +213,14 @@ export function ExecuteReport(Found: ExecuteAnswer) {
   }
 
   if (Found.output && Found.output.length > 0) {
-    Parts.push(Found.output.join("\n"));
+    // The same line printed many times, such as an engine warning repeating every frame, is shown once with a count.
+    const Counts = new Map<string, number>();
+
+    for (const Line of Found.output) {
+      Counts.set(Line, (Counts.get(Line) || 0) + 1);
+    }
+
+    Parts.push([...Counts].map(([Line, Count]) => Count > 1 ? `${Line} (×${Count})` : Line).join("\n"));
   }
 
   if (Parts.length === 0) {

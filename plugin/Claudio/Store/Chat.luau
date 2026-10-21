@@ -2635,18 +2635,32 @@ const function Execute(Input: any): any
 		RunLogs[Run] = {Said = Said, Started = os.clock()}
 	end
 
+	-- A line printed again is counted on its first copy instead of added, so a warning repeating every frame
+	-- takes one line rather than filling the output.
+	const Positions: {[string]: {Index: number, Count: number}} = {}
+
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
+		const Line = if Kind == Enum.MessageType.MessageOutput then Placed(Message) elseif Kind == Enum.MessageType.MessageWarning then `warn: {Placed(Message)}` elseif Kind == Enum.MessageType.MessageError then `error: {Placed(Message)}` else nil
+
+		if not Line then
+			return
+		end
+
+		const Seen = Positions[Line]
+
+		if Seen then
+			Seen.Count += 1
+			Said[Seen.Index] = `{Line} (×{Seen.Count})`
+
+			return
+		end
+
 		if #Said >= 200 then
 			return
 		end
 
-		if Kind == Enum.MessageType.MessageOutput then
-			table.insert(Said, Placed(Message))
-		elseif Kind == Enum.MessageType.MessageWarning then
-			table.insert(Said, `warn: {Placed(Message)}`)
-		elseif Kind == Enum.MessageType.MessageError then
-			table.insert(Said, `error: {Placed(Message)}`)
-		end
+		table.insert(Said, Line)
+		Positions[Line] = {Index = #Said, Count = 1}
 	end)
 
 	const Step = if Input.readOnly ~= true then StartStep("ClaudioExecute", Input.undoName or "Claudio ran a script") else nil

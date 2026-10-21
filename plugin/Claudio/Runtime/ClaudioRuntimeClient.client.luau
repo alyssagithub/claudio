@@ -484,9 +484,26 @@ end
 
 const function Run(Code: string, Within: string?, Current: string?): any
 	const Said = {}
+	-- A repeated line is counted on its first copy instead of added again, so a warning repeating every frame
+	-- takes one line.
+	const Positions: {[string]: {Index: number, Count: number}} = {}
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
-		if #Said < 200 and Kind ~= Enum.MessageType.MessageInfo then
+		if Kind == Enum.MessageType.MessageInfo then
+			return
+		end
+
+		const Seen = Positions[Message]
+
+		if Seen then
+			Seen.Count += 1
+			Said[Seen.Index] = `{Message} (×{Seen.Count})`
+
+			return
+		end
+
+		if #Said < 200 then
 			table.insert(Said, Message)
+			Positions[Message] = {Index = #Said, Count = 1}
 		end
 	end)
 

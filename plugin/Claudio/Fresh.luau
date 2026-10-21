@@ -9,6 +9,7 @@ const Loading: {[ModuleScript]: boolean} = {}
 
 local Load: (any, Instance?) -> any
 local Rested = os.clock()
+local Depth = 0
 
 -- Modules loaded here run on Studio's main thread like execute code does, so their loops get the same
 -- pauses execute inserts; without them a long simulation inside a module froze Studio until it offered
@@ -113,12 +114,46 @@ Load = function(Target: any, From: Instance?): any
 	}, {__index = getfenv(0)}))
 
 	Loading[Target] = true
+	Depth += 1
 
-	const Results = table.pack(xpcall(Chunk, function(Trouble: any): any
-		return Trouble
-	end))
+	const Mine = Depth
+	const Began = os.clock()
+	local Results: any
+	const function Execute()
+		Results = table.pack(xpcall(Chunk, function(Trouble: any): any
+			return Trouble
+		end))
+	end
+	const Worker = if coroutine.isyieldable() then task.spawn(Execute) else nil
+
+	if not Worker then
+		Execute()
+	end
+
+	-- A module whose top-level code waits on something that only exists in a running game, such as a remote
+	-- made by the server, would hold the caller until its time limit. Paused for 5 seconds without taking a
+	-- loop step, it is stopped and named. Only the module loading deepest is watched, so the report names the
+	-- one actually waiting rather than the modules that required it.
+	while not Results and Worker do
+		if Depth == Mine and os.clock() - math.max(Rested, Began) > 5 and coroutine.status(Worker) == "suspended" then
+			const Where = {}
+
+			for Line in debug.traceback(Worker :: thread):gmatch("[^\n]+") do
+				table.insert(Where, Line)
+			end
+
+			task.cancel(Worker :: thread)
+			Loading[Target] = nil
+			Depth -= 1
+
+			error(`{Target:GetFullName()} did not finish loading: its top-level code has been waiting for over 5 seconds, most likely for something that only exists in a running game, such as an instance or remote the server creates. Load it in a playtest instead, or test the parts that do not need it. It was waiting at:\n{table.concat(Where, "\n")}`, 0)
+		end
+
+		task.wait(0.1)
+	end
 
 	Loading[Target] = nil
+	Depth -= 1
 
 	if not Results[1] then
 		error(Results[2], 0)

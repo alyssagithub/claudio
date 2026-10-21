@@ -6,7 +6,7 @@ import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { AllowedTools, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, EffortOrder, PlanInstructions, CommandsCacheFile, DesktopConfigPath, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory, DeveloperUserIds } from "./Config.js";
-import { AddDesktopSession, FindFile, ListConversations, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
+import { AddDesktopSession, FindFile, ListConversations, PriceUsage, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
 import { TrimOldResults } from "./Trim.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
@@ -696,6 +696,9 @@ function RememberSize(Id: string) {
   // Claude Code finishes writing a turn shortly after reporting it done, so take the size again a moment later.
   setTimeout(() => KnownSizes.set(Id, TranscriptSize(Id)), 5000).unref();
 }
+
+// What each turn's own API replies cost, priced from their usage, for turns whose reported total cannot be trusted.
+const OwnCosts = new WeakMap<Turn, { Cost: number; Seen: Set<string> }>();
 
 function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
   if (Turn.Status !== "running" && Turn.Status !== "cancelling") {
@@ -1782,6 +1785,19 @@ function RouteMessage(Session: Session, Message: any) {
   }
 
   if (Message.type === "assistant") {
+    const Billed = Message.message as { id?: string; model?: string; usage?: Record<string, number> } | undefined;
+
+    if (Billed && Billed.id && Billed.usage) {
+      const Priced = OwnCosts.get(Turn) || {Cost: 0, Seen: new Set<string>()};
+
+      // One API reply arrives as several messages carrying the same usage, so each is counted once.
+      if (!Priced.Seen.has(Billed.id)) {
+        Priced.Seen.add(Billed.id);
+        Priced.Cost += PriceUsage(Billed.model || Turn.Model || "", Billed.usage) || 0;
+        OwnCosts.set(Turn, Priced);
+      }
+    }
+
     const Asked = (Message.message && Message.message.usage) as { input_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
 
     // The latest request's prompt is the conversation's real size. The usage on the turn's result is added
@@ -1931,8 +1947,11 @@ function RouteMessage(Session: Session, Message: any) {
   Turn.Activity = Turn.Activity.concat((Message.permission_denials || []).map((Denial: {tool_name: string}) => `denied ${Denial.tool_name}`));
   Turn.Milliseconds = Message.duration_ms || (Date.now() - Turn.StartedAt);
   const Spent = Message.total_cost_usd || 0;
+  const Priced = OwnCosts.get(Turn);
 
-  Turn.Cost += Math.max(0, Spent - (Session.Spent || 0));
+  // A session opened on an existing chat reports the chat's whole running total on its first result, so that
+  // turn is priced from its own messages and the total only becomes the starting point for later turns.
+  Turn.Cost += Session.Spent === undefined && Session.ConversationId && Priced ? Priced.Cost : Math.max(0, Spent - (Session.Spent || 0));
   Session.Spent = Spent;
 
   if (Message.usage) {

@@ -752,8 +752,11 @@ export function RecordCost(Id: string, Cost: number) {
 }
 
 function EstimateCost(Line: TranscriptEntry): number | null {
-  const Usage = Line.message && Line.message.usage;
-  const Price = PriceFor((Line.message && Line.message.model) || "");
+  return PriceUsage((Line.message && Line.message.model) || "", Line.message && Line.message.usage);
+}
+
+export function PriceUsage(Model: string, Usage: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined | null): number | null {
+  const Price = PriceFor(Model);
 
   if (!Usage || !Price) {
     return null;

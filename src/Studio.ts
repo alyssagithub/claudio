@@ -19,7 +19,7 @@ export type Owner = { Id: string; Name: () => string };
 const Users = new Map<string, { Name: () => string; At: number }>();
 const Boots = new Set<string>();
 let ReloadedAt = 0;
-const Playtest = { By: "", Since: 0, Live: false, Players: 0, Most: 0 };
+const Playtest = { By: "", Since: 0, Live: false, Players: 0, Most: 0, StoppedBy: "", StoppedAt: 0, ReplacedBy: "" };
 
 function Ago(At: number): string {
   const Seconds = Math.max(1, Math.round((Date.now() - At) / 1000));
@@ -49,9 +49,17 @@ function Notice(Kind: string, Input: unknown, Who?: Owner): string | null {
       Notes.push(`${Others.length > 1 ? "Other sessions are" : "Another session is"} driving this Studio too: ${Listed.join("; ")}. Their playtests, plugin reloads and probe scripts can stop or change yours, so if something stops unexpectedly, wait and retry rather than treating it as a bug in the game.`);
     }
 
-    if (Playtest.By === Who.Id && Playtest.Live && !RuntimeLive() && !(Kind === "playtest" && Action === "start")) {
-      Notes.push("The playtest you started has ended, but you did not stop it: it was stopped from outside, by another session, by the user in Studio, or by a plugin reload.");
+    // Says only what is known: who stopped it when a session did, and whether a different playtest is running now.
+    // A server that stops checking in may also just be too busy running code, so that case is not called an end.
+    if (Playtest.By === Who.Id && Playtest.Live && (Playtest.StoppedBy !== "" || !RuntimeLive()) && !(Kind === "playtest" && Action === "start")) {
+      const Now = Playtest.ReplacedBy !== "" ? ` A different playtest is running now, started by ${Playtest.ReplacedBy}.` : RuntimeLive() ? " A playtest is running now, but not the one you started." : "";
+
+      Notes.push(Playtest.StoppedBy !== ""
+        ? `The playtest you started was stopped ${Ago(Playtest.StoppedAt)} by ${Playtest.StoppedBy}, not by you.${Now}`
+        : `The playtest you started has not answered for over 6 seconds: it was stopped from outside, by the user in Studio or a plugin reload, or its server is too busy running code to check in. Check with playtest status before relying on it.${Now}`);
       Playtest.By = "";
+      Playtest.StoppedBy = "";
+      Playtest.ReplacedBy = "";
     }
   }
 
@@ -81,13 +89,32 @@ function Track(Kind: string, Input: unknown, Who?: Owner) {
   if (Kind === "playtest" && Action === "start") {
     const Asked = Input && typeof Input === "object" ? Input as { mode?: unknown; players?: unknown } : {};
 
+    // A start while another session's playtest is still running is refused, so it does not take it over.
+    if (Playtest.By !== "" && Playtest.By !== Who.Id && RuntimeLive() && Playtest.StoppedBy === "") {
+      return;
+    }
+
+    // Another session starting one after this owner's ended is remembered, so the owner hears about it.
+    if (Playtest.By !== "" && Playtest.By !== Who.Id) {
+      Playtest.ReplacedBy = Who.Name();
+
+      return;
+    }
+
     Playtest.By = Who.Id;
+    Playtest.StoppedBy = "";
+    Playtest.ReplacedBy = "";
     Playtest.Since = Date.now();
     Playtest.Live = false;
     Playtest.Players = Asked.mode === "multiplayer" ? Math.max(1, Number(Asked.players) || 1) : 0;
     Playtest.Most = 0;
   } else if (Kind === "playtest" && Action === "stop") {
-    Playtest.By = "";
+    if (Playtest.By !== "" && Playtest.By !== Who.Id) {
+      Playtest.StoppedBy = Who.Name();
+      Playtest.StoppedAt = Date.now();
+    } else {
+      Playtest.By = "";
+    }
   }
 }
 

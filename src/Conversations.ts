@@ -621,7 +621,9 @@ export function ListConversations(): Listing[] {
       const File = path.join(Folder, Name);
       const Lines = (ReadLines(File, 256 * 1024) || []).concat(ReadTail(File, true));
 
-      if (!Lines || !Lines.some(IsPromptLine)) {
+      // Only the start and end of a transcript are read, and a chat that begins with a long summary can show none
+      // of the user's messages there, so a chat the desktop app has named counts as real without one.
+      if (!Lines || (!Lines.some(IsPromptLine) && !(Desktop[Id] && Desktop[Id].title))) {
         continue;
       }
 

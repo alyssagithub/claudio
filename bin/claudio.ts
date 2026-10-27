@@ -2,6 +2,7 @@
 import { DefaultPort } from "../src/Config.js";
 import { InstallPlugin } from "../src/PluginInstaller.js";
 import { StartServer } from "../src/Server.js";
+import { WaitForSdk } from "../src/ClaudeSession.js";
 import { RunSetup } from "../src/Setup.js";
 import { RunUninstall } from "../src/Uninstall.js";
 import { ReportVersion } from "../src/Version.js";
@@ -69,13 +70,14 @@ if (Command === "setup") {
   StopBridge(ChosenPort());
 } else if (Command === undefined || Command === "start" || Command === "--port") {
   StartServer(ChosenPort());
-  execFile("npm", ["update", "@anthropic-ai/claude-agent-sdk", "--no-audit", "--no-fund"], {
+  WaitForSdk(new Promise<void>((Resolve) => execFile("npm", ["update", "@anthropic-ai/claude-agent-sdk", "--no-audit", "--no-fund"], {
     cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".."),
     shell: true,
     timeout: 300000,
   }, (Trouble, Output) => {
     console.log(Trouble ? `Could not update the Agent SDK, carrying on with the installed one: ${Trouble.message.trim().slice(0, 200)}` : `Checked the Agent SDK for updates${/changed|added/.test(Output) ? "; the update takes effect for new chats" : ""}.`);
-  });
+    Resolve();
+  })));
 } else {
   console.error([
     "Usage:",

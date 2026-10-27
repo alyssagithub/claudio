@@ -19,6 +19,18 @@ import { GetModels, RememberModels, SupportsEffort } from "./Models.js";
 import { ListServerTools } from "./McpTools.js";
 import type { Asked, Breakdown, Call, CallStatus, ContentBlock, Content, JobAnswer, LineCount, Part, Permission, Picture, Question, Query, SdkMessage, SentImage, Session, Task, Turn, TurnRequest, Usage } from "./Types.js";
 
+// Claude Code labels each request with the app running it. Claudio names itself, rather than passing on
+// whatever label the bridge happened to inherit, such as the desktop app's when it was started from there.
+process.env.CLAUDE_CODE_ENTRYPOINT = "claudio";
+
+// The bridge updates the Agent SDK while it starts, which rewrites the Claude Code program, so a session started
+// meanwhile fails to launch it. New sessions wait for the update to finish.
+let SdkReady: Promise<unknown> = Promise.resolve();
+
+export function WaitForSdk(Update: Promise<unknown>) {
+  SdkReady = Update.catch(() => {});
+}
+
 const Turns = new Map<string, Turn>();
 const Sessions = new Map<string, Session>();
 const SessionAllowances = new Map<string, Set<string>>();
@@ -2164,6 +2176,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
 
   const Run = async () => {
     try {
+      await SdkReady;
       await TrimIfCold(Ping ? null : ConversationId);
 
       Session.Query = query({

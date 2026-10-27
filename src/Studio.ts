@@ -24,6 +24,8 @@ function Ago(At: number): string {
   return Seconds < 120 ? `${Seconds}s ago` : `${Math.round(Seconds / 60)} min ago`;
 }
 
+const Told = new Map<string, string>();
+
 function Notice(Kind: string, Input: unknown, Who?: Owner): string | null {
   const Notes: string[] = [];
   const Action = Input && typeof Input === "object" ? (Input as { action?: unknown }).action : undefined;
@@ -31,7 +33,9 @@ function Notice(Kind: string, Input: unknown, Who?: Owner): string | null {
   if (Who) {
     const Others = [...Users.entries()].filter(([Id, Used]) => Id !== Who.Id && Date.now() - Used.At < 180000);
 
-    if (Others.length > 0) {
+    const Group = [...new Set(Others.map(([, Used]) => Used.Name()))].sort().join("|");
+
+    if (Others.length > 0 && Told.get(Who.Id) !== Group) {
       const Grouped = new Map<string, { Count: number; At: number }>();
 
       for (const [, Used] of Others) {
@@ -45,6 +49,8 @@ function Notice(Kind: string, Input: unknown, Who?: Owner): string | null {
 
       Notes.push(`${Others.length > 1 ? "Other sessions are" : "Another session is"} driving this Studio too: ${Listed.join("; ")}. Their playtests, plugin reloads and probe scripts can stop or change yours, so if something stops unexpectedly, wait and retry rather than treating it as a bug in the game.`);
     }
+
+    Told.set(Who.Id, Group);
 
     if (Playtest.By === Who.Id && Playtest.Live && (Playtest.StoppedBy !== "" || !RuntimeLive()) && !(Kind === "playtest" && Action === "start")) {
       const Now = Playtest.ReplacedBy !== "" ? ` A different playtest is running now, started by ${Playtest.ReplacedBy}.` : RuntimeLive() ? " A playtest is running now, but not the one you started." : "";

@@ -18,9 +18,6 @@ function VisualBasicString(Value: string): string {
 function WriteLauncher(Port?: number | null) {
   const CliPath = path.resolve(fileURLToPath(import.meta.url), "..", "..", "bin", "claudio.js");
   const Chosen = Port && Port !== DefaultPort ? ` --port ${Number(Port)}` : "";
-  // The bridge runs inside a loop that starts it again a few seconds after it crashes, for example when the
-  // machine runs out of memory during a multiplayer test. A deliberate stop or restart exits cleanly and
-  // ends the loop.
   const Looper = path.join(path.dirname(LogFile), "bridge-loop.cmd");
 
   fs.mkdirSync(path.dirname(LogFile), {recursive: true});

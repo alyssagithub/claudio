@@ -27,8 +27,6 @@ function Pictures.Available(): boolean
 		return Allowed :: boolean
 	end
 
-	-- A playtest refuses EditableImage unless the place allows it, and even a guarded test prints an
-	-- unattributed error into the game's output, so the panel never draws pictures in a play session.
 	if not game:GetService("RunService"):IsEdit() then
 		Allowed = false
 

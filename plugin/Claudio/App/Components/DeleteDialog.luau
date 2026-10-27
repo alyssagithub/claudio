@@ -21,8 +21,6 @@ const function Title(): string
 end
 
 return function()
-	-- Sized from the list rather than AutomaticSize, which measured the wrapped body before the panel had a
-	-- width and grew taller than the window, pushing the text off screen.
 	const Content = Vide.source(0)
 
 	return Create "Frame" {

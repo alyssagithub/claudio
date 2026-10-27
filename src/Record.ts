@@ -9,12 +9,10 @@ import jpeg from "jpeg-js";
 const FramesScript = path.resolve(fileURLToPath(import.meta.url), "..", "..", "..", "src", "Frames.ps1");
 const ClipFolder = path.join(os.homedir(), ".claudio", "recordings");
 
-// Studio writes each recording to this folder and deletes it within minutes.
 function CaptureFolder(): string {
   return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "Roblox", "tmp-capture-storage");
 }
 
-// Copies the newest clip Studio wrote since the recording began to a lasting place, and returns its path.
 export function KeepClip(Since: number): string | null {
   let Newest: { File: string; At: number } | null = null;
 
@@ -41,7 +39,6 @@ export function KeepClip(Since: number): string | null {
 
   fs.copyFileSync(Newest.File, Kept);
 
-  // Old clips are not needed for long; keep the twenty newest.
   const Old = fs.readdirSync(ClipFolder).filter((Name) => Name.endsWith(".mp4")).sort().reverse().slice(20);
 
   for (const Name of Old) {
@@ -78,8 +75,6 @@ export function ClipLength(Clip: string): Promise<number> {
   return PullFrames(Clip, [0]).then((Found) => Found.Length);
 }
 
-// Lays the frames out in a grid, reading left to right then top to bottom, each scaled to Width pixels
-// wide by averaging the source pixels it covers.
 export function Sheet(Files: string[], Width = 300): Buffer {
   const Frames = Files.map((File) => jpeg.decode(fs.readFileSync(File), {useTArray: true}));
   const Columns = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(Frames.length))));

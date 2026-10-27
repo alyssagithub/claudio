@@ -40,7 +40,6 @@ function Attention.Notify(Text: string, Chat: string?)
 		return
 	end
 
-	-- The testing mount says so in its notifications, so they are never mistaken for the real plugin's.
 	const Name = if (script.Parent.Parent :: Instance).Name:match("Testing$") then "Claudio Testing" else Config.Name
 
 	task.spawn(Client.Notify, if Chat then `{Name}: {Chat}` else Name, Attention.Closing(Text), Wanted)

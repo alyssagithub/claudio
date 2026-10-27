@@ -19,12 +19,8 @@ import { GetModels, RememberModels, SupportsEffort } from "./Models.js";
 import { ListServerTools } from "./McpTools.js";
 import type { Asked, Breakdown, Call, CallStatus, ContentBlock, Content, JobAnswer, LineCount, Part, Permission, Picture, Question, Query, SdkMessage, SentImage, Session, Task, Turn, TurnRequest, Usage } from "./Types.js";
 
-// Claude Code labels each request with the app running it. Claudio names itself, rather than passing on
-// whatever label the bridge happened to inherit, such as the desktop app's when it was started from there.
 process.env.CLAUDE_CODE_ENTRYPOINT = "claudio";
 
-// The bridge updates the Agent SDK while it starts, which rewrites the Claude Code program, so a session started
-// meanwhile fails to launch it. New sessions wait for the update to finish.
 let SdkReady: Promise<unknown> = Promise.resolve();
 
 export function WaitForSdk(Update: Promise<unknown>) {
@@ -688,9 +684,6 @@ function SaveQuietly(Where: string, Save: () => void) {
   }
 }
 
-// How long each chat's transcript was when Claudio last finished a turn in it. A chat continued somewhere else,
-// such as the Claude desktop app, grows its transcript without Claudio's open session seeing those messages,
-// so a longer file means the session has to be opened again from the file.
 const KnownSizes = new Map<string, number>();
 
 function TranscriptSize(Id: string): number {
@@ -705,11 +698,9 @@ function TranscriptSize(Id: string): number {
 
 function RememberSize(Id: string) {
   KnownSizes.set(Id, TranscriptSize(Id));
-  // Claude Code finishes writing a turn shortly after reporting it done, so take the size again a moment later.
   setTimeout(() => KnownSizes.set(Id, TranscriptSize(Id)), 5000).unref();
 }
 
-// What each turn's own API replies cost, priced from their usage, for turns whose reported total cannot be trusted.
 const OwnCosts = new WeakMap<Turn, { Cost: number; Seen: Set<string> }>();
 
 function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
@@ -948,10 +939,8 @@ export function ClearFinishedTasks(ConversationId: string) {
 
 type FinishedTurn = { conversationId: string; endedAt: number; status: string; text: string };
 
-// Recently finished turns, so the plugin can tell you about chats you are not looking at.
 const Finished: FinishedTurn[] = [];
 
-// Turns started for testing, which must not notify anyone or appear in the Claude desktop app.
 const Quiet = new Set<string>();
 
 export function QuietTurn(Id: string) {
@@ -964,22 +953,14 @@ export function FinishedSince(Since: number): FinishedTurn[] {
 
 type SessionSettings = [string, string, string | null, boolean, boolean, boolean, boolean, string, boolean, string, boolean];
 
-// The settings each chat's last turn ran with, because the warming request must match them exactly: any
-// difference in model, instructions or tools makes it write a whole new cache instead of refreshing it.
 const Remembered = new Map<string, SessionSettings>();
 const Pinged = new Map<string, number>();
 const Missed = new Set<string>();
 let OpenChat = { Id: "", At: 0 };
 
-// What each chat's latest request read from the cache and wrote to it. Some chats rewrite a block of their
-// prompt on every request, real messages included, so a refresh is judged against what the chat itself does.
 const Requests = new Map<string, { Read: number; Wrote: number }>();
 const RefreshAfter = 55 * 60 * 1000;
 
-// The cache lasts an hour. A refresh re-reads it at a tenth of the input price and rewrites the chat's
-// changing block at twice the price, while a cold return writes the whole context again at twice the price
-// instead of reading it. Refreshing hourly stays cheaper than a cold return for this many hours, capped at
-// nineteen, the limit for a chat with no changing block at all.
 function WarmFor(Id: string): number {
   const Last = Requests.get(Id);
 
@@ -992,10 +973,6 @@ function WarmFor(Id: string): number {
   return Math.min(19, Math.floor(1.9 * Context / (0.1 * Context + 2 * Last.Wrote))) * 60 * 60 * 1000;
 }
 
-// The cache lasts an hour after the chat last used it, either by a message or by a warming refresh. Once it
-// has gone, resuming writes the whole chat to the cache again, so leaving old pictures and log dumps out
-// first only makes that cheaper. While the cache is warm nothing is touched, since changing earlier
-// messages would throw the warm cache away.
 async function TrimIfCold(Id: string | null) {
   const File = Id ? FindFile(Id) : null;
 
@@ -1018,7 +995,6 @@ export function NoteOpenChat(Id: string) {
   OpenChat = {Id, At: Date.now()};
 }
 
-// Refreshes the chat's cache now when Forced, otherwise only when the open chat is due. Returns what happened.
 export async function WarmChat(Id: string, Forced = false): Promise<string> {
   const LastReal = Ended.get(Id) || 0;
   const Settings = Remembered.get(Id);
@@ -1059,8 +1035,6 @@ export async function WarmChat(Id: string, Forced = false): Promise<string> {
   const Read = Usage ? Usage.cache_read_input_tokens || 0 : 0;
   const Wrote = Usage ? Usage.cache_creation_input_tokens || 0 : 0;
 
-  // A refresh that writes far more than the chat's own last message did is not matching the real prompt,
-  // so it is rewriting the cache rather than refreshing it.
   if (!Usage || Wrote > Before.Wrote * 2 + 20000) {
     const Said = `Stopped keeping ${Id}'s prompt cache warm: the refresh ${Usage ? `wrote ${Wrote} tokens of new cache where the chat's last message wrote ${Before.Wrote}` : "got no answer"}, so it is not refreshing the real cache.`;
 
@@ -1287,8 +1261,6 @@ function UserMessage(Text: string, Images: Picture[], Id?: string) {
   };
 }
 
-// A session with background agents still working counts as busy even with no turn open, since a turn
-// can end on a usage limit while its agents carry on, and closing the session would stop them.
 function Idle(Session: Session): boolean {
   return !Session.CurrentTurn && Session.Background.size === 0;
 }
@@ -1406,8 +1378,6 @@ function OpenAutoTurn(Session: Session): Turn | null {
 
 const ToolBlocks = new Set(["tool_use", "server_tool_use", "mcp_tool_use"]);
 
-// Mirrors how the Claude desktop app decides what its working line says: which stage the turn is waiting on,
-// whether a thinking block is streaming, and whether the API is retrying.
 function TrackStage(Turn: Turn, Message: any) {
   const Pending = Turn.PendingTools || (Turn.PendingTools = new Set());
   const Before = [Turn.Stage || null, Turn.Thinking === true, Turn.Retry || null];
@@ -1802,7 +1772,6 @@ function RouteMessage(Session: Session, Message: any) {
     if (Billed && Billed.id && Billed.usage) {
       const Priced = OwnCosts.get(Turn) || {Cost: 0, Seen: new Set<string>()};
 
-      // One API reply arrives as several messages carrying the same usage, so each is counted once.
       if (!Priced.Seen.has(Billed.id)) {
         Priced.Seen.add(Billed.id);
         Priced.Cost += PriceUsage(Billed.model || Turn.Model || "", Billed.usage) || 0;
@@ -1812,8 +1781,6 @@ function RouteMessage(Session: Session, Message: any) {
 
     const Asked = (Message.message && Message.message.usage) as { input_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } | undefined;
 
-    // The latest request's prompt is the conversation's real size. The usage on the turn's result is added
-    // up over every request in the turn, so a long run of tool calls made it read many times the window.
     if (Asked && !Message.parent_tool_use_id) {
       if (Session.ConversationId) {
         Requests.set(Session.ConversationId, {Read: Asked.cache_read_input_tokens || 0, Wrote: Asked.cache_creation_input_tokens || 0});
@@ -1961,13 +1928,10 @@ function RouteMessage(Session: Session, Message: any) {
   const Spent = Message.total_cost_usd || 0;
   const Priced = OwnCosts.get(Turn);
 
-  // A session opened on an existing chat reports the chat's whole running total on its first result, so that
-  // turn is priced from its own messages and the total only becomes the starting point for later turns.
   Turn.Cost += Session.Spent === undefined && Session.ConversationId && Priced ? Priced.Cost : Math.max(0, Spent - (Session.Spent || 0));
   Session.Spent = Spent;
 
   if (Message.usage) {
-    // Only the output total comes from here; input and cache stay as the latest request reported them.
     Turn.Usage = {
       Input: Turn.Usage.Input || Message.usage.input_tokens || 0,
       Output: Message.usage.output_tokens || Turn.Usage.Output,
@@ -1991,8 +1955,6 @@ function RouteMessage(Session: Session, Message: any) {
     }
   }
 
-  // Hitting a usage limit comes back as an ordinary result, but nothing can run until it resets, so end
-  // the turn as failed now instead of waiting on background agents that are stopped by the same limit.
   const Limited = Turn.LimitHit === true || (typeof Message.result === "string" && Message.result.length < 400 && /^\s*(you've hit your|you have hit your|claude ai usage limit reached|you're out of (usage )?credits)/i.test(Message.result));
 
   if (Session.Background.size > 0 && Turn.Status === "running" && !Message.is_error && !Limited) {
@@ -2056,8 +2018,6 @@ export function LadderBelow(Model: string): string[] {
 const OwnerIds = new WeakMap<Session, string>();
 let Titles: { At: number; Known: Map<string, string> } = {At: 0, Known: new Map()};
 
-// Titles come from the chat list, which reads only the start and end of each transcript, and are reused
-// for a minute. Loading the whole conversation for a title ran the bridge out of memory on huge chats.
 function TitleOf(Id: string): string | null {
   if (Date.now() - Titles.At > 60000) {
     try {
@@ -2088,8 +2048,6 @@ function StudioOwner(Session: Session): StudioOwnerType {
   };
 }
 
-// Ping, when given, makes a throwaway session for keeping the prompt cache warm: it branches off the chat
-// without saving anything, is never registered as the chat's session, and hands its messages to Ping.
 function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string, Model: string, Effort: string | null, AskForTools: boolean, ExtraPrompt: boolean, FastMode: boolean, Planning: boolean, Mode: string, Bypass: boolean, OutputStyle: string, StepDown: boolean, Ping?: (Message: SdkMessage) => void): Session {
   const Pending: unknown[] = [];
   let Wake: ((Value?: unknown) => void) | null = null;
@@ -2192,8 +2150,6 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
           promptSuggestions: true,
           env: {...process.env, CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: "true"},
           extraArgs: {"replay-user-messages": null},
-          // Searching only needs to find and quote, so the search helper runs on the small model while
-          // helpers that edit, judge or design keep the chat's own model.
           agents: {
             Explore: {
               description: "Fast read-only search helper for finding code, files, instances or text across many places when you only need where things are and short excerpts, not edits or judgement. Say how thorough to be. Runs on a small, cheap model, so give anything that needs reasoning about correctness, design or review to general-purpose instead.",
@@ -2631,8 +2587,6 @@ export function StartTurn(Request: TurnRequest) {
   const Warm = ConversationId ? Sessions.get(ConversationId) : TakeSpare(Chosen.model, Chosen.effort);
   const Outside = Boolean(ConversationId && Warm && KnownSizes.has(ConversationId) && TranscriptSize(ConversationId) > (KnownSizes.get(ConversationId) || 0));
   const Fits = Warm && !Outside && !Warm.CurrentTurn && !Warm.Ended && EffortRank(Chosen.effort) <= EffortRank(Warm.Effort) && Warm.ExtraPrompt === Turn.ExtraPrompt && Warm.FastMode === Turn.FastMode && Warm.WorkingDirectory === Turn.WorkingDirectory && Warm.Planning === Turn.Planning && Warm.Mode === PermissionModeFor(Turn.Mode, Turn.Bypass);
-  // Closing a session also stops its background agents, so while any are working the chat keeps its session
-  // even when a setting changed, rather than losing that work.
   const Busy = !Fits && !Outside && Warm && !Warm.CurrentTurn && !Warm.Ended && Warm.Background.size > 0;
   const Reusable = Fits || Busy;
 

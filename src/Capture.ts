@@ -88,8 +88,6 @@ export function EncodePixels(Width: number, Height: number, Base64Pixels: string
 
   return {data: PNG.sync.write(Image).toString("base64")};
 }
-// Shrinks a picture so its longer side is at most Longest pixels, averaging the pixels each output pixel
-// covers so small text stays readable. Returns it unchanged when it already fits.
 export function Shrink(Data: string, Longest: number): { data: string; width: number; height: number; scale: number } {
   const Image = PNG.sync.read(Buffer.from(Data, "base64"));
   const Scale = Math.max(Image.width, Image.height) / Longest;
@@ -126,8 +124,6 @@ export function Shrink(Data: string, Longest: number): { data: string; width: nu
   return {data: PNG.sync.write(Out).toString("base64"), width: Out.width, height: Out.height, scale: Scale};
 }
 
-// Compares two pictures of the same size and returns the smallest box holding every pixel that changed by
-// more than a little, so noise such as dithering does not count. Null when nothing changed.
 export function Changed(Before: string, After: string): { x: number; y: number; width: number; height: number; share: number } | null | "size" {
   const Old = PNG.sync.read(Buffer.from(Before, "base64"));
   const New = PNG.sync.read(Buffer.from(After, "base64"));

@@ -312,8 +312,6 @@ export function CaptureWindow(Title: string | null | undefined, Crop: CropBox): 
     });
   });
 }
-// The same window search as a capture, then frames saved as fast as Windows draws them for the given time,
-// from one process so startup is paid once. Says READY before the first frame, then FRAME|ms|file per frame.
 const BurstScript = Script.slice(0, Script.indexOf("$Width = $Rect.Right")) + `
 $Width = $Rect.Right - $Rect.Left
 $Height = $Rect.Bottom - $Rect.Top

@@ -13,9 +13,6 @@ let Counter = 0;
 
 export type Owner = { Id: string; Name: () => string };
 
-// Several sessions can drive the same Studio without knowing about each other: one session's playtest,
-// plugin reload or probe script silently ends another's. Remember who used Studio and when, so the
-// playtest and execute tools can say so instead of leaving an unexplained failure.
 const Users = new Map<string, { Name: () => string; At: number }>();
 const Boots = new Set<string>();
 let ReloadedAt = 0;
@@ -49,8 +46,6 @@ function Notice(Kind: string, Input: unknown, Who?: Owner): string | null {
       Notes.push(`${Others.length > 1 ? "Other sessions are" : "Another session is"} driving this Studio too: ${Listed.join("; ")}. Their playtests, plugin reloads and probe scripts can stop or change yours, so if something stops unexpectedly, wait and retry rather than treating it as a bug in the game.`);
     }
 
-    // Says only what is known: who stopped it when a session did, and whether a different playtest is running now.
-    // A server that stops checking in may also just be too busy running code, so that case is not called an end.
     if (Playtest.By === Who.Id && Playtest.Live && (Playtest.StoppedBy !== "" || !RuntimeLive()) && !(Kind === "playtest" && Action === "start")) {
       const Now = Playtest.ReplacedBy !== "" ? ` A different playtest is running now, started by ${Playtest.ReplacedBy}.` : RuntimeLive() ? " A playtest is running now, but not the one you started." : "";
 
@@ -63,7 +58,6 @@ function Notice(Kind: string, Input: unknown, Who?: Owner): string | null {
     }
   }
 
-  // A multiplayer test can lose a client window without anything saying so; compare against what was asked for.
   if (Playtest.Players > 0 && RuntimeLive() && Date.now() - Playtest.Since > 45000 && typeof Clients === "number" && Clients < Playtest.Players) {
     Notes.push(Playtest.Most > Clients
       ? `Only ${Clients} of the ${Playtest.Players} players asked for are still in the test: a client window closed or crashed since. Results that need every player may be missing some.`
@@ -89,12 +83,10 @@ function Track(Kind: string, Input: unknown, Who?: Owner) {
   if (Kind === "playtest" && Action === "start") {
     const Asked = Input && typeof Input === "object" ? Input as { mode?: unknown; players?: unknown } : {};
 
-    // A start while another session's playtest is still running is refused, so it does not take it over.
     if (Playtest.By !== "" && Playtest.By !== Who.Id && RuntimeLive() && Playtest.StoppedBy === "") {
       return;
     }
 
-    // Another session starting one after this owner's ended is remembered, so the owner hears about it.
     if (Playtest.By !== "" && Playtest.By !== Who.Id) {
       Playtest.ReplacedBy = Who.Name();
 
@@ -177,7 +169,6 @@ function Raw(Kind: string, Input: unknown, Timeout?: number | null, Role?: strin
 
       if (Index >= 0) {
         Pending.splice(Index, 1);
-        // A Studio that checked in shortly before is connected but busy, usually still inside earlier code.
         const Last = Heard.get(Role || "edit") || 0;
 
         Give({error: Date.now() - Last < 180000 && Date.now() - Last > 5000

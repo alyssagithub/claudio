@@ -285,9 +285,6 @@ return function(Props: Props)
 			return Pairs
 		end
 
-		-- The output reads "Question"="Answer", "Question"="Answer". with nothing escaped, so an answer can
-		-- hold quotes of its own. Each answer runs up to where the next question starts, and the last one
-		-- up to the final closing quote.
 		const Output = Entry.output
 		const Starts: {{Question: string, From: number, At: number}} = {}
 		local Search = 1
@@ -452,7 +449,6 @@ return function(Props: Props)
 			AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1,
 			LayoutOrder = Index,
-
 
 			Create "UIListLayout" {
 				SortOrder = Enum.SortOrder.LayoutOrder,
@@ -661,7 +657,6 @@ return function(Props: Props)
 								return true
 							end
 
-							-- The description is already the header, and the time limit says nothing about what ran.
 							return Pair().Key ~= "description" and Pair().Key ~= "timeout"
 						end,
 
@@ -1099,8 +1094,6 @@ return function(Props: Props)
 					},
 				},
 			},
-			-- A message sent while Claude was working, once Claude has read it, gets the same actions as any
-			-- other message you sent.
 			Create "Frame" {
 				Name = "SentActions",
 				Size = UDim2.fromOffset(0, 18),

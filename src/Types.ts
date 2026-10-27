@@ -191,7 +191,6 @@ export type Task = {
   ToolUseId?: string | null;
 };
 
-// A background task as the tasks panel shows it; kept on the session because tasks outlive the turn that started them.
 export type TaskRecord = {
   Id: string;
   Description: string;
@@ -257,7 +256,6 @@ export type ModelInfo = {
   description: string;
   version?: string;
 };
-
 
 export type Mode = {
   value: string;

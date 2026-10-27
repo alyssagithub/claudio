@@ -74,7 +74,6 @@ return function(Open: (boolean?) -> boolean, Insert: (string) -> ())
 	return Create "Frame" {
 		Name = "AddMenu",
 		Vide.action(Covers.Add),
-		-- Sits at the add button with no size, so the menu floats over the message box without moving anything.
 		Size = UDim2.fromScale(0, 0),
 		BackgroundTransparency = 1,
 		LayoutOrder = 4,

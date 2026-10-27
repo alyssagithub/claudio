@@ -38,7 +38,6 @@ function Builder.Serve()
 			return if Rendered then {now = tostring((settings() :: any).Rendering.QualityLevel)} else {error = `Studio refused the graphics level: {tostring(Trouble)}`}
 		end
 
-		-- The script profiler needs plugin permission, which code run through the session agent does not have.
 		if typeof(Source) == "table" and typeof(Source.profile) == "number" then
 			const Profiler = game:GetService("ScriptProfilerService")
 			const Seconds = math.clamp(Source.profile, 1, 60)

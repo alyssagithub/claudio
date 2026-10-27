@@ -12,7 +12,6 @@ const Covers = require(script.Parent.Parent.Covers)
 
 const Create = Vide.create
 
--- The wording and timing below follow the Claude desktop app's working line.
 const Waits: {[string]: string} = {
 	sending = "Sending",
 	starting = "Starting session",
@@ -78,7 +77,6 @@ return function()
 	local SettlingSince = 0
 	local WasWorking = false
 
-	-- The line reads before, then the running tasks as a button that opens the tasks pane, then the stage.
 	const function Pieces(): (string, boolean, string)
 		const Tasks = TasksLabel() ~= nil
 

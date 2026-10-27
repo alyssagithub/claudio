@@ -1,5 +1,3 @@
-# Pulls still frames out of a video with Windows' own media decoder, so the record tool needs nothing
-# installed. Prints the clip's length on the first line, then one written JPEG path per frame.
 param([string]$Video, [string]$OutFolder, [string]$Seconds)
 
 $ErrorActionPreference = "Stop"
@@ -22,7 +20,6 @@ $File = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($Video)) ([Wi
 $Clip = Await ([Windows.Media.Editing.MediaClip]::CreateFromFileAsync($File)) ([Windows.Media.Editing.MediaClip])
 $Composition = New-Object Windows.Media.Editing.MediaComposition
 
-# PowerShell 5.1 cannot call Add on this Windows list directly, so go through the .NET interface.
 [System.Collections.Generic.ICollection[Windows.Media.Editing.MediaClip]].GetMethod("Add").Invoke($Composition.Clips, @($Clip)) | Out-Null
 
 $Length = $Composition.Duration.TotalSeconds

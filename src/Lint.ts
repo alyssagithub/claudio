@@ -21,7 +21,6 @@ const Assets: Record<string, string> = {
 
 const Ignored = /Key 'Source' not found in external type 'LuaSourceContainer'/;
 
-// TestEZ gives its .spec scripts these as globals, so they are not mistakes there.
 const TestGlobals = /Unknown global '(describe|it|expect|beforeAll|afterAll|beforeEach|afterEach|FOCUS|SKIP|fit|fdescribe|xit|xdescribe|describeFOCUS|describeSKIP|itFOCUS|itSKIP|itFIXME)'/;
 
 let Ready: Promise<string | null> | null = null;
@@ -531,9 +530,6 @@ export async function Warm(): Promise<void> {
     await Flags(Analyzer);
   }
 }
-// Names the execute code uses that exist nowhere, such as a misspelt local, so a failed run can say which
-// name was wrong. Only run after a failure, so a run that works costs nothing and the analyzer never piles up
-// in memory. The names execute itself passes in are left out.
 export async function UnknownGlobals(Code: string): Promise<string[]> {
   const Analyzer = await Prepared();
 

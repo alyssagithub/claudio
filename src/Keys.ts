@@ -143,8 +143,6 @@ export function DescribeReturn() {
   };
 }
 
-// Answers as soon as a Return press newer than After is seen, so the plugin can hold a request open
-// and already know whether Shift was down by the time the newline reaches its text box.
 export function WaitForReturn(After: number, Milliseconds: number, PasteAfter = Infinity): Promise<ReturnType<typeof DescribeReturn>> {
   if ((LastReturn && LastReturn.at > After) || LastPaste > PasteAfter) {
     return Promise.resolve(DescribeReturn());

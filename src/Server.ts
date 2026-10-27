@@ -647,8 +647,6 @@ export function StartServer(Port: number) {
           return;
         }
 
-        // Big files arrive in parts, because Studio cannot send one string of a hundred megabytes. The
-        // first part makes the file and each later part with the same upload id is added to its end.
         const Upload = typeof Body.upload === "string" && /^[\w-]{8,64}$/.test(Body.upload) ? Body.upload : null;
         const Known = Upload ? Uploads.get(Upload) : undefined;
         const Folder = path.join(os.homedir(), ".claudio", "attachments", String(Date.now()));
@@ -1254,7 +1252,6 @@ ${Text}`;
     console.error((Error as NodeJS.ErrnoException).code === "EADDRINUSE"
       ? `Port ${Port} is already in use. Is another Claudio bridge running? Use --port to pick another.`
       : `Could not listen on port ${Port}: ${Error.message}`);
-    // A clean exit, so the launcher's restart loop does not keep retrying while another bridge has the port.
     process.exit((Error as NodeJS.ErrnoException).code === "EADDRINUSE" ? 0 : 1);
   });
 

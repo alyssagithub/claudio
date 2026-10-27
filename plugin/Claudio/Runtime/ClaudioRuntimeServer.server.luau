@@ -17,16 +17,12 @@ end
 
 script.Parent = nil
 
--- The bridge gives up at the same time limit, so stop the code a little sooner: the reply then arrives in
--- time and carries what the code printed before it was stopped, which shows whether it was slow or stuck.
 const function Within(Timeout: any): number
 	const Seconds = math.clamp(tonumber(Timeout) or 300, 1, 1800)
 
 	return math.max(1, Seconds - 3)
 end
 
--- Which script raised each error, since the log history keeps only the text. Errors that never reach
--- ScriptContext.Error came from Studio or an engine call rather than a script.
 const ErrorSources: {[string]: string} = {}
 const ErrorOrder: {string} = {}
 const WatchingSince = os.time()
@@ -192,8 +188,6 @@ end
 
 const function Run(Code: string, Within: string?, Current: string?, Seconds: number?): any
 	const Said = {}
-	-- A repeated line is counted on its first copy instead of added again, so a warning repeating every frame
-	-- takes one line.
 	const Positions: {[string]: {Index: number, Count: number}} = {}
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
 		if Kind == Enum.MessageType.MessageInfo then

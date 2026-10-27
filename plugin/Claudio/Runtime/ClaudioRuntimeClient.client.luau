@@ -484,8 +484,6 @@ end
 
 const function Run(Code: string, Within: string?, Current: string?): any
 	const Said = {}
-	-- A repeated line is counted on its first copy instead of added again, so a warning repeating every frame
-	-- takes one line.
 	const Positions: {[string]: {Index: number, Count: number}} = {}
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
 		if Kind == Enum.MessageType.MessageInfo then
@@ -571,7 +569,6 @@ const function Run(Code: string, Within: string?, Current: string?): any
 	return Finish(Answer)
 end
 
--- The record tool's video capture, kept here because this script cannot reach the plugin's own modules.
 local Recording: {Done: boolean, Result: string?}? = nil
 
 const function Record(Action: string): any

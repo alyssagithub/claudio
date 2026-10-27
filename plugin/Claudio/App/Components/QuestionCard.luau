@@ -13,8 +13,6 @@ const Create = Vide.create
 
 const Other = "Other"
 
--- What has been answered so far, kept outside the card so that the same question handed over again, as
--- happens when a playtest ends, or the card being built again, keeps the answers in progress.
 local Kept: {Id: string?, Step: number, Picked: {[string]: {[string]: boolean}}, Written: {[string]: string}} = {
 	Id = nil,
 	Step = 1,
@@ -34,7 +32,6 @@ return function()
 		Vide.untrack(function()
 			const Id = if Held then Held.id else nil
 
-			-- The question can vanish for a moment, such as while a playtest ends, before coming back.
 			if Id == nil then
 				return
 			end
@@ -390,7 +387,6 @@ return function()
 			BackgroundTransparency = 1,
 			LayoutOrder = 1,
 
-			-- Placed by hand rather than with a row layout, which stops the wrapped question from growing taller.
 			Create "TextLabel" {
 				Name = "Counter",
 				AutomaticSize = Enum.AutomaticSize.XY,

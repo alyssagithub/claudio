@@ -32,10 +32,8 @@ end
 
 const Client = {}
 
--- Set by the chat store, so the regular check-in can say which chat is open.
 Client.OpenChat = nil :: (() -> string?)?
 
--- Changes every time the plugin loads, so the bridge can tell a reload apart from a long quiet spell.
 const Boot = game:GetService("HttpService"):GenerateGUID(false)
 const Testing = (script.Parent.Parent :: Instance).Name:match("Testing$") ~= nil
 
@@ -205,8 +203,6 @@ function Client.AnswerQuestion(RequestId: string, QuestionId: string, Answers: {
 end
 
 function Client.TakeStudioJob(): (boolean, any)
-	-- The testing copy leaves the boot out, so mounting it is not reported as the plugin reloading.
-	-- The open chat rides along, so the bridge knows which chat to keep warm and that Studio is still there.
 	const Open = if Client.OpenChat then Client.OpenChat() else nil
 
 	return Http.Request("GET", `{BaseUrl()}/studio/job{if Testing then "" else `?boot={Boot}{if Open then `&chat={Open}` else ""}`}`)
@@ -564,8 +560,6 @@ function Client.ConversationCost(Id: string): (boolean, any)
 	return Http.Request("GET", `{BaseUrl()}/conversations/{Id}/cost`)
 end
 
--- Sends the file's raw bytes in parts of a few megabytes, since Studio cannot send one huge string. On
--- Progress gets the share sent so far after each part.
 function Client.SaveAttachment(Name: string, Raw: string, Progress: ((number) -> ())?): (boolean, any)
 	const Part = 3 * 1024 * 1024
 	const Upload = game:GetService("HttpService"):GenerateGUID(false)

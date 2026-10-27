@@ -1,6 +1,4 @@
 --!strict
--- Records the viewport with Studio's own video capture, for the record tool. Studio writes the clip to
--- its temporary capture folder, where the bridge picks it up; the capture object itself gives no path.
 const CaptureService = game:GetService("CaptureService")
 
 const Video = {}

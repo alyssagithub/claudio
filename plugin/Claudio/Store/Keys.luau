@@ -33,8 +33,6 @@ const function Sync()
 	end)
 end
 
--- Keeps a request open that the bridge answers on the next Return press, so the Shift state is
--- usually already here when the newline reaches the text box and Enter can send without a round trip.
 const function Feed()
 	Feeding += 1
 
@@ -122,7 +120,6 @@ function Keys.ShiftedReturn(): boolean
 	return Seen ~= nil and Seen.shift == true and typeof(Seen.now) == "number" and typeof(Seen.at) == "number" and Seen.now - Seen.at < 2000
 end
 
--- Whether the Return that just typed a newline had Shift held, using the pushed press when it has arrived.
 function Keys.Shifted(): boolean
 	const Deadline = os.clock() + 0.25
 

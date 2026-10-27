@@ -297,7 +297,6 @@ return function()
 				return
 			end
 
-			-- Enter also types a carriage return after the newline; drop it so the draft only holds \n.
 			if Text:find("\r", 1, true) then
 				const Kept = if Cursor > 0 then (Text:sub(1, Cursor - 1):gsub("\r", "")) else ""
 				const Clean = Text:gsub("\r", "")
@@ -319,8 +318,6 @@ return function()
 				return
 			end
 
-			-- The box already knows where the newline went; searching for the first changed character
-			-- would land at the end of a run of blank lines instead.
 			const Where = Cursor - 1
 			const Added = #Text == #Previous + 1 and Where >= 1 and Text:sub(Where, Where) == "\n" and Text:sub(1, Where - 1) .. Text:sub(Where + 1) == Previous
 
@@ -515,7 +512,6 @@ return function()
 				end,
 				BackgroundTransparency = 1,
 				LayoutOrder = 0,
-				-- Sized to the button alone, so the floating menu inside does not stretch the row.
 				Vide.action(function(Holder: Frame)
 					const Plus = Holder:FindFirstChildWhichIsA("GuiButton")
 

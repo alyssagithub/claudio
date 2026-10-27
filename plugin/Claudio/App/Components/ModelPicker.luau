@@ -308,8 +308,6 @@ const function Pick(Model: () -> Types.ModelInfo, LayoutOrder: number, Inside: b
 	end)
 end
 
--- The top right corner of each popup's button, in screen pixels, so the popup opens just above its own
--- button and over the message box, as the Claude desktop app's do.
 const Edges = {
 	ModelMenu = Vide.source(Vector2.zero),
 	EffortMenu = Vide.source(Vector2.zero),

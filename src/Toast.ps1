@@ -8,8 +8,6 @@ $Title = & $Escape $env:CLAUDIO_TITLE
 $Body = & $Escape $env:CLAUDIO_BODY
 $Icon = & $Escape ("file:///" + ($env:CLAUDIO_ICON -replace "\\", "/"))
 
-# The alarm scenario is one of the kinds Windows lets through Do Not Disturb, which it turns on while a
-# fullscreen app is in front, so this shows over fullscreen too. Alarms loop a sound by default, hence silent.
 $Chime = $null
 $ChimePath = Join-Path $env:WINDIR "Media\Windows Notify System Generic.wav"
 

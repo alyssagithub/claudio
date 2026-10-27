@@ -1,6 +1,4 @@
 --!strict
--- The background tasks pane, following the Claude desktop app's: running tasks first, finished ones folded
--- under a count with a button to clear them, and each Bash task opening to its command and output.
 const Vide = require(script.Parent.Parent.Parent.Packages.vide)
 const Config = require(script.Parent.Parent.Parent.Config)
 const Settings = require(script.Parent.Parent.Parent.Settings)
@@ -47,7 +45,6 @@ const function HasSummary(Task: Types.BackgroundTask): boolean
 	return typeof(Task.summary) == "string" and Task.summary ~= "" and Task.summary ~= Task.description
 end
 
--- A tool's input arrives as "key: value" lines, with a long value running on until the next key.
 const function Command(Task: Types.BackgroundTask): string?
 	local Current: string? = nil
 	const Found: {[string]: string} = {}
@@ -108,7 +105,6 @@ const function Row(Value: () -> Types.BackgroundTask): Frame
 		Alive = false
 	end)
 
-	-- Tick the running clock and follow the output while the row is open.
 	task.spawn(function()
 		while Alive do
 			Now(os.time())
@@ -506,8 +502,6 @@ const function Section(Heading: string, Tasks: () -> {Types.BackgroundTask}, Col
 				HorizontalFlex = Enum.UIFlexAlignment.Fill,
 				Padding = UDim.new(0, 4),
 			},
-			-- Rows are keyed by task id, since each refresh brings new tables and keying by value would rebuild
-			-- every row, closing any that were opened.
 			Vide.indexes(Vide.derive(function(): {[string]: Types.BackgroundTask}
 				const Keyed = {}
 

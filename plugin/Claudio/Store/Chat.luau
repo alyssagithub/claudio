@@ -134,7 +134,6 @@ const function Append(Message: Types.Message)
 	const Messages = table.clone(Chat.Messages())
 
 	table.insert(Messages, With(Message, {At = os.time()}))
-	-- Grow the rendered window with the chat, so a new message never pushes an older one out of view.
 	Chat.Shown(Chat.Shown() + 1)
 	Chat.Messages(Messages)
 end
@@ -853,9 +852,6 @@ const function Playtest(Input: any): any
 			return false
 		end
 
-		-- A start that has not returned only counts while Studio could still be bringing the playtest up.
-		-- After that Studio's own state decides, since a plugin reload mid-playtest kills the waiting call
-		-- but leaves this record behind, and it would otherwise block every later start.
 		if typeof(Held.At) == "number" and os.clock() - Held.At < 300 then
 			return true
 		end
@@ -1428,7 +1424,6 @@ const function Rbxm(Input: any): any
 	const EncodingService = game:GetService("EncodingService")
 
 	if Input.base64 then
-		-- Comparing needs no destination, so only loading insists on one.
 		const Parent = if typeof(Input.path) == "string" and Input.path ~= "" then Resolve(Input.path) else nil
 
 		if not Parent and Input.compare ~= true then
@@ -1529,8 +1524,6 @@ const function Rbxm(Input: any): any
 				end
 			end
 
-			-- Some services read from a place file have locked children and refuse to be destroyed; they are
-			-- outside the place and go away on their own.
 			for _, Object in Made do
 				pcall(Object.Destroy, Object)
 			end
@@ -1547,8 +1540,6 @@ const function Rbxm(Input: any): any
 		const Skipped = {}
 		local Replaced = 0
 
-		-- With replace, an earlier copy of the same name is removed first, so repeated loads do not pile up
-		-- copies that a later FindFirstChild could pick the wrong one of.
 		const function Clear(Name: string)
 			if Input.replace ~= true then
 				return
@@ -1564,8 +1555,6 @@ const function Rbxm(Input: any): any
 		const Wanted = if typeof(Input.services) == "table" and #Input.services > 0 then Input.services else nil
 
 		for _, Object in Made do
-			-- Filter first: a place file is all services, and some, such as DataStoreService, do not exist in
-			-- the editor yet, so FindService misses them and moving them fails.
 			if Wanted and not table.find(Wanted, Object.Name) then
 				continue
 			end
@@ -1708,7 +1697,6 @@ const Corners = {
 	Vector3.new(1, 1, 1),
 }
 
--- The box around a part, a model, or anything else holding parts such as a folder, for framing and cropping.
 const function Bounds(Object: Instance): (CFrame?, Vector3?)
 	if Object:IsA("Model") then
 		return (Object :: Model):GetBoundingBox()
@@ -2019,7 +2007,6 @@ const function Frame(Input: any): any
 		const Middle = Box.Position
 		const Reach = Size.Magnitude
 
-		-- Close enough that the whole target just fits the view, so a crop around it keeps plenty of pixels.
 		const Away = math.max(Reach, 1) / 2 / math.sin(math.rad(Camera.FieldOfView / 2)) * 1.05
 
 		Camera.CFrame = CFrame.lookAt(Middle + Vector3.new(1, 0.5, 1).Unit * Away, Middle)
@@ -2536,7 +2523,6 @@ end
 const Runs: {[string]: any} = {}
 const RunOrder: {string} = {}
 const Workers: {[string]: thread} = {}
--- What each run has printed so far and when it began, so asking after a run that is still going shows progress.
 const RunLogs: {[string]: {Said: {string}, Started: number}} = {}
 
 const function Waiting(Run: string): string
@@ -2635,8 +2621,6 @@ const function Execute(Input: any): any
 		RunLogs[Run] = {Said = Said, Started = os.clock()}
 	end
 
-	-- A line printed again is counted on its first copy instead of added, so a warning repeating every frame
-	-- takes one line rather than filling the output.
 	const Positions: {[string]: {Index: number, Count: number}} = {}
 
 	const Listening = LogService.MessageOut:Connect(function(Message: string, Kind: Enum.MessageType)
@@ -2985,8 +2969,6 @@ function Chat.WatchStudioJobs()
 	local FinishedAfter: number? = nil
 	local CheckingFinished = false
 
-	-- Turns keep running in chats you switch away from, and only the chat on screen is followed turn by
-	-- turn, so ask the bridge which turns ended elsewhere and notify for those the same way.
 	const function CheckFinished()
 		if CheckingFinished then
 			return
@@ -3015,7 +2997,6 @@ function Chat.WatchStudioJobs()
 
 			FinishedAfter = math.max(FinishedAfter :: number, Entry.endedAt)
 
-			-- Chats the testing mount started are its own business, and it notifies for them itself.
 			const Testing = _G.ClaudioTestedChats
 			const Tested = typeof(Testing) == "table" and Testing[Entry.conversationId] == true
 
@@ -3111,7 +3092,6 @@ function Chat.WatchStudioJobs()
 			if Mounted then
 				_G.ClaudioMountSeen = DateTime.now().UnixTimestampMillis / 1000
 
-				-- Record the mount's chat straight away, so the real plugin never notifies for it.
 				const Current = Chat.ConversationId()
 				const Known = if typeof(_G.ClaudioTestState) == "table" then _G.ClaudioTestState.Known else nil
 
@@ -3247,8 +3227,6 @@ const function Poll(Turn: Types.Turn, CurrentGeneration: number): (string, strin
 			return "cancelled", "", nil
 		end
 
-		-- An update that does not match what the panel expects is skipped rather than ending the turn, which
-		-- used to leave a long error on the reply and the panel showing a turn that had long since finished.
 		const Problem = if Polled then nil else tostring(State)
 
 		if Problem and Problem:find("^The bridge sent something unexpected") then
@@ -4133,8 +4111,6 @@ function Chat.Open(Id: string)
 		return
 	end
 
-	-- Leaving a chat only stops following its turn; the turn keeps going and is picked up again when
-	-- the chat is opened, so several chats can work at once.
 	Reset()
 	Context.Clear()
 	Chat.Shown(40)
@@ -4870,14 +4846,12 @@ function Chat.ForkHere(Index: number?)
 	Chat.Fork(Id)
 end
 
--- The failed reply that ended on a usage limit, while it is still the last thing in the chat.
 const function LimitedReply(): Types.Message?
 	const Last = Chat.Messages()[#Chat.Messages()]
 
 	return if Last and Last.Failed and Last.Error and Format.IsLimit(Last.Error) then Last else nil
 end
 
--- When the limit message says it resets, such as "resets 1:30am", read as the next such time after the reply.
 const function ResetFromText(Reply: Types.Message): number?
 	const Clock = Format.ResetsAt(Reply.Error or "")
 
@@ -4899,7 +4873,6 @@ const function ResetFromText(Reply: Types.Message): number?
 		Hours += 12
 	end
 
-	-- os.date agrees with Windows' clock, where DateTime.fromLocalTime came out an hour off in Studio.
 	const Midnight = Base - (Day.hour * 3600 + Day.min * 60 + Day.sec)
 	local Reset = Midnight + Hours * 3600 + (tonumber(Minute) or 0) * 60
 
@@ -4910,7 +4883,6 @@ const function ResetFromText(Reply: Types.Message): number?
 	return Reset
 end
 
--- Whether the limit is known not to have reset yet, from the usage windows or the limit message itself.
 const function WaitingOnReset(Reply: Types.Message): boolean
 	for _, Limit in Chat.Limits() do
 		if Limit.resetsAt and Limit.resetsAt > os.time() and ((Limit.utilization and Limit.utilization >= 0.99) or Limit.status == "rejected") then
@@ -4923,7 +4895,6 @@ const function WaitingOnReset(Reply: Types.Message): boolean
 	return Reset ~= nil and Reset > os.time()
 end
 
--- Messages sent while the limit holds wait in the queue instead of failing, and go out when work resumes.
 function Chat.Limited(): boolean
 	const Reply = LimitedReply()
 
@@ -4959,7 +4930,6 @@ function Chat.ResumeAfterLimit()
 		return
 	end
 
-	-- Without a known reset time, try again at most every five minutes rather than every second.
 	if os.clock() - TriedAt < 300 then
 		return
 	end

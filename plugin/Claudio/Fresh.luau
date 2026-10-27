@@ -11,9 +11,6 @@ local Load: (any, Instance?) -> any
 local Rested = os.clock()
 local Depth = 0
 
--- Modules loaded here run on Studio's main thread like execute code does, so their loops get the same
--- pauses execute inserts; without them a long simulation inside a module froze Studio until it offered
--- to stop the plugin. A loop that cannot yield, such as inside a sort comparator, just carries on.
 const function Pace()
 	if os.clock() - Rested < 0.03 or not coroutine.isyieldable() then
 		return
@@ -23,9 +20,6 @@ const function Pace()
 	Rested = os.clock()
 end
 
--- Follows a require-by-string path, such as "./_Index/roblox_testez@0.4.1/testez" in a Wally link module,
--- from the module that asked. Roblox's own require cannot do this for code loaded here, because it only
--- knows the path relative to a real script.
 const function Resolve(Path: string, From: Instance?): Instance
 	if not From then
 		error(`Cannot follow "{Path}" because it was not required from a module.`, 3)
@@ -87,8 +81,6 @@ Load = function(Target: any, From: Instance?): any
 		return require(Target)
 	end
 
-	-- Reused only while the source is unchanged, so editing a module and loading it again in the same call
-	-- runs the new source.
 	const Held = Loaded[Target]
 
 	if Held and Held.Source == Target.Source then
@@ -130,10 +122,6 @@ Load = function(Target: any, From: Instance?): any
 		Execute()
 	end
 
-	-- A module whose top-level code waits on something that only exists in a running game, such as a remote
-	-- made by the server, would hold the caller until its time limit. Paused for 5 seconds without taking a
-	-- loop step, it is stopped and named. Only the module loading deepest is watched, so the report names the
-	-- one actually waiting rather than the modules that required it.
 	while not Results and Worker do
 		if Depth == Mine and os.clock() - math.max(Rested, Began) > 5 and coroutine.status(Worker) == "suspended" then
 			const Where = {}

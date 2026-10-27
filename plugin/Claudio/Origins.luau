@@ -1,7 +1,4 @@
 --!strict
--- Remembers which script raised each error, so the logs tool can say where an error came from. The log
--- history only keeps the text, but ScriptContext.Error also hands over the script, and an error that
--- never reaches it was raised by Studio itself or by an engine call rather than by a script.
 const ScriptContext = game:GetService("ScriptContext")
 
 const Origins = {}
@@ -47,7 +44,6 @@ function Origins.Start()
 	end)
 end
 
--- The note to put after an error line, or nil when there is nothing to say.
 function Origins.Label(Message: string, Timestamp: number): string?
 	const Found = Sources[Message]
 

@@ -15,8 +15,6 @@ const Create = Vide.create
 
 const Edge = 18
 
--- The same early warnings Claude Code gives: a limit counts as running ahead of pace once this share of it is
--- used while no more than this share of its window has passed.
 const Paces = {
 	five_hour = {
 		Window = 5 * 60 * 60,
@@ -34,8 +32,6 @@ const Paces = {
 	},
 }
 
--- How a limit is going at the pace used so far in its window: whether it is ahead of pace, and when it would
--- run out if that pace keeps up.
 const function Pace(Limit: Types.Limit): (string, boolean)
 	const Rules: {Window: number, Thresholds: {{Used: number, Passed: number}}}? = if Limit.kind == "five_hour" then Paces.five_hour elseif Limit.kind:find("^seven_day") then Paces.seven_day else nil
 	const Used = Limit.utilization
@@ -477,7 +473,6 @@ return function()
 				return UDim2.fromOffset(Room(), 0)
 			end,
 			AutomaticSize = Enum.AutomaticSize.Y,
-			-- Opens just above the ring, right-aligned with it, over the message box, and stops at the bar's left edge.
 			AnchorPoint = Vector2.new(1, 1),
 			Position = function()
 				return UDim2.new(1, math.max(0, Shift() + Room() - Edge), 0, -6)

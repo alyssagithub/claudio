@@ -25,7 +25,6 @@ const ExecuteDescription = [
   "Never run patterns that start or end with a greedy class, such as [^\\n]*word[^\\n]*, over a whole script's source: their cost grows with the square of the line length. Split the source into lines with gmatch(\"[^\\n]+\") and test each with find(word, 1, true).",
 ].join(" ");
 
-// The last few captures by their settings, at full size, for the capture tool's changes option.
 const Captures = new Map<string, string>();
 
 const InputDescription = [
@@ -74,9 +73,6 @@ function StudioMemory(): Promise<{Editor: number, Test: number, Room: number, Ra
   });
 }
 
-// Each test window is estimated from a running test process, or else as three quarters of the editor,
-// which matches what test windows have used in practice; the old quarter of the editor was far too low.
-// Room counts the page file, so a test can be allowed and still run mostly from disk; that gets a warning.
 async function Headroom(Clients: number, Starting: boolean): Promise<{ Refused: string | null; Warning: string | null }> {
   const Gigabyte = 1024 * 1024 * 1024;
   const Processes = Clients + (Starting ? 1 : 0);
@@ -151,10 +147,6 @@ function Said(Found: SaidAnswer, Missing: string): string {
 
 export function StudioTools(Deps: Dependencies): StudioTool[] {
   const { Presence, LiveSession } = Deps;
-  // The bridge adds a notice to an answer when another session is driving the same Studio, the plugin
-  // just reloaded, or a playtest was stopped from outside. Collect them so playtest and execute show them.
-  // Keyed by the note with its numbers taken out, so a tool that polls many times, such as playtest stop
-  // waiting for edit mode, shows each note once, with the newest timings.
   const Notices = new Map<string, string>();
   const Note = (Said: string) => {
     for (const Line of Said.split("\n")) {
@@ -199,8 +191,6 @@ export function StudioTools(Deps: Dependencies): StudioTool[] {
     return "A playtest is running, but its server has not checked in with Claudio for over 20 seconds, so nothing can run there. It is usually busy with a long task or stuck; stop the playtest and start it again.";
   }
 
-  // Stop returns as soon as the session takes the request, but Studio needs a while to tear the playtest
-  // down; wait until the editor reports it is back in edit mode so the next start is not refused.
   async function WaitUntilStopped(Signal?: AbortSignal): Promise<string> {
     const Said = await WaitForEditMode(Signal);
 
@@ -656,9 +646,6 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
           ]};
         };
 
-        // During a playtest the editor's viewport is not drawn, so the shot is taken on the player's client with
-        // Studio's own screenshot, which it saves as a PNG in its capture folder, and read from there.
-        // It does not depend on which Studio window is in front, so it is also the first try for element.
         const ClientShot = async (Around: string | undefined): Promise<ToolAnswer | null> => {
           const Folder = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "Roblox", "tmp-capture-storage");
           const Began = Date.now();
@@ -690,7 +677,6 @@ if Target ~= "" then
 	end
 end
 return {shot = Got and tostring(Got) or nil, bounds = Bounds}`}, 40) as { error?: string; result?: unknown } | null;
-          // Session code hands tables back as JSON text.
           const Found = (() => {
             try {
               return (typeof Taken?.result === "string" ? JSON.parse(Taken.result) : Taken?.result) as { shot?: string; bounds?: number[] } | undefined;
@@ -1636,8 +1622,6 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds}`}, 40) as { error?
     },
   ];
 
-  // A very long result costs its full length in every later request of the chat, so past about eight
-  // thousand tokens the reply keeps its start and end and the whole text goes to a file Claude can read.
   for (const Tool of Tools) {
     const Run = Tool.Run;
 
@@ -1679,7 +1663,6 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds}`}, 40) as { error?
         return Answer;
       }
 
-      // Joined into the last text part, because clients show separate parts with nothing between them.
       const Last = [...Answer.content].reverse().find((Part) => Part.type === "text") as { type: "text"; text: string } | undefined;
 
       if (!Last) {

@@ -213,7 +213,6 @@ export function ExecuteReport(Found: ExecuteAnswer) {
   }
 
   if (Found.output && Found.output.length > 0) {
-    // The same line printed many times, such as an engine warning repeating every frame, is shown once with a count.
     const Counts = new Map<string, number>();
 
     for (const Line of Found.output) {
@@ -255,12 +254,6 @@ export function LintReport(Found: LintAnswer) {
   return Lines.length > 0 ? Lines.join("\n") : "No warnings.";
 }
 
-
-
-
-
-
-
 export function AskServerFor(Reach: Reacher, ReachIn: ReacherIn) {
   const Shared = StudioTools({
     Reach,
@@ -293,8 +286,6 @@ export function AskServerFor(Reach: Reacher, ReachIn: ReacherIn) {
 }
 type ProfiledFunction = Record<string, unknown>;
 
-// Ranks what Roblox's script profiler recorded. Each function's total includes the functions it called,
-// so the per-script figure is each script's busiest function rather than a sum, which would count time twice.
 export function ProfileReport(Found: { error?: string; json?: string } | null, Seconds: number): string {
   if (!Found) {
     return "The play session did not answer.";
@@ -322,8 +313,6 @@ export function ProfileReport(Found: { error?: string; json?: string } | null, S
   const Where = (Entry: ProfiledFunction) => String(Entry.Source ?? Entry.Script ?? "unknown script");
   const Label = (Entry: ProfiledFunction) => `${String(Entry.Name || "anonymous")}${Entry.Line !== undefined ? ` (line ${Entry.Line})` : ""}`;
   const Unit = (Value: number) => `${(Value / 1000).toFixed(1)} ms`;
-  // In a run-mode playtest the server shares Studio's own process, so plugins and engine code show up too.
-  // Keep the game's scripts, whose sources are paths inside the place, and total the rest on one line.
   const Services = /^(Workspace|ServerScriptService|ServerStorage|ReplicatedStorage|ReplicatedFirst|StarterPlayer|StarterGui|StarterPack|Players|Lighting|SoundService|Teams|Chat|TextChatService)\./;
   const Game = Functions.filter((Entry) => Services.test(Where(Entry)));
   const Others = Functions.filter((Entry) => !Services.test(Where(Entry))).reduce((Most, Entry) => Math.max(Most, Time(Entry)), 0);

@@ -170,8 +170,6 @@ const function Queued(Entry: () -> Types.QueuedMessage, Index: number)
 	}
 end
 
--- Queued messages sit at the very end of the message list, so they scroll with the chat like a message
--- just sent, and anything new that arrives lands above them.
 return function()
 	return Create "Frame" {
 		Name = "Queue",

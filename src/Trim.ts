@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 
-// How far into each transcript everything is already trimmed, so a later resume only reads what came after.
 const DoneFile = path.join(os.homedir(), ".claudio", "trimmed.json");
 
 const PictureNote = "[An earlier picture was left out when this chat was resumed, to save context. Capture again if you need to see it; the line below says where it was saved.]";
@@ -30,10 +29,6 @@ function IsPrompt(Entry: { type?: string; isSidechain?: boolean; message?: { con
   return typeof Content === "string" || (Array.isArray(Content) && !Content.some((Block) => Block && Block.type === "tool_result"));
 }
 
-// Leaves pictures and long log dumps older than the last few prompts out of what a resumed chat sends.
-// Only called when the chat's prompt cache has already expired, because the whole chat is written to the
-// cache again on resume anyway, so a smaller chat is strictly cheaper; doing it to a warm chat would throw
-// away its cache. The text and the decisions around them stay, and the pictures stay on disk.
 export async function TrimOldResults(File: string, KeepPrompts = 3): Promise<{ Pictures: number; Logs: number }> {
   const Done = (() => {
     try {
@@ -142,7 +137,6 @@ export async function TrimOldResults(File: string, KeepPrompts = 3): Promise<{ P
     fs.rmSync(Temporary, {force: true});
   }
 
-  // Trimming only ever shortens lines before the cutoff, so the cutoff moves by however much was saved.
   Done[File] = Changed ? Reached - Saved : Reached;
   fs.writeFileSync(DoneFile, JSON.stringify(Done));
 

@@ -351,16 +351,18 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
       Name: "read",
       Description: "Read a part of the open place in one call: the instance tree under a path, plus the source of scripts in it. Prefer this over walking the tree with separate calls.",
       Schema: {
-        path: z.string().optional().describe("Where to start, such as ServerScriptService. Defaults to the whole place."),
+        path: z.string().optional().describe("Where to start, such as ServerScriptService. Defaults to the whole place, which covers the services a game's own content lives in and leaves out engine services such as CoreGui; give one of those as path to read it."),
         depth: z.number().optional().describe("How many levels deep, 3 by default."),
         contains: z.string().optional().describe("Only return script sources containing this text."),
+        sources: z.boolean().optional().describe("false returns only the tree, without script sources."),
       },
-      Run: async (Input: { path?: string; depth?: number; contains?: string }) => ({content: [{
+      Run: async (Input: { path?: string; depth?: number; contains?: string; sources?: boolean }) => ({content: [{
         type: "text",
         text: ReadReport(await Reach("read", {
           path: Input.path || "game",
           depth: Input.depth,
           contains: Input.contains,
+          sources: Input.sources,
         })),
       }]}),
     },
@@ -1387,7 +1389,7 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds}`}, 40) as { error?
         }
 
         if (Tree || (Input.paths && Input.paths.length > 0)) {
-          const Found: { error?: string; text?: string; base64?: string; count?: number } | null = await Reach("rbxm", {paths: Input.paths, tree: Tree});
+          const Found: { error?: string; text?: string; base64?: string; count?: number; dropped?: string[] } | null = await Reach("rbxm", {paths: Input.paths, tree: Tree});
 
           if (!Found || Found.error || !Found.base64) {
             return {content: [{
@@ -1407,7 +1409,7 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds}`}, 40) as { error?
 
           return {content: [{
             type: "text",
-            text: `Saved ${Found.count} to ${Input.file}.`,
+            text: `Saved ${Found.count} to ${Input.file}.${Found.dropped && Found.dropped.length > 0 ? ` Roblox left ${Found.dropped.length} out of the file because it cannot save them: ${Found.dropped.join(", ")}. Create those from a script at runtime instead.` : ""}`,
           }]};
         }
 

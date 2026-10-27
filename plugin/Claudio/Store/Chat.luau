@@ -235,7 +235,7 @@ const function EditedScripts(): {any}
 	return Wanted
 end
 
-const Places = {
+const Places: {Instance} = {
 	game:GetService("Workspace"),
 	game:GetService("ReplicatedFirst"),
 	game:GetService("ReplicatedStorage"),
@@ -245,6 +245,10 @@ const Places = {
 	game:GetService("StarterPack"),
 	game:GetService("StarterPlayer"),
 	game:GetService("Lighting"),
+	game:GetService("MaterialService"),
+	game:GetService("SoundService"),
+	game:GetService("Teams"),
+	game:GetService("TextChatService"),
 }
 
 const function ScriptTree(): {any}
@@ -1635,6 +1639,53 @@ const function Rbxm(Input: any): any
 	const Saved, Bytes = pcall(function()
 		return SerializationService:SerializeInstancesAsync(Wanted)
 	end)
+	const Dropped = {}
+
+	if Saved then
+		const Read, Back = pcall(function()
+			return SerializationService:DeserializeInstancesAsync(Bytes)
+		end)
+
+		const function Compare(Original: Instance, Copy: Instance?, Above: string)
+			const Label = if Above == "" then Original.Name else `{Above}.{Original.Name}`
+
+			if not Copy then
+				table.insert(Dropped, `{Label} ({Original.ClassName})`)
+
+				return
+			end
+
+			const Used: {[Instance]: boolean} = {}
+
+			for _, Child in Original:GetChildren() do
+				local Match: Instance?
+
+				for _, Candidate in Copy:GetChildren() do
+					if not Used[Candidate] and Candidate.Name == Child.Name and Candidate.ClassName == Child.ClassName then
+						Match = Candidate
+
+						break
+					end
+				end
+
+				if Match then
+					Used[Match] = true
+				end
+
+				Compare(Child, Match, Label)
+			end
+		end
+
+		if Read then
+			for Index, Original in Wanted do
+				Compare(Original, Back[Index], "")
+			end
+
+			for _, Copy in Back do
+				Copy:Destroy()
+			end
+		end
+	end
 
 	if Assembled then
 		Assembled:Destroy()
@@ -1655,6 +1706,7 @@ const function Rbxm(Input: any): any
 	return {
 		base64 = Text,
 		count = #Wanted,
+		dropped = Dropped,
 	}
 end
 
@@ -2361,7 +2413,9 @@ const function ReadPlace(Input: any): any
 			return
 		end
 
-		for _, Child in Object:GetChildren() do
+		const Children: {Instance} = if Object == game then Places else Object:GetChildren()
+
+		for _, Child in Children do
 			if Counted >= 400 then
 				Cut = true
 
@@ -2372,7 +2426,7 @@ const function ReadPlace(Input: any): any
 
 			table.insert(Tree, `{Indent}{Child.Name} [{Child.ClassName}]`)
 
-			if Child:IsA("LuaSourceContainer") and Child.Source ~= "" then
+			if Input.sources ~= false and Child:IsA("LuaSourceContainer") and Child.Source ~= "" then
 				const Body = Child.Source
 
 				if not Wanted or Body:lower():find(Wanted, 1, true) or Child.Name:lower():find(Wanted, 1, true) then
@@ -2390,7 +2444,7 @@ const function ReadPlace(Input: any): any
 
 	table.insert(Tree, `{Root.Name} [{Root.ClassName}]`)
 
-	if Root:IsA("LuaSourceContainer") and Root.Source ~= "" then
+	if Input.sources ~= false and Root:IsA("LuaSourceContainer") and Root.Source ~= "" then
 		table.insert(Sources, {
 			path = Root:GetFullName(),
 			source = Root.Source,
@@ -2648,6 +2702,33 @@ const function Execute(Input: any): any
 	end)
 
 	const Step = if Input.readOnly ~= true then StartStep("ClaudioExecute", Input.undoName or "Claudio ran a script") else nil
+	const Changed = {}
+	local Changes = 0
+	const Watching: {RBXScriptConnection} = {}
+
+	if not Step then
+		const function Record(Object: Instance, What: string)
+			if Object:IsDescendantOf(workspace.CurrentCamera) or Object == workspace.CurrentCamera or Object.Name == "ClaudioExecute" or Object:IsDescendantOf(game:GetService("CoreGui")) or Object:IsDescendantOf(game:GetService("PluginGuiService")) then
+				return
+			end
+
+			Changes += 1
+
+			if #Changed < 8 then
+				table.insert(Changed, What)
+			end
+		end
+
+		table.insert(Watching, game.ItemChanged:Connect(function(Object: Instance, Property: string)
+			Record(Object, `set {Property} on {Object:GetFullName()}`)
+		end))
+		table.insert(Watching, game.DescendantAdded:Connect(function(Object: Instance)
+			Record(Object, `added {Object:GetFullName()}`)
+		end))
+		table.insert(Watching, game.DescendantRemoving:Connect(function(Object: Instance)
+			Record(Object, `removed {Object:GetFullName()}`)
+		end))
+	end
 
 	_G.ClaudioFresh = Fresh.Load
 
@@ -2807,6 +2888,15 @@ const function Execute(Input: any): any
 
 	if Step then
 		Answer.undo = Step.Name
+	end
+
+	for _, Connection in Watching do
+		Connection:Disconnect()
+	end
+
+	if Changes > 0 then
+		Answer.changed = Changed
+		Answer.changes = Changes
 	end
 
 	if Run then

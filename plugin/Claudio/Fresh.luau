@@ -11,6 +11,81 @@ local Load: (any, Instance?) -> any
 local Rested = os.clock()
 local Depth = 0
 
+const RunService = game:GetService("RunService")
+const Connections: {RBXScriptConnection} = {}
+const Bound: {string} = {}
+
+const function Watch(Signal: RBXScriptSignal): any
+	const function Track(Method: string): (any, any) -> RBXScriptConnection
+		return function(_, Callback: any): RBXScriptConnection
+			const Connection = (Signal :: any)[Method](Signal, Callback)
+
+			table.insert(Connections, Connection)
+
+			return Connection
+		end
+	end
+
+	return {
+		Connect = Track("Connect"),
+		Once = Track("Once"),
+		ConnectParallel = Track("ConnectParallel"),
+		Wait = function(): ...any
+			return Signal:Wait()
+		end,
+	}
+end
+
+const WatchedRunService = setmetatable({}, {
+	__index = function(_, Key: string): any
+		const Value = (RunService :: any)[Key]
+
+		if typeof(Value) == "RBXScriptSignal" then
+			return Watch(Value)
+		end
+
+		if typeof(Value) ~= "function" then
+			return Value
+		end
+
+		return function(_, Name: any, ...: any): ...any
+			if Key == "BindToRenderStep" then
+				table.insert(Bound, Name)
+			end
+
+			return Value(RunService, Name, ...)
+		end
+	end,
+})
+
+const WatchedGame = setmetatable({}, {
+	__index = function(_, Key: string): any
+		const Value = (game :: any)[Key]
+
+		if Key == "RunService" then
+			return WatchedRunService
+		end
+
+		if typeof(Value) ~= "function" then
+			return Value
+		end
+
+		return function(_, ...: any): ...any
+			if (Key == "GetService" or Key == "FindService") and ... == "RunService" then
+				return WatchedRunService
+			end
+
+			return Value(game, ...)
+		end
+	end,
+	__newindex = function(_, Key: string, Value: any)
+		(game :: any)[Key] = Value
+	end,
+	__tostring = function(): string
+		return tostring(game)
+	end,
+})
+
 const function Pace()
 	if os.clock() - Rested < 0.03 or not coroutine.isyieldable() then
 		return
@@ -99,6 +174,7 @@ Load = function(Target: any, From: Instance?): any
 
 	setfenv(Chunk, setmetatable({
 		script = Target,
+		game = WatchedGame,
 		__ClaudioPace = Pace,
 		require = function(Wanted: any): any
 			return Load(Wanted, Target)
@@ -163,6 +239,17 @@ end
 function Fresh.Clear()
 	Loaded = {}
 	table.clear(Loading)
+
+	for _, Connection in Connections do
+		Connection:Disconnect()
+	end
+
+	for _, Name in Bound do
+		RunService:UnbindFromRenderStep(Name)
+	end
+
+	table.clear(Connections)
+	table.clear(Bound)
 end
 
 return Fresh

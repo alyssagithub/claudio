@@ -189,7 +189,7 @@ export function ApiReport(Found: ApiAnswer) {
   return Parts.join("\n");
 }
 
-export type ExecuteAnswer = { error?: string; line?: string; trace?: string; result?: unknown; output?: string[]; undo?: boolean } | null;
+export type ExecuteAnswer = { error?: string; line?: string; trace?: string; result?: unknown; output?: string[]; undo?: boolean; changed?: string[]; changes?: number } | null;
 
 export function ExecuteReport(Found: ExecuteAnswer) {
   if (!Found) {
@@ -220,6 +220,10 @@ export function ExecuteReport(Found: ExecuteAnswer) {
     }
 
     Parts.push([...Counts].map(([Line, Count]) => Count > 1 ? `${Line} (×${Count})` : Line).join("\n"));
+  }
+
+  if (Found.changed && Found.changed.length > 0) {
+    Parts.push(`This run was marked readOnly but changed the place ${Found.changes} time${Found.changes === 1 ? "" : "s"}, with no undo step recorded: ${Found.changed.join(", ")}${(Found.changes || 0) > Found.changed.length ? ", and more" : ""}. Run writes without readOnly so they can be undone.`);
   }
 
   if (Parts.length === 0) {

@@ -7,9 +7,9 @@ import type { Chapter, Content, ContentBlock, Part, StoredCall, StoredMessage, T
 
 type TranscriptEntry = TranscriptLine & { customTitle?: string; aiTitle?: string; summary?: string };
 
-type DesktopSession = { title: string | undefined; workingDirectory: string | undefined; starred: boolean; archived: boolean };
+type DesktopSession = { title: string | undefined; workingDirectory: string | undefined; starred: boolean; archived: boolean; scheduled: boolean };
 
-type DesktopRecord = Record<string, unknown> & { cliSessionId?: string; title?: string; cwd?: string; isStarred?: boolean; isArchived?: boolean };
+type DesktopRecord = Record<string, unknown> & { cliSessionId?: string; title?: string; cwd?: string; isStarred?: boolean; isArchived?: boolean; scheduledTaskId?: string };
 
 type CostStore = Record<string, number[] | Record<string, number>>;
 
@@ -84,6 +84,7 @@ function ReadDesktopSessions(): Record<string, DesktopSession> {
           workingDirectory: Session.cwd,
           starred: Session.isStarred === true,
           archived: Session.isArchived === true,
+          scheduled: Boolean(Session.scheduledTaskId),
         };
       }
     }
@@ -614,7 +615,7 @@ export function ListConversations(): Listing[] {
     for (const Name of fs.readdirSync(Folder)) {
       const Id = Name.slice(0, -6);
 
-      if (!Name.endsWith(".jsonl") || (!Desktop[Id] && !Own.has(Id))) {
+      if (!Name.endsWith(".jsonl") || (!Desktop[Id] && !Own.has(Id)) || (Desktop[Id] && Desktop[Id].scheduled)) {
         continue;
       }
 

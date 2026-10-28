@@ -89,8 +89,9 @@ function Runtime.Start(CurrentPlugin: Plugin)
 
 		Runtime.Fill(Copy, Key)
 		Copy.RunContext = if OnServer then Enum.RunContext.Server else Enum.RunContext.Client
-		Copy.Disabled = false
+		Copy.Disabled = true
 		Copy.Parent = if OnServer then ServerScriptService else ReplicatedStorage
+		Copy.Disabled = false
 
 		return Copy
 	end

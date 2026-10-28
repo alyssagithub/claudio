@@ -15,6 +15,26 @@ const Methods: {[string]: "DELETE" | "GET" | "POST"} = {
 
 const Relay = {}
 
+const function Secret(): string
+	const CurrentPlugin = Settings.Plugin()
+
+	if not CurrentPlugin then
+		return ""
+	end
+
+	const Stored = CurrentPlugin:GetSetting("Claudio_RelayToken")
+
+	if typeof(Stored) == "string" and Stored ~= "" then
+		return Stored
+	end
+
+	const Made = HttpService:GenerateGUID(false)
+
+	CurrentPlugin:SetSetting("Claudio_RelayToken", Made)
+
+	return Made
+end
+
 const function Digest(Secret: string, Message: string): string
 	const Inner = EncodingService:ComputeStringHash(Secret .. Message, Enum.HashAlgorithm.Sha256)
 
@@ -22,23 +42,23 @@ const function Digest(Secret: string, Message: string): string
 end
 
 function Relay.Sign(Nonce: string, Method: string, Url: string, Body: string?): string
-	const Secret = Settings.Get("RelayToken")()
+	const Key = Secret()
 
-	if Secret == "" then
+	if Key == "" then
 		return ""
 	end
 
-	return Digest(Secret, `ask|{Nonce}|{Method}|{Url}|{Body or ""}`)
+	return Digest(Key, `ask|{Nonce}|{Method}|{Url}|{Body or ""}`)
 end
 
 function Relay.SignReply(Nonce: string, Status: number?, Body: string?): string
-	const Secret = Settings.Get("RelayToken")()
+	const Key = Secret()
 
-	if Secret == "" then
+	if Key == "" then
 		return ""
 	end
 
-	return Digest(Secret, `answer|{Nonce}|{tostring(Status)}|{Body or ""}`)
+	return Digest(Key, `answer|{Nonce}|{tostring(Status)}|{Body or ""}`)
 end
 
 function Relay.Serve()

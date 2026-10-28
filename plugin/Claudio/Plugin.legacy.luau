@@ -56,10 +56,6 @@ end
 if not Playing then
 	pcall(require(script.Parent.Runtime).Remove)
 
-	if Settings.Get("RelayToken")() == "" then
-		Settings.Set("RelayToken", game:GetService("HttpService"):GenerateGUID(false))
-	end
-
 	Watcher.Start()
 end
 

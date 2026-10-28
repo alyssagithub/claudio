@@ -245,7 +245,6 @@ const Hidden: {[string]: string | boolean} = {
 	FolderAsked = false,
 	LastChat = "",
 	LastChatCopy = "",
-	RelayToken = "",
 	BuildKey = "",
 	Mode = "auto",
 	Bypass = false,

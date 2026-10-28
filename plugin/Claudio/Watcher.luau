@@ -394,7 +394,7 @@ const function Render(Where: Bucket): {string}
 	for _, Item in Where.Entries do
 		const Object = Item.Object
 
-		if Object and Object:IsA("LuaSourceContainer") and Item.Verb == "Edited" and Item.Before == (Object :: any).Source then
+		if Object and Object:IsA("LuaSourceContainer") and Item.Verb == "Edited" and (Item.Before == (Object :: any).Source or not Object:IsDescendantOf(game)) then
 			continue
 		end
 
@@ -486,7 +486,7 @@ const function Describe(Where: Bucket): {Types.Change}
 
 		const Object = Item.Object
 
-		if Object and Object:IsA("LuaSourceContainer") and Item.Verb == "Edited" and Item.Before == (Object :: any).Source then
+		if Object and Object:IsA("LuaSourceContainer") and Item.Verb == "Edited" and (Item.Before == (Object :: any).Source or not Object:IsDescendantOf(game)) then
 			continue
 		end
 

@@ -18,28 +18,36 @@ const Users = new Map<string, { Name: () => string; At: number }>();
 const Windows = new Map<string, { Place: string; Chat: string; At: number }>();
 const Chosen = new Map<string, string>();
 
-function LiveWindows(): [string, { Place: string; Chat: string; At: number }][] {
-  return [...Windows.entries()].filter(([, Window]) => Date.now() - Window.At < 8000);
+function LiveWindows(): { Place: string; Chat: string; At: number }[] {
+  const Newest = new Map<string, { Place: string; Chat: string; At: number }>();
+
+  for (const Window of Windows.values()) {
+    if (Date.now() - Window.At < 8000 && (Newest.get(Window.Place)?.At || 0) < Window.At) {
+      Newest.set(Window.Place, Window);
+    }
+  }
+
+  return [...Newest.values()];
 }
 
 function Choose(Input: unknown, Who?: Owner): unknown {
   const Wanted = Input && typeof Input === "object" ? String((Input as { use?: unknown }).use || "").toLowerCase() : "";
   const Live = LiveWindows();
-  const Listed = Live.map(([, Window], Index) => `${Index + 1}: "${Window.Place}"`).join(", ") || "none";
+  const Listed = Live.map((Window, Index) => `${Index + 1}: "${Window.Place}"`).join(", ") || "none";
 
   if (Wanted === "") {
-    return {text: `Studio windows connected: ${Listed}.${Who && Chosen.has(Who.Id) ? ` This session uses "${Windows.get(Chosen.get(Who.Id)!)?.Place}".` : ""}`};
+    return {text: `Studio windows connected: ${Listed}.${Who && Chosen.has(Who.Id) ? ` This session uses "${Chosen.get(Who.Id)}".` : ""}`};
   }
 
-  const Found = /^\d+$/.test(Wanted) ? Live.slice(Number(Wanted) - 1, Number(Wanted)) : Live.filter(([, Window]) => Window.Place.toLowerCase().includes(Wanted));
+  const Found = /^\d+$/.test(Wanted) ? Live.slice(Number(Wanted) - 1, Number(Wanted)) : Live.filter((Window) => Window.Place.toLowerCase().includes(Wanted));
 
   if (Found.length !== 1 || !Who) {
-    return {error: Found.length === 0 ? `No connected Studio window has a place matching "${Wanted}". Connected: ${Listed}.` : `More than one window matches "${Wanted}": ${Found.map(([, Window]) => `"${Window.Place}"`).join(", ")}. Give more of the name.`};
+    return {error: Found.length === 0 ? `No connected Studio window has a place matching "${Wanted}". Connected: ${Listed}.` : `More than one window matches "${Wanted}": ${Found.map((Window) => `"${Window.Place}"`).join(", ")}. Give more of the name.`};
   }
 
-  Chosen.set(Who.Id, Found[0][0]);
+  Chosen.set(Who.Id, Found[0].Place);
 
-  return {text: `This session now sends everything to "${Found[0][1].Place}".`};
+  return {text: `This session now sends everything to "${Found[0].Place}".`};
 }
 
 function TargetFor(Who?: Owner): string | { error: string } | undefined {
@@ -47,17 +55,17 @@ function TargetFor(Who?: Owner): string | { error: string } | undefined {
   const Picked = Who && Chosen.get(Who.Id);
 
   if (Picked) {
-    return Live.some(([Boot]) => Boot === Picked) ? Picked : {error: `The Studio window this session chose, "${Windows.get(Picked)?.Place}", is no longer connected. Choose another with the studio tool.`};
+    return Live.some((Window) => Window.Place === Picked) ? Picked : {error: `The Studio window this session chose, "${Picked}", is not connected right now. Calls go back to it on their own once it reconnects, or choose another with the studio tool.`};
   }
 
-  const Own = Who && Live.find(([, Window]) => `chat-${Window.Chat}` === Who.Id);
+  const Own = Who && Live.find((Window) => `chat-${Window.Chat}` === Who.Id);
 
   if (Own) {
-    return Own[0];
+    return Own.Place;
   }
 
   if (Live.length > 1) {
-    return {error: `${Live.length} Studio windows are connected (${Live.map(([, Window]) => `"${Window.Place}"`).join(", ")}), so Claudio does not know which one to use. Choose one with the studio tool first.`};
+    return {error: `${Live.length} Studio windows are connected (${Live.map((Window) => `"${Window.Place}"`).join(", ")}), so Claudio does not know which one to use. Choose one with the studio tool first.`};
   }
 
   return undefined;
@@ -306,7 +314,7 @@ export function Take(Role?: string | null, Able?: boolean, Attached?: number, Lo
     Windows.set(Boot, {Place: Place || "an unnamed place", Chat: Chat || "", At: Date.now()});
   }
 
-  const At = Pending.findIndex((Job) => Job.Role === Wanted && (!Job.Target || Job.Target === Boot));
+  const At = Pending.findIndex((Job) => Job.Role === Wanted && (!Job.Target || (Boot && Windows.get(Boot)?.Place) === Job.Target));
 
   if (At < 0) {
     return null;

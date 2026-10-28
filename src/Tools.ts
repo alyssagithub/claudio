@@ -367,6 +367,17 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
       }]}),
     },
     {
+      Name: "studio",
+      Description: "List the Studio windows connected to Claudio, or choose which one this session uses by part of its place name or its number in the list. Needed only when more than one window is open; a Claudio chat always uses the window its panel is in.",
+      Schema: {
+        use: z.string().optional().describe("Part of the place name, or the number from the list, of the window to use from now on. Leave out to list the windows."),
+      },
+      Run: async (Input: { use?: string }) => ({content: [{
+        type: "text",
+        text: Said(await Reach("choose", {use: Input.use}), "Studio did not say."),
+      }]}),
+    },
+    {
       Name: "hidden",
       Description: "Read properties Roblox hides from plugins and scripts, which properties and execute cannot see: Workspace's streaming settings (StreamOutBehavior, StreamingTargetRadius, StreamingMinRadius, StreamingIntegrityMode, ModelStreamingBehavior), its physics, avatar and replication settings, Lighting.Technology, and hidden properties on any other instance. Use this instead of assuming what they are set to. Claudio reads them from a copy of the place that Studio writes when a test server starts. That copy is reused for 30 minutes unless fresh is true; making a new one briefly starts and stops a server-only test, which takes up to a minute and cannot happen while a playtest is running. Only the user can change these properties, in Studio's Properties panel.",
       Schema: {

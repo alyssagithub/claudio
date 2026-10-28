@@ -205,7 +205,7 @@ end
 function Client.TakeStudioJob(): (boolean, any)
 	const Open = if Client.OpenChat then Client.OpenChat() else nil
 
-	return Http.Request("GET", `{BaseUrl()}/studio/job{if Testing then "" else `?boot={Boot}{if Open then `&chat={Open}` else ""}`}`)
+	return Http.Request("GET", `{BaseUrl()}/studio/job{if Testing then "" else `?boot={Boot}&place={HttpService:UrlEncode(game.Name)}{if Open then `&chat={Open}` else ""}`}`)
 end
 
 const function Repaired(Value: any): any

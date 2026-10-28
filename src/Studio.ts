@@ -3,6 +3,7 @@ type Job = {
   Kind: string;
   Input: unknown;
   Role: string;
+  Target?: string;
 };
 
 const Pending: Job[] = [];
@@ -14,6 +15,53 @@ let Counter = 0;
 export type Owner = { Id: string; Name: () => string };
 
 const Users = new Map<string, { Name: () => string; At: number }>();
+const Windows = new Map<string, { Place: string; Chat: string; At: number }>();
+const Chosen = new Map<string, string>();
+
+function LiveWindows(): [string, { Place: string; Chat: string; At: number }][] {
+  return [...Windows.entries()].filter(([, Window]) => Date.now() - Window.At < 8000);
+}
+
+function Choose(Input: unknown, Who?: Owner): unknown {
+  const Wanted = Input && typeof Input === "object" ? String((Input as { use?: unknown }).use || "").toLowerCase() : "";
+  const Live = LiveWindows();
+  const Listed = Live.map(([, Window], Index) => `${Index + 1}: "${Window.Place}"`).join(", ") || "none";
+
+  if (Wanted === "") {
+    return {text: `Studio windows connected: ${Listed}.${Who && Chosen.has(Who.Id) ? ` This session uses "${Windows.get(Chosen.get(Who.Id)!)?.Place}".` : ""}`};
+  }
+
+  const Found = /^\d+$/.test(Wanted) ? Live.slice(Number(Wanted) - 1, Number(Wanted)) : Live.filter(([, Window]) => Window.Place.toLowerCase().includes(Wanted));
+
+  if (Found.length !== 1 || !Who) {
+    return {error: Found.length === 0 ? `No connected Studio window has a place matching "${Wanted}". Connected: ${Listed}.` : `More than one window matches "${Wanted}": ${Found.map(([, Window]) => `"${Window.Place}"`).join(", ")}. Give more of the name.`};
+  }
+
+  Chosen.set(Who.Id, Found[0][0]);
+
+  return {text: `This session now sends everything to "${Found[0][1].Place}".`};
+}
+
+function TargetFor(Who?: Owner): string | { error: string } | undefined {
+  const Live = LiveWindows();
+  const Picked = Who && Chosen.get(Who.Id);
+
+  if (Picked) {
+    return Live.some(([Boot]) => Boot === Picked) ? Picked : {error: `The Studio window this session chose, "${Windows.get(Picked)?.Place}", is no longer connected. Choose another with the studio tool.`};
+  }
+
+  const Own = Who && Live.find(([, Window]) => `chat-${Window.Chat}` === Who.Id);
+
+  if (Own) {
+    return Own[0];
+  }
+
+  if (Live.length > 1) {
+    return {error: `${Live.length} Studio windows are connected (${Live.map(([, Window]) => `"${Window.Place}"`).join(", ")}), so Claudio does not know which one to use. Choose one with the studio tool first.`};
+  }
+
+  return undefined;
+}
 const Boots = new Set<string>();
 let ReloadedAt = 0;
 const Playtest = { By: "", Since: 0, Live: false, Players: 0, Most: 0, StoppedBy: "", StoppedAt: 0, ReplacedBy: "" };
@@ -129,14 +177,24 @@ export function Booted(Boot: string | null) {
 }
 
 export function Request(Kind: string, Input: unknown, Timeout?: number | null, Role?: string | null, Who?: Owner): Promise<unknown> {
+  if (Kind === "choose") {
+    return Promise.resolve(Choose(Input, Who));
+  }
+
+  const Target = (Role || "edit") === "edit" ? TargetFor(Who) : undefined;
+
+  if (Target && typeof Target === "object") {
+    return Promise.resolve(Target);
+  }
+
   const Note = Kind === "playtest" || Kind === "execute" ? Notice(Kind, Input, Who) : null;
 
   Track(Kind, Input, Who);
 
-  return Raw(Kind, Input, Timeout, Role).then((Result) => Note && Result && typeof Result === "object" && !Array.isArray(Result) ? {...Result, notice: Note} : Result);
+  return Raw(Kind, Input, Timeout, Role, Target).then((Result) => Note && Result && typeof Result === "object" && !Array.isArray(Result) ? {...Result, notice: Note} : Result);
 }
 
-function Raw(Kind: string, Input: unknown, Timeout?: number | null, Role?: string | null): Promise<unknown> {
+function Raw(Kind: string, Input: unknown, Timeout?: number | null, Role?: string | null, Target?: string): Promise<unknown> {
   return new Promise<unknown>((Resolve) => {
     const Id = `job-${Counter += 1}-${Math.random().toString(36).slice(2, 8)}`;
     let Timer: NodeJS.Timeout | null = null;
@@ -168,6 +226,7 @@ function Raw(Kind: string, Input: unknown, Timeout?: number | null, Role?: strin
       Kind,
       Input,
       Role: Role || "edit",
+      Target,
     });
 
     Timer = setTimeout(() => {
@@ -238,12 +297,16 @@ export function Seen(Role?: string | null, Able?: boolean, Attached?: number, Lo
   }
 }
 
-export function Take(Role?: string | null, Able?: boolean, Attached?: number, Loaded?: number, Games?: number) {
+export function Take(Role?: string | null, Able?: boolean, Attached?: number, Loaded?: number, Games?: number, Boot?: string | null, Place?: string | null, Chat?: string | null) {
   const Wanted = Role || "edit";
 
   Seen(Wanted, Able, Attached, Loaded, Games);
 
-  const At = Pending.findIndex((Job) => Job.Role === Wanted);
+  if (Wanted === "edit" && Boot) {
+    Windows.set(Boot, {Place: Place || "an unnamed place", Chat: Chat || "", At: Date.now()});
+  }
+
+  const At = Pending.findIndex((Job) => Job.Role === Wanted && (!Job.Target || Job.Target === Boot));
 
   if (At < 0) {
     return null;

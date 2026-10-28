@@ -903,7 +903,7 @@ ${Text}`;
             NoteOpenChat(String(Url.searchParams.get("chat")));
           }
 
-          SendJson(Response, 200, {job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true", Attached === null ? undefined : Number(Attached), Loaded === null ? undefined : Number(Loaded), Games === null ? undefined : Number(Games))});
+          SendJson(Response, 200, {job: TakeStudioJob(Url.searchParams.get("role") || "edit", Able === null ? undefined : Able === "true", Attached === null ? undefined : Number(Attached), Loaded === null ? undefined : Number(Loaded), Games === null ? undefined : Number(Games), Url.searchParams.get("boot"), Url.searchParams.get("place"), Url.searchParams.get("chat"))});
           return;
         }
 

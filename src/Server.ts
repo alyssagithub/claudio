@@ -538,7 +538,7 @@ export function StartServer(Port: number) {
       const Role = Url.searchParams.get("role") || "";
 
       if (!TokenMatches(Offered) && !(FromPlaytest && ((Url.pathname === "/studio/job" && (Request.method === "POST" || Role === "server" || Role === "client")) || Url.pathname === "/picker"))) {
-        SendJson(Response, 401, {error: "This request did not come from the Claudio plugin"});
+        SendJson(Response, 401, {error: "This Studio window does not have Claudio's key yet, which happens the first time a Roblox account uses Claudio. Close this Studio window and open it again"});
         return;
       }
 
@@ -1257,6 +1257,8 @@ ${Text}`;
 
   Server.listen(Port, "127.0.0.1", () => {
     const Reached = HandToken();
+
+    setInterval(HandToken, 30000).unref();
 
     const Root = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
     const Tools = StudioTools({

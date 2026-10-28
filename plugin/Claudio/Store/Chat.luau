@@ -2708,7 +2708,13 @@ const function Execute(Input: any): any
 
 	if not Step then
 		const function Record(Object: Instance, What: string)
-			if Object:IsDescendantOf(workspace.CurrentCamera) or Object == workspace.CurrentCamera or Object.Name == "ClaudioExecute" or Object:IsDescendantOf(game:GetService("CoreGui")) or Object:IsDescendantOf(game:GetService("PluginGuiService")) then
+			local Top = Object
+
+			while Top.Parent and Top.Parent ~= game do
+				Top = Top.Parent
+			end
+
+			if not table.find(Places, Top) or Object:IsDescendantOf(workspace.CurrentCamera) or Object == workspace.CurrentCamera then
 				return
 			end
 

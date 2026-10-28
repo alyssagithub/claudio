@@ -2714,7 +2714,7 @@ const function Execute(Input: any): any
 				Top = Top.Parent
 			end
 
-			if not table.find(Places, Top) or Object:IsDescendantOf(workspace.CurrentCamera) or Object == workspace.CurrentCamera then
+			if not table.find(Places, Top) or Object:IsDescendantOf(workspace.CurrentCamera) or Object == workspace.CurrentCamera or next(Running, (next(Running))) ~= nil then
 				return
 			end
 

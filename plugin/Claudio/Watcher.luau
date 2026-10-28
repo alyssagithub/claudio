@@ -393,6 +393,11 @@ const function Render(Where: Bucket): {string}
 
 	for _, Item in Where.Entries do
 		const Object = Item.Object
+
+		if Object and Object:IsA("LuaSourceContainer") and Item.Verb == "Edited" and Item.Before == (Object :: any).Source then
+			continue
+		end
+
 		const Path = Format.Path(if Object and Object.Parent then Object:GetFullName() else Item.Path)
 
 		if Item.Verb == "Created" and Item.Class then
@@ -480,6 +485,11 @@ const function Describe(Where: Bucket): {Types.Change}
 		end
 
 		const Object = Item.Object
+
+		if Object and Object:IsA("LuaSourceContainer") and Item.Verb == "Edited" and Item.Before == (Object :: any).Source then
+			continue
+		end
+
 		const Path = Format.Path(if Object and Object.Parent then Object:GetFullName() else Item.Path)
 		const Change: Types.Change = {
 			Kind = if Item.Verb == "Created" then "added" elseif Item.Verb == "Deleted" then "removed" else "changed",

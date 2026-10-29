@@ -136,9 +136,15 @@ const function TurnBody(Text: string, ConversationId: string?, Images: {Types.Im
 			name = GetPlaceName(),
 			placeId = if game.PlaceId == 0 then nil else string.format("%d", game.PlaceId),
 			universeId = if game.GameId == 0 then nil else string.format("%d", game.GameId),
-			userId = (select(2, pcall(function(): string?
-				return string.format("%d", StudioService:GetUserId())
-			end))),
+			userId = (function(): string?
+				const Ok, Id = pcall(function(): number
+					return StudioService:GetUserId()
+				end)
+				const Player = game:GetService("Players").LocalPlayer
+				const Found = if Ok and Id > 0 then Id elseif Player and Player.UserId > 0 then Player.UserId else nil
+
+				return if Found then string.format("%d", Found) else nil
+			end)(),
 		},
 	}
 end

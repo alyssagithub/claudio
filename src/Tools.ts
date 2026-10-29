@@ -5,7 +5,7 @@ import { ReadDiskTree } from "./DiskTree.js";
 import type { DiskNode } from "./DiskTree.js";
 import { execFile } from "node:child_process";
 import { z } from "zod/v3";
-import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport, ProfileReport } from "./Ask.js";
+import { ReadReport, PropertyReport, ApiReport, ExecuteReport, FindReport, SourceReport, SelectReport, LogReport, LintReport, ProfileReport, type SourceAnswer, type LintAnswer } from "./Ask.js";
 import type { LogAnswer, ExecuteAnswer } from "./Ask.js";
 import { QuietFlash } from "./Notify.js";
 import { Changed, Cut, Enlarge, Guide, Shrink } from "./Capture.js";
@@ -1331,21 +1331,31 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds}`}, 40) as { error?
     },
     {
       Name: "source",
-      Description: "Read or change a script's source by line. get returns a numbered window, set replaces the whole thing, and insert, replace and delete work on line ranges. Every change is one undo step. Read a script before editing it, because a stale line range edits the wrong lines instead of failing. Prefer this over rewriting a whole script when only part of it changes.",
+      Description: "Read, search or change script source in the open place. edit is the way to change code: it replaces exact text, so it never hits the wrong lines after the file shifts, takes many replacements across one or more scripts in one call, applies all of them or none, makes one undo step, shows the changed lines, and lints the result. Use it instead of editing local copies and loading them back through rbxm. search finds text across scripts with line numbers and surrounding lines. get returns a numbered window, set replaces a whole script, and insert, replace and delete work on line ranges, which need a fresh read first because a stale range edits the wrong lines.",
       Schema: {
-        path: z.string().describe("The script's full instance path."),
-        action: z.enum(["get", "set", "insert", "replace", "delete"]).optional().describe("What to do. Defaults to get."),
+        path: z.string().optional().describe("The script's full instance path. For search, where to look, the whole place by default. For edit, the script any edit without its own path goes to."),
+        action: z.enum(["get", "set", "insert", "replace", "delete", "edit", "search"]).optional().describe("What to do. Defaults to get."),
         from: z.number().optional().describe("First line, counting from one."),
         to: z.number().optional().describe("Last line, for get, replace and delete."),
-        text: z.string().optional().describe("The new source, for set, insert and replace."),
+        text: z.string().optional().describe("The new source, for set, insert and replace. For search, the text to find, ignoring case."),
+        edits: z.array(z.object({
+          path: z.string().optional().describe("The script, when it is not the call's path."),
+          old: z.string().describe("Exact text now in the script, found exactly once. Include enough surrounding lines to make it unique."),
+          new: z.string().describe("What replaces it."),
+        })).optional().describe("For edit, the replacements, applied in order. If any old is missing or found more than once, nothing changes."),
+        context: z.number().optional().describe("For search, how many lines to show around each match, 2 by default."),
         undoName: z.string().optional().describe("What the undo step should be called."),
       },
-      Run: async (Input: { path: string; action?: "get" | "set" | "insert" | "replace" | "delete"; from?: number; to?: number; text?: string; undoName?: string }) => ({content: [{
-        type: "text",
-        text: (Input.action === "set" || Input.action === "insert" || Input.action === "replace") && typeof Input.text !== "string"
-          ? `Nothing was changed: ${Input.action} needs the new source in text, and no text was given. Parameters this tool does not know are dropped, so check the name is text.`
-          : SourceReport(await Reach("source", Input)),
-      }]}),
+      Run: async (Input: { path?: string; action?: "get" | "set" | "insert" | "replace" | "delete" | "edit" | "search"; from?: number; to?: number; text?: string; undoName?: string; edits?: { path?: string; old: string; new: string }[]; context?: number }) => {
+        if ((Input.action === "set" || Input.action === "insert" || Input.action === "replace" || Input.action === "search") && typeof Input.text !== "string") {
+          return {content: [{type: "text", text: `Nothing was changed: ${Input.action} needs text, and no text was given. Parameters this tool does not know are dropped, so check the name is text.`}]};
+        }
+
+        const Found = await Reach("source", Input) as (NonNullable<SourceAnswer> & { edited?: string[] }) | null;
+        const Lint = Found && Found.edited && Found.edited.length > 0 ? LintReport(await Reach("lint", {paths: Found.edited, exact: true}) as LintAnswer) : "";
+
+        return {content: [{type: "text", text: `${SourceReport(Found)}${Lint ? `\n\nLint: ${Lint}` : ""}`}]};
+      },
     },
     {
       Name: "select",

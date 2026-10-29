@@ -471,7 +471,209 @@ const function Measured(Before: string, After: string): (number, number)
 	return NewEnd - Start, OldEnd - Start
 end
 
+const function SearchSources(Input: any): any
+	const Wanted = if typeof(Input.text) == "string" then Input.text:lower() else ""
+
+	if Wanted == "" then
+		return {error = "Give the text to search for in text."}
+	end
+
+	const Root = if typeof(Input.path) == "string" and Input.path ~= "" then Resolve(Input.path) else nil
+
+	if Input.path and not Root then
+		return {error = `Nothing at "{tostring(Input.path)}".`}
+	end
+
+	const Around = math.clamp(tonumber(Input.context) or 2, 0, 10)
+	const Found = {}
+	local Matches = 0
+
+	const Tops: {Instance} = if Root then {Root} else Places
+
+	for _, Top in Tops do
+		const Candidates = Top:GetDescendants()
+
+		table.insert(Candidates, 1, Top)
+
+		for _, Candidate in Candidates do
+			if not Candidate:IsA("LuaSourceContainer") then
+				continue
+			end
+
+			const Lines = string.split((Candidate :: any).Source, "\n")
+
+			for Index, Line in Lines do
+				if not Line:lower():find(Wanted, 1, true) then
+					continue
+				end
+
+				Matches += 1
+
+				if Matches > 60 then
+					continue
+				end
+
+				const Block = {}
+
+				for Near = math.max(1, Index - Around), math.min(#Lines, Index + Around) do
+					table.insert(Block, `{Near}{if Near == Index then ">" else ":"} {Lines[Near]}`)
+				end
+
+				table.insert(Found, `{Candidate:GetFullName()}\n{table.concat(Block, "\n")}`)
+			end
+		end
+	end
+
+	if Matches == 0 then
+		return {text = `No script contains "{Input.text}".`}
+	end
+
+	return {text = `{Matches} match{if Matches == 1 then "" else "es"}{if Matches > 60 then ", the first 60 shown" else ""}:\n\n{table.concat(Found, "\n\n")}`}
+end
+
+const function EditSources(Input: any): any
+	if typeof(Input.edits) ~= "table" or #Input.edits == 0 then
+		return {error = "Give the replacements in edits, each with old and new, and path when it is not the same as the call's path."}
+	end
+
+	const Texts: {[LuaSourceContainer]: string} = {}
+	const Order: {LuaSourceContainer} = {}
+	const Problems = {}
+
+	for Index, Edit in Input.edits do
+		const Path = if typeof(Edit.path) == "string" and Edit.path ~= "" then Edit.path else Input.path
+		const Object = if typeof(Path) == "string" then Resolve(Path) else nil
+
+		if not Object or not Object:IsA("LuaSourceContainer") then
+			table.insert(Problems, `edit {Index}: nothing scriptable at "{tostring(Path)}"`)
+
+			continue
+		end
+
+		const Script = Object :: LuaSourceContainer
+
+		if Texts[Script] == nil then
+			Texts[Script] = Script.Source
+			table.insert(Order, Script)
+		end
+
+		if typeof(Edit.old) ~= "string" or Edit.old == "" or typeof(Edit.new) ~= "string" then
+			table.insert(Problems, `edit {Index}: needs old and new as text, and old cannot be empty`)
+
+			continue
+		end
+
+		const Text = Texts[Script]
+		const Start, Finish = Text:find(Edit.old, 1, true)
+
+		if not Start or not Finish then
+			table.insert(Problems, `edit {Index}: old was not found in {Script:GetFullName()}`)
+
+			continue
+		end
+
+		if Text:find(Edit.old, Finish + 1, true) then
+			local Count = 0
+			local From = 1
+
+			while true do
+				const Next, Stop = Text:find(Edit.old, From, true)
+
+				if not Next or not Stop then
+					break
+				end
+
+				Count += 1
+				From = Stop + 1
+			end
+
+			table.insert(Problems, `edit {Index}: old is found {Count} times in {Script:GetFullName()}, so include more of the surrounding text to pick one`)
+
+			continue
+		end
+
+		Texts[Script] = `{Text:sub(1, Start - 1)}{Edit.new}{Text:sub(Finish + 1)}`
+	end
+
+	if #Problems > 0 then
+		return {error = `Nothing was changed, because {#Problems} of the {#Input.edits} edits could not be applied:\n{table.concat(Problems, "\n")}`}
+	end
+
+	const Step = StartStep("ClaudioSource", Input.undoName or `Claudio edited {if #Order == 1 then Order[1].Name else `{#Order} scripts`}`)
+	const Before: {[LuaSourceContainer]: string} = {}
+
+	const Ok, Trouble = pcall(function()
+		for _, Script in Order do
+			Before[Script] = Script.Source
+			Script.Source = Texts[Script]
+		end
+	end)
+
+	if not Ok then
+		for Script, Text in Before do
+			Script.Source = Text
+		end
+	end
+
+	EndStep(Step, Ok)
+
+	if not Ok then
+		return {error = `Nothing was changed: {tostring(Trouble)}`}
+	end
+
+	const Report = {}
+
+	for _, Script in Order do
+		Remember(Script)
+
+		const Added, Removed = Measured(Before[Script], Script.Source)
+		const Old = string.split(Before[Script], "\n")
+		const New = string.split(Script.Source, "\n")
+		local First = 1
+
+		while First <= #Old and First <= #New and Old[First] == New[First] do
+			First += 1
+		end
+
+		local Last = #New
+		local OldLast = #Old
+
+		while Last >= First and OldLast >= First and Old[OldLast] == New[Last] do
+			Last -= 1
+			OldLast -= 1
+		end
+
+		const Shown = {}
+
+		for Index = First, math.min(Last, First + 39) do
+			table.insert(Shown, `{Index}: {New[Index]}`)
+		end
+
+		table.insert(Report, `{Script:GetFullName()}: +{Added} -{Removed}, now {#New} lines{if #Shown > 0 then `. Changed lines:\n{table.concat(Shown, "\n")}{if Last - First > 39 then "\n..." else ""}` else ""}`)
+	end
+
+	const Paths = {}
+
+	for _, Script in Order do
+		table.insert(Paths, Script:GetFullName())
+	end
+
+	return {
+		text = table.concat(Report, "\n\n"),
+		edited = Paths,
+		undo = true,
+	}
+end
+
 const function Source(Input: any): any
+	if Input.action == "search" then
+		return SearchSources(Input)
+	end
+
+	if Input.action == "edit" then
+		return EditSources(Input)
+	end
+
 	const Object = Resolve(Input.path)
 
 	if not Object or not Object:IsA("LuaSourceContainer") then

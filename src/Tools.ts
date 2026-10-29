@@ -1314,40 +1314,41 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds}`}, 40) as { error?
     },
     {
       Name: "find",
-      Description: "Search every script in the place, or under a path, for a piece of text. Returns each match as a path, a line number and the line, so it can be read without opening anything.",
+      Description: "Search every script in the place, or under a path, for a piece of text. Returns each match as a path, a line number and the line, so it can be read without opening anything; context adds the lines around each match. The line numbers go straight to source get, replace and delete, and the text it shows is what source edit's old needs.",
       Schema: {
         text: z.string().describe("The text to look for. Case is ignored."),
         path: z.string().optional().describe("Only search under here, such as ServerScriptService."),
         limit: z.number().optional().describe("How many matches to return, forty by default."),
+        context: z.number().optional().describe("How many lines to show before and after each match, none by default."),
       },
-      Run: async (Input: { text: string; path?: string; limit?: number }) => ({content: [{
+      Run: async (Input: { text: string; path?: string; limit?: number; context?: number }) => ({content: [{
         type: "text",
         text: FindReport(await Reach("find", {
           text: Input.text,
           path: Input.path,
           limit: Input.limit,
+          context: Input.context,
         })),
       }]}),
     },
     {
       Name: "source",
-      Description: "Read, search or change script source in the open place. edit is the way to change code: it replaces exact text, so it never hits the wrong lines after the file shifts, takes many replacements across one or more scripts in one call, applies all of them or none, makes one undo step, shows the changed lines, and lints the result. Use it instead of editing local copies and loading them back through rbxm. search finds text across scripts with line numbers and surrounding lines. get returns a numbered window, set replaces a whole script, and insert, replace and delete work on line ranges, which need a fresh read first because a stale range edits the wrong lines.",
+      Description: "Read, search or change script source in the open place. edit is the way to change code: it replaces exact text, so it never hits the wrong lines after the file shifts, takes many replacements across one or more scripts in one call, applies all of them or none, makes one undo step, shows the changed lines, and lints the result. Use it instead of editing local copies and loading them back through rbxm. To locate text before editing, use find, whose line numbers and text this takes directly. get returns a numbered window, set replaces a whole script, and insert, replace and delete work on line ranges, which need a fresh read first because a stale range edits the wrong lines.",
       Schema: {
-        path: z.string().optional().describe("The script's full instance path. For search, where to look, the whole place by default. For edit, the script any edit without its own path goes to."),
-        action: z.enum(["get", "set", "insert", "replace", "delete", "edit", "search"]).optional().describe("What to do. Defaults to get."),
+        path: z.string().optional().describe("The script's full instance path. For edit, the script any edit without its own path goes to."),
+        action: z.enum(["get", "set", "insert", "replace", "delete", "edit"]).optional().describe("What to do. Defaults to get."),
         from: z.number().optional().describe("First line, counting from one."),
         to: z.number().optional().describe("Last line, for get, replace and delete."),
-        text: z.string().optional().describe("The new source, for set, insert and replace. For search, the text to find, ignoring case."),
+        text: z.string().optional().describe("The new source, for set, insert and replace."),
         edits: z.array(z.object({
           path: z.string().optional().describe("The script, when it is not the call's path."),
           old: z.string().describe("Exact text now in the script, found exactly once. Include enough surrounding lines to make it unique."),
           new: z.string().describe("What replaces it."),
         })).optional().describe("For edit, the replacements, applied in order. If any old is missing or found more than once, nothing changes."),
-        context: z.number().optional().describe("For search, how many lines to show around each match, 2 by default."),
         undoName: z.string().optional().describe("What the undo step should be called."),
       },
-      Run: async (Input: { path?: string; action?: "get" | "set" | "insert" | "replace" | "delete" | "edit" | "search"; from?: number; to?: number; text?: string; undoName?: string; edits?: { path?: string; old: string; new: string }[]; context?: number }) => {
-        if ((Input.action === "set" || Input.action === "insert" || Input.action === "replace" || Input.action === "search") && typeof Input.text !== "string") {
+      Run: async (Input: { path?: string; action?: "get" | "set" | "insert" | "replace" | "delete" | "edit"; from?: number; to?: number; text?: string; undoName?: string; edits?: { path?: string; old: string; new: string }[] }) => {
+        if ((Input.action === "set" || Input.action === "insert" || Input.action === "replace") && typeof Input.text !== "string") {
           return {content: [{type: "text", text: `Nothing was changed: ${Input.action} needs text, and no text was given. Parameters this tool does not know are dropped, so check the name is text.`}]};
         }
 

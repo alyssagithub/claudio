@@ -348,6 +348,7 @@ const function Find(Input: any): any
 
 	const Lower = Needle:lower()
 	const Limit = math.clamp(tonumber(Input.limit) or 40, 1, 200)
+	const Around = math.clamp(tonumber(Input.context) or 0, 0, 10)
 	const Hits = {}
 	const Searched = {}
 	local Scanned = 0
@@ -382,7 +383,17 @@ const function Find(Input: any): any
 				if #Hits >= Limit then
 					More += 1
 				else
-					table.insert(Hits, `{Script:GetFullName()}:{Line}: {Text:gsub("^%s+", ""):sub(1, 160)}`)
+					if Around == 0 then
+						table.insert(Hits, `{Script:GetFullName()}:{Line}: {Text:gsub("^%s+", ""):sub(1, 160)}`)
+					else
+						const Block = {`{Script:GetFullName()}:{Line}`}
+
+						for Near = math.max(1, Line - Around), math.min(#Lines, Line + Around) do
+							table.insert(Block, `{Near}{if Near == Line then ">" else ":"} {Lines[Near]}`)
+						end
+
+						table.insert(Hits, table.concat(Block, "\n"))
+					end
 				end
 			end
 		end
@@ -469,66 +480,6 @@ const function Measured(Before: string, After: string): (number, number)
 	end
 
 	return NewEnd - Start, OldEnd - Start
-end
-
-const function SearchSources(Input: any): any
-	const Wanted = if typeof(Input.text) == "string" then Input.text:lower() else ""
-
-	if Wanted == "" then
-		return {error = "Give the text to search for in text."}
-	end
-
-	const Root = if typeof(Input.path) == "string" and Input.path ~= "" then Resolve(Input.path) else nil
-
-	if Input.path and not Root then
-		return {error = `Nothing at "{tostring(Input.path)}".`}
-	end
-
-	const Around = math.clamp(tonumber(Input.context) or 2, 0, 10)
-	const Found = {}
-	local Matches = 0
-
-	const Tops: {Instance} = if Root then {Root} else Places
-
-	for _, Top in Tops do
-		const Candidates = Top:GetDescendants()
-
-		table.insert(Candidates, 1, Top)
-
-		for _, Candidate in Candidates do
-			if not Candidate:IsA("LuaSourceContainer") then
-				continue
-			end
-
-			const Lines = string.split((Candidate :: any).Source, "\n")
-
-			for Index, Line in Lines do
-				if not Line:lower():find(Wanted, 1, true) then
-					continue
-				end
-
-				Matches += 1
-
-				if Matches > 60 then
-					continue
-				end
-
-				const Block = {}
-
-				for Near = math.max(1, Index - Around), math.min(#Lines, Index + Around) do
-					table.insert(Block, `{Near}{if Near == Index then ">" else ":"} {Lines[Near]}`)
-				end
-
-				table.insert(Found, `{Candidate:GetFullName()}\n{table.concat(Block, "\n")}`)
-			end
-		end
-	end
-
-	if Matches == 0 then
-		return {text = `No script contains "{Input.text}".`}
-	end
-
-	return {text = `{Matches} match{if Matches == 1 then "" else "es"}{if Matches > 60 then ", the first 60 shown" else ""}:\n\n{table.concat(Found, "\n\n")}`}
 end
 
 const function EditSources(Input: any): any
@@ -666,10 +617,6 @@ const function EditSources(Input: any): any
 end
 
 const function Source(Input: any): any
-	if Input.action == "search" then
-		return SearchSources(Input)
-	end
-
 	if Input.action == "edit" then
 		return EditSources(Input)
 	end

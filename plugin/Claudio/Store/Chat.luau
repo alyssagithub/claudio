@@ -488,6 +488,7 @@ const function EditSources(Input: any): any
 	end
 
 	const Texts: {[LuaSourceContainer]: string} = {}
+	const Applied: {[LuaSourceContainer]: {{Old: string, New: string}}} = {}
 	const Order: {LuaSourceContainer} = {}
 	const Problems = {}
 
@@ -544,6 +545,8 @@ const function EditSources(Input: any): any
 		end
 
 		Texts[Script] = `{Text:sub(1, Start - 1)}{Edit.new}{Text:sub(Finish + 1)}`
+		Applied[Script] = Applied[Script] or {}
+		table.insert(Applied[Script], {Old = Edit.old, New = Edit.new})
 	end
 
 	if #Problems > 0 then
@@ -577,30 +580,36 @@ const function EditSources(Input: any): any
 	for _, Script in Order do
 		Remember(Script)
 
-		const Added, Removed = Measured(Before[Script], Script.Source)
-		const Old = string.split(Before[Script], "\n")
-		const New = string.split(Script.Source, "\n")
-		local First = 1
-
-		while First <= #Old and First <= #New and Old[First] == New[First] do
-			First += 1
-		end
-
-		local Last = #New
-		local OldLast = #Old
-
-		while Last >= First and OldLast >= First and Old[OldLast] == New[Last] do
-			Last -= 1
-			OldLast -= 1
-		end
-
+		const Lines = string.split(Script.Source, "\n")
 		const Shown = {}
+		local Added = 0
+		local Removed = 0
 
-		for Index = First, math.min(Last, First + 39) do
-			table.insert(Shown, `{Index}: {New[Index]}`)
+		for _, Change in Applied[Script] do
+			const More, Fewer = Measured(Change.Old, Change.New)
+
+			Added += More
+			Removed += Fewer
+
+			const Start, Finish = Script.Source:find(Change.New, 1, true)
+
+			if Change.New == "" or not Start or not Finish or #Shown >= 60 then
+				continue
+			end
+
+			const First = #string.split(Script.Source:sub(1, Start), "\n")
+			const Last = First + #string.split(Change.New, "\n") - 1
+
+			if #Shown > 0 then
+				table.insert(Shown, "...")
+			end
+
+			for Index = math.max(1, First - 1), math.min(#Lines, Last + 1) do
+				table.insert(Shown, `{Index}{if Index >= First and Index <= Last then ">" else ":"} {Lines[Index]}`)
+			end
 		end
 
-		table.insert(Report, `{Script:GetFullName()}: +{Added} -{Removed}, now {#New} lines{if #Shown > 0 then `. Changed lines:\n{table.concat(Shown, "\n")}{if Last - First > 39 then "\n..." else ""}` else ""}`)
+		table.insert(Report, `{Script:GetFullName()}: +{Added} -{Removed}, now {#Lines} lines{if #Shown > 0 then `. Changed lines, marked with >:\n{table.concat(Shown, "\n")}` else ""}`)
 	end
 
 	const Paths = {}

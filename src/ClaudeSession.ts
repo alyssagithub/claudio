@@ -1515,6 +1515,10 @@ function RouteMessage(Session: Session, Message: any) {
     Publish(Turn, {Received: true});
   }
 
+  if (Message.type === "system" && Message.subtype === "compact_boundary") {
+    Session.Place = "";
+  }
+
   if (Turn && Message.type === "system" && Message.subtype === "compact_boundary") {
     const Metadata = Message.compact_metadata || {};
     const Running = Turn.Calls.find((Call) => Call.Name === "Compaction" && Call.Status === "running");

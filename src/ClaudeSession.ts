@@ -7,7 +7,8 @@ import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { AllowedTools, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, EffortOrder, PlanInstructions, CommandsCacheFile, DesktopConfigPath, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory, DeveloperUserIds } from "./Config.js";
 import { AddDesktopSession, FindFile, ListConversations, PriceUsage, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
-import { TrimOldResults } from "./Trim.js";
+import { TrimOldResults, UnpinChangedTools, type ToolShape } from "./Trim.js";
+import { StudioTools } from "./Tools.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
@@ -971,6 +972,36 @@ function WarmFor(Id: string): number {
   const Context = Last.Read + Last.Wrote;
 
   return Math.min(19, Math.floor(1.9 * Context / (0.1 * Context + 2 * Last.Wrote))) * 60 * 60 * 1000;
+}
+
+let CurrentTools: Map<string, ToolShape> | null = null;
+
+async function UnpinIfChanged(Id: string | null) {
+  const File = Id ? FindFile(Id) : null;
+
+  if (!Id || !File) {
+    return;
+  }
+
+  CurrentTools ||= new Map(StudioTools({
+    Reach: (async () => ({})) as Reacher,
+    ReachIn: (async () => ({})) as ReacherIn,
+    Presence: async () => "",
+    LiveSession: async () => null,
+  }).map((Tool) => [`mcp__claudio__${Tool.Name}`, {
+    description: Tool.Description,
+    properties: Object.fromEntries(Object.entries(Tool.Schema).map(([Name, Field]) => [Name, (Field as { description?: string }).description || ""])),
+  }]));
+
+  try {
+    const Dropped = await UnpinChangedTools(File, CurrentTools);
+
+    if (Dropped > 0) {
+      console.log(`Opening ${Id} with ${Dropped} saved Claudio tool definitions dropped, since those tools have changed since they were saved.`);
+    }
+  } catch (Trouble) {
+    console.error(`Could not check ${Id}'s saved tool definitions: ${(Trouble as Error).message}`);
+  }
 }
 
 async function TrimIfCold(Id: string | null) {
@@ -2139,6 +2170,7 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
   const Run = async () => {
     try {
       await SdkReady;
+      await UnpinIfChanged(Ping ? null : ConversationId);
       await TrimIfCold(Ping ? null : ConversationId);
 
       Session.Query = query({

@@ -142,3 +142,61 @@ export async function TrimOldResults(File: string, KeepPrompts = 3): Promise<{ P
 
   return Totals;
 }
+
+export type ToolShape = { description: string; properties: Record<string, string> };
+
+export async function UnpinChangedTools(File: string, Current: Map<string, ToolShape>): Promise<number> {
+  const Lines = (await fs.promises.readFile(File, "utf8")).split("\n");
+  let Dropped = 0;
+
+  const Kept = Lines.map((Line) => {
+    if (!Line.includes("\"deferred_tools_record\"") || !Line.includes("\"mcp__claudio__")) {
+      return Line;
+    }
+
+    let Entry: { attachment?: { entries?: { name?: string; description?: string; input_schema?: { properties?: Record<string, { description?: string }> } }[] } };
+
+    try {
+      Entry = JSON.parse(Line);
+    } catch {
+      return Line;
+    }
+
+    const Entries = Entry.attachment && Entry.attachment.entries;
+
+    if (!Entries) {
+      return Line;
+    }
+
+    const Fresh = Entries.filter((Pinned) => {
+      const Now = Pinned.name ? Current.get(Pinned.name) : undefined;
+
+      if (!Now) {
+        return true;
+      }
+
+      const Properties = (Pinned.input_schema && Pinned.input_schema.properties) || {};
+      const Same = Pinned.description === Now.description
+        && Object.keys(Properties).length === Object.keys(Now.properties).length
+        && Object.entries(Now.properties).every(([Name, Said]) => Properties[Name] !== undefined && (Properties[Name].description || "") === Said);
+
+      return Same;
+    });
+
+    if (Fresh.length === Entries.length) {
+      return Line;
+    }
+
+    Dropped += Entries.length - Fresh.length;
+    Entry.attachment!.entries = Fresh;
+
+    return JSON.stringify(Entry);
+  });
+
+  if (Dropped > 0) {
+    await fs.promises.writeFile(`${File}.claudio-writing`, Kept.join("\n"));
+    await fs.promises.rename(`${File}.claudio-writing`, File);
+  }
+
+  return Dropped;
+}

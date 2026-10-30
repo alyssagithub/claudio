@@ -552,6 +552,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         window: z.string().optional().describe("Part of a Studio window title to capture instead of the main one, for a panel floated out of Studio. Only for of window."),
         widget: z.string().optional().describe("Part of a plugin panel's title, such as Claudio. The window capture is cropped to that panel. Only for of window."),
         around: z.string().optional().describe("Instance to crop tightly around, such as Workspace.Model or a GuiObject path."),
+        preview: z.string().optional().describe("In edit mode, the path of any GuiObject or ScreenGui, wherever it lives, such as a template in ReplicatedStorage. Claudio shows a temporary copy on screen, captures it cropped, and removes it, leaving the place and its undo history untouched. To compare made-up UI, build it with execute first and point preview at it."),
         element: z.string().optional().describe("During a playtest, a GuiObject on a player's screen to capture on its own, such as Players.LocalPlayer.PlayerGui.Menu.Avatar. Claudio marks it, captures the Studio window and crops to exactly that element. Pair it with zoom to inspect small UI."),
         player: z.string().optional().describe("For element, which client: a player's name or their number in join order. The first player by default."),
         frame: z.string().optional().describe("A target size or aspect for framing, such as 1920x1080 or 16:9. The largest centred area of that shape is outlined in yellow with rule-of-thirds lines and everything outside it is darkened, so you can see exactly what a thumbnail of that shape would contain. A size such as 1920x1080 renders the viewport at exactly that resolution through the device emulator with actual-resolution scaling, then ends the simulation; an aspect such as 16:9, or a size while a simulation is already running, frames the viewport as it is."),
@@ -568,7 +569,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         changes: z.boolean().optional().describe("Compare with the last capture taken with the same settings and return only the part that changed, or just say nothing changed. Use it when checking the result of a small change, such as after a click or an edit, to avoid paying for the whole picture again. Coordinates in the reply are in the full picture. When most of the picture changed, or there is no earlier capture to compare with, the whole picture comes back as usual."),
         full: z.boolean().optional().describe("Return the picture at full size, one image pixel per screen pixel. By default a picture longer than 1024 pixels on a side is shrunk to save context, and the reply says how to scale its coordinates; pass full when you need exact pixel positions, such as for the input tool, layout measurements or reading tiny text."),
       },
-      Run: async (Input: { changes?: boolean; full?: boolean; of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; quality?: number; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
+      Run: async (Input: { preview?: string; changes?: boolean; full?: boolean; of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; quality?: number; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
         const Shape = Input.frame ? Input.frame.match(/^\s*(\d+(?:\.\d+)?)\s*[x:×]\s*(\d+(?:\.\d+)?)\s*$/i) : null;
         const Picture = (Given: string, Said: string): ToolAnswer => {
           let Data = Given;
@@ -750,6 +751,24 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
 
           return null;
         };
+
+        if (Input.preview) {
+          if (await LiveSession()) {
+            return {content: [{type: "text", text: "preview works in edit mode. Stop the playtest first, or capture the running UI with element."}]};
+          }
+
+          const Shown = await Reach("preview", {path: Input.preview}) as { error?: string; around?: string } | null;
+
+          if (!Shown || Shown.error || !Shown.around) {
+            return {content: [{type: "text", text: (Shown && Shown.error) || "Studio did not answer."}]};
+          }
+
+          try {
+            return await Tools.find((Tool) => Tool.Name === "capture")!.Run({...Input, preview: undefined, around: Shown.around});
+          } finally {
+            await Reach("preview", {remove: true});
+          }
+        }
 
         if (Input.element && process.platform === "win32" && await LiveSession()) {
           const Direct = await ClientShot(Input.element);

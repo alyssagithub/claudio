@@ -3088,6 +3088,65 @@ const function RunStudioJob(Job: any)
 				return Find(Job.input)
 			end
 
+			if Job.kind == "preview" then
+				const ChangeHistoryService = game:GetService("ChangeHistoryService")
+
+				if Job.input.remove then
+					const Open = _G.ClaudioPreview
+
+					_G.ClaudioPreview = nil
+
+					if Open then
+						if Open.Holder then
+							Open.Holder:Destroy()
+						end
+
+						if Open.Recording then
+							ChangeHistoryService:FinishRecording(Open.Recording, Enum.FinishRecordingOperation.Cancel)
+						end
+					end
+
+					return {text = "Removed."}
+				end
+
+				const Object = Resolve(Job.input.path)
+
+				if not Object or not (Object:IsA("GuiObject") or Object:IsA("LayerCollector")) then
+					return {error = `Nothing to preview at "{tostring(Job.input.path)}". Give a GuiObject or a ScreenGui.`}
+				end
+
+				const Recording = ChangeHistoryService:TryBeginRecording("ClaudioPreview", "Claudio preview")
+				const Original = Object :: Instance
+				const Archived = Original.Archivable
+
+				Original.Archivable = true
+
+				const Copy = Original:Clone()
+
+				Original.Archivable = Archived
+
+				const Holder: ScreenGui = if Copy:IsA("ScreenGui") then Copy :: ScreenGui else Instance.new("ScreenGui")
+
+				Holder.Name = "ClaudioPreview"
+				Holder.Enabled = true
+				Holder.DisplayOrder = 1000000
+
+				if Holder ~= Copy then
+					Copy.Parent = Holder
+				end
+
+				game:GetService("StarterGui").ShowDevelopmentGui = true
+				Holder.Parent = game:GetService("StarterGui")
+				_G.ClaudioPreview = {
+					Holder = Holder,
+					Recording = Recording,
+				}
+
+				task.wait(0.2)
+
+				return {around = if Holder == Copy then Holder:GetFullName() else Copy:GetFullName()}
+			end
+
 			if Job.kind == "sources" then
 				const Under = if typeof(Job.input.path) == "string" and Job.input.path ~= "" then Job.input.path else nil
 				const Found = {}

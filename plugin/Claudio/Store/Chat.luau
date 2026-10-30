@@ -3088,6 +3088,22 @@ const function RunStudioJob(Job: any)
 				return Find(Job.input)
 			end
 
+			if Job.kind == "sources" then
+				const Under = if typeof(Job.input.path) == "string" and Job.input.path ~= "" then Job.input.path else nil
+				const Found = {}
+
+				for _, Entry in ScriptTree() do
+					if Entry.source and (not Under or Entry.path == Under or Entry.path:sub(1, #Under + 1) == `{Under}.`) then
+						table.insert(Found, {
+							path = Entry.path,
+							source = Entry.source,
+						})
+					end
+				end
+
+				return {scripts = Found}
+			end
+
 			if Job.kind == "source" then
 				return Source(Job.input)
 			end

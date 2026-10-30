@@ -759,7 +759,9 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
           }
         }
 
-        if (Input.element) {
+        if (Input.element && !(await LiveSession())) {
+          Input.around = Input.around || Input.element;
+        } else if (Input.element) {
           const { CaptureWindow, CropToMarker } = await import("./Window.js");
           const Marked = await ReachIn("server", "input", {action: "mark", path: Input.element, player: Input.player}) as { error?: string; text?: string; width?: number; height?: number; beside?: boolean } | null;
 
@@ -1336,8 +1338,54 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
         path: z.string().optional().describe("Only search under here, such as ServerScriptService."),
         limit: z.number().optional().describe("How many matches to return, forty by default."),
         context: z.number().optional().describe("How many lines to show before and after each match, none by default."),
+        regex: z.boolean().optional().describe("Treat text as a JavaScript regular expression, such as CatalogPlus.(Icon|ProjectedIcon), still ignoring case."),
       },
-      Run: async (Input: { text: string; path?: string; limit?: number; context?: number }) => ({content: [{
+      Run: async (Input: { text: string; path?: string; limit?: number; context?: number; regex?: boolean }) => Input.regex ? {content: [{
+        type: "text",
+        text: await (async () => {
+          let Pattern: RegExp;
+
+          try {
+            Pattern = new RegExp(Input.text, "i");
+          } catch (Trouble) {
+            return `That is not a valid regular expression: ${(Trouble as Error).message}`;
+          }
+
+          const Found = await Reach("sources", {path: Input.path}) as { error?: string; scripts?: { path: string; source: string }[] } | null;
+
+          if (!Found || Found.error || !Found.scripts) {
+            return (Found && Found.error) || "Studio did not answer.";
+          }
+
+          const Limit = Math.min(Math.max(Input.limit || 40, 1), 200);
+          const Around = Math.min(Math.max(Input.context || 0, 0), 10);
+          const Hits: string[] = [];
+          let More = 0;
+
+          for (const Script of Found.scripts) {
+            const Lines = Script.source.split("\n");
+
+            Lines.forEach((Line, Index) => {
+              if (!Pattern.test(Line)) {
+                return;
+              }
+
+              if (Hits.length >= Limit) {
+                More += 1;
+                return;
+              }
+
+              Hits.push(Around === 0
+                ? `${Script.path}:${Index + 1}: ${Line.trim().slice(0, 160)}`
+                : [`${Script.path}:${Index + 1}`, ...Lines.slice(Math.max(0, Index - Around), Index + Around + 1).map((Near, Offset) => `${Math.max(0, Index - Around) + Offset + 1}${Math.max(0, Index - Around) + Offset === Index ? ">" : ":"} ${Near}`)].join("\n"));
+            });
+          }
+
+          return Hits.length === 0
+            ? `No line in ${Found.scripts.length} script${Found.scripts.length === 1 ? "" : "s"} matches /${Input.text}/i.`
+            : `${Hits.join("\n")}${More > 0 ? `\n${More} more matches not shown; raise limit to see them.` : ""}`;
+        })(),
+      }]} : ({content: [{
         type: "text",
         text: FindReport(await Reach("find", {
           text: Input.text,

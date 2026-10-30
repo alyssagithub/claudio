@@ -15,7 +15,7 @@ let Counter = 0;
 export type Owner = { Id: string; Name: () => string };
 
 const Users = new Map<string, { Name: () => string; At: number }>();
-const Windows = new Map<string, { Place: string; Chat: string; At: number }>();
+const Windows = new Map<string, { Place: string; Chat: string; At: number; PlaceId?: string }>();
 const Chosen = new Map<string, string>();
 
 function LiveWindows(): { Place: string; Chat: string; At: number }[] {
@@ -190,7 +190,7 @@ export function Request(Kind: string, Input: unknown, Timeout?: number | null, R
     return Promise.resolve(Choose(Input, Who));
   }
 
-  const Target = (Role || "edit") === "edit" ? TargetFor(Who) : undefined;
+  const Target = TargetFor(Who);
 
   if (Target && typeof Target === "object") {
     return Promise.resolve(Target);
@@ -316,16 +316,16 @@ export function Seen(Role?: string | null, Able?: boolean, Attached?: number, Lo
   }
 }
 
-export function Take(Role?: string | null, Able?: boolean, Attached?: number, Loaded?: number, Games?: number, Boot?: string | null, Place?: string | null, Chat?: string | null) {
+export function Take(Role?: string | null, Able?: boolean, Attached?: number, Loaded?: number, Games?: number, Boot?: string | null, Place?: string | null, Chat?: string | null, PlaceId?: string | null) {
   const Wanted = Role || "edit";
 
   Seen(Wanted, Able, Attached, Loaded, Games);
 
   if (Wanted === "edit" && Boot) {
-    Windows.set(Boot, {Place: Place || "an unnamed place", Chat: Chat || "", At: Date.now()});
+    Windows.set(Boot, {Place: Place || "an unnamed place", Chat: Chat || "", At: Date.now(), PlaceId: PlaceId || "0"});
   }
 
-  const At = Pending.findIndex((Job) => Job.Role === Wanted && (!Job.Target || (Boot && Windows.get(Boot)?.Place) === Job.Target));
+  const At = Pending.findIndex((Job) => Job.Role === Wanted && (!Job.Target || (Wanted === "edit" ? (Boot && Windows.get(Boot)?.Place) === Job.Target : [...Windows.values()].some((Window) => Window.Place === Job.Target && Window.PlaceId === (PlaceId || "0")))));
 
   if (At < 0) {
     return null;

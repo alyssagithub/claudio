@@ -40,6 +40,7 @@ const InputDescription = [
 ].join(" ");
 
 const PlaytestDescription = [
+  "A multiplayer test puts every player in one server. For a cross-server test with the real MessagingService, the user opens a second Studio window on another place in the same universe; choose each window in turn with the studio tool and start a playtest in it, and execute, input and logs then go to the playtest of whichever window is chosen.",
   "Start, stop or inspect a playtest of the open place.",
   "Always stop what you started.",
   "Check status first rather than assuming.",

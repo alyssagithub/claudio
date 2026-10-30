@@ -313,7 +313,7 @@ task.spawn(function()
 			end
 		end
 
-		const Ok, Reply = Call("GET", `/studio/job?role=server&canRun={Builder() ~= nil}&clients={#game:GetService("Players"):GetPlayers()}&ready={Ready}&games={Games}`, nil)
+		const Ok, Reply = Call("GET", `/studio/job?role=server&canRun={Builder() ~= nil}&clients={#game:GetService("Players"):GetPlayers()}&ready={Ready}&games={Games}&placeId={string.format("%d", game.PlaceId)}`, nil)
 
 		if Ok and Reply and Reply.job then
 			const Job = Reply.job

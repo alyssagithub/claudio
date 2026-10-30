@@ -673,12 +673,10 @@ ${Said(await Reach("choose", {}), "Studio did not say.")}`,
 ${Input.code}
 end)
 task.wait(${Math.min(Math.max(Input.delay ?? 0.5, 0), 30)})
-` : ""}local Got
-local Started = os.clock()
-game:GetService("CaptureService"):CaptureScreenshot(function(Content) Got = Content end)
-while not Got and os.clock() - Started < 10 do task.wait(0.05) end
-local Bounds
+` : ""}local Bounds
 local Near
+local Scrolled = {}
+local Hidden
 local Target = ${JSON.stringify(Around || "")}
 if Target ~= "" then
 	local Object = game
@@ -696,6 +694,27 @@ if Target ~= "" then
 		end
 	end
 	if Object and Object:IsA("GuiObject") then
+		local Ancestor = Object.Parent
+		while Ancestor and Ancestor ~= game do
+			if Ancestor:IsA("ScrollingFrame") then
+				local Offset = Object.AbsolutePosition - Ancestor.AbsolutePosition
+				local Window = Ancestor.AbsoluteWindowSize
+				local Move = Vector2.new(
+					if Offset.X < 0 or Offset.X + Object.AbsoluteSize.X > Window.X then Offset.X - math.max(0, (Window.X - Object.AbsoluteSize.X) / 2) else 0,
+					if Offset.Y < 0 or Offset.Y + Object.AbsoluteSize.Y > Window.Y then Offset.Y - math.max(0, (Window.Y - Object.AbsoluteSize.Y) / 2) else 0
+				)
+				if Move.Magnitude > 0 then
+					Ancestor.CanvasPosition += Move
+					table.insert(Scrolled, Ancestor.Name)
+					task.wait()
+				end
+			end
+			Ancestor = Ancestor.Parent
+		end
+		local Screen = workspace.CurrentCamera.ViewportSize
+		if Object.AbsolutePosition.X + Object.AbsoluteSize.X <= 0 or Object.AbsolutePosition.Y + Object.AbsoluteSize.Y <= 0 or Object.AbsolutePosition.X >= Screen.X or Object.AbsolutePosition.Y >= Screen.Y then
+			Hidden = "it is off the screen"
+		end
 		local Inset = game:GetService("GuiService"):GetGuiInset()
 		local Low, High = Object.AbsolutePosition, Object.AbsolutePosition + Object.AbsoluteSize
 		if ${Input.overflow ? "true" : "false"} then
@@ -718,10 +737,14 @@ if Target ~= "" then
 		Bounds = {Left, Top, Right, Bottom}
 	end
 end
-return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40) as { error?: string; result?: unknown } | null;
+local Got
+local Started = os.clock()
+game:GetService("CaptureService"):CaptureScreenshot(function(Content) Got = Content end)
+while not Got and os.clock() - Started < 10 do task.wait(0.05) end
+return {shot = Got and tostring(Got) or nil, bounds = if Hidden then nil else Bounds, near = Near, scrolled = Scrolled, hidden = Hidden}`}, 40) as { error?: string; result?: unknown } | null;
           const Found = (() => {
             try {
-              return (typeof Taken?.result === "string" ? JSON.parse(Taken.result) : Taken?.result) as { shot?: string; bounds?: number[]; near?: { found: string; missing: string; deeper?: string; children: string[] } } | undefined;
+              return (typeof Taken?.result === "string" ? JSON.parse(Taken.result) : Taken?.result) as { shot?: string; bounds?: number[]; near?: { found: string; missing: string; deeper?: string; children: string[] }; scrolled?: string[]; hidden?: string } | undefined;
             } catch {
               return undefined;
             }
@@ -741,7 +764,7 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
             const { PNG } = await import("pngjs");
             const Size = PNG.sync.read(Buffer.from(Data, "base64"));
             const Bounds = Found && Found.bounds;
-            let Said = `${Size.width}x${Size.height} of the player's screen in the playtest`;
+            let Said = `${Size.width}x${Size.height} of the player's screen in the playtest${Found && Found.scrolled && Found.scrolled.length > 0 ? `, after scrolling ${Found.scrolled.join(" and ")} to bring it into view` : ""}`;
             const Region = Bounds
               ? {x: Bounds[0] - (Input.padding ?? 8), y: Bounds[1] - (Input.padding ?? 8), width: Bounds[2] - Bounds[0] + 2 * (Input.padding ?? 8), height: Bounds[3] - Bounds[1] + 2 * (Input.padding ?? 8)}
               : Input.width && Input.height ? {x: Input.x || 0, y: Input.y || 0, width: Input.width, height: Input.height} : null;
@@ -749,7 +772,9 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
             if (Around && !Bounds) {
               const Near = Found && Found.near;
 
-              Said += Near
+              Said += Found && Found.hidden
+                ? `, not cropped because ${Around} is not on screen: ${Found.hidden}`
+                : Near
                 ? `, not cropped because ${Near.found} has no child named ${Near.missing}${Near.deeper ? `. There is one further down, at ${Near.deeper}` : ""}. Its children are: ${Near.children.join(", ") || "none"}`
                 : `, not cropped because ${Around} is not a part, model or GuiObject on that client`;
             }
@@ -1168,8 +1193,9 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
         level: z.number().optional().describe("Graphics level from 1, the lowest, to 10, the highest, for the quality action."),
         player: z.string().optional().describe("Which client the quality action applies to: a player's name, or their number in join order. Defaults to the first player."),
         force: z.boolean().optional().describe("Start a multiplayer test or add players even when the memory check says the machine cannot carry it."),
+        fresh: z.boolean().optional().describe("For start, stop a playtest that is already running and start a new one, for a clean state in one call."),
       },
-      Run: async (Input: { action: "start" | "stop" | "status" | "players" | "quality"; mode?: "play" | "run" | "multiplayer"; players?: number; force?: boolean; level?: number; player?: string }, Extra?: unknown) => {
+      Run: async (Input: { fresh?: boolean; action: "start" | "stop" | "status" | "players" | "quality"; mode?: "play" | "run" | "multiplayer"; players?: number; force?: boolean; level?: number; player?: string }, Extra?: unknown) => {
         const Signal = (Extra as {signal?: AbortSignal} | undefined)?.signal;
 
         if (Input.action === "quality") {
@@ -1240,10 +1266,20 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
         }
 
         if (Reachable && Input.action === "start") {
-          return {content: [{
-            type: "text",
-            text: "A playtest is already running and its session is reachable, so it was left alone. Stop it first if you want a fresh run.",
-          }]};
+          if (!Input.fresh) {
+            return {content: [{
+              type: "text",
+              text: "A playtest is already running and its session is reachable, so it was left alone. Start with fresh true to stop it and start a new one in the same call.",
+            }]};
+          }
+
+          const Playtest = Tools.find((Tool) => Tool.Name === "playtest")!;
+          const Stopped = await Playtest.Run({action: "stop"}, Extra);
+          const Started = await Playtest.Run({...Input, fresh: false}, Extra);
+          const Said = (Answer: ToolAnswer) => Answer.content.filter((Part) => Part.type === "text").map((Part) => (Part as { text: string }).text).join(" ");
+
+          return {content: [{type: "text", text: `${Said(Stopped)}
+${Said(Started)}`}]};
         }
 
         if (Reachable && Input.action === "status") {

@@ -4,7 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import fs from "node:fs";
 import http from "node:http";
 import { DefaultPort, TokenFile } from "../src/Config.js";
-import { StudioTools } from "../src/Tools.js";
+import { RejectUnknownOptions, StudioTools } from "../src/Tools.js";
 import { Describe as DescribePresence } from "../src/StudioPresence.js";
 
 const Port = Number(process.env.CLAUDIO_PORT) || DefaultPort;
@@ -91,5 +91,7 @@ for (const Entry of StudioTools({
 })) {
   Server.tool(Entry.Name, Entry.Description, Entry.Schema, Entry.Run);
 }
+
+RejectUnknownOptions(Server);
 
 await Server.connect(new StdioServerTransport());

@@ -124,6 +124,16 @@ export type ToolContent = { type: "text"; text: string } | { type: "image"; data
 
 export type ToolAnswer = { content: ToolContent[] };
 
+export function RejectUnknownOptions(Server: unknown) {
+  const Registered = (Server as { _registeredTools?: Record<string, { inputSchema?: { strict?: () => unknown } }> })._registeredTools || {};
+
+  for (const Tool of Object.values(Registered)) {
+    if (Tool.inputSchema && typeof Tool.inputSchema.strict === "function") {
+      Tool.inputSchema = Tool.inputSchema.strict() as typeof Tool.inputSchema;
+    }
+  }
+}
+
 export type StudioTool = {
   Name: string;
   Description: string;
@@ -545,6 +555,9 @@ ${Said(await Reach("choose", {}), "Studio did not say.")}`,
         window: z.string().optional().describe("Part of a Studio window title to capture instead of the main one, for a panel floated out of Studio. Only for of window."),
         widget: z.string().optional().describe("Part of a plugin panel's title, such as Claudio. The window capture is cropped to that panel. Only for of window."),
         around: z.string().optional().describe("Instance to crop tightly around, such as Workspace.Model or a GuiObject path."),
+        overflow: z.boolean().optional().describe("With element, around or preview on a GuiObject, widen the crop to take in its visible descendants that stick out past its own box, such as a label hanging below a search bar."),
+        code: z.string().optional().describe("Luau to run first, in the editor or, during a playtest, on the player's client, without waiting for it to finish. Use it to make something appear, such as a message that clears itself, and capture it in the same call."),
+        delay: z.number().optional().describe("Seconds to wait before taking the picture, after code starts if given. Half a second by default with code, otherwise none. Up to 30."),
         preview: z.string().optional().describe("In edit mode, the path of any GuiObject or ScreenGui, wherever it lives, such as a template in ReplicatedStorage. Claudio shows a temporary copy on screen, captures it cropped, and removes it, leaving the place and its undo history untouched. To compare made-up UI, build it with execute first and point preview at it."),
         element: z.string().optional().describe("During a playtest, a GuiObject on a player's screen to capture on its own, such as Players.LocalPlayer.PlayerGui.Menu.Avatar. Claudio marks it, captures the Studio window and crops to exactly that element. Pair it with zoom to inspect small UI."),
         player: z.string().optional().describe("For element, which client: a player's name or their number in join order. The first player by default."),
@@ -562,7 +575,7 @@ ${Said(await Reach("choose", {}), "Studio did not say.")}`,
         changes: z.boolean().optional().describe("Compare with the last capture taken with the same settings and return only the part that changed, or just say nothing changed. Use it when checking the result of a small change, such as after a click or an edit, to avoid paying for the whole picture again. Coordinates in the reply are in the full picture. When most of the picture changed, or there is no earlier capture to compare with, the whole picture comes back as usual."),
         full: z.boolean().optional().describe("Return the picture at full size, one image pixel per screen pixel. By default a picture longer than 1024 pixels on a side is shrunk to save context, and the reply says how to scale its coordinates; pass full when you need exact pixel positions, such as for the input tool, layout measurements or reading tiny text."),
       },
-      Run: async (Input: { preview?: string; changes?: boolean; full?: boolean; of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; quality?: number; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
+      Run: async (Input: { overflow?: boolean; code?: string; delay?: number; preview?: string; changes?: boolean; full?: boolean; of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; quality?: number; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
         const Shape = Input.frame ? Input.frame.match(/^\s*(\d+(?:\.\d+)?)\s*[x:×]\s*(\d+(?:\.\d+)?)\s*$/i) : null;
         const Picture = (Given: string, Said: string): ToolAnswer => {
           let Data = Given;
@@ -656,7 +669,11 @@ ${Said(await Reach("choose", {}), "Studio did not say.")}`,
         const ClientShot = async (Around: string | undefined): Promise<ToolAnswer | null> => {
           const Folder = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "Roblox", "tmp-capture-storage");
           const Began = Date.now();
-          const Taken = await ReachIn("server", "execute", {target: "client", player: Input.player, readOnly: true, timeout: 30, code: `local Got
+          const Taken = await ReachIn("server", "execute", {target: "client", player: Input.player, readOnly: true, timeout: 60, code: `${Input.code ? `task.spawn(function()
+${Input.code}
+end)
+task.wait(${Math.min(Math.max(Input.delay ?? 0.5, 0), 30)})
+` : ""}local Got
 local Started = os.clock()
 game:GetService("CaptureService"):CaptureScreenshot(function(Content) Got = Content end)
 while not Got and os.clock() - Started < 10 do task.wait(0.05) end
@@ -680,7 +697,15 @@ if Target ~= "" then
 	end
 	if Object and Object:IsA("GuiObject") then
 		local Inset = game:GetService("GuiService"):GetGuiInset()
-		Bounds = {Object.AbsolutePosition.X + Inset.X, Object.AbsolutePosition.Y + Inset.Y, Object.AbsolutePosition.X + Inset.X + Object.AbsoluteSize.X, Object.AbsolutePosition.Y + Inset.Y + Object.AbsoluteSize.Y}
+		local Low, High = Object.AbsolutePosition, Object.AbsolutePosition + Object.AbsoluteSize
+		if ${Input.overflow ? "true" : "false"} then
+			for _, Inside in Object:GetDescendants() do
+				if Inside:IsA("GuiObject") and Inside.Visible and Inside.AbsoluteSize.X > 0 and Inside.AbsoluteSize.Y > 0 then
+					Low, High = Low:Min(Inside.AbsolutePosition), High:Max(Inside.AbsolutePosition + Inside.AbsoluteSize)
+				end
+			end
+		end
+		Bounds = {Low.X + Inset.X, Low.Y + Inset.Y, High.X + Inset.X, High.Y + Inset.Y}
 	elseif Object and (Object:IsA("BasePart") or Object:IsA("Model")) then
 		local Frame, Size
 		if Object:IsA("Model") then Frame, Size = Object:GetBoundingBox() else Frame, Size = Object.CFrame, Object.Size end
@@ -745,6 +770,16 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
           return null;
         };
 
+        const Playing = await LiveSession();
+
+        if (Input.code && !Playing) {
+          void Tools.find((Tool) => Tool.Name === "execute")!.Run({code: Input.code, undoName: "Claudio ran code before a capture", timeout: 60}).catch(() => null);
+        }
+
+        if ((Input.code && !Playing) || (Input.delay && !Input.code)) {
+          await new Promise((Resolve) => setTimeout(Resolve, Math.min(Math.max(Input.delay ?? 0.5, 0), 30) * 1000));
+        }
+
         if (Input.preview) {
           if (await LiveSession()) {
             return {content: [{type: "text", text: "preview works in edit mode. Stop the playtest first, or capture the running UI with element."}]};
@@ -757,7 +792,7 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
           }
 
           try {
-            return await Tools.find((Tool) => Tool.Name === "capture")!.Run({...Input, preview: undefined, around: Shown.around});
+            return await Tools.find((Tool) => Tool.Name === "capture")!.Run({...Input, preview: undefined, code: undefined, delay: undefined, around: Shown.around});
           } finally {
             await Reach("preview", {remove: true});
           }
@@ -904,6 +939,7 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
             height: Input.height,
             around: Input.around,
             padding: Input.padding,
+            overflow: Input.overflow,
           });
         } finally {
           if (Simulated && !Simulated.error) {
@@ -1564,7 +1600,7 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
 
         return {content: [{
           type: "text",
-          text: LogReport(Found),
+          text: `${LogReport(Found)}${Where === "edit" && await LiveSession() ? "\n\nThis is the editor's log. A playtest is running, and its output is in target server." : ""}`,
         }]};
       },
     },

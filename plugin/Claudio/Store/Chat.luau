@@ -1939,7 +1939,7 @@ const function Bounds(Object: Instance): (CFrame?, Vector3?)
 	return CFrame.new((Low + High) / 2), High - Low
 end
 
-const function ScreenBounds(Object: Instance, Viewport: Vector2): any
+const function ScreenBounds(Object: Instance, Viewport: Vector2, Overflow: boolean?): any
 	if Object:IsA("GuiObject") then
 		const Shown = Object :: GuiObject
 
@@ -1948,12 +1948,23 @@ const function ScreenBounds(Object: Instance, Viewport: Vector2): any
 		end
 
 		const Inset = game:GetService("GuiService"):GetGuiInset()
+		local Low = Shown.AbsolutePosition
+		local High = Shown.AbsolutePosition + Shown.AbsoluteSize
+
+		if Overflow then
+			for _, Inside in Shown:GetDescendants() do
+				if Inside:IsA("GuiObject") and Inside.Visible and Inside.AbsoluteSize.X > 0 and Inside.AbsoluteSize.Y > 0 then
+					Low = Low:Min(Inside.AbsolutePosition)
+					High = High:Max(Inside.AbsolutePosition + Inside.AbsoluteSize)
+				end
+			end
+		end
 
 		return {
-			Left = Shown.AbsolutePosition.X + Inset.X,
-			Top = Shown.AbsolutePosition.Y + Inset.Y,
-			Right = Shown.AbsolutePosition.X + Inset.X + Shown.AbsoluteSize.X,
-			Bottom = Shown.AbsolutePosition.Y + Inset.Y + Shown.AbsoluteSize.Y,
+			Left = Low.X + Inset.X,
+			Top = Low.Y + Inset.Y,
+			Right = High.X + Inset.X,
+			Bottom = High.Y + Inset.Y,
 		}
 	end
 
@@ -2059,7 +2070,7 @@ const function Shoot(Input: any): any
 			return {error = `{Object:GetFullName()} is inside a plugin window, which the viewport never draws. Capture with of window and widget set to that window's title instead.`}
 		end
 
-		const Edges = ScreenBounds(Object, Whole)
+		const Edges = ScreenBounds(Object, Whole, Input.overflow == true)
 
 		if Edges.error then
 			return {error = Edges.error}

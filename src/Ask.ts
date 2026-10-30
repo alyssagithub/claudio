@@ -1,5 +1,5 @@
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
-import { StudioTools } from "./Tools.js";
+import { RejectUnknownOptions, StudioTools } from "./Tools.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
 
 export const AskServerName = "claudio";
@@ -280,13 +280,17 @@ export function AskServerFor(Reach: Reacher, ReachIn: ReacherIn) {
     },
   });
 
-  return createSdkMcpServer({
+  const Made = createSdkMcpServer({
     name: AskServerName,
     version: "1.0.0",
     tools: [
       ...Shared.map((Entry) => tool(Entry.Name, Entry.Description, Entry.Schema, Entry.Run)),
     ],
   });
+
+  RejectUnknownOptions(Made.instance);
+
+  return Made;
 }
 type ProfiledFunction = Record<string, unknown>;
 

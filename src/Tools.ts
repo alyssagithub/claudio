@@ -381,6 +381,35 @@ ${Said(await Reach("choose", {}), "Studio did not say.")}`,
       }]}),
     },
     {
+      Name: "icons",
+      Description: "List the names in Roblox's BuilderIcons font, the icon set Studio ships, with the text that draws each one. Search by part of a name, ignoring case, with | between alternatives, such as trash|delete. Use it to check an icon exists before using it, instead of rendering names and measuring them, since the font also draws partial names.",
+      Schema: {
+        search: z.string().optional().describe("Part of an icon name to look for. Leave out to list them all."),
+      },
+      Run: async (Input: { search?: string }) => {
+        const Versions = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "Roblox", "Versions");
+        const Files = (fs.existsSync(Versions) ? fs.readdirSync(Versions) : [])
+          .map((Folder) => path.join(Versions, Folder, "ExtraContent", "LuaPackages", "Packages", "_Index", "BuilderIcons", "BuilderIcons", "Icon.lua"))
+          .filter((File) => fs.existsSync(File))
+          .sort((Left, Right) => fs.statSync(Right).mtimeMs - fs.statSync(Left).mtimeMs);
+
+        if (Files.length === 0) {
+          return {content: [{type: "text", text: "Could not find Studio's BuilderIcons list in the Roblox install folder."}]};
+        }
+
+        const Icons = [...fs.readFileSync(Files[0], "utf8").matchAll(/\["([^"]+)"\]\s*=\s*"([^"]+)"/g)].map((Found) => ({Name: Found[1], Text: Found[2]}));
+        const Wanted = (Input.search || "").toLowerCase().split("|").map((Part) => Part.trim().replace(/[\s_-]/g, "")).filter(Boolean);
+        const Matching = Wanted.length === 0 ? Icons : Icons.filter((Icon) => Wanted.some((Part) => Icon.Name.toLowerCase().includes(Part)));
+
+        return {content: [{
+          type: "text",
+          text: Matching.length === 0
+            ? `No BuilderIcons name contains ${Wanted.join(" or ")}, out of ${Icons.length}.`
+            : `${Matching.length} of ${Icons.length} icons, as name = text to draw it:\n${Matching.slice(0, 300).map((Icon) => `${Icon.Name} = ${Icon.Text}`).join("\n")}${Matching.length > 300 ? `\n${Matching.length - 300} more; narrow the search.` : ""}`,
+        }]};
+      },
+    },
+    {
       Name: "hidden",
       Description: "Read properties Roblox hides from plugins and scripts, which properties and execute cannot see: Workspace's streaming settings (StreamOutBehavior, StreamingTargetRadius, StreamingMinRadius, StreamingIntegrityMode, ModelStreamingBehavior), its physics, avatar and replication settings, Lighting.Technology, and hidden properties on any other instance. Use this instead of assuming what they are set to. Claudio reads them from a copy of the place that Studio writes when a test server starts. That copy is reused for 30 minutes unless fresh is true; making a new one briefly starts and stops a server-only test, which takes up to a minute and cannot happen while a playtest is running. Only the user can change these properties, in Studio's Properties panel.",
       Schema: {

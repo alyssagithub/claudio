@@ -1225,6 +1225,16 @@ return {shot = Got and tostring(Got) or nil, bounds = if Hidden then nil else Bo
         fresh: z.boolean().optional().describe("For start, stop a playtest that is already running and start a new one, for a clean state in one call."),
       },
       Run: async (Input: { fresh?: boolean; action: "start" | "stop" | "status" | "players" | "quality"; mode?: "play" | "run" | "multiplayer"; players?: number; force?: boolean; level?: number; player?: string }, Extra?: unknown) => {
+        if (Input.action === "start" && (Input.players || 0) > 1 && Input.mode !== "multiplayer") {
+          if (Input.mode) {
+            return {content: [{type: "text", text: `Nothing started: players ${Input.players} only works with mode multiplayer, and mode ${Input.mode} always has one player. Start again with mode multiplayer, or leave players out.`}]};
+          }
+
+          const Started = await Tools.find((Tool) => Tool.Name === "playtest")!.Run({...Input, mode: "multiplayer"}, Extra);
+
+          return {content: [{type: "text", text: `Started as multiplayer, since players was ${Input.players}.`}, ...Started.content]};
+        }
+
         const Signal = (Extra as {signal?: AbortSignal} | undefined)?.signal;
 
         if (Input.action === "quality") {

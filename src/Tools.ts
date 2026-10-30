@@ -1651,9 +1651,10 @@ ${Said(Started)}`}]};
         contains: z.string().optional().describe("Only lines containing this text."),
         limit: z.number().optional().describe("How many to return, newest last. Forty by default, two hundred at most."),
         since: z.number().optional().describe("Only entries from the last this many seconds."),
-        target: z.enum(["edit", "server"]).optional().describe("Whose log to read. edit is the editor and the default; server is the running play session."),
+        target: z.enum(["edit", "server", "client"]).optional().describe("Whose log to read. edit is the editor and the default; server is the running play session; client is a player's client in it, where most interface errors happen."),
+        player: z.string().optional().describe("For client, which player's client: a name, or their number in join order. Defaults to the first."),
       },
-      Run: async (Input: { level?: "all" | "print" | "warn" | "error" | "info" | "problems"; contains?: string; limit?: number; since?: number; target?: "edit" | "server" }) => {
+      Run: async (Input: { level?: "all" | "print" | "warn" | "error" | "info" | "problems"; contains?: string; limit?: number; since?: number; target?: "edit" | "server" | "client"; player?: string }) => {
         const Where = Input.target || "edit";
         const Sent = {
           level: Input.level,
@@ -1661,7 +1662,29 @@ ${Said(Started)}`}]};
           limit: Input.limit,
           since: Input.since,
         };
-        const Found: LogAnswer = Where === "edit" ? await Reach("logs", Sent) : await ReachIn("server", "logs", Sent);
+        const Client = Where === "client" ? await ReachIn("server", "execute", {target: "client", player: Input.player, readOnly: true, timeout: 30, code: `local Sent = game:GetService("HttpService"):JSONDecode(${JSON.stringify(JSON.stringify(Sent))})
+local Named = {[Enum.MessageType.MessageOutput] = "print", [Enum.MessageType.MessageInfo] = "info", [Enum.MessageType.MessageWarning] = "warn", [Enum.MessageType.MessageError] = "error"}
+local History = game:GetService("LogService"):GetLogHistory()
+local Limit = math.clamp(tonumber(Sent.limit) or 40, 1, 200)
+local Wanted = if typeof(Sent.level) == "string" then Sent.level:lower() else "all"
+local Needle = if typeof(Sent.contains) == "string" and Sent.contains ~= "" then Sent.contains:lower() else nil
+local Oldest = if tonumber(Sent.since) then os.time() - tonumber(Sent.since) else nil
+local Kept, Skipped, Seen = {}, 0, 0
+for Index = #History, 1, -1 do
+	local Entry = History[Index]
+	local Kind = Named[Entry.messageType] or "print"
+	Seen += 1
+	if (Wanted == "problems" and Kind ~= "warn" and Kind ~= "error") or (Wanted ~= "problems" and Wanted ~= "all" and Kind ~= Wanted) then continue end
+	if Oldest and Entry.timestamp < Oldest then continue end
+	local Message = tostring(Entry.message)
+	if Needle and not Message:lower():find(Needle, 1, true) then continue end
+	if #Kept >= Limit then Skipped += 1 continue end
+	table.insert(Kept, 1, Kind .. ": " .. (if #Message > 400 then Message:sub(1, 400) .. " [cut]" else Message))
+end
+return {lines = Kept, scanned = Seen, skipped = Skipped}`}, 40) as { error?: string; result?: unknown } | null : null;
+        const Found: LogAnswer = Where === "client"
+          ? (Client && Client.result ? (typeof Client.result === "string" ? JSON.parse(Client.result) : Client.result) as LogAnswer : {error: (Client && Client.error) || "The playtest client did not answer.", skipped: 0})
+          : Where === "edit" ? await Reach("logs", Sent) : await ReachIn("server", "logs", Sent);
 
         return {content: [{
           type: "text",

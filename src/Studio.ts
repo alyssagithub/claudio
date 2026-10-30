@@ -81,6 +81,7 @@ function Ago(At: number): string {
 }
 
 const Told = new Map<string, string>();
+let LastInPlaytest: { Id: string; Name: () => string; At: number; Kind: string } = {Id: "", Name: () => "", At: 0, Kind: ""};
 
 function Notice(Kind: string, Input: unknown, Who?: Owner): string | null {
   const Notes: string[] = [];
@@ -195,7 +196,17 @@ export function Request(Kind: string, Input: unknown, Timeout?: number | null, R
     return Promise.resolve(Target);
   }
 
-  const Note = Kind === "playtest" || Kind === "execute" ? Notice(Kind, Input, Who) : null;
+  const InPlaytest = Kind === "playtest" || (Role !== undefined && Role !== null && Role !== "edit");
+  const Earlier = LastInPlaytest;
+  const Shared = Who && InPlaytest && Earlier.Id !== "" && Earlier.Id !== Who.Id && Date.now() - Earlier.At < 120000
+    ? `${Earlier.Name()} also acted on this playtest ${Ago(Earlier.At)}, with ${Earlier.Kind}. Anything in the session you did not make may be theirs, not a bug in the game.`
+    : null;
+  const Noticed = Kind === "playtest" || Kind === "execute" ? Notice(Kind, Input, Who) : null;
+  const Note = [Noticed, Shared].filter(Boolean).join("\n") || null;
+
+  if (Who && InPlaytest) {
+    LastInPlaytest = {Id: Who.Id, Name: Who.Name, At: Date.now(), Kind};
+  }
 
   Track(Kind, Input, Who);
 

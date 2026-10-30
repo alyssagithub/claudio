@@ -507,6 +507,8 @@ function Selection.Begin(Entry: Block, Widget: any, Point: Vector2)
 			return
 		end
 
+		const Read, Start = pcall(Widget.GetRelativeMousePosition, Widget)
+		const Offset = if Read then Point - Start else Vector2.zero
 		local Last: Vector2?
 
 		while task.wait() and Dragging == Mine do
@@ -514,7 +516,7 @@ function Selection.Begin(Entry: Block, Widget: any, Point: Vector2)
 
 			if Ok and Where ~= Last then
 				Last = Where
-				Extend(Where)
+				Extend(Where + Offset)
 			end
 		end
 	end)

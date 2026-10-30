@@ -667,12 +667,22 @@ local Started = os.clock()
 game:GetService("CaptureService"):CaptureScreenshot(function(Content) Got = Content end)
 while not Got and os.clock() - Started < 10 do task.wait(0.05) end
 local Bounds
+local Near
 local Target = ${JSON.stringify(Around || "")}
 if Target ~= "" then
 	local Object = game
 	for Name in Target:gsub("^[Gg]ame%.", ""):gmatch("[^%.]+") do
+		local Inside = Object
 		Object = if Object == game then game:FindFirstChild(Name) or game:GetService(Name) else Object:FindFirstChild(Name)
-		if not Object then break end
+		if not Object then
+			local Deeper = Inside:FindFirstChild(Name, true)
+			local Children = {}
+			for _, Child in Inside:GetChildren() do
+				if #Children < 30 then table.insert(Children, Child.Name) end
+			end
+			Near = {found = Inside:GetFullName(), missing = Name, deeper = Deeper and Deeper:GetFullName() or nil, children = Children}
+			break
+		end
 	end
 	if Object and Object:IsA("GuiObject") then
 		local Inset = game:GetService("GuiService"):GetGuiInset()
@@ -689,10 +699,10 @@ if Target ~= "" then
 		Bounds = {Left, Top, Right, Bottom}
 	end
 end
-return {shot = Got and tostring(Got) or nil, bounds = Bounds}`}, 40) as { error?: string; result?: unknown } | null;
+return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40) as { error?: string; result?: unknown } | null;
           const Found = (() => {
             try {
-              return (typeof Taken?.result === "string" ? JSON.parse(Taken.result) : Taken?.result) as { shot?: string; bounds?: number[] } | undefined;
+              return (typeof Taken?.result === "string" ? JSON.parse(Taken.result) : Taken?.result) as { shot?: string; bounds?: number[]; near?: { found: string; missing: string; deeper?: string; children: string[] } } | undefined;
             } catch {
               return undefined;
             }
@@ -718,7 +728,11 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds}`}, 40) as { error?
               : Input.width && Input.height ? {x: Input.x || 0, y: Input.y || 0, width: Input.width, height: Input.height} : null;
 
             if (Around && !Bounds) {
-              Said += `, not cropped because ${Around} is not a part, model or GuiObject on that client`;
+              const Near = Found && Found.near;
+
+              Said += Near
+                ? `, not cropped because ${Near.found} has no child named ${Near.missing}${Near.deeper ? `. There is one further down, at ${Near.deeper}` : ""}. Its children are: ${Near.children.join(", ") || "none"}`
+                : `, not cropped because ${Around} is not a part, model or GuiObject on that client`;
             }
 
             if (Region) {

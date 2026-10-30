@@ -198,6 +198,10 @@ Roblox said: "${Said}".`;
       : "\nThe key was refused for this call. It may lack the permission or the experience this needs, or have expired; the user can add them on the Creator Dashboard or paste a new key.";
   }
 
+  if (Response.status === 404 || Response.status === 405) {
+    Hint = await RouteHint(Method, Url.pathname);
+  }
+
   if (!Response.ok && !Hint && (Text === "" || !/"message"\s*:\s*"[^"]/.test(Text))) {
     Hint = Response.status >= 500
       ? `\nRoblox sent no explanation with this ${Response.status}, which means its server failed rather than that the request was refused. Retry in a little while, and if it keeps failing, report it. Only if the same request fails every time while a differently shaped one works is the request itself the likely cause.`
@@ -248,9 +252,9 @@ export function AskForKey(): Promise<void> {
   });
 }
 
-const SpecFile = path.join(os.homedir(), ".claudio", "opencloud-scopes.json");
+const SpecFile = path.join(os.homedir(), ".claudio", "opencloud-routes.json");
 
-type ScopeRoute = { method: string; pattern: string; scopes: string[] };
+type ScopeRoute = { method: string; template: string; pattern: string; scopes: string[] };
 
 async function ScopeRoutes(): Promise<ScopeRoute[]> {
   try {
@@ -273,8 +277,8 @@ async function ScopeRoutes(): Promise<ScopeRoute[]> {
         const Secured = (Operation.security || []).flatMap((Entry) => Object.values(Entry).flat());
         const Scopes = [...new Set([...Named, ...Secured])].filter((Scope) => Scope.includes(":"));
 
-        if (Scopes.length > 0) {
-          Routes.push({method: Method.toUpperCase(), pattern: `^${Template.replace(/[.*+?^$()|[\]\]/g, "\$&").replace(/\?\{[^}]+\?\}/g, "[^/]+").replace(/\{[^}]+\}/g, "[^/]+")}$`, scopes: Scopes});
+        {
+          Routes.push({method: Method.toUpperCase(), template: Template, pattern: `^${Template.replace(/[.*+?^$()|[\]\]/g, "\$&").replace(/\?\{[^}]+\?\}/g, "[^/]+").replace(/\{[^}]+\}/g, "[^/]+")}$`, scopes: Scopes});
         }
       }
     }
@@ -286,6 +290,45 @@ async function ScopeRoutes(): Promise<ScopeRoute[]> {
   } catch {
     return [];
   }
+}
+
+async function RouteHint(Method: string, Pathname: string): Promise<string> {
+  const Routes = await ScopeRoutes();
+
+  if (Routes.length === 0) {
+    return "";
+  }
+
+  const Matching = Routes.filter((Route) => new RegExp(Route.pattern).test(Pathname));
+
+  if (Matching.length === 0) {
+    const Parts = Pathname.split("/");
+    const Closest = [...new Set(Routes.map((Route) => Route.template))]
+      .map((Template) => {
+        const Pieces = Template.split("/");
+        let Shared = 0;
+
+        while (Shared < Pieces.length && Shared < Parts.length && (Pieces[Shared] === Parts[Shared] || /^\{.*\}$/.test(Pieces[Shared]))) {
+          Shared += 1;
+        }
+
+        return {Template, Shared};
+      })
+      .filter((Entry) => Entry.Shared > 1)
+      .sort((Left, Right) => Right.Shared - Left.Shared)
+      .slice(0, 6)
+      .map((Entry) => Entry.Template);
+
+    return `\nOpen Cloud has no route at this path, according to Roblox's published API reference, so the endpoint itself does not exist; changing the method or body will not help.${Closest.length > 0 ? ` The nearest routes that do exist: ${Closest.join(", ")}.` : ""}`;
+  }
+
+  const Methods = [...new Set(Matching.map((Route) => Route.method))];
+
+  if (!Methods.includes(Method)) {
+    return `\nThis path exists, but not for ${Method}: it takes ${Methods.join(", ")}.`;
+  }
+
+  return "\nThis route exists in Roblox's published API reference, so the endpoint is right. A 404 here means something it points at does not exist or the key cannot see it, such as a wrong id in the path or an experience missing from the key's list.";
 }
 
 export async function ScopesFor(Method: string, Pathname: string): Promise<string[]> {

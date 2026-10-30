@@ -321,8 +321,55 @@ const function Interact(Body: string): any
 		return {text = `Held the {(Input.button or "left")} button at {Where(From)} and moved the mouse by {Move.X}, {Move.Y} with the cursor locked, so InputChanged and GetMouseDelta saw the movement. Roblox scales the delta by the mouse sensitivity setting.`}
 	end
 
+	if typeof(Input.named) == "string" and Input.named ~= "" then
+		local Best: GuiButton?
+		local Rank = -math.huge
+
+		for _, Screen in (game:GetService("Players").LocalPlayer :: Player):WaitForChild("PlayerGui"):GetChildren() do
+			if not Screen:IsA("ScreenGui") or not Screen.Enabled then
+				continue
+			end
+
+			for Order, Button in Screen:GetDescendants() do
+				if not Button:IsA("GuiButton") or (Button.Name ~= Input.named and not (Button:IsA("TextButton") and Button.Text == Input.named)) then
+					continue
+				end
+
+				if Button.AbsoluteSize.X < 1 or Button.AbsoluteSize.Y < 1 then
+					continue
+				end
+
+				local Shown = true
+				local Ancestor: Instance? = Button
+
+				while Ancestor and Ancestor ~= Screen do
+					if Ancestor:IsA("GuiObject") and not (Ancestor :: GuiObject).Visible then
+						Shown = false
+
+						break
+					end
+
+					Ancestor = Ancestor.Parent
+				end
+
+				const Score = Screen.DisplayOrder * 1e8 + Button.ZIndex * 1e5 + Order
+
+				if Shown and Score > Rank then
+					Best = Button :: GuiButton
+					Rank = Score
+				end
+			end
+		end
+
+		if not Best then
+			return {error = `No visible button is named or labelled "{Input.named}".`}
+		end
+
+		Input.path = Best:GetFullName()
+	end
+
 	if typeof(Input.path) ~= "string" then
-		return {error = `{Action} needs a path to the GuiObject to act on.`}
+		return {error = `{Action} needs a path to the GuiObject to act on, or named for a button.`}
 	end
 
 	const Target, Trouble = Find(Input.path)

@@ -673,7 +673,7 @@ if Target ~= "" then
 	local Object = game
 	for Name in Target:gsub("^[Gg]ame%.", ""):gmatch("[^%.]+") do
 		local Inside = Object
-		Object = if Object == game then game:FindFirstChild(Name) or game:GetService(Name) else Object:FindFirstChild(Name)
+		Object = if Object == game then game:FindFirstChild(Name) or game:GetService(Name) elseif Name == "LocalPlayer" and Object:IsA("Players") then Object.LocalPlayer else Object:FindFirstChild(Name)
 		if not Object then
 			local Deeper = Inside:FindFirstChild(Name, true)
 			local Children = {}
@@ -1013,6 +1013,7 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
         pad: z.enum(PadInputs).optional().describe("For gamepad: the button, d-pad direction or stick push to hold for hold seconds, 0.1 by default. The game sees a genuine connected gamepad, so GamepadEnabled, gamepad UI selection and gamepad bindings all respond. Start opens Roblox's own menu, which then takes all gamepad input until B closes it. Needs the user to have the Controller Emulator panel open and visible; the first press takes up to a minute while Claudio finds the panel."),
         window: z.boolean().optional().describe("For click: x and y are pixels in a capture of the Studio window, and the click is sent to that window as a real mouse click instead of simulated game input. This reaches CoreGui, such as purchase and prompt windows, which refuse simulated input, and works without a play session."),
         path: z.string().optional().describe("Full instance path of the GuiObject for press, hover, scroll and drag."),
+        named: z.string().optional().describe("Instead of path: act on the topmost visible button with this name or label, such as Cancel."),
         text: z.string().optional().describe("The text to type, for type."),
         key: z.string().optional().describe("KeyCode name to press and release, such as Return or E, for key."),
         amount: z.number().optional().describe("Wheel amount for scroll, negative scrolls down. Defaults to -1."),
@@ -1025,7 +1026,7 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
         hold: z.number().optional().describe("Seconds to keep the button down at the end of a drag before releasing, or to hold a gamepad input, up to 5."),
         player: z.string().optional().describe("Which client to send it to: a player's name, or their number in join order starting at 1. Defaults to the first player."),
       },
-      Run: async (Input: { action: "press" | "click" | "type" | "key" | "hover" | "scroll" | "drag" | "gamepad"; pad?: string; window?: boolean; path?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number; button?: "left" | "right" | "middle"; hold?: number; player?: string; times?: number; gap?: number }) => {
+      Run: async (Input: { action: "press" | "click" | "type" | "key" | "hover" | "scroll" | "drag" | "gamepad"; pad?: string; window?: boolean; path?: string; named?: string; text?: string; key?: string; amount?: number; to?: string; x?: number; y?: number; button?: "left" | "right" | "middle"; hold?: number; player?: string; times?: number; gap?: number }) => {
         if (Input.action === "type" && !Input.text) {
           return {content: [{
             type: "text",
@@ -1063,10 +1064,10 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
           }]};
         }
 
-        if (Input.action !== "type" && Input.action !== "key" && Input.action !== "drag" && Input.action !== "click" && !Input.path) {
+        if (Input.action !== "type" && Input.action !== "key" && Input.action !== "drag" && Input.action !== "click" && !Input.path && !Input.named) {
           return {content: [{
             type: "text",
-            text: `${Input.action} needs path, the full instance path of the GuiObject to act on.`,
+            text: `${Input.action} needs path, the full instance path of the GuiObject to act on, or named for a button.`,
           }]};
         }
 
@@ -1091,6 +1092,7 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
           text: Said(await ReachIn("server", "input", {
             action: Input.action,
             path: Input.path,
+            named: Input.named,
             text: Input.text,
             key: Input.key,
             amount: Input.amount,

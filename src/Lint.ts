@@ -420,6 +420,38 @@ function Prepared(): Promise<string | null> {
   return Ready;
 }
 
+let InstanceMembers: Set<string> | null = null;
+
+function NameClashes(Source: string): string[] {
+  if (!InstanceMembers) {
+    InstanceMembers = new Set();
+
+    const Text = fs.existsSync(Definitions()) ? fs.readFileSync(Definitions(), "utf8") : "";
+
+    for (const Block of Text.matchAll(/^declare extern type (?:Object|Instance)\b[^\n]*\n([\s\S]*?)^end/gm)) {
+      for (const Member of Block[1].matchAll(/^\s+(?:function\s+)?([A-Z][A-Za-z0-9_]*)\s*[:(]/gm)) {
+        InstanceMembers.add(Member[1]);
+      }
+    }
+  }
+
+  const Found: string[] = [];
+
+  for (const Named of Source.matchAll(/\bName\s*=\s*"([A-Za-z_][A-Za-z0-9_]*)"/g)) {
+    const Name = Named[1];
+
+    if (!InstanceMembers.has(Name) || !new RegExp(`\\.${Name}\\b(?!\\s*\\()`).test(Source)) {
+      continue;
+    }
+
+    const Line = Source.slice(0, Named.index).split("\n").length;
+
+    Found.push(`line ${Line}: NameClash: a child named "${Name}" has the same name as the Instance member ${Name}, so reading Parent.${Name} gets the member instead of the child. Use FindFirstChild("${Name}") to reach it, or rename the child`);
+  }
+
+  return Found;
+}
+
 async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]) {
   const Analyzer = await Prepared();
 
@@ -517,6 +549,22 @@ async function AnalyzeNow(Entries: ScriptEntry[], Raw: boolean, Tree: TreeItem[]
         path: Script,
         lines: Kept.slice(0, 40),
       });
+    }
+  }
+
+  for (const Entry of Entries) {
+    const Clashes = NameClashes(Entry.source);
+
+    if (Clashes.length === 0) {
+      continue;
+    }
+
+    const Existing = Report.find((Item) => Item.path === Entry.path);
+
+    if (Existing) {
+      Existing.lines.push(...Clashes);
+    } else {
+      Report.push({path: Entry.path, lines: Clashes});
     }
   }
 

@@ -65,19 +65,59 @@ const function Explain(Trouble: string, Said: {string}): string
 end
 
 const function Find(Path: string): (GuiObject?, string?)
-	local Object: Instance? = game
+	const Steps = string.split(Path, ".")
 
-	for Index, Step in string.split(Path, ".") do
-		if Index == 1 and (Step == "game" or Step == "Game") then
-			continue
-		end
-
-		if not Object then
-			return nil, `Nothing at "{Path}".`
-		end
-
-		Object = if Step == "LocalPlayer" and (Object :: Instance):IsA("Players") then (Object :: Players).LocalPlayer else (Object :: Instance):FindFirstChild(Step)
+	if Steps[1] == "game" or Steps[1] == "Game" then
+		table.remove(Steps, 1)
 	end
+
+	const function Shown(Candidate: Instance): boolean
+		if not Candidate:IsA("GuiObject") or Candidate.AbsoluteSize.X < 1 or Candidate.AbsoluteSize.Y < 1 then
+			return false
+		end
+
+		local Ancestor: Instance? = Candidate
+
+		while Ancestor and Ancestor ~= game do
+			if (Ancestor:IsA("GuiObject") and not (Ancestor :: GuiObject).Visible) or (Ancestor:IsA("LayerCollector") and not (Ancestor :: LayerCollector).Enabled) then
+				return false
+			end
+
+			Ancestor = Ancestor.Parent
+		end
+
+		return true
+	end
+
+	const function Walk(From: Instance, Index: number): Instance?
+		if Index > #Steps then
+			return From
+		end
+
+		const Step = Steps[Index]
+
+		if Step ~= "*" then
+			const Next = if Step == "LocalPlayer" and From:IsA("Players") then (From :: Players).LocalPlayer else From:FindFirstChild(Step)
+
+			return if Next then Walk(Next, Index + 1) else nil
+		end
+
+		local Fallback: Instance?
+
+		for _, Child in From:GetChildren() do
+			const Found = Walk(Child, Index + 1)
+
+			if Found and Shown(Found) then
+				return Found
+			end
+
+			Fallback = Fallback or Found
+		end
+
+		return Fallback
+	end
+
+	const Object = Walk(game, 1)
 
 	if not Object or not Object:IsA("GuiObject") then
 		return nil, `Nothing usable at "{Path}". Give the full path to a GuiObject, such as Players.LocalPlayer.PlayerGui.Menu.Play.`
@@ -207,6 +247,25 @@ const function Interact(Body: string): any
 			return {error = "Typing needs text."}
 		end
 
+		const UserInputService = game:GetService("UserInputService")
+
+		if typeof(Input.path) == "string" and Input.path ~= "" then
+			const Box, Trouble = Find(Input.path)
+
+			if not Box or not Box:IsA("TextBox") then
+				return {error = Trouble or `{Input.path} is not a TextBox, so it cannot take typing.`}
+			end
+
+			;(Box :: TextBox):CaptureFocus()
+			task.wait()
+		end
+
+		const Focused = UserInputService:GetFocusedTextBox()
+
+		if not Focused then
+			return {error = "Nothing has focus, so the typing would be lost. Give path to the TextBox to type into, and Claudio focuses it first."}
+		end
+
 		const Ok, Trouble = pcall(function()
 			Virtual:SendTextInput(Input.text)
 		end)
@@ -215,7 +274,9 @@ const function Interact(Body: string): any
 			return {error = `Studio refused the typing: {tostring(Trouble)}`}
 		end
 
-		return {text = `Typed {#Input.text} characters into whatever has focus. Check the place to confirm where they landed.`}
+		task.wait(0.2)
+
+		return {text = `Typed {#Input.text} characters into {Focused:GetFullName()}, which now reads "{Focused.Text:sub(1, 200)}".`}
 	end
 
 	if Action == "key" then

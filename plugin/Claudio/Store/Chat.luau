@@ -2320,13 +2320,23 @@ const function Api(Input: any): any
 	end
 
 	if Input.search then
-		const Needle = tostring(Input.search):lower()
+		const Needles = string.split(tostring(Input.search):lower(), "|")
 		const Hits = {}
+
+		const function Matches(Text: string): boolean
+			for _, Needle in Needles do
+				if Needle ~= "" and Text:lower():find(Needle, 1, true) then
+					return true
+				end
+			end
+
+			return false
+		end
 
 		for _, Class in Reflection:GetClasses({}) do
 			const Name = tostring(Class.Name)
 
-			if Name:lower():find(Needle, 1, true) then
+			if Matches(Name) then
 				table.insert(Hits, `class {Name}`)
 			end
 
@@ -2336,7 +2346,7 @@ const function Api(Input: any): any
 		end
 
 		for _, Given in Enum:GetEnums() do
-			if tostring(Given):lower():find(Needle, 1, true) and #Hits < 80 then
+			if Matches(tostring(Given)) and #Hits < 80 then
 				table.insert(Hits, `enum {tostring(Given)}`)
 			end
 		end
@@ -2353,7 +2363,7 @@ const function Api(Input: any): any
 
 				if Ok and typeof(Listed) == "table" then
 					for _, Entry in Listed do
-						if tostring(Entry.Name):lower():find(Needle, 1, true) and #Hits < 120 then
+						if Matches(tostring(Entry.Name)) and #Hits < 120 then
 							table.insert(Hits, `{Input.className}.{tostring(Entry.Name)}`)
 						end
 					end

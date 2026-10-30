@@ -339,15 +339,6 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
 
   const Tools: StudioTool[] = [
     {
-      Name: "instances",
-      Description: "Say whether Studio is open and whether the Claudio plugin has checked in. Ask this before assuming nothing is connected, and never open Studio yourself on the strength of an empty answer.",
-      Schema: {},
-      Run: async () => ({content: [{
-        type: "text",
-        text: await Presence(),
-      }]}),
-    },
-    {
       Name: "read",
       Description: "Read a part of the open place in one call: the instance tree under a path, plus the source of scripts in it. Prefer this over walking the tree with separate calls.",
       Schema: {
@@ -368,13 +359,15 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
     },
     {
       Name: "studio",
-      Description: "List the Studio windows connected to Claudio, or choose which one this session uses by part of its place name or its number in the list. Needed only when more than one window is open; a Claudio chat always uses the window its panel is in.",
+      Description: "Say whether Studio is open and the Claudio plugin is connected, and list the connected Studio windows. Ask this before assuming nothing is connected, and never open Studio yourself on the strength of an empty answer. With use, choose which window this session uses, by part of its place name or its number in the list; that is needed only when more than one window is open, and a Claudio chat always uses the window its panel is in.",
       Schema: {
         use: z.string().optional().describe("Part of the place name, or the number from the list, of the window to use from now on. Leave out to list the windows."),
       },
       Run: async (Input: { use?: string }) => ({content: [{
         type: "text",
-        text: Said(await Reach("choose", {use: Input.use}), "Studio did not say."),
+        text: Input.use ? Said(await Reach("choose", {use: Input.use}), "Studio did not say.") : `${await Presence()}
+
+${Said(await Reach("choose", {}), "Studio did not say.")}`,
       }]}),
     },
     {
@@ -430,7 +423,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
         query: z.string().optional().describe("Anything to look up: a class such as Lighting, a member as Class.Member such as UserInputService.GetMouseDelta, or text to search for."),
         className: z.string().optional().describe("Class to describe, such as Lighting, or Class.Member for one member. Leave out everything to list every class."),
         member: z.string().optional().describe("Only this member of the class."),
-        search: z.string().optional().describe("Find a class or enum whose name contains this. Pass className too to search that class's members."),
+        search: z.string().optional().describe("Find a class or enum whose name contains this, ignoring case. Separate alternatives with |, such as Transfer|Receipt. Pass className too to search that class's members."),
         enumName: z.string().optional().describe("An enum to list the items of, such as Material."),
         inherited: z.boolean().optional().describe("Include the members every instance has, such as Name and Destroy, which are left out by default."),
         deprecated: z.boolean().optional().describe("Only list members that are deprecated."),
@@ -548,7 +541,7 @@ return game:GetService("HttpService"):JSONEncode(Out)`}) as { result?: unknown }
       Name: "capture",
       Description: "Take a picture of Studio. `of` picks what to capture: `viewport` is the rendered 3D view and the default; `window` is the whole Studio window as the user sees it, at true colours. To look at a plugin's own interface use `of: window` with `widget` set to part of that panel's title, and the picture is cropped to exactly that panel wherever it is docked. Give `around` an instance path to crop the viewport tightly to a part, model or on screen GuiObject, `path` to point the camera at something first, or `x`, `y`, `width` and `height` to crop by hand. The camera is always put back where it was.",
       Schema: {
-        of: z.enum(["viewport", "window"]).optional().describe("What to capture. viewport by default."),
+        of: z.enum(["viewport", "window"]).optional().describe("What to capture. viewport by default, which is Roblox's own screenshot and leaves out CoreGui, such as Roblox's notifications, chat and menus. window captures the Studio window as the user sees it, CoreGui included; combine it with x, y, width and height to crop."),
         window: z.string().optional().describe("Part of a Studio window title to capture instead of the main one, for a panel floated out of Studio. Only for of window."),
         widget: z.string().optional().describe("Part of a plugin panel's title, such as Claudio. The window capture is cropped to that panel. Only for of window."),
         around: z.string().optional().describe("Instance to crop tightly around, such as Workspace.Model or a GuiObject path."),
@@ -1033,7 +1026,7 @@ return {shot = Got and tostring(Got) or nil, bounds = Bounds, near = Near}`}, 40
         action: z.enum(["press", "click", "type", "key", "hover", "scroll", "drag", "gamepad"]).describe("What to send. click hits a point given by x and y instead of a path. gamepad presses an input on a real emulated gamepad, through Studio's Controller Emulator panel."),
         pad: z.enum(PadInputs).optional().describe("For gamepad: the button, d-pad direction or stick push to hold for hold seconds, 0.1 by default. The game sees a genuine connected gamepad, so GamepadEnabled, gamepad UI selection and gamepad bindings all respond. Start opens Roblox's own menu, which then takes all gamepad input until B closes it. Needs the user to have the Controller Emulator panel open and visible; the first press takes up to a minute while Claudio finds the panel."),
         window: z.boolean().optional().describe("For click: x and y are pixels in a capture of the Studio window, and the click is sent to that window as a real mouse click instead of simulated game input. This reaches CoreGui, such as purchase and prompt windows, which refuse simulated input, and works without a play session."),
-        path: z.string().optional().describe("Full instance path of the GuiObject for press, hover, scroll and drag."),
+        path: z.string().optional().describe("Full instance path of the GuiObject for press, hover, scroll and drag, or of the TextBox to focus and type into for type. Any part can be * to match any name, such as Players.LocalPlayer.PlayerGui.Shop.Holder.*.Remove, which picks the first visible match."),
         named: z.string().optional().describe("Instead of path: act on the topmost visible button with this name or label, such as Cancel."),
         text: z.string().optional().describe("The text to type, for type."),
         key: z.string().optional().describe("KeyCode name to press and release, such as Return or E, for key."),

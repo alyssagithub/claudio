@@ -42,7 +42,7 @@ export const AllowedTools = [
 ];
 export const CappedTools = ["Read", "Glob", "Grep"];
 export const DeveloperUserIds = ["109830895"];
-export const DeveloperSession = "Claudio | Plugin";
+export const DeveloperSession = "local_ef62ae87-7e2c-406e-bb91-c898d681be59";
 
 export function SystemPromptFor(ServerNames: string[]) {
   const Sections = ["# Claudio\n\nYou are Claudio, a chat assistant in a plugin widget docked in Roblox Studio."];

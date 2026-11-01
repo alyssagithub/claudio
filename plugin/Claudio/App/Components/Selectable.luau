@@ -133,11 +133,21 @@ return function(Props: Props)
 		})
 	end
 
+	const function Capped(): string
+		const Value = Props.Text()
+
+		if #Value <= 100000 then
+			return Value
+		end
+
+		return `{Value:sub(1, 100000)}\n\n[{#Value - 100000} more characters not shown]`
+	end
+
 	const Entry: Selection.Block = {
 		Box = nil :: any,
 		Range = Range,
 		Native = Track,
-		Rich = Props.Text,
+		Rich = Capped,
 	}
 
 	Box = Create "TextBox" {
@@ -157,7 +167,7 @@ return function(Props: Props)
 		TextYAlignment = Enum.TextYAlignment.Top,
 		LayoutOrder = Props.LayoutOrder,
 		Text = function()
-			return Keys.Clean(Props.Text())
+			return Keys.Clean(Capped())
 		end,
 		Focused = function()
 			Focused += 1
@@ -270,7 +280,7 @@ return function(Props: Props)
 			Text = function()
 				const Chosen = Range()
 
-				return Marked(Props.Text(), Chosen[1], Chosen[2], Theme.Colors.Accent():ToHex())
+				return Marked(Capped(), Chosen[1], Chosen[2], Theme.Colors.Accent():ToHex())
 			end,
 		},
 

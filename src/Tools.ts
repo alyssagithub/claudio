@@ -410,6 +410,18 @@ ${Said(await Reach("choose", {}), "Studio did not say.")}`,
       },
     },
     {
+      Name: "camera",
+      Description: "Save the editor camera's position, focus and field of view, or put it back. Save before moving the camera for a capture or preview, and restore after, so the user's view ends where it started.",
+      Schema: {
+        action: z.enum(["save", "restore"]).describe("save remembers the current view; restore puts it back."),
+        name: z.string().optional().describe("A name for the saved view, so several can be kept. default by default."),
+      },
+      Run: async (Input: { action: "save" | "restore"; name?: string }) => ({content: [{
+        type: "text",
+        text: Said(await Reach("camera", Input), "Studio did not say."),
+      }]}),
+    },
+    {
       Name: "hidden",
       Description: "Read properties Roblox hides from plugins and scripts, which properties and execute cannot see: Workspace's streaming settings (StreamOutBehavior, StreamingTargetRadius, StreamingMinRadius, StreamingIntegrityMode, ModelStreamingBehavior), its physics, avatar and replication settings, Lighting.Technology, and hidden properties on any other instance. Use this instead of assuming what they are set to. Claudio reads them from a copy of the place that Studio writes when a test server starts. That copy is reused for 30 minutes unless fresh is true; making a new one briefly starts and stops a server-only test, which takes up to a minute and cannot happen while a playtest is running. Only the user can change these properties, in Studio's Properties panel.",
       Schema: {
@@ -1533,8 +1545,9 @@ ${Said(Started)}`}]};
           new: z.string().describe("What replaces it."),
         })).optional().describe("For edit, the replacements, applied in order. If any old is missing or found more than once, nothing changes."),
         undoName: z.string().optional().describe("What the undo step should be called."),
+        force: z.boolean().optional().describe("For set, replace the script even though it changed since you last read it."),
       },
-      Run: async (Input: { path?: string; action?: "get" | "set" | "insert" | "replace" | "delete" | "edit"; from?: number; to?: number; text?: string; undoName?: string; edits?: { path?: string; old: string; new: string }[] }) => {
+      Run: async (Input: { force?: boolean; path?: string; action?: "get" | "set" | "insert" | "replace" | "delete" | "edit"; from?: number; to?: number; text?: string; undoName?: string; edits?: { path?: string; old: string; new: string }[] }) => {
         if ((Input.action === "set" || Input.action === "insert" || Input.action === "replace") && typeof Input.text !== "string") {
           return {content: [{type: "text", text: `Nothing was changed: ${Input.action} needs text, and no text was given. Parameters this tool does not know are dropped, so check the name is text.`}]};
         }

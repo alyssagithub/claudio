@@ -305,6 +305,7 @@ const function ScriptTree(): {any}
 end
 
 const Running: {[string]: boolean} = {}
+const SavedCameras: {[string]: {Frame: CFrame, Focus: CFrame, Fov: number}} = {}
 local Watching = false
 
 const function Resolve(Path: string): Instance?
@@ -660,7 +661,13 @@ const function Source(Input: any): any
 		}
 	end
 
-	if Action ~= "set" or Script.Source ~= "" then
+	if Action == "set" then
+		const Stamped = Seen[Path]
+
+		if Stamped and Stamped ~= Fingerprint(Script) and not Input.force then
+			return {error = `{Path} has changed since you last read it, so set would overwrite those changes, possibly someone else's. Read it again first, or send force true to replace it anyway.`}
+		end
+	else
 		const Stamped = Seen[Path]
 
 		if Stamped ~= Fingerprint(Script) then
@@ -3107,6 +3114,29 @@ const function RunStudioJob(Job: any)
 		const Ok, Outcome = pcall(function()
 			if Job.kind == "find" then
 				return Find(Job.input)
+			end
+
+			if Job.kind == "camera" then
+				const Camera = workspace.CurrentCamera
+				const Name = if typeof(Job.input.name) == "string" and Job.input.name ~= "" then Job.input.name else "default"
+
+				if Job.input.action == "save" then
+					SavedCameras[Name] = {Frame = Camera.CFrame, Focus = Camera.Focus, Fov = Camera.FieldOfView}
+
+					return {text = `Saved the editor camera as "{Name}".`}
+				end
+
+				const Saved = SavedCameras[Name]
+
+				if not Saved then
+					return {error = `No camera is saved as "{Name}". Save one first.`}
+				end
+
+				Camera.CFrame = Saved.Frame
+				Camera.Focus = Saved.Focus
+				Camera.FieldOfView = Saved.Fov
+
+				return {text = `Put the editor camera back to "{Name}".`}
 			end
 
 			if Job.kind == "preview" then

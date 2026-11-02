@@ -124,6 +124,20 @@ export type ToolContent = { type: "text"; text: string } | { type: "image"; data
 
 export type ToolAnswer = { content: ToolContent[] };
 
+function FolderProblem(File?: string): string | null {
+  if (!File) {
+    return null;
+  }
+
+  try {
+    fs.mkdirSync(path.dirname(File), {recursive: true});
+
+    return null;
+  } catch (Trouble) {
+    return `Nothing was made, because the folder for ${File} could not be made: ${(Trouble as Error).message}`;
+  }
+}
+
 export function RejectUnknownOptions(Server: unknown) {
   const Registered = (Server as { _registeredTools?: Record<string, { inputSchema?: { strict?: () => unknown } }> })._registeredTools || {};
 
@@ -540,6 +554,12 @@ ${Said(await Reach("choose", {}), "Studio did not say.")}`,
         file: z.string().optional().describe("Where to save the PNG. Defaults to a file in the user's Claudio renders folder."),
       },
       Run: async (Input: { path: string; view?: string; yaw?: number; pitch?: number; distance?: number; fov?: number; size?: number; background?: string; isolate?: boolean; lighting?: string; file?: string }) => {
+        const Unwritable = FolderProblem(Input.file);
+
+        if (Unwritable) {
+          return {content: [{type: "text", text: Unwritable}]};
+        }
+
         const Playing: { text?: string } | null = await LiveSession() ? {text: "running"} : await Reach("playtest", {action: "status"});
 
         if (Playing && typeof Playing.text === "string" && !Playing.text.startsWith("No playtest")) {
@@ -617,6 +637,12 @@ ${Said(await Reach("choose", {}), "Studio did not say.")}`,
         full: z.boolean().optional().describe("Return the picture at full size, one image pixel per screen pixel. By default a picture longer than 1024 pixels on a side is shrunk to save context, and the reply says how to scale its coordinates; pass full when you need exact pixel positions, such as for the input tool, layout measurements or reading tiny text."),
       },
       Run: async (Input: { overflow?: boolean; code?: string; delay?: number; preview?: string; changes?: boolean; full?: boolean; of?: "viewport" | "window"; window?: string; widget?: string; around?: string; element?: string; player?: string; zoom?: number; frame?: string; crop?: boolean; quality?: number; padding?: number; path?: string; x?: number; y?: number; width?: number; height?: number; file?: string }) => {
+        const Unwritable = FolderProblem(Input.file);
+
+        if (Unwritable) {
+          return {content: [{type: "text", text: Unwritable}]};
+        }
+
         const Shape = Input.frame ? Input.frame.match(/^\s*(\d+(?:\.\d+)?)\s*[x:×]\s*(\d+(?:\.\d+)?)\s*$/i) : null;
         const Picture = (Given: string, Said: string): ToolAnswer => {
           let Data = Given;
@@ -1621,6 +1647,7 @@ ${Said(Started)}`}]};
           }
 
           try {
+            fs.mkdirSync(path.dirname(Input.file), {recursive: true});
             fs.writeFileSync(Input.file, Buffer.from(Found.base64, "base64"));
           } catch (Trouble) {
             return {content: [{

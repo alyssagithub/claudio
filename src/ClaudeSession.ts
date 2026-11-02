@@ -8,6 +8,7 @@ import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } fro
 import { AllowedTools, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, EffortOrder, PlanInstructions, CommandsCacheFile, DesktopConfigPath, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory, DeveloperUserIds, DeveloperSession, NotesFolder } from "./Config.js";
 import { AddDesktopSession, FindFile, ListConversations, PriceUsage, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
 import { TrimOldResults, UnpinChangedTools, type ToolShape } from "./Trim.js";
+import { OpenElsewhere } from "./Notes.js";
 import { StudioTools } from "./Tools.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
@@ -2262,6 +2263,13 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
                 const Sending = Asked.tool_input as {to?: unknown, message?: unknown} | null;
 
                 if (Asked.tool_name === "SendMessage" && Sending && Sending.to === DeveloperSession && typeof Sending.message === "string" && (Session.Place || "").includes("<claudio_developer>")) {
+                  if (await OpenElsewhere()) {
+                    return {hookSpecificOutput: {
+                      hookEventName: "PreToolUse",
+                      permissionDecision: "allow",
+                    }};
+                  }
+
                   fs.mkdirSync(NotesFolder, {recursive: true});
                   fs.writeFileSync(path.join(NotesFolder, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`), JSON.stringify({from: Session.ConversationId, note: Sending.message, at: new Date().toISOString()}));
 

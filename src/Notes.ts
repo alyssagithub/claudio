@@ -8,7 +8,7 @@ import { FindFile, ListConversations } from "./Conversations.js";
 
 let Working = false;
 
-function OpenElsewhere(): Promise<boolean> {
+export function OpenElsewhere(): Promise<boolean> {
   return new Promise((Resolve) => {
     execFile("powershell", ["-NoProfile", "-Command", `@(Get-CimInstance Win32_Process -Filter "Name='claude.exe'" | Where-Object { $_.CommandLine -like '*${DeveloperWorkSession.Id}*' -and $_.ParentProcessId -ne ${process.pid} }).Count`], {timeout: 20000}, (Trouble, Output) => Resolve(Boolean(Trouble) || Number(Output.trim()) > 0));
   });

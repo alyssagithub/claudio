@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import http from "node:http";
+import { WebSocketServer } from "ws";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import fs from "node:fs";
 import os from "node:os";
@@ -11,7 +12,7 @@ import { SystemPromptFor } from "./Config.js";
 import { ReloadReleased } from "./Models.js";
 import { StatsAge, StatsFor } from "./Stats.js";
 import { GetLimits, GetBreakdown, PollUsage, RefreshConversationContext, SignIn } from "./ClaudeSession.js";
-import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving, Booted } from "./Studio.js";
+import { OnJobQueued, Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving, Booted } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
 import { WatchNotes } from "./Notes.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
@@ -1254,6 +1255,57 @@ ${Text}`;
       ? `Port ${Port} is already in use. Is another Claudio bridge running? Use --port to pick another.`
       : `Could not listen on port ${Port}: ${Error.message}`);
     process.exit((Error as NodeJS.ErrnoException).code === "EADDRINUSE" ? 0 : 1);
+  });
+
+  const Sockets = new WebSocketServer({noServer: true});
+
+  Server.on("upgrade", (Request, Socket, Head) => {
+    const Url = new URL(Request.url || "", "http://localhost");
+
+    if (Url.pathname !== "/studio/socket" || Request.headers.origin !== undefined || !TokenMatches(Request.headers["x-claudio-token"])) {
+      Socket.destroy();
+      return;
+    }
+
+    Sockets.handleUpgrade(Request, Socket, Head, (Client) => {
+      const Boot = Url.searchParams.get("boot");
+      const Place = Url.searchParams.get("place");
+      let Chat: string | null = null;
+
+      const Pull = () => {
+        const Job = TakeStudioJob("edit", undefined, undefined, undefined, undefined, Boot, Place, Chat);
+
+        if (Job) {
+          Client.send(JSON.stringify({job: Job}));
+        }
+      };
+
+      Booted(Boot);
+
+      const Stop = OnJobQueued(() => setImmediate(Pull));
+      const Beat = setInterval(Pull, 1000);
+
+      Client.on("message", (Data) => {
+        try {
+          const Said = JSON.parse(String(Data)) as { chat?: unknown };
+
+          Chat = typeof Said.chat === "string" ? Said.chat : null;
+        } catch {
+          return;
+        }
+
+        if (Chat) {
+          NoteOpenChat(Chat);
+        }
+
+        Pull();
+      });
+
+      Client.on("close", () => {
+        clearInterval(Beat);
+        Stop();
+      });
+    });
   });
 
   Server.listen(Port, "127.0.0.1", () => {

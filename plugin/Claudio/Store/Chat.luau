@@ -3504,6 +3504,14 @@ function Chat.WatchStudioJobs()
 				continue
 			end
 
+			Client.WatchSocket(RunStudioJob)
+
+			if Client.SocketOpen() then
+				Client.SocketBeat()
+
+				continue
+			end
+
 			const Polled, Trouble = pcall(function(): boolean
 				const Ok, Result = Client.TakeStudioJob()
 
@@ -5524,6 +5532,7 @@ end
 
 function Chat.Unload()
 	Watching = false
+	Client.CloseSocket()
 	Chat.RequestId = nil
 
 	Chat.Sending(false)

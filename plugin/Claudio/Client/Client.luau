@@ -208,6 +208,69 @@ function Client.AnswerQuestion(RequestId: string, QuestionId: string, Answers: {
 	})
 end
 
+local Socket: WebStreamClient? = nil
+local SocketTried = -math.huge
+
+function Client.SocketOpen(): boolean
+	return Socket ~= nil and (Socket :: WebStreamClient).ConnectionState.Name == "Open"
+end
+
+function Client.CloseSocket()
+	const Open = Socket
+
+	Socket = nil
+
+	if Open then
+		pcall(Open.Close, Open)
+	end
+end
+
+function Client.WatchSocket(OnJob: (any) -> ())
+	if Testing or Client.SocketOpen() or os.clock() - SocketTried < 5 then
+		return
+	end
+
+	SocketTried = os.clock()
+	Client.CloseSocket()
+
+	const Made, Opened = pcall(function(): WebStreamClient
+		return HttpService:CreateWebStreamClient(Enum.WebStreamClientType.WebSocket, {
+			Url = `ws://127.0.0.1:{Settings.Get("Port")()}/studio/socket?boot={Boot}&place={HttpService:UrlEncode(game.Name)}`,
+			Headers = {["X-Claudio-Token"] = Settings.Token()},
+		})
+	end)
+
+	if not Made then
+		return
+	end
+
+	Socket = Opened
+	Opened.MessageReceived:Connect(function(Message: string)
+		const Read, Data = pcall(HttpService.JSONDecode, HttpService, Message)
+
+		if Read and typeof(Data) == "table" and typeof(Data.job) == "table" then
+			task.spawn(OnJob, Data.job)
+		end
+	end)
+	Opened.Closed:Connect(function()
+		if Socket == Opened then
+			Socket = nil
+		end
+	end)
+end
+
+function Client.SocketBeat()
+	const Open = Socket
+
+	if not Open then
+		return
+	end
+
+	pcall(function()
+		Open:Send(HttpService:JSONEncode({chat = if Client.OpenChat then Client.OpenChat() else nil}))
+	end)
+end
+
 function Client.TakeStudioJob(): (boolean, any)
 	const Open = if Client.OpenChat then Client.OpenChat() else nil
 

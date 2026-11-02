@@ -7,6 +7,13 @@ type Job = {
 };
 
 const Pending: Job[] = [];
+const Pullers = new Set<() => void>();
+
+export function OnJobQueued(Pull: () => void): () => void {
+  Pullers.add(Pull);
+
+  return () => Pullers.delete(Pull);
+}
 const Waiting = new Map<string, (Result: unknown) => void>();
 const Roles = new Map<string, string>();
 
@@ -247,6 +254,10 @@ function Raw(Kind: string, Input: unknown, Timeout?: number | null, Role?: strin
       Role: Role || "edit",
       Target,
     });
+
+    for (const Pull of Pullers) {
+      Pull();
+    }
 
     Timer = setTimeout(() => {
       const Index = Pending.findIndex((Job) => Job.Id === Id);

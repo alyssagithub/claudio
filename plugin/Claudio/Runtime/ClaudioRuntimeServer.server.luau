@@ -296,8 +296,65 @@ const function Run(Code: string, Within: string?, Current: string?, Seconds: num
 	return Finish(Answer)
 end
 
+const Queued: {any} = {}
+local Socket: WebStreamClient? = nil
+local SocketTried = -math.huge
+
+const function SocketOpen(): boolean
+	return Socket ~= nil and (Socket :: WebStreamClient).ConnectionState.Name == "Open"
+end
+
+const function WatchSocket()
+	if SocketOpen() or os.clock() - SocketTried < 5 then
+		return
+	end
+
+	SocketTried = os.clock()
+
+	if Socket then
+		pcall((Socket :: WebStreamClient).Close, Socket)
+		Socket = nil
+	end
+
+	const Made, Opened = pcall(function(): WebStreamClient
+		return HttpService:CreateWebStreamClient(Enum.WebStreamClientType.WebSocket, {
+			Url = `{Base:gsub("^http", "ws")}/studio/socket?role=server`,
+			Headers = {["x-claudio-token"] = Token},
+		})
+	end)
+
+	if not Made then
+		return
+	end
+
+	Socket = Opened
+	Opened.MessageReceived:Connect(function(Message: string)
+		const Read, Data = pcall(HttpService.JSONDecode, HttpService, Message)
+
+		if Read and typeof(Data) == "table" and typeof(Data.job) == "table" then
+			table.insert(Queued, Data.job)
+		end
+	end)
+	Opened.Closed:Connect(function()
+		if Socket == Opened then
+			Socket = nil
+		end
+	end)
+end
+
+const function Rest()
+	const Until = os.clock() + 1
+
+	while #Queued == 0 and os.clock() < Until do
+		task.wait()
+	end
+end
+
 task.spawn(function()
-	while RunService:IsRunning() and task.wait(1) do
+	while RunService:IsRunning() do
+		Rest()
+		WatchSocket()
+
 		local Ready = 0
 		local Games = 0
 
@@ -313,7 +370,18 @@ task.spawn(function()
 			end
 		end
 
-		const Ok, Reply = Call("GET", `/studio/job?role=server&canRun={Builder() ~= nil}&clients={#game:GetService("Players"):GetPlayers()}&ready={Ready}&games={Games}`, nil)
+		const Status = {canRun = Builder() ~= nil, clients = #game:GetService("Players"):GetPlayers(), ready = Ready, games = Games}
+		local Ok, Reply = false, nil :: any
+
+		if #Queued > 0 then
+			Ok, Reply = true, {job = table.remove(Queued, 1)}
+		elseif SocketOpen() then
+			pcall(function()
+				(Socket :: WebStreamClient):Send(HttpService:JSONEncode(Status))
+			end)
+		else
+			Ok, Reply = Call("GET", `/studio/job?role=server&canRun={Status.canRun}&clients={Status.clients}&ready={Ready}&games={Games}`, nil)
+		end
 
 		if Ok and Reply and Reply.job then
 			const Job = Reply.job

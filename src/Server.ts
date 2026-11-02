@@ -875,7 +875,7 @@ ${Text}`;
       if (Request.method === "GET" && Url.pathname === "/studio/presence") {
         SendJson(Response, 200, {
           ...StudioPresence(),
-          processes: await StudioProcesses(),
+          processes: Url.searchParams.get("quick") ? undefined : await StudioProcesses(),
         });
         return;
       }
@@ -1262,7 +1262,9 @@ ${Text}`;
   Server.on("upgrade", (Request, Socket, Head) => {
     const Url = new URL(Request.url || "", "http://localhost");
 
-    if (Url.pathname !== "/studio/socket" || Request.headers.origin !== undefined || !TokenMatches(Request.headers["x-claudio-token"])) {
+    const Playtest = Url.searchParams.get("role") === "server";
+
+    if (Url.pathname !== "/studio/socket" || Request.headers.origin !== undefined || !(TokenMatches(Request.headers["x-claudio-token"]) || (Playtest && PlaytestKeyMatches(Request.headers["x-claudio-token"])))) {
       Socket.destroy();
       return;
     }
@@ -1271,16 +1273,21 @@ ${Text}`;
       const Boot = Url.searchParams.get("boot");
       const Place = Url.searchParams.get("place");
       let Chat: string | null = null;
+      let Status: { canRun?: unknown; clients?: unknown; ready?: unknown; games?: unknown } = {};
 
       const Pull = () => {
-        const Job = TakeStudioJob("edit", undefined, undefined, undefined, undefined, Boot, Place, Chat);
+        const Job = Playtest
+          ? TakeStudioJob("server", typeof Status.canRun === "boolean" ? Status.canRun : undefined, typeof Status.clients === "number" ? Status.clients : undefined, typeof Status.ready === "number" ? Status.ready : undefined, typeof Status.games === "number" ? Status.games : undefined)
+          : TakeStudioJob("edit", undefined, undefined, undefined, undefined, Boot, Place, Chat);
 
         if (Job) {
           Client.send(JSON.stringify({job: Job}));
         }
       };
 
-      Booted(Boot);
+      if (!Playtest) {
+        Booted(Boot);
+      }
 
       const Stop = OnJobQueued(() => setImmediate(Pull));
       const Beat = setInterval(Pull, 1000);
@@ -1289,6 +1296,7 @@ ${Text}`;
         try {
           const Said = JSON.parse(String(Data)) as { chat?: unknown };
 
+          Status = Said as typeof Status;
           Chat = typeof Said.chat === "string" ? Said.chat : null;
         } catch {
           return;

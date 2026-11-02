@@ -11,6 +11,7 @@ export type Entry = {
 	Class: string?,
 	Fields: {string},
 	Values: {[string]: string},
+	Counts: {[string]: number},
 	Before: string?,
 }
 
@@ -90,6 +91,7 @@ local Listeners: {[Instance]: RBXScriptConnection} = {}
 local Attributes: {[Instance]: RBXScriptConnection} = {}
 local Sources: {[Instance]: string} = {}
 local Paths: {[Instance]: string} = {}
+const Snapshots: {[Instance]: {[string]: any}} = setmetatable({}, {__mode = "k"}) :: any
 local Connections: {RBXScriptConnection} = {}
 local Turn = NewBucket()
 local Idle = NewBucket()
@@ -207,6 +209,8 @@ const function Record(Object: Instance?, Path: string, Verb: string, Class: stri
 			Found.Values[Field] = Value
 		end
 
+		Found.Counts[Field] = (Found.Counts[Field] or 0) + 1
+
 		for _, Existing in Found.Fields do
 			if Existing == Field then
 				return
@@ -225,6 +229,7 @@ const function Record(Object: Instance?, Path: string, Verb: string, Class: stri
 		Class = Class,
 		Fields = if Field then {Field} else {},
 		Values = if Field and Value then {[Field] = Value} else {},
+		Counts = if Field then {[Field] = 1} else {},
 	}
 
 	Where.Keys[Key] = Made
@@ -241,6 +246,25 @@ const function AddListener(Object: Instance)
 	end
 
 	Paths[Object] = Object:GetFullName()
+
+	if Object.Parent == game then
+		const Snapshot = {}
+
+		pcall(function()
+			for _, Property in (game:GetService("ReflectionService") :: any):GetPropertiesOfClass(Object.ClassName, {}) do
+				const Read, Value = pcall(function()
+					return (Object :: any)[Property.Name]
+				end)
+
+				if Read then
+					Snapshot[Property.Name] = Value
+				end
+			end
+		end)
+
+		Snapshots[Object] = Snapshot
+	end
+
 	Listeners[Object] = Object.Changed:Connect(function(Field: string)
 		if Field == "Name" or Field == "Parent" then
 			Paths[Object] = Object:GetFullName()
@@ -388,6 +412,30 @@ const function OnDescendantRemoving(Object: Instance)
 	Record(nil, Path or Object:GetFullName(), "Deleted", Object.ClassName)
 end
 
+const function Still(Item: Entry): {string}
+	const Object = Item.Object
+
+	if Item.Verb ~= "Changed" or not Object then
+		return Item.Fields
+	end
+
+	const Kept = {}
+
+	for _, Field in Item.Fields do
+		const Read, Now = pcall(function()
+			return (Object :: any)[Field]
+		end)
+		const Known = Snapshots[Object]
+		const Back = if Known and Known[Field] ~= nil then Now == Known[Field] else typeof(Now) == "boolean" and (Item.Counts[Field] or 1) % 2 == 0
+
+		if not Read or not Back then
+			table.insert(Kept, Field)
+		end
+	end
+
+	return Kept
+end
+
 const function Render(Where: Bucket): {string}
 	const Lines = {}
 
@@ -405,7 +453,11 @@ const function Render(Where: Bucket): {string}
 		elseif Item.Verb == "Changed" and #Item.Fields > 0 then
 			const Told = {}
 
-			for _, Field in Item.Fields do
+			if #Still(Item) == 0 then
+				continue
+			end
+
+			for _, Field in Still(Item) do
 				const Value = Item.Values[Field]
 
 				table.insert(Told, if Value then `{Field} to {Value}` else Field)
@@ -490,6 +542,10 @@ const function Describe(Where: Bucket): {Types.Change}
 			continue
 		end
 
+		if Item.Verb == "Changed" and #Item.Fields > 0 and #Still(Item) == 0 then
+			continue
+		end
+
 		const Path = Format.Path(if Object and Object.Parent then Object:GetFullName() else Item.Path)
 		const Change: Types.Change = {
 			Kind = if Item.Verb == "Created" then "added" elseif Item.Verb == "Deleted" then "removed" else "changed",
@@ -500,7 +556,7 @@ const function Describe(Where: Bucket): {Types.Change}
 				Deleted = {},
 			})[1],
 			Path = Path,
-			Fields = if #Item.Fields > 0 then Item.Fields else nil,
+			Fields = if #Still(Item) > 0 then Still(Item) else nil,
 		}
 
 		if Object and Object:IsA("LuaSourceContainer") and (Item.Before or Item.Verb == "Created") then

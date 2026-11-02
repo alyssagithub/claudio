@@ -4286,7 +4286,7 @@ const function LoadImagesFor(Index: number, CurrentGeneration: number)
 
 				if Built then
 					Fetched[Slot] = Pictures.Tag(Picture, function()
-						return Client.GetConversationImage(Id, Index, 2048)
+						return Client.GetConversationImage(Id, Index, 8192)
 					end)
 				end
 			end
@@ -5145,12 +5145,12 @@ function Chat.LoadPicture(Path: string)
 
 	LoadingPictures[Path] = true
 
-	const Ok, Result = Client.ReadPicture(Path, 1024)
+	const Ok, Result = Client.ReadPicture(Path, 2048)
 	const Built, Image = pcall(function(): EditableImage
 		assert(Ok and typeof(Result) == "table" and typeof(Result.pixels) == "string", "unreadable")
 
 		return Pictures.Tag(Pictures.Build(Result.width, Result.height, Result.pixels), function()
-			return Client.ReadPicture(Path, 2048)
+			return Client.ReadPicture(Path, 8192)
 		end, Path)
 	end)
 	const Known = table.clone(Chat.PathPictures())
@@ -5170,7 +5170,7 @@ function Chat.ViewPicture(Path: string)
 	end
 
 	Chat.Zoomed(Pictures.Tag(Pictures.Build(Result.width, Result.height, Result.pixels), function()
-		return Client.ReadPicture(Path, 2048)
+		return Client.ReadPicture(Path, 8192)
 	end, Path))
 end
 

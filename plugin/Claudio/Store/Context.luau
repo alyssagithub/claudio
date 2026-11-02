@@ -223,7 +223,7 @@ function Context.AddImage(Name: string, Data: string, MediaType: string, Token: 
 
 			if Built then
 				Pictures.Tag(Picture, function()
-					return Client.DecodeImage(Data, MediaType, 2048)
+					return Client.DecodeImage(Data, MediaType, 8192)
 				end)
 			end
 		end

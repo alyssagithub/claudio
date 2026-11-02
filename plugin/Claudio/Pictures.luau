@@ -16,7 +16,7 @@ export type Full = {
 	Tiles: {Tile},
 }
 
-const Side = 1024
+const Side = 2048
 local Allowed: boolean? = nil
 const Origins: {[EditableImage]: () -> (boolean, any)} = setmetatable({}, {__mode = "k"}) :: any
 const Files: {[EditableImage]: string?} = setmetatable({}, {__mode = "k"}) :: any

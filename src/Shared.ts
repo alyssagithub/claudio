@@ -48,11 +48,11 @@ export function OpenPath(Given: string, Reveal: boolean): string | null {
   return null;
 }
 
-export function ReadPicture(Given: string, Side = 1024): { width: number; height: number; pixels: string } | null {
+export function ReadPicture(Given: string, Side = 2048): { width: number; height: number; pixels: string } | null {
   try {
     const Bytes = fs.readFileSync(Given);
     const Decoded = /\.png$/i.test(Given) ? PNG.sync.read(Bytes) : jpeg.decode(Bytes, {useTArray: true, formatAsRGBA: true});
-    const Limit = Math.min(Math.max(Math.floor(Side) || 1024, 16), 2048);
+    const Limit = Math.min(Math.max(Math.floor(Side) || 2048, 16), 8192);
     const Scale = Math.min(1, Limit / Decoded.width, Limit / Decoded.height);
     const Width = Math.max(1, Math.round(Decoded.width * Scale));
     const Height = Math.max(1, Math.round(Decoded.height * Scale));

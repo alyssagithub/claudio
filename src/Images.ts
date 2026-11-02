@@ -34,7 +34,7 @@ export function DecodeImage(MediaType: string, Base64: string, Side = MaxImageSi
     return null;
   }
 
-  const Limit = Math.min(Math.max(Math.floor(Side) || MaxImageSide, 16), 2048);
+  const Limit = Math.min(Math.max(Math.floor(Side) || MaxImageSide, 16), 8192);
   const Scale = Math.min(1, Limit / Decoded.width, Limit / Decoded.height);
   const Width = Math.max(1, Math.round(Decoded.width * Scale));
   const Height = Math.max(1, Math.round(Decoded.height * Scale));

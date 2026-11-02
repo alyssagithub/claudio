@@ -1275,7 +1275,17 @@ ${Text}`;
       let Chat: string | null = null;
       let Status: { canRun?: unknown; clients?: unknown; ready?: unknown; games?: unknown } = {};
 
+      let Heard = Date.now();
+
       const Pull = () => {
+        if (Date.now() - Heard > 3000) {
+          if (Date.now() - Heard > 15000) {
+            Client.terminate();
+          }
+
+          return;
+        }
+
         const Job = Playtest
           ? TakeStudioJob("server", typeof Status.canRun === "boolean" ? Status.canRun : undefined, typeof Status.clients === "number" ? Status.clients : undefined, typeof Status.ready === "number" ? Status.ready : undefined, typeof Status.games === "number" ? Status.games : undefined)
           : TakeStudioJob("edit", undefined, undefined, undefined, undefined, Boot, Place, Chat);
@@ -1324,6 +1334,7 @@ ${Text}`;
           const Said = JSON.parse(String(Data)) as { chat?: unknown; follow?: { id?: unknown; version?: unknown } };
 
           Status = Said as typeof Status;
+          Heard = Date.now();
 
           if (Said.follow && typeof Said.follow.id === "string" && Said.follow.id !== Followed) {
             Followed = Said.follow.id;

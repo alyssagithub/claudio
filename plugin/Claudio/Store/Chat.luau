@@ -420,6 +420,30 @@ type Step = {
 	Name: string,
 }
 
+const function WriteSource(Script: LuaSourceContainer, Text: string)
+	local Done = false
+
+	task.spawn(function()
+		pcall(function()
+			game:GetService("ScriptEditorService"):UpdateSourceAsync(Script, function()
+				return Text
+			end)
+		end)
+
+		Done = true
+	end)
+
+	const Until = os.clock() + 5
+
+	while not Done and os.clock() < Until do
+		task.wait()
+	end
+
+	if (Script :: any).Source ~= Text then
+		(Script :: any).Source = Text
+	end
+end
+
 const function StartStep(Kind: string, Name: string): Step
 	const ChangeHistoryService = game:GetService("ChangeHistoryService")
 	const Recording = ChangeHistoryService:TryBeginRecording(Kind, Name)
@@ -560,13 +584,13 @@ const function EditSources(Input: any): any
 	const Ok, Trouble = pcall(function()
 		for _, Script in Order do
 			Before[Script] = Script.Source
-			Script.Source = Texts[Script]
+			WriteSource(Script, Texts[Script])
 		end
 	end)
 
 	if not Ok then
 		for Script, Text in Before do
-			Script.Source = Text
+			WriteSource(Script, Text)
 		end
 	end
 
@@ -683,7 +707,7 @@ const function Source(Input: any): any
 
 	const Ok, Trouble = pcall(function(): string
 		if Action == "set" then
-			Script.Source = tostring(Input.text)
+			WriteSource(Script, tostring(Input.text))
 
 			return Script.Source
 		end
@@ -714,7 +738,7 @@ const function Source(Input: any): any
 			error(`Claudio does not know the source action "{tostring(Action)}"`)
 		end
 
-		Script.Source = table.concat(Lines, "\n")
+		WriteSource(Script, table.concat(Lines, "\n"))
 
 		return Script.Source
 	end)

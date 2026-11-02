@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { forkSession, query } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinition, EffortLevel, PermissionMode, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { AllowedTools, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, EffortOrder, PlanInstructions, CommandsCacheFile, DesktopConfigPath, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory, DeveloperUserIds, DeveloperSession } from "./Config.js";
+import { AllowedTools, PermissionModeFor, CancelGraceMilliseconds, CoalesceMilliseconds, DefaultMode, EffortOrder, PlanInstructions, CommandsCacheFile, DesktopConfigPath, WindowsFile, FinishedTurnLifetimeMilliseconds, IdleSessionMilliseconds, KeepSessionsWarm, MaxWarmSessions, MostCallText, SystemPromptFor, WorkingDirectory, DeveloperUserIds, DeveloperSession, NotesFolder } from "./Config.js";
 import { AddDesktopSession, FindFile, ListConversations, PriceUsage, ExtractContext, LatestContext, RecordCost, RememberOwnSession, SetGeneratedTitle, StripContext, UpdateDesktopSession, CompactionInput } from "./Conversations.js";
 import { TrimOldResults, UnpinChangedTools, type ToolShape } from "./Trim.js";
 import { StudioTools } from "./Tools.js";
@@ -2259,6 +2259,19 @@ function OpenSession(ConversationId: string | null, TurnWorkingDirectory: string
                   return {};
                 }
 
+                const Sending = Asked.tool_input as {to?: unknown, message?: unknown} | null;
+
+                if (Asked.tool_name === "SendMessage" && Sending && Sending.to === DeveloperSession && typeof Sending.message === "string" && (Session.Place || "").includes("<claudio_developer>")) {
+                  fs.mkdirSync(NotesFolder, {recursive: true});
+                  fs.writeFileSync(path.join(NotesFolder, `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`), JSON.stringify({from: Session.ConversationId, note: Sending.message, at: new Date().toISOString()}));
+
+                  return {hookSpecificOutput: {
+                    hookEventName: "PreToolUse",
+                    permissionDecision: "deny",
+                    permissionDecisionReason: "Delivered. Claudio passed this note to the developer's work session itself, so this is not an error; do not resend it or write it in your reply.",
+                  }};
+                }
+
                 const Edited = EditedFile(Asked.tool_name, Asked.tool_input);
 
                 if (Edited && ToolUseId) {
@@ -2474,7 +2487,7 @@ function DescribePlace(Place: {name?: string, placeId?: number, universeId?: num
     return Described;
   }
 
-  return `${Described}\n\n<claudio_developer>\nThe person using this Studio is the developer of Claudio, the plugin and bridge you are running inside. Their goal is to make Claudio, its tools and the way it works as good as they can be, and you are the one who uses them most, so they want your complaints and your suggestions. When Claudio's own tools (mcp__claudio__*) or anything else in Claudio misbehaves, returns something wrong, confusing or incomplete, is missing something you needed, makes you work around it, or when you can think of a change that would have made the job easier, faster or clearer, send a note for Claudio with SendMessage with to set to exactly "${DeveloperSession}", the id of the developer's Claudio work session and fixes these notes without them having to pass anything on. Load SendMessage with ToolSearch first if it is not loaded. Say what you tried, what happened, what you expected or would prefer, and why it would help, with enough detail to act on without seeing this chat. Do not wait for an answer, and do not repeat the note in your reply; a short mention that you sent one is enough. That session replies with a cross-session message once it has dealt with the note, saying whether it was fixed and how to use the fix, could not be reproduced, or needs the user's decision. When that reply arrives, tell the user in a sentence or two and use the fix from then on, rather than your workaround. Only if SendMessage cannot reach that session, write the note in your reply instead. Then carry on with their task. When you work around a Claudio tool, for example by writing your own Lua in execute or editing files outside Studio and loading them back, say what feature would have let you skip the workaround, even when the workaround went fine.\n\nOnly send a note when there is something to say. Never report that a tool worked, that nothing broke, or that you have no notes, since silence already means that.\n</claudio_developer>`;
+  return `${Described}\n\n<claudio_developer>\nThe person using this Studio is the developer of Claudio, the plugin and bridge you are running inside. Their goal is to make Claudio, its tools and the way it works as good as they can be, and you are the one who uses them most, so they want your complaints and your suggestions. When Claudio's own tools (mcp__claudio__*) or anything else in Claudio misbehaves, returns something wrong, confusing or incomplete, is missing something you needed, makes you work around it, or when you can think of a change that would have made the job easier, faster or clearer, send a note for Claudio with SendMessage with to set to exactly "${DeveloperSession}", which is the developer's Claudio work session and fixes these notes without them having to pass anything on. Load SendMessage with ToolSearch first if it is not loaded. Say what you tried, what happened, what you expected or would prefer, and why it would help, with enough detail to act on without seeing this chat. Do not wait for an answer, and do not repeat the note in your reply; a short mention that you sent one is enough. That session replies with a cross-session message once it has dealt with the note, saying whether it was fixed and how to use the fix, could not be reproduced, or needs the user's decision. When that reply arrives, tell the user in a sentence or two and use the fix from then on, rather than your workaround. Only if SendMessage cannot reach that session, write the note in your reply instead. Then carry on with their task. When you work around a Claudio tool, for example by writing your own Lua in execute or editing files outside Studio and loading them back, say what feature would have let you skip the workaround, even when the workaround went fine.\n\nOnly send a note when there is something to say. Never report that a tool worked, that nothing broke, or that you have no notes, since silence already means that.\n</claudio_developer>`;
 }
 
 let LastStyle = "default";

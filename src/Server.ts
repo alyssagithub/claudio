@@ -13,6 +13,7 @@ import { StatsAge, StatsFor } from "./Stats.js";
 import { GetLimits, GetBreakdown, PollUsage, RefreshConversationContext, SignIn } from "./ClaudeSession.js";
 import { Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving, Booted } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
+import { WatchNotes } from "./Notes.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
 import type { Picture, TurnRequest } from "./Types.js";
 import { StudioProcesses } from "./StudioPresence.js";
@@ -1269,6 +1270,7 @@ ${Text}`;
     }).length + 1;
 
     Serving(Version, Root, Tools);
+    WatchNotes();
     const FetchModels = () => execFile(process.execPath, [process.argv[1], "models"], {timeout: 60000}, (Trouble, Output, Problem) => {
       if (Trouble || Problem) {
         console.error(`Could not list Claude models: ${String(Problem || Trouble?.message).trim().slice(0, 200)}`);

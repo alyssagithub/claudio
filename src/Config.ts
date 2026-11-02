@@ -42,7 +42,9 @@ export const AllowedTools = [
 ];
 export const CappedTools = ["Read", "Glob", "Grep"];
 export const DeveloperUserIds = ["109830895"];
-export const DeveloperSession = "local_ef62ae87-7e2c-406e-bb91-c898d681be59";
+export const DeveloperSession = "Claudio | Plugin";
+export const DeveloperWorkSession = {Id: "bfd9f18c-bf3f-488d-9f82-2e31589a9207", Folder: path.join(os.homedir(), "Documents", "Obsidian Vault")};
+export const NotesFolder = path.join(os.homedir(), ".claudio", "notes");
 
 export function SystemPromptFor(ServerNames: string[]) {
   const Sections = ["# Claudio\n\nYou are Claudio, a chat assistant in a plugin widget docked in Roblox Studio."];

@@ -12,7 +12,7 @@ import { SystemPromptFor } from "./Config.js";
 import { ReloadReleased } from "./Models.js";
 import { StatsAge, StatsFor } from "./Stats.js";
 import { GetLimits, GetBreakdown, PollUsage, RefreshConversationContext, SignIn } from "./ClaudeSession.js";
-import { OnJobQueued, Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving, Booted } from "./Studio.js";
+import { OnBroadcast, OnJobQueued, Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving, Booted } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
 import { WatchNotes } from "./Notes.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
@@ -1291,12 +1291,44 @@ ${Text}`;
 
       const Stop = OnJobQueued(() => setImmediate(Pull));
       const Beat = setInterval(Pull, 1000);
+      const Quiet = Playtest ? () => {} : OnBroadcast((Message) => Client.send(Message));
+      let Followed = "";
+
+      const Follow = async (Id: string, Known: number) => {
+        let Version = Known;
+
+        while (Followed === Id && Client.readyState === Client.OPEN) {
+          const Turn = GetTurn(Id);
+
+          if (!Turn) {
+            return;
+          }
+
+          await WaitForChange(Turn, Version, LongPollMilliseconds);
+
+          if (Followed !== Id || Client.readyState !== Client.OPEN || Turn.Version === Version) {
+            continue;
+          }
+
+          Version = Turn.Version;
+          Client.send(JSON.stringify({turn: DescribeTurn(Turn)}));
+
+          if (Turn.Status !== "running" && Turn.Status !== "cancelling") {
+            Followed = "";
+          }
+        }
+      };
 
       Client.on("message", (Data) => {
         try {
-          const Said = JSON.parse(String(Data)) as { chat?: unknown };
+          const Said = JSON.parse(String(Data)) as { chat?: unknown; follow?: { id?: unknown; version?: unknown } };
 
           Status = Said as typeof Status;
+
+          if (Said.follow && typeof Said.follow.id === "string" && Said.follow.id !== Followed) {
+            Followed = Said.follow.id;
+            void Follow(Followed, typeof Said.follow.version === "number" ? Said.follow.version : -1);
+          }
           Chat = typeof Said.chat === "string" ? Said.chat : null;
         } catch {
           return;
@@ -1312,6 +1344,8 @@ ${Text}`;
       Client.on("close", () => {
         clearInterval(Beat);
         Stop();
+        Quiet();
+        Followed = "";
       });
     });
   });

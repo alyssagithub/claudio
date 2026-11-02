@@ -8,6 +8,21 @@ type Job = {
 
 const Pending: Job[] = [];
 const Pullers = new Set<() => void>();
+const Listeners = new Set<(Message: string) => void>();
+
+export function OnBroadcast(Listen: (Message: string) => void): () => void {
+  Listeners.add(Listen);
+
+  return () => Listeners.delete(Listen);
+}
+
+export function Broadcast(Event: string) {
+  const Message = JSON.stringify({event: Event});
+
+  for (const Listen of Listeners) {
+    Listen(Message);
+  }
+}
 
 export function OnJobQueued(Pull: () => void): () => void {
   Pullers.add(Pull);

@@ -13,7 +13,7 @@ import { StudioTools } from "./Tools.js";
 import { DecodeImage, ImagesInContent } from "./Images.js";
 import { AskServerFor, AskServerName } from "./Ask.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
-import { Request as RequestStudio, type Owner as StudioOwnerType } from "./Studio.js";
+import { Broadcast, Request as RequestStudio, type Owner as StudioOwnerType } from "./Studio.js";
 import { ReadPluginSetting } from "./PluginSettings.js";
 import { MirrorSkills, MirrorSyncedSkills } from "./SyncedSkills.js";
 import { CountLines, EditedFile, ReadFileText } from "./Lines.js";
@@ -706,6 +706,7 @@ function RememberSize(Id: string) {
 const OwnCosts = new WeakMap<Turn, { Cost: number; Seen: Set<string> }>();
 
 function FinishTurn(Turn: Turn, Status: string, Error?: string | null) {
+  setImmediate(() => Broadcast("conversations"));
   if (Turn.Status !== "running" && Turn.Status !== "cancelling") {
     return;
   }
@@ -1402,6 +1403,7 @@ function OpenAutoTurn(Session: Session): Turn | null {
   };
 
   Turns.set(Turn.Id, Turn);
+  Broadcast("turns");
   Session.CurrentTurn = Turn;
   console.log(`Turn ${Turn.Id}: the session carried on by itself, so a turn was opened for it`);
 
@@ -2639,6 +2641,7 @@ export function StartTurn(Request: TurnRequest) {
   };
 
   Turns.set(Turn.Id, Turn);
+  Broadcast("turns");
   LastFolder = Turn.WorkingDirectory;
 
   const Warm = ConversationId ? Sessions.get(ConversationId) : TakeSpare(Chosen.model, Chosen.effort);

@@ -4420,11 +4420,21 @@ function Chat.WatchIdle(): () -> ()
 	local Watching = true
 
 	task.spawn(function()
-		while task.wait(3) and Watching do
+		while Watching do
+			Client.WaitFor("turns", 3)
+
 			const Id = Chat.ConversationId()
 
 			if Id and not Chat.Sending() then
 				Attach(Id)
+			end
+		end
+	end)
+
+	task.spawn(function()
+		while Watching do
+			if Client.WaitFor("conversations", 30) and Watching then
+				Chat.Refresh()
 			end
 		end
 	end)

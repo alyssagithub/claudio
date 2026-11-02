@@ -5151,7 +5151,7 @@ function Chat.LoadPicture(Path: string)
 
 		return Pictures.Tag(Pictures.Build(Result.width, Result.height, Result.pixels), function()
 			return Client.ReadPicture(Path, 2048)
-		end)
+		end, Path)
 	end)
 	const Known = table.clone(Chat.PathPictures())
 
@@ -5171,12 +5171,26 @@ function Chat.ViewPicture(Path: string)
 
 	Chat.Zoomed(Pictures.Tag(Pictures.Build(Result.width, Result.height, Result.pixels), function()
 		return Client.ReadPicture(Path, 2048)
-	end))
+	end, Path))
 end
 
 function Chat.OpenPicture(Image: EditableImage)
-	const Size = Image.Size
-	const Ok, Result = Client.SavePicture(Size.X, Size.Y, Base64.Encode(buffer.tostring(Image:ReadPixelsBuffer(Vector2.zero, Size))), true)
+	const File = Pictures.File(Image)
+
+	if File then
+		Chat.OpenFile(File, false)
+
+		return
+	end
+
+	const Fetched, Found = Pictures.Largest(Image)
+	const Bigger = Fetched and typeof(Found) == "table" and typeof(Found.pixels) == "string" and Found.width > Image.Size.X
+	const Ok, Result = Client.SavePicture(
+		if Bigger then Found.width else Image.Size.X,
+		if Bigger then Found.height else Image.Size.Y,
+		if Bigger then Found.pixels else Base64.Encode(buffer.tostring(Image:ReadPixelsBuffer(Vector2.zero, Image.Size))),
+		true
+	)
 
 	if not Ok then
 		Chat.Say(`Could not open that picture outside Studio: {Result}`)

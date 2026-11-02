@@ -19,6 +19,7 @@ export type Full = {
 const Side = 1024
 local Allowed: boolean? = nil
 const Origins: {[EditableImage]: () -> (boolean, any)} = setmetatable({}, {__mode = "k"}) :: any
+const Files: {[EditableImage]: string?} = setmetatable({}, {__mode = "k"}) :: any
 
 Pictures.Off = "EditableImage is turned off for this place, so Claudio cannot show or read pictures here. Turn on EditableImage in the Security tab of Game Settings to use them."
 
@@ -66,8 +67,9 @@ function Pictures.Build(Width: number, Height: number, PixelsBase64: string): Ed
 	return Image
 end
 
-function Pictures.Tag(Image: EditableImage, Fetch: () -> (boolean, any)): EditableImage
+function Pictures.Tag(Image: EditableImage, Fetch: () -> (boolean, any), File: string?): EditableImage
 	Origins[Image] = Fetch
+	Files[Image] = File
 
 	return Image
 end
@@ -100,6 +102,20 @@ function Pictures.Tiles(Width: number, Height: number, PixelsBase64: string): {T
 	end
 
 	return Tiles
+end
+
+function Pictures.File(Image: EditableImage): string?
+	return Files[Image]
+end
+
+function Pictures.Largest(Image: EditableImage): (boolean, any)
+	const Fetch = Origins[Image]
+
+	if not Fetch then
+		return false, nil
+	end
+
+	return Fetch()
 end
 
 function Pictures.Full(Image: EditableImage): Full?

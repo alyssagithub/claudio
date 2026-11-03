@@ -186,7 +186,7 @@ function Client.WatchSocket(OnJob: (any) -> ())
 
 	const Made, Opened = pcall(function(): WebStreamClient
 		return HttpService:CreateWebStreamClient(Enum.WebStreamClientType.WebSocket, {
-			Url = `ws://127.0.0.1:{Settings.Get("Port")()}/studio/socket?boot={Boot}&place={HttpService:UrlEncode(game.Name)}`,
+			Url = `ws://127.0.0.1:{Settings.Get("Port")()}/studio/socket?boot={Boot}&place={HttpService:UrlEncode(GetPlaceName())}`,
 			Headers = {["X-Claudio-Token"] = Settings.Token()},
 		})
 	end)
@@ -227,7 +227,7 @@ function Client.SocketBeat()
 	end
 
 	pcall(function()
-		Open:Send(HttpService:JSONEncode({chat = if Client.OpenChat then Client.OpenChat() else nil, follow = Followed}))
+		Open:Send(HttpService:JSONEncode({chat = if Client.OpenChat then Client.OpenChat() else nil, follow = Followed, place = GetPlaceName()}))
 	end)
 end
 
@@ -329,7 +329,7 @@ end
 function Client.TakeStudioJob(): (boolean, any)
 	const Open = if Client.OpenChat then Client.OpenChat() else nil
 
-	return Http.Request("GET", `{BaseUrl()}/studio/job{if Testing then "" else `?boot={Boot}&place={HttpService:UrlEncode(game.Name)}{if Open then `&chat={Open}` else ""}`}`)
+	return Http.Request("GET", `{BaseUrl()}/studio/job{if Testing then "" else `?boot={Boot}&place={HttpService:UrlEncode(GetPlaceName())}{if Open then `&chat={Open}` else ""}`}`)
 end
 
 const function Repaired(Value: any): any

@@ -1271,7 +1271,7 @@ ${Text}`;
 
     Sockets.handleUpgrade(Request, Socket, Head, (Client) => {
       const Boot = Url.searchParams.get("boot");
-      const Place = Url.searchParams.get("place");
+      let Place = Url.searchParams.get("place");
       let Chat: string | null = null;
       let Status: { canRun?: unknown; clients?: unknown; ready?: unknown; games?: unknown } = {};
 
@@ -1331,7 +1331,11 @@ ${Text}`;
 
       Client.on("message", (Data) => {
         try {
-          const Said = JSON.parse(String(Data)) as { chat?: unknown; follow?: { id?: unknown; version?: unknown } };
+          const Said = JSON.parse(String(Data)) as { chat?: unknown; place?: unknown; follow?: { id?: unknown; version?: unknown } };
+
+          if (typeof Said.place === "string" && Said.place !== "") {
+            Place = Said.place;
+          }
 
           Status = Said as typeof Status;
           Heard = Date.now();

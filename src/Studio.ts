@@ -74,20 +74,28 @@ function Choose(Input: unknown, Who?: Owner): unknown {
 
 function TargetFor(Who?: Owner): string | { error: string } | undefined {
   const Live = LiveWindows();
-  const Picked = Who && Chosen.get(Who.Id);
-
-  if (Picked) {
-    return Live.some((Window) => Window.Place === Picked) ? Picked : {error: `The Studio window this session chose, "${Picked}", is not connected right now. Calls go back to it on their own once it reconnects, or choose another with the studio tool.`};
-  }
-
   const Own = Who && Live.find((Window) => `chat-${Window.Chat}` === Who.Id);
 
   if (Own) {
+    Chosen.set(Who.Id, Own.Place);
+
     return Own.Place;
+  }
+
+  const Picked = Who && Chosen.get(Who.Id);
+
+  if (Picked) {
+    return Live.some((Window) => Window.Place === Picked) ? Picked : {error: `"${Picked}", the Studio window this session has been using, is not connected right now, so nothing was run in another place instead. Its Claudio plugin may have stopped or reloaded; calls go back to it on their own once it reconnects, or choose another with the studio tool.`};
   }
 
   if (Live.length > 1) {
     return {error: `${Live.length} Studio windows are connected (${Live.map((Window) => `"${Window.Place}"`).join(", ")}), so Claudio does not know which one to use. Choose one with the studio tool first.`};
+  }
+
+  if (Who && Live.length === 1) {
+    Chosen.set(Who.Id, Live[0].Place);
+
+    return Live[0].Place;
   }
 
   return undefined;

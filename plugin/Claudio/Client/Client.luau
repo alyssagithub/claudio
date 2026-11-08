@@ -33,6 +33,8 @@ end
 const Client = {}
 
 Client.OpenChat = nil :: (() -> string?)?
+-- Set by the chat store: opens a chat in this panel when the bridge asks (POST /studio/open for this window's place).
+Client.OnOpenChat = nil :: ((string) -> ())?
 
 const Boot = game:GetService("HttpService"):GenerateGUID(false)
 const Testing = (script.Parent.Parent :: Instance).Name:match("Testing$") ~= nil
@@ -208,6 +210,10 @@ function Client.WatchSocket(OnJob: (any) -> ())
 		elseif typeof(Data.turn) == "table" and typeof(Data.turn.requestId) == "string" then
 			Pushed[Data.turn.requestId] = Data.turn
 			Arrived:Fire("turn")
+		elseif typeof(Data.open) == "table" and typeof(Data.open.chat) == "string" then
+			if Client.OnOpenChat then
+				task.spawn(Client.OnOpenChat, Data.open.chat)
+			end
 		elseif typeof(Data.event) == "string" then
 			Arrived:Fire(Data.event)
 		end

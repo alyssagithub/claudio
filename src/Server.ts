@@ -12,7 +12,7 @@ import { SystemPromptFor } from "./Config.js";
 import { ReloadReleased } from "./Models.js";
 import { StatsAge, StatsFor } from "./Stats.js";
 import { GetLimits, GetBreakdown, PollUsage, RefreshConversationContext, SignIn } from "./ClaudeSession.js";
-import { OnBroadcast, OnJobQueued, Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving, Booted } from "./Studio.js";
+import { OnBroadcast, OnJobQueued, OnOpenChat, OpenChatIn, Take as TakeStudioJob, Deliver as DeliverStudio, Request as RequestStudio, Presence as StudioPresence, Serving, Booted } from "./Studio.js";
 import { StudioTools } from "./Tools.js";
 import { WatchNotes } from "./Notes.js";
 import type { Reacher, ReacherIn } from "./Tools.js";
@@ -880,6 +880,26 @@ ${Text}`;
         return;
       }
 
+      if (Request.method === "POST" && Url.pathname === "/studio/open") {
+        const Body = await ReadBody(Request);
+        const Chat = SessionId(Body.chat);
+
+        if (!Chat || typeof Body.place !== "string" || Body.place === "") {
+          SendJson(Response, 400, {error: "Give the chat to open and the place whose window should open it."});
+          return;
+        }
+
+        if (!ConversationExists(Chat)) {
+          SendJson(Response, 404, {error: "No such chat yet."});
+          return;
+        }
+
+        const Sent = OpenChatIn(Body.place, Chat);
+
+        SendJson(Response, Sent > 0 ? 200 : 409, Sent > 0 ? {opened: Sent} : {error: `No connected Studio window is showing ${JSON.stringify(Body.place)}.`});
+        return;
+      }
+
       if (Request.method === "POST" && Url.pathname === "/studio/enqueue") {
         const Wanted = await ReadBody(Request);
 
@@ -1302,6 +1322,15 @@ ${Text}`;
       const Stop = OnJobQueued(() => setImmediate(Pull));
       const Beat = setInterval(Pull, 1000);
       const Quiet = Playtest ? () => {} : OnBroadcast((Message) => Client.send(Message));
+      const StopOpening = Playtest ? () => {} : OnOpenChat((ForPlace, Id) => {
+        if (ForPlace !== Place || Client.readyState !== Client.OPEN) {
+          return false;
+        }
+
+        Client.send(JSON.stringify({open: {chat: Id}}));
+
+        return true;
+      });
       let Followed = "";
 
       const Follow = async (Id: string, Known: number) => {
@@ -1360,6 +1389,7 @@ ${Text}`;
         clearInterval(Beat);
         Stop();
         Quiet();
+        StopOpening();
         Followed = "";
       });
     });

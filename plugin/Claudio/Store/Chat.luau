@@ -5578,4 +5578,11 @@ Client.OpenChat = function(): string?
 	return Chat.ConversationId()
 end
 
+-- The bridge asked this window to show a chat (for example one started from Discord for this place); same as picking it in the list.
+Client.OnOpenChat = function(Id: string)
+	if Chat.ConversationId() ~= Id then
+		Chat.Open(Id)
+	end
+end
+
 return Chat

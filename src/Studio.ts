@@ -389,6 +389,7 @@ export function Presence() {
     peers: [...Heard.entries()].filter(([, At]) => Date.now() - At < 8000).map(([Role]) => Role),
     waiting: Waiting.size,
     queued: Pending.length,
+    windows: LiveWindows().map((Window) => ({place: Window.Place, chat: Window.Chat || null, seenAt: Window.At})),
   };
 }
 

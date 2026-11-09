@@ -1937,12 +1937,13 @@ return {lines = Kept, scanned = Seen, skipped = Skipped}`}, 40) as { error?: str
         paths: z.array(z.string()).optional().describe("Instance paths to check, such as ServerScriptService.Main. Each path also covers every script inside it. Omit to check the whole place."),
         exact: z.boolean().optional().describe("Check only the scripts at exactly these paths, not the scripts inside them. Use it on a ModuleScript with many child modules to keep the report short."),
         files: z.array(z.string()).optional().describe("Instead of the open place, check .luau or .lua files or folders on disk, with no Studio needed. Inside a Rojo project, requires and instance paths resolve through its project file; any other file, such as an executor script, is checked on its own."),
+        globals: z.array(z.string()).optional().describe("With files, names the code's environment defines that Roblox's own definitions do not, such as an executor's getgenv, hookfunction or Drawing, so they are not reported as unknown globals."),
       },
-      Run: async (Input: { paths?: string[]; exact?: boolean; files?: string[] }) => ({content: [{
+      Run: async (Input: { paths?: string[]; exact?: boolean; files?: string[]; globals?: string[] }) => ({content: [{
         type: "text",
         text: Input.files && Input.files.length > 0
           ? await import("./Lint.js").then(async (Lint) => {
-            const Found = await Lint.AnalyzeFiles(Input.files!, false);
+            const Found = await Lint.AnalyzeFiles(Input.files!, false, Input.globals || []);
 
             return "error" in Found ? Found.error : Found.text;
           })

@@ -678,7 +678,7 @@ function FindProject(From: string): string | null {
   }
 }
 
-export async function AnalyzeFiles(Given: string[], Raw: boolean): Promise<{ text: string } | { error: string }> {
+export async function AnalyzeFiles(Given: string[], Raw: boolean, Known: string[] = []): Promise<{ text: string } | { error: string }> {
   const Analyzer = await Prepared();
 
   if (!Analyzer) {
@@ -743,7 +743,7 @@ export async function AnalyzeFiles(Given: string[], Raw: boolean): Promise<{ tex
 
   for (const File of Files) {
     const Key = [...Found.keys()].find((Where) => path.resolve(Workspace(), Where).toLowerCase() === File.toLowerCase());
-    const Lines = (Key ? [...Found.get(Key)!] : []).filter((Line) => Raw || !Ignored.test(Line)).concat(NameClashes(fs.readFileSync(File, "utf8")));
+    const Lines = (Key ? [...Found.get(Key)!] : []).filter((Line) => Raw || !Ignored.test(Line)).filter((Line) => !Known.includes((Line.match(/Unknown global '([^']+)'/) || [])[1] || "")).concat(NameClashes(fs.readFileSync(File, "utf8")));
 
     if (Lines.length > 0) {
       Parts.push(`${File}\n  ${Lines.sort((Left, Right) => Number(Left.match(/\d+/)![0]) - Number(Right.match(/\d+/)![0])).slice(0, 40).join("\n  ")}`);

@@ -365,7 +365,7 @@ function Parse(Text: string): Map<string, Set<string>> {
   let Open: { Where: string; Parts: string[] } | null = null;
 
   for (const Line of Text.split(/\r?\n/)) {
-    const Match = Line.match(/^(.+?\.luau)(?:\s+\[[^\]]*\])?\((\d+),\d+\):\s*(.+)$/);
+    const Match = Line.match(/^(.+?\.luau?)(?:\s+\[[^\]]*\])?\((\d+),\d+\):\s*(.+)$/);
 
     if (!Match) {
       if (Open && Line.trim() !== "") {
@@ -598,4 +598,157 @@ export async function UnknownGlobals(Code: string): Promise<string[]> {
   } finally {
     fs.rmSync(Folder, {recursive: true, force: true});
   }
+}
+
+type MapNode = { name: string; className: string; filePaths?: string[]; children?: MapNode[] };
+
+function MapFolder(Folder: string, Name: string): MapNode | null {
+  const Entries = fs.readdirSync(Folder);
+  const Init = Entries.find((Entry) => /^init(\.server|\.client)?\.luau?$/.test(Entry));
+  const Node: MapNode = {
+    name: Name,
+    className: Init ? (Init.includes(".server") ? "Script" : Init.includes(".client") ? "LocalScript" : "ModuleScript") : "Folder",
+    filePaths: Init ? [path.join(Folder, Init)] : undefined,
+    children: [],
+  };
+
+  for (const Entry of Entries) {
+    const Full = path.join(Folder, Entry);
+
+    if (Entry === Init || Entry.startsWith(".")) {
+      continue;
+    }
+
+    if (fs.statSync(Full).isDirectory()) {
+      const Child = MapFolder(Full, Entry);
+
+      if (Child) {
+        Node.children!.push(Child);
+      }
+
+      continue;
+    }
+
+    const Script = Entry.match(/^(.+?)(\.server|\.client)?\.luau?$/);
+
+    if (Script) {
+      Node.children!.push({name: Script[1], className: Script[2] === ".server" ? "Script" : Script[2] === ".client" ? "LocalScript" : "ModuleScript", filePaths: [Full]});
+    }
+  }
+
+  return Node;
+}
+
+function MapProject(Tree: Record<string, unknown>, Name: string, Root: string): MapNode {
+  const Given = typeof Tree.$path === "string" ? path.resolve(Root, Tree.$path) : null;
+  const Node: MapNode = Given && fs.existsSync(Given)
+    ? (fs.statSync(Given).isDirectory() ? MapFolder(Given, Name)! : {name: Name, className: /\.server\.luau?$/.test(Given) ? "Script" : /\.client\.luau?$/.test(Given) ? "LocalScript" : "ModuleScript", filePaths: [Given]})
+    : {name: Name, className: typeof Tree.$className === "string" ? Tree.$className : "Folder"};
+
+  if (typeof Tree.$className === "string") {
+    Node.className = Tree.$className;
+  }
+
+  for (const [Key, Value] of Object.entries(Tree)) {
+    if (Key.startsWith("$") || !Value || typeof Value !== "object") {
+      continue;
+    }
+
+    Node.children = (Node.children || []).concat(MapProject(Value as Record<string, unknown>, Key, Root));
+  }
+
+  return Node;
+}
+
+function FindProject(From: string): string | null {
+  let Folder = fs.existsSync(From) && fs.statSync(From).isDirectory() ? From : path.dirname(From);
+
+  while (true) {
+    const Found = fs.existsSync(Folder) ? fs.readdirSync(Folder).find((Entry) => Entry === "default.project.json") || fs.readdirSync(Folder).find((Entry) => Entry.endsWith(".project.json")) : undefined;
+
+    if (Found) {
+      return path.join(Folder, Found);
+    }
+
+    if (path.dirname(Folder) === Folder) {
+      return null;
+    }
+
+    Folder = path.dirname(Folder);
+  }
+}
+
+export async function AnalyzeFiles(Given: string[], Raw: boolean): Promise<{ text: string } | { error: string }> {
+  const Analyzer = await Prepared();
+
+  if (!Analyzer) {
+    return {error: "The Luau analyzer could not be prepared."};
+  }
+
+  const Files: string[] = [];
+
+  const Gather = (Where: string) => {
+    if (fs.statSync(Where).isDirectory()) {
+      for (const Entry of fs.readdirSync(Where)) {
+        if (!Entry.startsWith(".") && Entry !== "node_modules" && Entry !== "Packages") {
+          Gather(path.join(Where, Entry));
+        }
+      }
+
+      return;
+    }
+
+    if (/\.luau?$/.test(Where)) {
+      Files.push(path.resolve(Where));
+    }
+  };
+
+  for (const Each of Given) {
+    if (!fs.existsSync(Each)) {
+      return {error: `There is no file or folder at ${Each}.`};
+    }
+
+    Gather(Each);
+  }
+
+  if (Files.length === 0) {
+    return {error: "No .luau or .lua files were found there."};
+  }
+
+  const Project = FindProject(path.resolve(Given[0]));
+  const Arguments = ["analyze", ...(await Flags(Analyzer))];
+
+  if (Project) {
+    const Map = path.join(Workspace(), "files-sourcemap.json");
+    const Read = JSON.parse(fs.readFileSync(Project, "utf8")) as { name?: string; tree?: Record<string, unknown> };
+
+    fs.writeFileSync(Map, JSON.stringify(MapProject(Read.tree || {}, Read.name || "game", path.dirname(Project))));
+    Arguments.push(`--sourcemap=${Map}`);
+  }
+
+  for (const Extra of [Definitions(), Overrides()]) {
+    if (fs.existsSync(Extra)) {
+      Arguments.push(`--definitions=${Extra}`);
+    }
+  }
+
+  const Outcome = await Run(Analyzer, Arguments.concat(Files), {cwd: Workspace()});
+
+  if (Outcome.Stopped) {
+    return {error: Outcome.Text};
+  }
+
+  const Found = Parse(Outcome.Text);
+  const Parts: string[] = [];
+
+  for (const File of Files) {
+    const Key = [...Found.keys()].find((Where) => path.resolve(Workspace(), Where).toLowerCase() === File.toLowerCase());
+    const Lines = (Key ? [...Found.get(Key)!] : []).filter((Line) => Raw || !Ignored.test(Line)).concat(NameClashes(fs.readFileSync(File, "utf8")));
+
+    if (Lines.length > 0) {
+      Parts.push(`${File}\n  ${Lines.sort((Left, Right) => Number(Left.match(/\d+/)![0]) - Number(Right.match(/\d+/)![0])).slice(0, 40).join("\n  ")}`);
+    }
+  }
+
+  return {text: Parts.length > 0 ? Parts.join("\n") : `No problems in ${Files.length} file${Files.length === 1 ? "" : "s"}${Project ? `, checked against ${path.basename(Project)}` : ", checked on their own since there is no Rojo project file above them, so requires between files and instance paths are not resolved"}.`};
 }

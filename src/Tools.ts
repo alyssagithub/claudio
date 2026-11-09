@@ -621,7 +621,7 @@ ${Said(await Reach("choose", {}), "Studio did not say.")}`,
         delay: z.number().optional().describe("Seconds to wait before taking the picture, after code starts if given. Half a second by default with code, otherwise none. Up to 30."),
         preview: z.string().optional().describe("In edit mode, the path of any GuiObject or ScreenGui, wherever it lives, such as a template in ReplicatedStorage. Claudio shows a temporary copy on screen, captures it cropped, and removes it, leaving the place and its undo history untouched. To compare made-up UI, build it with execute first and point preview at it."),
         element: z.string().optional().describe("During a playtest, a GuiObject on a player's screen to capture on its own, such as Players.LocalPlayer.PlayerGui.Menu.Avatar. Claudio marks it, captures the Studio window and crops to exactly that element. Pair it with zoom to inspect small UI."),
-        player: z.string().optional().describe("For element, which client: a player's name or their number in join order. The first player by default."),
+        player: z.string().optional().describe("Which client, by a player's name or their number in join order: for element, and for of window during a multiplayer test, where it picks that player's window out of several with the same title. The first player by default. The viewport capture leaves out BillboardGuis and SurfaceGuis, so use of window with player to check world-space interface."),
         frame: z.string().optional().describe("A target size or aspect for framing, such as 1920x1080 or 16:9. The largest centred area of that shape is outlined in yellow with rule-of-thirds lines and everything outside it is darkened, so you can see exactly what a thumbnail of that shape would contain. A size such as 1920x1080 renders the viewport at exactly that resolution through the device emulator with actual-resolution scaling, then ends the simulation; an aspect such as 16:9, or a size while a simulation is already running, frames the viewport as it is."),
         quality: z.number().optional().describe("Graphics level from 1 to 21, the same levels as Studio's Rendering settings, to render this capture at; 21 is the highest, for thumbnails and other high quality renders. The user's own level is put back afterwards."),
         crop: z.boolean().optional().describe("With frame, return only the framed area instead of the guides."),
@@ -950,6 +950,54 @@ return {shot = Got and tostring(Got) or nil, bounds = if Hidden then nil else Bo
           }
 
           let Taken: { error?: string; data: string; title: string; width: number; height: number };
+          let Index = 0;
+          let Guessed = "";
+
+          if (Input.player && await LiveSession()) {
+            const Placed = await ReachIn("server", "execute", {target: "client", player: Input.player, readOnly: true, timeout: 15, code: `local Gui = Instance.new("ScreenGui")
+Gui.Name = "ClaudioWindowMarker"
+Gui.IgnoreGuiInset = true
+Gui.DisplayOrder = 2147483647
+for Index, Colour in {Color3.fromRGB(255, 0, 254), Color3.fromRGB(1, 255, 254)} do
+	local Square = Instance.new("Frame")
+	Square.BorderSizePixel = 0
+	Square.BackgroundColor3 = Colour
+	Square.Size = UDim2.fromOffset(8, 8)
+	Square.Position = UDim2.new(0.5, (Index - 2) * 8, 0.5, 0)
+	Square.Parent = Gui
+end
+Gui.Parent = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui")
+game:GetService("RunService").RenderStepped:Wait()
+game:GetService("RunService").RenderStepped:Wait()
+return true`}) as { error?: string } | null;
+
+            if (!Placed || Placed.error) {
+              return {content: [{type: "text", text: (Placed && Placed.error) || "The playtest client did not answer, so its window could not be picked out."}]};
+            }
+
+            try {
+              Index = -1;
+
+              for (let Tried = 0; Tried < 8 && Index < 0; Tried += 1) {
+                const Candidate = await CaptureWindow(Input.window, {}, Tried) as { error?: string; data?: string };
+
+                if (Candidate.error || !Candidate.data) {
+                  break;
+                }
+
+                if (!(CropToMarker(Candidate.data, 1, 1) as { error?: string }).error) {
+                  Index = Tried;
+                }
+              }
+            } finally {
+              await ReachIn("server", "execute", {target: "client", player: Input.player, readOnly: true, timeout: 15, code: `local Gui = game:GetService("Players").LocalPlayer:FindFirstChildOfClass("PlayerGui"):FindFirstChild("ClaudioWindowMarker") if Gui then Gui:Destroy() end game:GetService("RunService").RenderStepped:Wait() return true`});
+            }
+
+            if (Index < 0) {
+              Index = 0;
+              Guessed = ` Claudio could not tell which window is ${Input.player}'s, so this is the first one matching${Input.window ? ` "${Input.window}"` : ""}; check it shows the right player.`;
+            }
+          }
 
           try {
             Taken = await CaptureWindow(Input.window, Marked ? {} : {
@@ -957,7 +1005,7 @@ return {shot = Got and tostring(Got) or nil, bounds = if Hidden then nil else Bo
               y: Input.y,
               width: Input.width,
               height: Input.height,
-            }) as typeof Taken;
+            }, Index) as typeof Taken;
           } finally {
             if (Marked) {
               await Reach("unmark", {});
@@ -972,7 +1020,7 @@ return {shot = Got and tostring(Got) or nil, bounds = if Hidden then nil else Bo
           }
 
           if (!Marked) {
-            return Picture(Taken.data, `${Taken.width}x${Taken.height} of the window "${Taken.title}"${Input.width && Input.height ? `, cropped at ${Input.x || 0}, ${Input.y || 0}` : ""}`);
+            return Picture(Taken.data, `${Taken.width}x${Taken.height} of the window "${Taken.title}"${Input.player && !Guessed ? `, ${Input.player}'s client` : ""}${Input.width && Input.height ? `, cropped at ${Input.x || 0}, ${Input.y || 0}` : ""}.${Guessed}`);
           }
 
           const Cropped = CropToMarker(Taken.data, Marked.width, Marked.height) as { error?: string; data: string; width: number; height: number; x: number; y: number };
@@ -1888,10 +1936,17 @@ return {lines = Kept, scanned = Seen, skipped = Skipped}`}, 40) as { error?: str
       Schema: {
         paths: z.array(z.string()).optional().describe("Instance paths to check, such as ServerScriptService.Main. Each path also covers every script inside it. Omit to check the whole place."),
         exact: z.boolean().optional().describe("Check only the scripts at exactly these paths, not the scripts inside them. Use it on a ModuleScript with many child modules to keep the report short."),
+        files: z.array(z.string()).optional().describe("Instead of the open place, check .luau or .lua files or folders on disk, with no Studio needed. Inside a Rojo project, requires and instance paths resolve through its project file; any other file, such as an executor script, is checked on its own."),
       },
-      Run: async (Input: { paths?: string[]; exact?: boolean }) => ({content: [{
+      Run: async (Input: { paths?: string[]; exact?: boolean; files?: string[] }) => ({content: [{
         type: "text",
-        text: LintReport(await Reach("lint", {paths: Input.paths || [], exact: Input.exact === true})),
+        text: Input.files && Input.files.length > 0
+          ? await import("./Lint.js").then(async (Lint) => {
+            const Found = await Lint.AnalyzeFiles(Input.files!, false);
+
+            return "error" in Found ? Found.error : Found.text;
+          })
+          : LintReport(await Reach("lint", {paths: Input.paths || [], exact: Input.exact === true})),
       }]}),
     },
   ];

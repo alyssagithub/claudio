@@ -115,6 +115,7 @@ public static class Shot {
 $Wanted = $env:CLAUDIO_WINDOW_TITLE
 $Studio = @(Get-Process | Where-Object { $_.Name -like 'RobloxStudio*' } | ForEach-Object { [uint32]$_.Id })
 $Found = [IntPtr]::Zero
+$Seen = 0
 $Titles = New-Object System.Collections.Generic.List[string]
 $Callback = [Shot+EnumWindowsProc]{
   param($Handle, $Extra)
@@ -128,7 +129,8 @@ $Callback = [Shot+EnumWindowsProc]{
   if ($Title.Length -eq 0) { return $true }
   $Titles.Add($Title)
   $Matches = if ($Wanted) { $Title.ToLower().Contains($Wanted.ToLower()) } else { $Title.EndsWith('Roblox Studio') }
-  if ($Matches -and $script:Found -eq [IntPtr]::Zero) { $script:Found = $Handle }
+  if ($Matches) { $script:Seen += 1 }
+  if ($Matches -and $script:Seen -eq [int]$env:CLAUDIO_WINDOW_INDEX + 1) { $script:Found = $Handle }
   return $true
 }
 [void][Shot]::EnumWindows($Callback, [IntPtr]::Zero)
@@ -252,7 +254,7 @@ export function ClickWindow(X: number, Y: number, Button: string): Promise<strin
   });
 }
 
-export function CaptureWindow(Title: string | null | undefined, Crop: CropBox): Promise<WindowShot> {
+export function CaptureWindow(Title: string | null | undefined, Crop: CropBox, Index = 0): Promise<WindowShot> {
   if (process.platform !== "win32") {
     return Promise.resolve({error: "Capturing the Studio window only works on Windows, because it reads the window through Win32. Use the viewport capture instead."});
   }
@@ -267,6 +269,7 @@ export function CaptureWindow(Title: string | null | undefined, Crop: CropBox): 
       env: {
         ...process.env,
         CLAUDIO_WINDOW_TITLE: Title || "",
+        CLAUDIO_WINDOW_INDEX: String(Index),
         CLAUDIO_SHOT_FILE: File,
         CLAUDIO_CROP_X: String(Crop.x || 0),
         CLAUDIO_CROP_Y: String(Crop.y || 0),

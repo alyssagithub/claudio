@@ -33,6 +33,7 @@ end
 const Client = {}
 
 Client.OpenChat = nil :: (() -> string?)?
+Client.OnOpenChat = nil :: ((string) -> ())?
 
 const Boot = game:GetService("HttpService"):GenerateGUID(false)
 const Testing = (script.Parent.Parent :: Instance).Name:match("Testing$") ~= nil
@@ -208,6 +209,10 @@ function Client.WatchSocket(OnJob: (any) -> ())
 		elseif typeof(Data.turn) == "table" and typeof(Data.turn.requestId) == "string" then
 			Pushed[Data.turn.requestId] = Data.turn
 			Arrived:Fire("turn")
+		elseif typeof(Data.open) == "table" and typeof(Data.open.chat) == "string" then
+			if Client.OnOpenChat then
+				task.spawn(Client.OnOpenChat, Data.open.chat)
+			end
 		elseif typeof(Data.event) == "string" then
 			Arrived:Fire(Data.event)
 		end

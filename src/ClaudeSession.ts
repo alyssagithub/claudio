@@ -1712,6 +1712,7 @@ function RouteMessage(Session: Session, Message: any) {
       SessionAllowances.set(Session.Key, SessionAllowances.get(Turn.Id) || new Set());
       SessionAllowances.delete(Turn.Id);
       RememberOwnSession(Message.session_id);
+      setImmediate(() => Broadcast("conversations"));
 
       if (!Quiet.has(Turn.Id)) {
         AddDesktopSession(Message.session_id, Session.WorkingDirectory, StripContext(Turn.Prompt).replace(/\s+/g, " ").trim().slice(0, 60));
@@ -2922,6 +2923,11 @@ export function DescribeTurn(Turn: Turn) {
 
 export async function ForkConversation(ConversationId: string, UpTo: string | null) {
   const Result = await forkSession(ConversationId, UpTo ? {upToMessageId: UpTo} : undefined) as {sessionId?: string};
+
+  if (Result.sessionId) {
+    RememberOwnSession(Result.sessionId);
+    setImmediate(() => Broadcast("conversations"));
+  }
 
   return Result.sessionId;
 }

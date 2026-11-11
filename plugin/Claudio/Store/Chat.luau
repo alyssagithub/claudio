@@ -5578,4 +5578,12 @@ Client.OpenChat = function(): string?
 	return Chat.ConversationId()
 end
 
+Client.OnOpenChat = function(Id: string)
+	if Chat.ConversationId() == Id or Chat.Sending() or Chat.Draft():match("%S") then
+		return
+	end
+
+	Chat.Open(Id)
+end
+
 return Chat

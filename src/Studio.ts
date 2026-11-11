@@ -16,6 +16,26 @@ export function OnBroadcast(Listen: (Message: string) => void): () => void {
   return () => Listeners.delete(Listen);
 }
 
+const Openers = new Set<(Place: string, Chat: string) => boolean>();
+
+export function OnOpenChat(Listen: (Place: string, Chat: string) => boolean): () => void {
+  Openers.add(Listen);
+
+  return () => Openers.delete(Listen);
+}
+
+export function OpenChatIn(Place: string, Chat: string): number {
+  let Sent = 0;
+
+  for (const Open of Openers) {
+    if (Open(Place, Chat)) {
+      Sent += 1;
+    }
+  }
+
+  return Sent;
+}
+
 export function Broadcast(Event: string) {
   const Message = JSON.stringify({event: Event});
 
@@ -389,6 +409,7 @@ export function Presence() {
     peers: [...Heard.entries()].filter(([, At]) => Date.now() - At < 8000).map(([Role]) => Role),
     waiting: Waiting.size,
     queued: Pending.length,
+    windows: LiveWindows().map((Window) => ({place: Window.Place, chat: Window.Chat || null, seenAt: Window.At})),
   };
 }
 
